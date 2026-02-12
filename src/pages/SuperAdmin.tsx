@@ -1,57 +1,79 @@
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { useDarkMode } from '@/lib/useDarkMode';
 import {
   Shield, Key, Users, FileText, Download, Trash2, Check, X,
   Play, Pause, Copy, ChefHat, Clock
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Input } from '@/components/ui/input';
-import {
-  getRestaurants, saveRestaurants, updateRestaurant, deleteRestaurant,
-  getLicenseKeys, generateLicenseKey, exportDatabase,
-  type Restaurant, type LicenseKey
-} from '@/lib/store';
+import { useAuth } from '@/lib/AuthContext';
+import { useDarkMode } from '@/lib/useDarkMode';
+import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 
 type Tab = 'restaurants' | 'licenses' | 'receipts' | 'backup';
 
 const SuperAdmin = () => {
   useDarkMode();
+  const navigate = useNavigate();
+  const { user, isSuperAdmin, loading: authLoading } = useAuth();
   const [tab, setTab] = useState<Tab>('restaurants');
-  const [restaurants, setRestaurants] = useState<Restaurant[]>([]);
-  const [licenses, setLicenses] = useState<LicenseKey[]>([]);
+  const [restaurants, setRestaurants] = useState<any[]>([]);
+  const [licenses, setLicenses] = useState<any[]>([]);
+  const [receipts, setReceipts] = useState<any[]>([]);
   const [duration, setDuration] = useState(30);
 
-  const load = () => {
-    setRestaurants(getRestaurants());
-    setLicenses(getLicenseKeys());
+  useEffect(() => {
+    if (!authLoading && (!user || !isSuperAdmin)) {
+      toast.error('غير مصرح لك بالوصول');
+      navigate('/');
+    }
+  }, [user, isSuperAdmin, authLoading, navigate]);
+
+  const load = async () => {
+    const { data: rests } = await supabase.from('restaurants').select('*').order('created_at', { ascending: false });
+    setRestaurants(rests || []);
+
+    const { data: lics } = await supabase.from('license_keys').select('*').order('created_at', { ascending: false });
+    setLicenses(lics || []);
+
+    const { data: rcpts } = await supabase.from('payment_receipts').select('*, restaurants(name)').order('uploaded_at', { ascending: false });
+    setReceipts(rcpts || []);
   };
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => { if (isSuperAdmin) load(); }, [isSuperAdmin]);
 
-  const handleStatusChange = (id: string, status: Restaurant['status']) => {
-    updateRestaurant(id, { status });
+  const handleStatusChange = async (id: string, status: string) => {
+    await supabase.from('restaurants').update({ status }).eq('id', id);
     load();
     toast.success('تم تحديث الحالة');
   };
 
-  const handleDelete = (id: string) => {
-    deleteRestaurant(id);
+  const handleDelete = async (id: string) => {
+    await supabase.from('restaurants').delete().eq('id', id);
     load();
     toast.success('تم حذف المطعم');
   };
 
-  const handleGenerate = () => {
-    const key = generateLicenseKey(duration);
-    load();
+  const handleGenerate = async () => {
+    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+    const seg = () => Array.from({ length: 4 }, () => chars[Math.floor(Math.random() * chars.length)]).join('');
+    const key = `SR-${seg()}-${seg()}`;
+
+    const { error } = await supabase.from('license_keys').insert({ key, duration_days: duration });
+    if (error) { toast.error('خطأ في إنشاء المفتاح'); return; }
     navigator.clipboard.writeText(key);
     toast.success(`تم إنشاء المفتاح: ${key} (تم النسخ)`);
+    load();
   };
 
-  const handleExport = () => {
-    const data = exportDatabase();
+  const handleExport = async () => {
+    const { data: rests } = await supabase.from('restaurants').select('*');
+    const { data: lics } = await supabase.from('license_keys').select('*');
+    const { data: orders } = await supabase.from('orders').select('*');
+    const { data: items } = await supabase.from('menu_items').select('*');
+    const data = JSON.stringify({ restaurants: rests, license_keys: lics, orders, menu_items: items, exportedAt: new Date().toISOString() }, null, 2);
     const blob = new Blob([data], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -62,20 +84,16 @@ const SuperAdmin = () => {
     toast.success('تم تحميل النسخة الاحتياطية');
   };
 
-  const handleApproveReceipt = (restaurantId: string, receiptId: string) => {
-    const r = restaurants.find(r => r.id === restaurantId);
-    if (!r) return;
-    const receipts = r.paymentReceipts.map(rc =>
-      rc.id === receiptId ? { ...rc, status: 'approved' as const } : rc
-    );
+  const handleApproveReceipt = async (receiptId: string, restaurantId: string) => {
+    await supabase.from('payment_receipts').update({ status: 'approved' }).eq('id', receiptId);
     const endDate = new Date();
     endDate.setDate(endDate.getDate() + 30);
-    updateRestaurant(restaurantId, { paymentReceipts: receipts, status: 'active', subscriptionEnd: endDate.toISOString() });
+    await supabase.from('restaurants').update({ status: 'active', subscription_end: endDate.toISOString() }).eq('id', restaurantId);
     load();
     toast.success('تم الموافقة وتفعيل المطعم');
   };
 
-  const allReceipts = restaurants.flatMap(r => r.paymentReceipts.map(rc => ({ ...rc, restaurantName: r.name })));
+  if (authLoading) return <div className="min-h-screen bg-background flex items-center justify-center"><p className="text-muted-foreground">جاري التحميل...</p></div>;
 
   const tabs: { id: Tab; label: string; icon: typeof Users }[] = [
     { id: 'restaurants', label: 'المطاعم', icon: Users },
@@ -86,30 +104,18 @@ const SuperAdmin = () => {
 
   return (
     <div className="min-h-screen bg-background" dir="rtl">
-      {/* Header */}
       <header className="border-b border-border bg-card">
         <div className="max-w-7xl mx-auto px-4 py-4 flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-destructive/20 flex items-center justify-center">
-            <Shield className="w-6 h-6 text-destructive" />
-          </div>
-          <div>
-            <h1 className="font-display font-bold text-lg">لوحة المدير العام</h1>
-            <p className="text-xs text-muted-foreground">SmartResto Super Admin</p>
-          </div>
+          <div className="w-10 h-10 rounded-xl bg-destructive/20 flex items-center justify-center"><Shield className="w-6 h-6 text-destructive" /></div>
+          <div><h1 className="font-display font-bold text-lg">لوحة المدير العام</h1><p className="text-xs text-muted-foreground">SmartResto Super Admin</p></div>
         </div>
       </header>
 
-      {/* Tabs */}
       <div className="max-w-7xl mx-auto px-4 mt-4">
         <div className="flex gap-2 overflow-x-auto pb-2">
           {tabs.map(t => (
-            <button
-              key={t.id}
-              onClick={() => setTab(t.id)}
-              className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm whitespace-nowrap transition-colors ${
-                tab === t.id ? 'gradient-bg text-primary-foreground' : 'bg-card text-muted-foreground hover:bg-secondary'
-              }`}
-            >
+            <button key={t.id} onClick={() => setTab(t.id)}
+              className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm whitespace-nowrap transition-colors ${tab === t.id ? 'gradient-bg text-primary-foreground' : 'bg-card text-muted-foreground hover:bg-secondary'}`}>
               <t.icon className="w-4 h-4" /> {t.label}
             </button>
           ))}
@@ -117,7 +123,6 @@ const SuperAdmin = () => {
       </div>
 
       <main className="max-w-7xl mx-auto px-4 py-6">
-        {/* Restaurants */}
         {tab === 'restaurants' && (
           <div className="space-y-4">
             <h2 className="font-display text-xl font-bold">المطاعم المسجلة ({restaurants.length})</h2>
@@ -125,35 +130,21 @@ const SuperAdmin = () => {
               <motion.div key={r.id} initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="glass-card p-4">
                 <div className="flex flex-col sm:flex-row sm:items-center gap-4">
                   <div className="flex items-center gap-3 flex-1 min-w-0">
-                    <div className="w-10 h-10 rounded-xl gradient-bg flex items-center justify-center shrink-0">
-                      <ChefHat className="w-5 h-5 text-primary-foreground" />
-                    </div>
+                    <div className="w-10 h-10 rounded-xl gradient-bg flex items-center justify-center shrink-0"><ChefHat className="w-5 h-5 text-primary-foreground" /></div>
                     <div className="min-w-0">
                       <p className="font-bold truncate">{r.name}</p>
-                      <p className="text-xs text-muted-foreground">{r.email} — {r.ownerName}</p>
                       <div className="flex items-center gap-2 mt-1">
                         <Badge className={r.status === 'active' ? 'status-active' : r.status === 'suspended' ? 'status-suspended' : 'status-pending'}>
                           {r.status === 'active' ? 'نشط' : r.status === 'suspended' ? 'موقوف' : 'معلق'}
                         </Badge>
-                        {r.subscriptionEnd && (
-                          <span className="text-xs text-muted-foreground flex items-center gap-1">
-                            <Clock className="w-3 h-3" />
-                            {new Date(r.subscriptionEnd).toLocaleDateString('ar-EG')}
-                          </span>
-                        )}
+                        {r.subscription_end && <span className="text-xs text-muted-foreground flex items-center gap-1"><Clock className="w-3 h-3" />{new Date(r.subscription_end).toLocaleDateString('ar-EG')}</span>}
                       </div>
                     </div>
                   </div>
                   <div className="flex gap-2 flex-wrap">
-                    <Button size="sm" variant="outline" onClick={() => handleStatusChange(r.id, 'active')}>
-                      <Play className="w-3 h-3 ml-1" /> تفعيل
-                    </Button>
-                    <Button size="sm" variant="outline" onClick={() => handleStatusChange(r.id, 'suspended')}>
-                      <Pause className="w-3 h-3 ml-1" /> إيقاف
-                    </Button>
-                    <Button size="sm" variant="outline" className="text-destructive border-destructive/30 hover:bg-destructive/10" onClick={() => handleDelete(r.id)}>
-                      <Trash2 className="w-3 h-3 ml-1" /> حذف
-                    </Button>
+                    <Button size="sm" variant="outline" onClick={() => handleStatusChange(r.id, 'active')}><Play className="w-3 h-3 ml-1" /> تفعيل</Button>
+                    <Button size="sm" variant="outline" onClick={() => handleStatusChange(r.id, 'suspended')}><Pause className="w-3 h-3 ml-1" /> إيقاف</Button>
+                    <Button size="sm" variant="outline" className="text-destructive border-destructive/30 hover:bg-destructive/10" onClick={() => handleDelete(r.id)}><Trash2 className="w-3 h-3 ml-1" /> حذف</Button>
                   </div>
                 </div>
               </motion.div>
@@ -162,41 +153,28 @@ const SuperAdmin = () => {
           </div>
         )}
 
-        {/* License Keys */}
         {tab === 'licenses' && (
           <div className="space-y-6">
             <div className="glass-card p-6">
               <h2 className="font-display text-xl font-bold mb-4">إنشاء مفتاح ترخيص جديد</h2>
               <div className="flex flex-col sm:flex-row gap-3">
-                <select
-                  value={duration}
-                  onChange={e => setDuration(Number(e.target.value))}
-                  className="px-4 py-2 rounded-lg bg-secondary text-secondary-foreground border border-border"
-                >
+                <select value={duration} onChange={e => setDuration(Number(e.target.value))} className="px-4 py-2 rounded-lg bg-secondary text-secondary-foreground border border-border">
                   <option value={30}>30 يوم</option>
                   <option value={180}>180 يوم</option>
                   <option value={365}>365 يوم</option>
                 </select>
-                <Button onClick={handleGenerate} className="gradient-bg text-primary-foreground border-0">
-                  <Key className="w-4 h-4 ml-2" /> إنشاء مفتاح
-                </Button>
+                <Button onClick={handleGenerate} className="gradient-bg text-primary-foreground border-0"><Key className="w-4 h-4 ml-2" /> إنشاء مفتاح</Button>
               </div>
             </div>
-
             <div className="space-y-3">
               <h3 className="font-display font-bold">المفاتيح ({licenses.length})</h3>
               {licenses.map(lic => (
-                <div key={lic.key} className="glass-card p-4 flex flex-col sm:flex-row sm:items-center gap-3">
+                <div key={lic.id} className="glass-card p-4 flex flex-col sm:flex-row sm:items-center gap-3">
                   <code className="font-mono text-sm text-primary flex-1">{lic.key}</code>
                   <div className="flex items-center gap-2 text-sm">
-                    <span className="text-muted-foreground">{lic.duration} يوم</span>
-                    <Badge className={lic.used ? 'status-suspended' : 'status-active'}>
-                      {lic.used ? 'مُستخدم' : 'متاح'}
-                    </Badge>
-                    {lic.usedBy && <span className="text-xs text-muted-foreground">({lic.usedBy})</span>}
-                    <Button size="sm" variant="ghost" onClick={() => { navigator.clipboard.writeText(lic.key); toast.success('تم النسخ'); }}>
-                      <Copy className="w-3 h-3" />
-                    </Button>
+                    <span className="text-muted-foreground">{lic.duration_days} يوم</span>
+                    <Badge className={lic.used ? 'status-suspended' : 'status-active'}>{lic.used ? 'مُستخدم' : 'متاح'}</Badge>
+                    <Button size="sm" variant="ghost" onClick={() => { navigator.clipboard.writeText(lic.key); toast.success('تم النسخ'); }}><Copy className="w-3 h-3" /></Button>
                   </div>
                 </div>
               ))}
@@ -205,15 +183,14 @@ const SuperAdmin = () => {
           </div>
         )}
 
-        {/* Receipts */}
         {tab === 'receipts' && (
           <div className="space-y-4">
-            <h2 className="font-display text-xl font-bold">إيصالات الدفع ({allReceipts.length})</h2>
-            {allReceipts.map(rc => (
+            <h2 className="font-display text-xl font-bold">إيصالات الدفع ({receipts.length})</h2>
+            {receipts.map(rc => (
               <div key={rc.id} className="glass-card p-4 flex flex-col sm:flex-row sm:items-center gap-4">
                 <div className="flex-1 min-w-0">
-                  <p className="font-bold text-sm">{rc.restaurantName}</p>
-                  <p className="text-xs text-muted-foreground">{new Date(rc.uploadedAt).toLocaleString('ar-EG')}</p>
+                  <p className="font-bold text-sm">{rc.restaurants?.name || 'مطعم'}</p>
+                  <p className="text-xs text-muted-foreground">{new Date(rc.uploaded_at).toLocaleString('ar-EG')}</p>
                   <p className="text-xs text-muted-foreground">{rc.method}</p>
                 </div>
                 <Badge className={rc.status === 'approved' ? 'status-active' : rc.status === 'rejected' ? 'status-suspended' : 'status-pending'}>
@@ -221,29 +198,22 @@ const SuperAdmin = () => {
                 </Badge>
                 {rc.status === 'pending' && (
                   <div className="flex gap-2">
-                    <Button size="sm" className="gradient-bg text-primary-foreground border-0" onClick={() => handleApproveReceipt(rc.restaurantId, rc.id)}>
-                      <Check className="w-3 h-3 ml-1" /> موافقة
-                    </Button>
-                    <Button size="sm" variant="outline" className="text-destructive">
-                      <X className="w-3 h-3 ml-1" /> رفض
-                    </Button>
+                    <Button size="sm" className="gradient-bg text-primary-foreground border-0" onClick={() => handleApproveReceipt(rc.id, rc.restaurant_id)}><Check className="w-3 h-3 ml-1" /> موافقة</Button>
+                    <Button size="sm" variant="outline" className="text-destructive"><X className="w-3 h-3 ml-1" /> رفض</Button>
                   </div>
                 )}
               </div>
             ))}
-            {allReceipts.length === 0 && <p className="text-muted-foreground text-center py-12">لا توجد إيصالات</p>}
+            {receipts.length === 0 && <p className="text-muted-foreground text-center py-12">لا توجد إيصالات</p>}
           </div>
         )}
 
-        {/* Backup */}
         {tab === 'backup' && (
           <div className="glass-card p-8 text-center max-w-md mx-auto">
             <Download className="w-16 h-16 text-primary mx-auto mb-4" />
             <h2 className="font-display text-xl font-bold mb-2">نسخة احتياطية</h2>
             <p className="text-muted-foreground mb-6">تحميل نسخة كاملة من قاعدة البيانات بصيغة JSON</p>
-            <Button onClick={handleExport} className="gradient-bg text-primary-foreground border-0" size="lg">
-              <Download className="w-5 h-5 ml-2" /> تحميل النسخة الاحتياطية
-            </Button>
+            <Button onClick={handleExport} className="gradient-bg text-primary-foreground border-0" size="lg"><Download className="w-5 h-5 ml-2" /> تحميل النسخة الاحتياطية</Button>
           </div>
         )}
       </main>

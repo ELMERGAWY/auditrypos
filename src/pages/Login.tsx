@@ -4,23 +4,31 @@ import { ChefHat } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { getRestaurants, setCurrentRestaurantId } from '@/lib/store';
+import { useAuth } from '@/lib/AuthContext';
 import { toast } from 'sonner';
 
 const Login = () => {
   const navigate = useNavigate();
+  const { signIn } = useAuth();
   const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [loading, setLoading] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const restaurant = getRestaurants().find(r => r.email === email);
-    if (!restaurant) {
-      toast.error('لم يتم العثور على حساب بهذا البريد');
+    if (!email || !password) {
+      toast.error('يرجى إدخال البريد وكلمة المرور');
       return;
     }
-    setCurrentRestaurantId(restaurant.id);
-    toast.success(`مرحباً ${restaurant.ownerName}!`);
-    navigate('/dashboard');
+    setLoading(true);
+    const { error } = await signIn(email, password);
+    setLoading(false);
+    if (error) {
+      toast.error(error.message);
+    } else {
+      toast.success('مرحباً بك!');
+      navigate('/dashboard');
+    }
   };
 
   return (
@@ -31,18 +39,21 @@ const Login = () => {
             <ChefHat className="w-8 h-8 text-primary-foreground" />
           </div>
           <h1 className="font-display text-2xl font-bold">تسجيل الدخول</h1>
-          <p className="text-muted-foreground mt-1">ادخل بريدك الإلكتروني للمتابعة</p>
+          <p className="text-muted-foreground mt-1">ادخل بياناتك للمتابعة</p>
         </div>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <Label>البريد الإلكتروني</Label>
             <Input type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="email@example.com" />
           </div>
-          <Button type="submit" className="w-full gradient-bg text-primary-foreground border-0">دخول</Button>
+          <div>
+            <Label>كلمة المرور</Label>
+            <Input type="password" value={password} onChange={e => setPassword(e.target.value)} placeholder="كلمة المرور" />
+          </div>
+          <Button type="submit" className="w-full gradient-bg text-primary-foreground border-0" disabled={loading}>
+            {loading ? 'جاري الدخول...' : 'تسجيل الدخول'}
+          </Button>
         </form>
-        <div className="mt-4 text-center text-sm text-muted-foreground">
-          <p>للتجربة: <button onClick={() => { setEmail('demo@smartresto.com'); }} className="text-primary hover:underline">استخدم الحساب التجريبي</button></p>
-        </div>
         <p className="text-center text-sm text-muted-foreground mt-4">
           ليس لديك حساب?{' '}
           <button onClick={() => navigate('/register')} className="text-primary hover:underline">سجّل الآن</button>
