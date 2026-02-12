@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
+import { useDarkMode } from '@/lib/useDarkMode';
 import {
   Shield, Key, Users, FileText, Download, Trash2, Check, X,
   Play, Pause, Copy, ChefHat, Clock
@@ -17,6 +18,7 @@ import { toast } from 'sonner';
 type Tab = 'restaurants' | 'licenses' | 'receipts' | 'backup';
 
 const SuperAdmin = () => {
+  useDarkMode();
   const [tab, setTab] = useState<Tab>('restaurants');
   const [restaurants, setRestaurants] = useState<Restaurant[]>([]);
   const [licenses, setLicenses] = useState<LicenseKey[]>([]);
@@ -83,7 +85,7 @@ const SuperAdmin = () => {
   ];
 
   return (
-    <div className="min-h-screen bg-background dark" dir="rtl">
+    <div className="min-h-screen bg-background" dir="rtl">
       {/* Header */}
       <header className="border-b border-border bg-card">
         <div className="max-w-7xl mx-auto px-4 py-4 flex items-center gap-3">
