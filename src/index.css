@@ -124,15 +124,24 @@
   }
 
   .status-active {
-    @apply bg-success/20 text-success border border-success/30;
+    @apply border;
+    color: hsl(var(--success));
+    background-color: hsl(var(--success) / 0.2);
+    border-color: hsl(var(--success) / 0.3);
   }
 
   .status-suspended {
-    @apply bg-destructive/20 text-destructive border border-destructive/30;
+    @apply border;
+    color: hsl(var(--destructive));
+    background-color: hsl(var(--destructive) / 0.2);
+    border-color: hsl(var(--destructive) / 0.3);
   }
 
   .status-pending {
-    @apply bg-warning/20 text-warning border border-warning/30;
+    @apply border;
+    color: hsl(var(--warning));
+    background-color: hsl(var(--warning) / 0.2);
+    border-color: hsl(var(--warning) / 0.3);
   }
 
   .sidebar-nav-item {
