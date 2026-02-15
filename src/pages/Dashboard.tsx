@@ -44,6 +44,7 @@ const Dashboard = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [isSuspended, setIsSuspended] = useState(false);
   const [profileName, setProfileName] = useState('');
+  const [dataLoaded, setDataLoaded] = useState(false);
 
   // Menu form
   const [showAddItem, setShowAddItem] = useState(false);
@@ -60,7 +61,7 @@ const Dashboard = () => {
     // Get restaurant
     const { data: rests } = await supabase.from('restaurants').select('*').eq('owner_id', user.id).limit(1);
     const rest = rests?.[0];
-    if (!rest) { setRestaurant(null); return; }
+    if (!rest) { setRestaurant(null); setDataLoaded(true); return; }
     setRestaurant(rest as Restaurant);
 
     // Check subscription
@@ -83,6 +84,7 @@ const Dashboard = () => {
     // Load waiter calls
     const { data: calls } = await supabase.from('waiter_calls').select('*').eq('restaurant_id', rest.id).order('created_at', { ascending: false });
     setWaiterCalls((calls || []) as WaiterCall[]);
+    setDataLoaded(true);
   }, [user]);
 
   useEffect(() => {
@@ -105,7 +107,7 @@ const Dashboard = () => {
     return () => { supabase.removeChannel(channel); };
   }, [restaurant]);
 
-  if (authLoading || (!restaurant && user)) return (
+  if (authLoading || (!dataLoaded && user)) return (
     <div className="min-h-screen bg-background flex items-center justify-center">
       <div className="text-center">
         <div className="w-12 h-12 rounded-xl gradient-bg flex items-center justify-center mx-auto mb-4 animate-pulse">
