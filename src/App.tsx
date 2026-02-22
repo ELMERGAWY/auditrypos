@@ -11,6 +11,8 @@ import Dashboard from "./pages/Dashboard";
 import QRMenu from "./pages/QRMenu";
 import Payment from "./pages/Payment";
 import SuperAdmin from "./pages/SuperAdmin";
+import DriverLogin from "./pages/DriverLogin";
+import DriverDashboard from "./pages/DriverDashboard";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -30,6 +32,8 @@ const App = () => (
             <Route path="/qr-menu/:restaurantId" element={<QRMenu />} />
             <Route path="/payment" element={<Payment />} />
             <Route path="/super-admin-portal" element={<SuperAdmin />} />
+            <Route path="/driver-login" element={<DriverLogin />} />
+            <Route path="/driver" element={<DriverDashboard />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </BrowserRouter>

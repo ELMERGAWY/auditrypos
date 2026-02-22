@@ -1,11 +1,12 @@
 import { useState, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   LayoutGrid, ShoppingCart, QrCode, Bell, Settings, LogOut, ChefHat,
   Plus, Minus, Trash2, Receipt, Wifi, WifiOff, X, Check,
   BarChart3, Pause, Play, Printer, Users, Hash, Percent,
   Clock, TrendingUp, UtensilsCrossed, AlertCircle, CheckCircle,
-  Timer, StickyNote, DollarSign, Truck, CalendarClock, MapPin, Phone
+  Timer, StickyNote, DollarSign, Truck, CalendarClock, MapPin, Phone, Lock, CreditCard
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -30,7 +31,14 @@ function CreateRestaurantForm({ userId, onCreated }: { userId: string; onCreated
   const handleCreate = async () => {
     if (!name.trim()) return;
     setLoading(true);
-    await supabase.from('restaurants').insert({ owner_id: userId, name });
+    const trialEnd = new Date();
+    trialEnd.setDate(trialEnd.getDate() + 14);
+    await supabase.from('restaurants').insert({
+      owner_id: userId,
+      name,
+      status: 'active',
+      subscription_end: trialEnd.toISOString(),
+    });
     setLoading(false);
     onCreated();
   };
@@ -50,6 +58,7 @@ const CHART_COLORS = [
 ];
 
 export default function Dashboard() {
+  const navigate = useNavigate();
   const {
     user, authLoading, isOnline, restaurant, menuItems, setMenuItems,
     orders, setOrders, waiterCalls, setWaiterCalls, agents, setAgents,
@@ -92,6 +101,18 @@ export default function Dashboard() {
   const isSuspended = restaurant
     ? restaurant.status === 'suspended' || (restaurant.subscription_end && new Date(restaurant.subscription_end) < new Date())
     : false;
+
+  // Trial detection: created within 14 days and no license key
+  const isTrial = restaurant
+    ? !restaurant.license_key && restaurant.status === 'active' && restaurant.subscription_end && new Date(restaurant.subscription_end) >= new Date()
+    : false;
+
+  const trialDaysLeft = restaurant?.subscription_end
+    ? Math.max(0, Math.ceil((new Date(restaurant.subscription_end).getTime() - Date.now()) / (1000 * 60 * 60 * 24)))
+    : 0;
+
+  // Features locked during trial
+  const lockedTabs: DashboardTab[] = isTrial ? ['orders', 'delivery', 'shifts', 'stats'] : [];
 
   // Computed — safe with optional chaining
   const currency = restaurant?.currency || 'ج.م';
@@ -269,17 +290,26 @@ export default function Dashboard() {
     setWaiterCalls(prev => prev.map(c => c.id === id ? { ...c, acknowledged: true } : c));
   };
 
-  const tabs: { id: DashboardTab; label: string; icon: typeof LayoutGrid; badge?: number }[] = [
+  const tabs: { id: DashboardTab; label: string; icon: typeof LayoutGrid; badge?: number; locked?: boolean }[] = [
     { id: 'pos', label: 'نقطة البيع', icon: LayoutGrid },
-    { id: 'orders', label: 'الطلبات', icon: Receipt, badge: pendingOrders.length },
-    { id: 'delivery', label: 'المناديب', icon: Truck, badge: deliveryOrders.length },
-    { id: 'shifts', label: 'الشفتات', icon: CalendarClock },
-    { id: 'stats', label: 'الإحصائيات', icon: BarChart3 },
+    { id: 'orders', label: 'الطلبات', icon: Receipt, badge: pendingOrders.length, locked: lockedTabs.includes('orders') },
+    { id: 'delivery', label: 'المناديب', icon: Truck, badge: deliveryOrders.length, locked: lockedTabs.includes('delivery') },
+    { id: 'shifts', label: 'الشفتات', icon: CalendarClock, locked: lockedTabs.includes('shifts') },
+    { id: 'stats', label: 'الإحصائيات', icon: BarChart3, locked: lockedTabs.includes('stats') },
     { id: 'menu', label: 'القائمة', icon: ShoppingCart },
     { id: 'qr', label: 'QR Code', icon: QrCode },
     { id: 'waiter', label: 'ويتر', icon: Bell, badge: unackCalls.length },
     { id: 'settings', label: 'الإعدادات', icon: Settings },
   ];
+
+  const handleTabClick = (tabId: DashboardTab) => {
+    const t = tabs.find(x => x.id === tabId);
+    if (t?.locked) {
+      toast.error('هذه الميزة متاحة بعد الترقية للنسخة المدفوعة');
+      return;
+    }
+    setActiveTab(tabId);
+  };
 
   if (authLoading || !user || !dataLoaded) return (
     <div className="min-h-screen bg-background flex items-center justify-center">
@@ -316,6 +346,9 @@ export default function Dashboard() {
               </div>
               <h2 className="font-display text-2xl font-bold mb-2">الحساب موقوف</h2>
               <p className="text-muted-foreground mb-6">انتهت صلاحية اشتراكك. يرجى تجديد الاشتراك للمتابعة.</p>
+              <Button onClick={() => navigate('/payment')} className="gradient-bg text-primary-foreground border-0">
+                <CreditCard className="w-4 h-4 ml-2" /> تجديد الاشتراك
+              </Button>
             </div>
           </motion.div>
         )}
@@ -400,12 +433,20 @@ export default function Dashboard() {
           </div>
         </div>
         <nav className="flex-1 p-3 space-y-1 overflow-y-auto">
+          {isTrial && (
+            <div className="mb-3 p-3 rounded-lg bg-warning/10 border border-warning/20 text-xs text-center">
+              <p className="font-bold text-warning">🎁 فترة تجريبية</p>
+              <p className="text-muted-foreground">متبقي {trialDaysLeft} يوم</p>
+              <button onClick={() => navigate('/payment')} className="text-primary underline text-xs mt-1">ترقية الآن</button>
+            </div>
+          )}
           {tabs.map(tab => (
-            <button key={tab.id} onClick={() => setActiveTab(tab.id)}
-              className={`sidebar-nav-item w-full ${activeTab === tab.id ? 'active' : ''}`}>
+            <button key={tab.id} onClick={() => handleTabClick(tab.id)}
+              className={`sidebar-nav-item w-full ${activeTab === tab.id ? 'active' : ''} ${tab.locked ? 'opacity-50' : ''}`}>
               <tab.icon className="w-5 h-5" />
               <span className="flex-1 text-right">{tab.label}</span>
-              {tab.badge ? <span className="w-5 h-5 rounded-full gradient-bg text-primary-foreground text-xs flex items-center justify-center">{tab.badge}</span> : null}
+              {tab.locked ? <Lock className="w-3 h-3 text-muted-foreground" /> : null}
+              {tab.badge && !tab.locked ? <span className="w-5 h-5 rounded-full gradient-bg text-primary-foreground text-xs flex items-center justify-center">{tab.badge}</span> : null}
             </button>
           ))}
         </nav>
@@ -431,10 +472,11 @@ export default function Dashboard() {
         <header className="lg:hidden flex items-center gap-2 p-3 border-b border-border overflow-x-auto bg-card shrink-0">
           {restaurant.logo_url && <img src={restaurant.logo_url} alt="logo" className="w-8 h-8 rounded-lg object-contain bg-secondary/50 shrink-0" />}
           {tabs.map(tab => (
-            <button key={tab.id} onClick={() => setActiveTab(tab.id)}
-              className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs whitespace-nowrap transition-colors ${activeTab === tab.id ? 'gradient-bg text-primary-foreground' : 'text-muted-foreground hover:bg-secondary'}`}>
+            <button key={tab.id} onClick={() => handleTabClick(tab.id)}
+              className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs whitespace-nowrap transition-colors ${activeTab === tab.id ? 'gradient-bg text-primary-foreground' : 'text-muted-foreground hover:bg-secondary'} ${tab.locked ? 'opacity-50' : ''}`}>
               <tab.icon className="w-4 h-4" />{tab.label}
-              {tab.badge ? <span className="w-4 h-4 rounded-full bg-destructive text-destructive-foreground text-[10px] flex items-center justify-center">{tab.badge}</span> : null}
+              {tab.locked ? <Lock className="w-3 h-3" /> : null}
+              {tab.badge && !tab.locked ? <span className="w-4 h-4 rounded-full bg-destructive text-destructive-foreground text-[10px] flex items-center justify-center">{tab.badge}</span> : null}
             </button>
           ))}
         </header>

@@ -1,6 +1,6 @@
 import { motion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
-import { ChefHat, Wifi, WifiOff, QrCode, LayoutGrid, Shield, Zap, ArrowRight } from 'lucide-react';
+import { ChefHat, Wifi, WifiOff, QrCode, LayoutGrid, Shield, Zap, ArrowRight, Truck } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
 const features = [
@@ -28,6 +28,9 @@ const Index = () => {
             <span className="font-display text-xl font-bold">SmartResto</span>
           </div>
           <div className="flex gap-3">
+            <Button variant="ghost" onClick={() => navigate('/driver-login')}>
+              <Truck className="w-4 h-4 ml-1" /> دخول المندوب
+            </Button>
             <Button variant="ghost" onClick={() => navigate('/login')}>تسجيل الدخول</Button>
             <Button className="gradient-bg text-primary-foreground border-0" onClick={() => navigate('/register')}>
               ابدأ مجاناً
