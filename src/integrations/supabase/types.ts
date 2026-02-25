@@ -14,6 +14,69 @@ export type Database = {
   }
   public: {
     Tables: {
+      bans: {
+        Row: {
+          ban_level: string
+          banned_at: string
+          banned_by: string
+          created_at: string
+          expires_at: string | null
+          id: string
+          is_active: boolean
+          notes: string
+          reason: string
+          restaurant_id: string
+          target_identifier: string
+          target_name: string
+          target_type: string
+        }
+        Insert: {
+          ban_level: string
+          banned_at?: string
+          banned_by: string
+          created_at?: string
+          expires_at?: string | null
+          id?: string
+          is_active?: boolean
+          notes?: string
+          reason?: string
+          restaurant_id: string
+          target_identifier: string
+          target_name?: string
+          target_type: string
+        }
+        Update: {
+          ban_level?: string
+          banned_at?: string
+          banned_by?: string
+          created_at?: string
+          expires_at?: string | null
+          id?: string
+          is_active?: boolean
+          notes?: string
+          reason?: string
+          restaurant_id?: string
+          target_identifier?: string
+          target_name?: string
+          target_type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "bans_restaurant_id_fkey"
+            columns: ["restaurant_id"]
+            isOneToOne: false
+            referencedRelation: "restaurants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bans_restaurant_id_fkey"
+            columns: ["restaurant_id"]
+            isOneToOne: false
+            referencedRelation: "restaurants_public"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       delivery_agents: {
         Row: {
           created_at: string
