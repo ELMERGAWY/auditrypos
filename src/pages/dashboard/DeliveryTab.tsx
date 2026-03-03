@@ -1,44 +1,16 @@
-import { useState } from 'react';
+import { useState, lazy, Suspense } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { MapContainer, TileLayer, Marker, Popup, useMapEvents } from 'react-leaflet';
-import L from 'leaflet';
-import 'leaflet/dist/leaflet.css';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Label } from '@/components/ui/label';
-import { Plus, Phone, MapPin, Navigation, Copy, Trash2, ExternalLink } from 'lucide-react';
-import type { DeliveryAgent, Order, AgentStatus, AGENT_STATUS_CONFIG } from './types';
+import { Plus, Phone, MapPin, Navigation, Copy, Trash2 } from 'lucide-react';
+import type { DeliveryAgent, Order, AgentStatus } from './types';
 import { AGENT_STATUS_CONFIG as STATUS_CONF } from './types';
 
-// Fix leaflet default icon issue with Vite
-delete (L.Icon.Default.prototype as unknown as Record<string, unknown>)._getIconUrl;
-L.Icon.Default.mergeOptions({
-  iconRetinaUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon-2x.png',
-  iconUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon.png',
-  shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png',
-});
-
-const agentIcon = (status: AgentStatus) => L.divIcon({
-  html: `<div style="background:${status === 'available' ? '#22c55e' : status === 'busy' ? '#f59e0b' : '#6b7280'};width:28px;height:28px;border-radius:50%;border:3px solid white;display:flex;align-items:center;justify-content:center;font-size:14px;box-shadow:0 2px 8px rgba(0,0,0,0.3)">🛵</div>`,
-  iconSize: [28, 28],
-  iconAnchor: [14, 14],
-  className: '',
-});
-
-const customerIcon = L.divIcon({
-  html: `<div style="background:#ef4444;width:28px;height:28px;border-radius:50%;border:3px solid white;display:flex;align-items:center;justify-content:center;font-size:14px;box-shadow:0 2px 8px rgba(0,0,0,0.3)">📍</div>`,
-  iconSize: [28, 28],
-  iconAnchor: [14, 28],
-  className: '',
-});
-
-function MapClickHandler({ onLocationPick }: { onLocationPick: (lat: number, lng: number) => void }) {
-  useMapEvents({ click: (e) => onLocationPick(e.latlng.lat, e.latlng.lng) });
-  return null;
-}
+const DeliveryMap = lazy(() => import('./DeliveryMap'));
 
 interface Props {
   restaurantId: string;
@@ -53,14 +25,11 @@ export function DeliveryTab({ restaurantId, agents, setAgents, deliveryOrders, o
   const [agentForm, setAgentForm] = useState({ name: '', phone: '' });
   const [pickingLocationFor, setPickingLocationFor] = useState<string | null>(null);
   const [pickedLocation, setPickedLocation] = useState<{ lat: number; lng: number } | null>(null);
-  const [mapCenter] = useState<[number, number]>([30.0444, 31.2357]); // Cairo default
 
   const handleAddAgent = async () => {
     if (!agentForm.name) { toast.error('أدخل اسم المندوب'); return; }
     const { data, error } = await supabase.from('delivery_agents').insert({
-      restaurant_id: restaurantId,
-      name: agentForm.name,
-      phone: agentForm.phone,
+      restaurant_id: restaurantId, name: agentForm.name, phone: agentForm.phone,
     }).select().single();
     if (error) { toast.error('خطأ في الإضافة'); return; }
     setAgents([...agents, data as unknown as DeliveryAgent]);
@@ -82,18 +51,12 @@ export function DeliveryTab({ restaurantId, agents, setAgents, deliveryOrders, o
 
   const handleSetLocation = async (agentId: string, lat: number, lng: number) => {
     await supabase.from('delivery_agents').update({
-      current_lat: lat,
-      current_lng: lng,
-      last_location_update: new Date().toISOString(),
+      current_lat: lat, current_lng: lng, last_location_update: new Date().toISOString(),
     }).eq('id', agentId);
     setAgents(agents.map(a => a.id === agentId ? { ...a, current_lat: lat, current_lng: lng } : a));
     setPickingLocationFor(null);
     setPickedLocation(null);
     toast.success('تم تحديث موقع المندوب');
-  };
-
-  const handleMapClick = (lat: number, lng: number) => {
-    setPickedLocation({ lat, lng });
   };
 
   const confirmPickedLocation = () => {
@@ -113,6 +76,7 @@ export function DeliveryTab({ restaurantId, agents, setAgents, deliveryOrders, o
   const agentsWithLocation = agents.filter(a => a.current_lat && a.current_lng);
   const availableAgents = agents.filter(a => a.status === 'available');
   const busyAgents = agents.filter(a => a.status === 'busy');
+  const showMap = agentsWithLocation.length > 0 || pickingLocationFor;
 
   return (
     <div className="p-4 space-y-4">
@@ -158,52 +122,19 @@ export function DeliveryTab({ restaurantId, agents, setAgents, deliveryOrders, o
         )}
       </AnimatePresence>
 
-      {/* Map */}
-      {(agentsWithLocation.length > 0 || pickingLocationFor) && (
-        <div className="glass-card overflow-hidden">
-          <div className="p-3 border-b border-border flex items-center justify-between">
-            <p className="font-bold flex items-center gap-2"><MapPin className="w-4 h-4 text-primary" /> خريطة المناديب</p>
-            {pickingLocationFor && (
-              <div className="flex gap-2 items-center">
-                <p className="text-xs text-muted-foreground">انقر على الخريطة لتحديد الموقع</p>
-                {pickedLocation && (
-                  <Button size="sm" onClick={confirmPickedLocation} className="gradient-bg text-primary-foreground border-0">تأكيد</Button>
-                )}
-                <Button size="sm" variant="outline" onClick={() => { setPickingLocationFor(null); setPickedLocation(null); }}>إلغاء</Button>
-              </div>
-            )}
-          </div>
-          <div style={{ height: 350 }}>
-            <MapContainer center={agentsWithLocation[0] ? [agentsWithLocation[0].current_lat!, agentsWithLocation[0].current_lng!] : mapCenter} zoom={12} style={{ height: '100%', width: '100%' }}>
-              <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" attribution='© OpenStreetMap' />
-              {pickingLocationFor && <MapClickHandler onLocationPick={handleMapClick} />}
-              {pickedLocation && (
-                <Marker position={[pickedLocation.lat, pickedLocation.lng]} icon={customerIcon}>
-                  <Popup>موقع مختار</Popup>
-                </Marker>
-              )}
-              {agentsWithLocation.map(agent => (
-                <Marker key={agent.id} position={[agent.current_lat!, agent.current_lng!]} icon={agentIcon(agent.status)}>
-                  <Popup>
-                    <div className="text-sm font-bold">{agent.name}</div>
-                    <div className="text-xs">{STATUS_CONF[agent.status].label}</div>
-                    {agent.last_location_update && (
-                      <div className="text-xs text-gray-500">آخر تحديث: {new Date(agent.last_location_update).toLocaleTimeString('ar-EG')}</div>
-                    )}
-                  </Popup>
-                </Marker>
-              ))}
-              {deliveryOrders.filter(o => o.delivery_lat && o.delivery_lng).map(o => (
-                <Marker key={o.id} position={[o.delivery_lat!, o.delivery_lng!]} icon={customerIcon}>
-                  <Popup>
-                    <div className="text-sm font-bold">طلب #{o.order_number.slice(-4)}</div>
-                    <div className="text-xs">{o.customer_name} - {o.delivery_address}</div>
-                  </Popup>
-                </Marker>
-              ))}
-            </MapContainer>
-          </div>
-        </div>
+      {/* Map - Lazy loaded */}
+      {showMap && (
+        <Suspense fallback={<div className="glass-card p-8 text-center text-muted-foreground">جاري تحميل الخريطة...</div>}>
+          <DeliveryMap
+            agents={agents}
+            deliveryOrders={deliveryOrders}
+            pickingLocationFor={pickingLocationFor}
+            pickedLocation={pickedLocation}
+            onMapClick={(lat, lng) => setPickedLocation({ lat, lng })}
+            onConfirmLocation={confirmPickedLocation}
+            onCancelPick={() => { setPickingLocationFor(null); setPickedLocation(null); }}
+          />
+        </Suspense>
       )}
 
       {/* Agents List */}
@@ -224,14 +155,12 @@ export function DeliveryTab({ restaurantId, agents, setAgents, deliveryOrders, o
                 {STATUS_CONF[agent.status].label}
               </Badge>
             </div>
-
             {agent.current_lat && (
               <div className="text-xs text-muted-foreground flex items-center gap-1 mb-3">
                 <Navigation className="w-3 h-3" />
                 آخر تحديث: {agent.last_location_update ? new Date(agent.last_location_update).toLocaleTimeString('ar-EG') : 'غير معروف'}
               </div>
             )}
-
             <div className="flex flex-wrap gap-2">
               {(['available', 'busy', 'offline'] as AgentStatus[]).map(s => (
                 <Button key={s} size="sm" variant={agent.status === s ? 'default' : 'outline'}
@@ -271,10 +200,8 @@ export function DeliveryTab({ restaurantId, agents, setAgents, deliveryOrders, o
                   {assignedAgent ? (
                     <Badge className="status-pending">🛵 {assignedAgent.name}</Badge>
                   ) : (
-                    <select
-                      className="text-xs bg-secondary border border-border rounded-lg px-2 py-1"
-                      onChange={e => e.target.value && onAssignAgent(order.id, e.target.value)}
-                      defaultValue="">
+                    <select className="text-xs bg-secondary border border-border rounded-lg px-2 py-1"
+                      onChange={e => e.target.value && onAssignAgent(order.id, e.target.value)} defaultValue="">
                       <option value="">تعيين مندوب...</option>
                       {availableAgents.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
                     </select>
