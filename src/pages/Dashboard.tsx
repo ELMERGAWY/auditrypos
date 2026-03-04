@@ -6,7 +6,8 @@ import {
   Plus, Minus, Trash2, Receipt, Wifi, WifiOff, X, Check,
   BarChart3, Pause, Play, Printer, Users, Hash, Percent,
   Clock, TrendingUp, UtensilsCrossed, AlertCircle, CheckCircle,
-  Timer, StickyNote, DollarSign, Truck, CalendarClock, MapPin, Phone, Lock, CreditCard
+  Timer, StickyNote, DollarSign, Truck, CalendarClock, MapPin, Phone, Lock, CreditCard,
+  Volume2, VolumeX
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -20,6 +21,7 @@ import { ReceiptModalWrapper } from './dashboard/ReceiptModal';
 import { DeliveryTab } from './dashboard/DeliveryTab';
 import { ShiftsTab } from './dashboard/ShiftsTab';
 import { MenuTab } from './dashboard/MenuTab';
+import { TableGrid } from './dashboard/TableGrid';
 import type {
   DashboardTab, OrderStatus, OrderType, MenuItem, Order, OrderItem, HeldInvoice
 } from './dashboard/types';
@@ -63,6 +65,7 @@ export default function Dashboard() {
     user, authLoading, isOnline, restaurant, menuItems, setMenuItems,
     orders, setOrders, waiterCalls, setWaiterCalls, agents, setAgents,
     currentShift, setCurrentShift, profileName, dataLoaded, loadData, handleLogout,
+    soundEnabled, setSoundEnabled,
   } = useDashboardData();
 
   const [activeTab, setActiveTab] = useState<DashboardTab>('pos');
@@ -456,6 +459,11 @@ export default function Dashboard() {
               <CalendarClock className="w-3 h-3" /> شفت مفتوح
             </div>
           )}
+          <button onClick={() => setSoundEnabled(!soundEnabled)}
+            className="sidebar-nav-item w-full">
+            {soundEnabled ? <Volume2 className="w-5 h-5 text-success" /> : <VolumeX className="w-5 h-5 text-muted-foreground" />}
+            <span>{soundEnabled ? 'الصوت مفعّل' : 'الصوت مغلق'}</span>
+          </button>
           <motion.div animate={{ backgroundColor: isOnline ? 'hsl(142 71% 45% / 0.1)' : 'hsl(0 84% 60% / 0.1)' }}
             className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm">
             {isOnline ? <Wifi className="w-4 h-4 text-success" /> : <WifiOff className="w-4 h-4 text-destructive" />}
@@ -507,6 +515,18 @@ export default function Dashboard() {
                     </div>
                   ))}
                 </div>
+
+                {/* Table Grid - only for dine-in */}
+                {orderType === 'dine_in' && (
+                  <div className="glass-card p-4 mb-4">
+                    <TableGrid
+                      orders={orders}
+                      onSelectTable={(num) => setTableNumber(String(num))}
+                      selectedTable={tableNumber}
+                      currency={currency}
+                    />
+                  </div>
+                )}
 
                 {/* Categories */}
                 <div className="flex gap-2 mb-4 overflow-x-auto pb-2">

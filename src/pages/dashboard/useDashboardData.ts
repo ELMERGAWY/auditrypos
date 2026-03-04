@@ -6,12 +6,15 @@ import { useOnlineStatus } from '@/lib/useOnlineStatus';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import type { MenuItem, Order, OrderItem, WaiterCall, Restaurant, DeliveryAgent, Shift } from './types';
+import { useOrderNotificationSound, useWaiterCallSound } from './SoundNotifications';
 
 export function useDashboardData() {
   useDarkMode();
   const navigate = useNavigate();
   const { user, signOut, loading: authLoading } = useAuth();
   const isOnline = useOnlineStatus();
+  const playOrderSound = useOrderNotificationSound();
+  const playWaiterSound = useWaiterCallSound();
 
   const [restaurant, setRestaurant] = useState<Restaurant | null>(null);
   const [menuItems, setMenuItems] = useState<MenuItem[]>([]);
@@ -21,6 +24,7 @@ export function useDashboardData() {
   const [currentShift, setCurrentShift] = useState<Shift | null>(null);
   const [profileName, setProfileName] = useState('');
   const [dataLoaded, setDataLoaded] = useState(false);
+  const [soundEnabled, setSoundEnabled] = useState(true);
 
   const loadData = useCallback(async () => {
     if (!user) return;
@@ -73,7 +77,7 @@ export function useDashboardData() {
     loadData();
   }, [user, authLoading, loadData, navigate]);
 
-  // Realtime: waiter calls + agent locations
+  // Realtime: waiter calls + agent locations + new orders
   useEffect(() => {
     if (!restaurant) return;
     const channel = supabase
@@ -81,8 +85,18 @@ export function useDashboardData() {
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'waiter_calls', filter: `restaurant_id=eq.${restaurant.id}` },
         (payload) => {
           setWaiterCalls(prev => [payload.new as WaiterCall, ...prev]);
-          try { new Audio('data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdW+Jn5+XkH17d3V5fYOGhYN9d3N0eH6EiIeEfnh0dHl/hYmIhYB7d3Z5foSIiIWBfHh2eX6EiIiFgXx4dnl+hIiIhYF8eHZ5foSIiIWBfHh2eX6EiIiFgQ==').play(); } catch {}
-          toast.info('🔔 استدعاء ويتر جديد!');
+          if (soundEnabled) playWaiterSound();
+          toast.info('🔔 استدعاء ويتر جديد!', { duration: 5000 });
+        }
+      )
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'orders', filter: `restaurant_id=eq.${restaurant.id}` },
+        async (payload) => {
+          // Load order items for the new order
+          const { data: items } = await supabase.from('order_items').select('*').eq('order_id', payload.new.id);
+          const newOrder = { ...payload.new, items: (items || []) as OrderItem[] } as unknown as Order;
+          setOrders(prev => [newOrder, ...prev]);
+          if (soundEnabled) playOrderSound();
+          toast.success(`🆕 طلب جديد #${(payload.new as any).order_number?.slice(-4)}`, { duration: 5000 });
         }
       )
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'delivery_agents', filter: `restaurant_id=eq.${restaurant.id}` },
@@ -92,7 +106,7 @@ export function useDashboardData() {
       )
       .subscribe();
     return () => { supabase.removeChannel(channel); };
-  }, [restaurant]);
+  }, [restaurant, soundEnabled, playOrderSound, playWaiterSound]);
 
   const handleLogout = async () => { await signOut(); navigate('/'); };
 
@@ -100,5 +114,6 @@ export function useDashboardData() {
     user, authLoading, isOnline, restaurant, menuItems, setMenuItems,
     orders, setOrders, waiterCalls, setWaiterCalls, agents, setAgents,
     currentShift, setCurrentShift, profileName, dataLoaded, loadData, handleLogout,
+    soundEnabled, setSoundEnabled,
   };
 }
