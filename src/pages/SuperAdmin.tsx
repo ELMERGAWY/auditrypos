@@ -245,11 +245,12 @@ const SuperAdmin = () => {
 
   const tabs: { id: Tab; label: string; icon: typeof Users; badge?: number }[] = [
     { id: 'overview', label: 'نظرة عامة', icon: BarChart3 },
-    { id: 'restaurants', label: 'المطاعم', icon: ChefHat, badge: restaurants.length },
+    { id: 'restaurants', label: 'الأنشطة', icon: Store, badge: restaurants.length },
     { id: 'agents', label: 'المناديب', icon: Truck, badge: stats.activeAgents },
     { id: 'bans', label: 'الحظر', icon: Ban, badge: stats.activeBans },
     { id: 'licenses', label: 'التراخيص', icon: Key },
-    { id: 'receipts', label: 'الإيصالات', icon: FileText, badge: receipts.filter(r => r.status === 'pending').length },
+    { id: 'receipts', label: 'الإيصالات', icon: FileText, badge: stats.pendingReceipts },
+    { id: 'system', label: 'النظام', icon: Database },
     { id: 'backup', label: 'النسخ', icon: Download },
   ];
 
