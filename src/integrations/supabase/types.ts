@@ -77,6 +77,128 @@ export type Database = {
           },
         ]
       }
+      customer_transactions: {
+        Row: {
+          amount: number
+          created_at: string
+          customer_id: string
+          description: string | null
+          id: string
+          order_id: string | null
+          restaurant_id: string
+          type: string
+        }
+        Insert: {
+          amount?: number
+          created_at?: string
+          customer_id: string
+          description?: string | null
+          id?: string
+          order_id?: string | null
+          restaurant_id: string
+          type?: string
+        }
+        Update: {
+          amount?: number
+          created_at?: string
+          customer_id?: string
+          description?: string | null
+          id?: string
+          order_id?: string | null
+          restaurant_id?: string
+          type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "customer_transactions_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "customer_transactions_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "customer_transactions_restaurant_id_fkey"
+            columns: ["restaurant_id"]
+            isOneToOne: false
+            referencedRelation: "restaurants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "customer_transactions_restaurant_id_fkey"
+            columns: ["restaurant_id"]
+            isOneToOne: false
+            referencedRelation: "restaurants_public"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      customers: {
+        Row: {
+          address: string | null
+          balance: number
+          created_at: string
+          credit_limit: number
+          customer_type: string
+          email: string | null
+          id: string
+          name: string
+          notes: string | null
+          phone: string
+          restaurant_id: string
+          updated_at: string
+        }
+        Insert: {
+          address?: string | null
+          balance?: number
+          created_at?: string
+          credit_limit?: number
+          customer_type?: string
+          email?: string | null
+          id?: string
+          name: string
+          notes?: string | null
+          phone?: string
+          restaurant_id: string
+          updated_at?: string
+        }
+        Update: {
+          address?: string | null
+          balance?: number
+          created_at?: string
+          credit_limit?: number
+          customer_type?: string
+          email?: string | null
+          id?: string
+          name?: string
+          notes?: string | null
+          phone?: string
+          restaurant_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "customers_restaurant_id_fkey"
+            columns: ["restaurant_id"]
+            isOneToOne: false
+            referencedRelation: "restaurants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "customers_restaurant_id_fkey"
+            columns: ["restaurant_id"]
+            isOneToOne: false
+            referencedRelation: "restaurants_public"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       delivery_agents: {
         Row: {
           created_at: string
@@ -121,6 +243,51 @@ export type Database = {
           },
           {
             foreignKeyName: "delivery_agents_restaurant_id_fkey"
+            columns: ["restaurant_id"]
+            isOneToOne: false
+            referencedRelation: "restaurants_public"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      expenses: {
+        Row: {
+          amount: number
+          category: string
+          created_at: string
+          date: string
+          description: string | null
+          id: string
+          restaurant_id: string
+        }
+        Insert: {
+          amount?: number
+          category?: string
+          created_at?: string
+          date?: string
+          description?: string | null
+          id?: string
+          restaurant_id: string
+        }
+        Update: {
+          amount?: number
+          category?: string
+          created_at?: string
+          date?: string
+          description?: string | null
+          id?: string
+          restaurant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "expenses_restaurant_id_fkey"
+            columns: ["restaurant_id"]
+            isOneToOne: false
+            referencedRelation: "restaurants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "expenses_restaurant_id_fkey"
             columns: ["restaurant_id"]
             isOneToOne: false
             referencedRelation: "restaurants_public"
@@ -393,6 +560,81 @@ export type Database = {
           },
         ]
       }
+      products: {
+        Row: {
+          available: boolean
+          barcode: string | null
+          category: string
+          cost_price: number
+          created_at: string
+          expiry_date: string | null
+          id: string
+          image: string
+          min_quantity: number
+          name: string
+          price: number
+          quantity: number
+          restaurant_id: string
+          sku: string | null
+          sort_order: number
+          unit: string
+          updated_at: string
+        }
+        Insert: {
+          available?: boolean
+          barcode?: string | null
+          category?: string
+          cost_price?: number
+          created_at?: string
+          expiry_date?: string | null
+          id?: string
+          image?: string
+          min_quantity?: number
+          name: string
+          price?: number
+          quantity?: number
+          restaurant_id: string
+          sku?: string | null
+          sort_order?: number
+          unit?: string
+          updated_at?: string
+        }
+        Update: {
+          available?: boolean
+          barcode?: string | null
+          category?: string
+          cost_price?: number
+          created_at?: string
+          expiry_date?: string | null
+          id?: string
+          image?: string
+          min_quantity?: number
+          name?: string
+          price?: number
+          quantity?: number
+          restaurant_id?: string
+          sku?: string | null
+          sort_order?: number
+          unit?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "products_restaurant_id_fkey"
+            columns: ["restaurant_id"]
+            isOneToOne: false
+            referencedRelation: "restaurants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "products_restaurant_id_fkey"
+            columns: ["restaurant_id"]
+            isOneToOne: false
+            referencedRelation: "restaurants_public"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           created_at: string
@@ -425,6 +667,7 @@ export type Database = {
       }
       restaurants: {
         Row: {
+          business_type: Database["public"]["Enums"]["business_type"]
           created_at: string
           currency: string
           id: string
@@ -437,6 +680,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          business_type?: Database["public"]["Enums"]["business_type"]
           created_at?: string
           currency?: string
           id?: string
@@ -449,6 +693,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          business_type?: Database["public"]["Enums"]["business_type"]
           created_at?: string
           currency?: string
           id?: string
@@ -515,6 +760,112 @@ export type Database = {
           },
           {
             foreignKeyName: "shifts_restaurant_id_fkey"
+            columns: ["restaurant_id"]
+            isOneToOne: false
+            referencedRelation: "restaurants_public"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      stock_movements: {
+        Row: {
+          created_at: string
+          id: string
+          product_id: string
+          quantity: number
+          reason: string | null
+          reference_id: string | null
+          restaurant_id: string
+          type: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          product_id: string
+          quantity?: number
+          reason?: string | null
+          reference_id?: string | null
+          restaurant_id: string
+          type?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          product_id?: string
+          quantity?: number
+          reason?: string | null
+          reference_id?: string | null
+          restaurant_id?: string
+          type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "stock_movements_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "stock_movements_restaurant_id_fkey"
+            columns: ["restaurant_id"]
+            isOneToOne: false
+            referencedRelation: "restaurants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "stock_movements_restaurant_id_fkey"
+            columns: ["restaurant_id"]
+            isOneToOne: false
+            referencedRelation: "restaurants_public"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      suppliers: {
+        Row: {
+          address: string | null
+          balance: number
+          created_at: string
+          email: string | null
+          id: string
+          name: string
+          notes: string | null
+          phone: string
+          restaurant_id: string
+        }
+        Insert: {
+          address?: string | null
+          balance?: number
+          created_at?: string
+          email?: string | null
+          id?: string
+          name: string
+          notes?: string | null
+          phone?: string
+          restaurant_id: string
+        }
+        Update: {
+          address?: string | null
+          balance?: number
+          created_at?: string
+          email?: string | null
+          id?: string
+          name?: string
+          notes?: string | null
+          phone?: string
+          restaurant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "suppliers_restaurant_id_fkey"
+            columns: ["restaurant_id"]
+            isOneToOne: false
+            referencedRelation: "restaurants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "suppliers_restaurant_id_fkey"
             columns: ["restaurant_id"]
             isOneToOne: false
             referencedRelation: "restaurants_public"
@@ -663,6 +1014,15 @@ export type Database = {
     }
     Enums: {
       app_role: "super_admin" | "restaurant_owner"
+      business_type:
+        | "restaurant"
+        | "retail"
+        | "wholesale"
+        | "warehouse"
+        | "cafe"
+        | "grocery"
+        | "pharmacy"
+        | "other"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -791,6 +1151,16 @@ export const Constants = {
   public: {
     Enums: {
       app_role: ["super_admin", "restaurant_owner"],
+      business_type: [
+        "restaurant",
+        "retail",
+        "wholesale",
+        "warehouse",
+        "cafe",
+        "grocery",
+        "pharmacy",
+        "other",
+      ],
     },
   },
 } as const

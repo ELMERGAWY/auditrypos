@@ -7,7 +7,7 @@ import {
   BarChart3, Pause, Play, Printer, Users, Hash, Percent,
   Clock, TrendingUp, UtensilsCrossed, AlertCircle, CheckCircle,
   Timer, StickyNote, DollarSign, Truck, CalendarClock, MapPin, Phone, Lock, CreditCard,
-  Volume2, VolumeX
+  Volume2, VolumeX, Package, Wallet, Store
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -22,6 +22,11 @@ import { DeliveryTab } from './dashboard/DeliveryTab';
 import { ShiftsTab } from './dashboard/ShiftsTab';
 import { MenuTab } from './dashboard/MenuTab';
 import { TableGrid } from './dashboard/TableGrid';
+import { InventoryTab } from './dashboard/InventoryTab';
+import { CustomersTab } from './dashboard/CustomersTab';
+import { SuppliersTab } from './dashboard/SuppliersTab';
+import { ExpensesTab } from './dashboard/ExpensesTab';
+import { BUSINESS_TYPES, BUSINESS_TABS, getBusinessLabel, type BusinessType } from '@/lib/businessTypes';
 import type {
   DashboardTab, OrderStatus, OrderType, MenuItem, Order, OrderItem, HeldInvoice
 } from './dashboard/types';
@@ -29,7 +34,22 @@ import { STATUS_CONFIG, ORDER_TYPE_CONFIG } from './dashboard/types';
 
 function CreateRestaurantForm({ userId, onCreated }: { userId: string; onCreated: () => void }) {
   const [name, setName] = useState('');
+  const [bizType, setBizType] = useState<BusinessType>('restaurant');
   const [loading, setLoading] = useState(false);
+
+  // Check localStorage for pending business from registration
+  useState(() => {
+    const pending = localStorage.getItem('pending_business');
+    if (pending) {
+      try {
+        const { name: bName, type } = JSON.parse(pending);
+        if (bName) setName(bName);
+        if (type) setBizType(type as BusinessType);
+        localStorage.removeItem('pending_business');
+      } catch {}
+    }
+  });
+
   const handleCreate = async () => {
     if (!name.trim()) return;
     setLoading(true);
@@ -40,16 +60,28 @@ function CreateRestaurantForm({ userId, onCreated }: { userId: string; onCreated
       name,
       status: 'active',
       subscription_end: trialEnd.toISOString(),
+      business_type: bizType,
     });
     setLoading(false);
     onCreated();
   };
   return (
-    <div className="flex gap-2">
-      <Input value={name} onChange={e => setName(e.target.value)} placeholder="اسم المطعم أو المحل" />
-      <Button onClick={handleCreate} disabled={loading} className="gradient-bg text-primary-foreground border-0">
-        {loading ? '...' : 'إنشاء'}
-      </Button>
+    <div className="space-y-3">
+      <div className="grid grid-cols-4 gap-2">
+        {(Object.entries(BUSINESS_TYPES) as [BusinessType, typeof BUSINESS_TYPES[BusinessType]][]).slice(0, 8).map(([key, bt]) => (
+          <button key={key} onClick={() => setBizType(key)}
+            className={`p-2 rounded-lg text-center transition-all text-xs ${bizType === key ? 'gradient-bg text-primary-foreground' : 'bg-secondary'}`}>
+            <span className="text-lg block">{bt.icon}</span>
+            {bt.label}
+          </button>
+        ))}
+      </div>
+      <div className="flex gap-2">
+        <Input value={name} onChange={e => setName(e.target.value)} placeholder="اسم النشاط" />
+        <Button onClick={handleCreate} disabled={loading} className="gradient-bg text-primary-foreground border-0">
+          {loading ? '...' : 'إنشاء'}
+        </Button>
+      </div>
     </div>
   );
 }
@@ -293,9 +325,16 @@ export default function Dashboard() {
     setWaiterCalls(prev => prev.map(c => c.id === id ? { ...c, acknowledged: true } : c));
   };
 
-  const tabs: { id: DashboardTab; label: string; icon: typeof LayoutGrid; badge?: number; locked?: boolean }[] = [
+  const businessType = (restaurant?.business_type || 'restaurant') as BusinessType;
+  const allowedTabs = BUSINESS_TABS[businessType] || BUSINESS_TABS.restaurant;
+
+  const allTabs: { id: DashboardTab; label: string; icon: typeof LayoutGrid; badge?: number; locked?: boolean }[] = [
     { id: 'pos', label: 'نقطة البيع', icon: LayoutGrid },
     { id: 'orders', label: 'الطلبات', icon: Receipt, badge: pendingOrders.length, locked: lockedTabs.includes('orders') },
+    { id: 'inventory', label: 'المخزون', icon: Package },
+    { id: 'customers', label: 'العملاء', icon: Users },
+    { id: 'suppliers', label: 'الموردين', icon: Store },
+    { id: 'expenses', label: 'المصروفات', icon: Wallet },
     { id: 'delivery', label: 'المناديب', icon: Truck, badge: deliveryOrders.length, locked: lockedTabs.includes('delivery') },
     { id: 'shifts', label: 'الشفتات', icon: CalendarClock, locked: lockedTabs.includes('shifts') },
     { id: 'stats', label: 'الإحصائيات', icon: BarChart3, locked: lockedTabs.includes('stats') },
@@ -304,6 +343,8 @@ export default function Dashboard() {
     { id: 'waiter', label: 'ويتر', icon: Bell, badge: unackCalls.length },
     { id: 'settings', label: 'الإعدادات', icon: Settings },
   ];
+
+  const tabs = allTabs.filter(t => allowedTabs.includes(t.id));
 
   const handleTabClick = (tabId: DashboardTab) => {
     const t = tabs.find(x => x.id === tabId);
@@ -426,13 +467,13 @@ export default function Dashboard() {
           {restaurant.logo_url ? (
             <img src={restaurant.logo_url} alt="logo" className="w-10 h-10 rounded-xl object-contain bg-secondary/50" />
           ) : (
-            <div className="w-10 h-10 rounded-xl gradient-bg flex items-center justify-center">
-              <ChefHat className="w-6 h-6 text-primary-foreground" />
+            <div className="w-10 h-10 rounded-xl gradient-bg flex items-center justify-center text-lg">
+              {BUSINESS_TYPES[businessType]?.icon || '🏢'}
             </div>
           )}
           <div className="min-w-0">
             <p className="font-display font-bold text-sm truncate">{restaurant.name}</p>
-            <p className="text-xs text-muted-foreground truncate">{profileName}</p>
+            <p className="text-xs text-muted-foreground truncate">{BUSINESS_TYPES[businessType]?.label} — {profileName}</p>
           </div>
         </div>
         <nav className="flex-1 p-3 space-y-1 overflow-y-auto">
@@ -928,6 +969,26 @@ export default function Dashboard() {
             </div>
           )}
 
+          {/* ===================== INVENTORY TAB ===================== */}
+          {activeTab === 'inventory' && (
+            <InventoryTab restaurantId={restaurant.id} currency={currency} />
+          )}
+
+          {/* ===================== CUSTOMERS TAB ===================== */}
+          {activeTab === 'customers' && (
+            <CustomersTab restaurantId={restaurant.id} currency={currency} />
+          )}
+
+          {/* ===================== SUPPLIERS TAB ===================== */}
+          {activeTab === 'suppliers' && (
+            <SuppliersTab restaurantId={restaurant.id} currency={currency} />
+          )}
+
+          {/* ===================== EXPENSES TAB ===================== */}
+          {activeTab === 'expenses' && (
+            <ExpensesTab restaurantId={restaurant.id} currency={currency} />
+          )}
+
           {/* ===================== SETTINGS TAB ===================== */}
           {activeTab === 'settings' && (
             <div className="p-4 max-w-lg space-y-4">
@@ -942,7 +1003,10 @@ export default function Dashboard() {
                     </div>
                   </div>
                 )}
-                <div><p className="text-sm text-muted-foreground">اسم المطعم</p><p className="font-medium">{restaurant.name}</p></div>
+                <div><p className="text-sm text-muted-foreground">نوع النشاط</p>
+                  <p className="font-medium">{BUSINESS_TYPES[businessType]?.icon} {BUSINESS_TYPES[businessType]?.label}</p>
+                </div>
+                <div><p className="text-sm text-muted-foreground">اسم النشاط</p><p className="font-medium">{restaurant.name}</p></div>
                 <div><p className="text-sm text-muted-foreground">المالك</p><p className="font-medium">{profileName}</p></div>
                 <div><p className="text-sm text-muted-foreground">البريد</p><p className="font-medium">{user?.email}</p></div>
                 <div><p className="text-sm text-muted-foreground">العملة</p><p className="font-medium">{restaurant.currency || 'ج.م'}</p></div>

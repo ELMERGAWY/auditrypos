@@ -1,4 +1,4 @@
-export type DashboardTab = 'pos' | 'orders' | 'menu' | 'delivery' | 'shifts' | 'qr' | 'waiter' | 'stats' | 'settings';
+export type DashboardTab = 'pos' | 'orders' | 'menu' | 'delivery' | 'shifts' | 'qr' | 'waiter' | 'stats' | 'settings' | 'inventory' | 'customers' | 'suppliers' | 'expenses';
 export type OrderStatus = 'pending' | 'preparing' | 'ready' | 'completed' | 'cancelled';
 export type OrderType = 'dine_in' | 'takeaway' | 'delivery';
 export type AgentStatus = 'available' | 'busy' | 'offline';
@@ -57,6 +57,7 @@ export interface Restaurant {
   logo_url: string | null;
   currency: string;
   license_key: string | null;
+  business_type: string;
 }
 
 export interface HeldInvoice {

@@ -6,7 +6,8 @@ import {
   Play, Pause, Copy, ChefHat, Clock, BarChart3, TrendingUp,
   Truck, Ban, AlertTriangle, UserX, Search, Filter,
   DollarSign, ShoppingCart, MapPin, Phone, Eye, EyeOff,
-  Calendar, ArrowUpRight, ArrowDownRight, Activity
+  Calendar, ArrowUpRight, ArrowDownRight, Activity,
+  Package, Store, Wallet, Settings, Bell, Globe, Database
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -15,12 +16,13 @@ import { useAuth } from '@/lib/AuthContext';
 import { useDarkMode } from '@/lib/useDarkMode';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { BUSINESS_TYPES, type BusinessType } from '@/lib/businessTypes';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line, Area, AreaChart
 } from 'recharts';
 
-type Tab = 'overview' | 'restaurants' | 'agents' | 'bans' | 'licenses' | 'receipts' | 'backup';
+type Tab = 'overview' | 'restaurants' | 'agents' | 'bans' | 'licenses' | 'receipts' | 'backup' | 'system';
 
 const CHART_COLORS = [
   'hsl(25, 95%, 53%)', 'hsl(38, 92%, 50%)', 'hsl(142, 71%, 45%)',
@@ -95,6 +97,13 @@ const SuperAdmin = () => {
     const busyAgents = agents.filter(a => a.status === 'busy').length;
     const activeBans = bans.filter(b => b.is_active).length;
 
+    // Business type distribution
+    const byBusinessType = Object.entries(BUSINESS_TYPES).map(([key, bt]) => ({
+      name: bt.label,
+      icon: bt.icon,
+      value: restaurants.filter(r => (r.business_type || 'restaurant') === key).length,
+    })).filter(d => d.value > 0);
+
     // Last 7 days revenue
     const last7Days = Array.from({ length: 7 }, (_, i) => {
       const date = new Date(); date.setDate(date.getDate() - (6 - i));
@@ -124,11 +133,22 @@ const SuperAdmin = () => {
     const yesterdayRevenue = orders.filter(o => o.status !== 'cancelled' && new Date(o.created_at).toDateString() === yesterday.toDateString()).reduce((s, o) => s + Number(o.total), 0);
     const revenueChange = yesterdayRevenue > 0 ? ((todayRevenue - yesterdayRevenue) / yesterdayRevenue * 100) : 0;
 
+    // Monthly revenue
+    const thisMonth = orders.filter(o => {
+      const d = new Date(o.created_at);
+      const now = new Date();
+      return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear() && o.status !== 'cancelled';
+    }).reduce((s, o) => s + Number(o.total), 0);
+
     return {
       activeRests, suspendedRests, trialRests, totalRevenue, todayRevenue, todayOrders: todayOrders.length,
-      activeAgents, busyAgents, activeBans, last7Days, revenueByRestaurant, ordersByType, revenueChange
+      activeAgents, busyAgents, activeBans, last7Days, revenueByRestaurant, ordersByType, revenueChange,
+      byBusinessType, thisMonth,
+      totalOrders: orders.length,
+      usedLicenses: licenses.filter(l => l.used).length,
+      pendingReceipts: receipts.filter(r => r.status === 'pending').length,
     };
-  }, [restaurants, orders, agents, bans]);
+  }, [restaurants, orders, agents, bans, licenses, receipts]);
 
   // ===== ACTIONS =====
   const handleStatusChange = async (id: string, status: string) => {
@@ -225,11 +245,12 @@ const SuperAdmin = () => {
 
   const tabs: { id: Tab; label: string; icon: typeof Users; badge?: number }[] = [
     { id: 'overview', label: 'نظرة عامة', icon: BarChart3 },
-    { id: 'restaurants', label: 'المطاعم', icon: ChefHat, badge: restaurants.length },
+    { id: 'restaurants', label: 'الأنشطة', icon: Store, badge: restaurants.length },
     { id: 'agents', label: 'المناديب', icon: Truck, badge: stats.activeAgents },
     { id: 'bans', label: 'الحظر', icon: Ban, badge: stats.activeBans },
     { id: 'licenses', label: 'التراخيص', icon: Key },
-    { id: 'receipts', label: 'الإيصالات', icon: FileText, badge: receipts.filter(r => r.status === 'pending').length },
+    { id: 'receipts', label: 'الإيصالات', icon: FileText, badge: stats.pendingReceipts },
+    { id: 'system', label: 'النظام', icon: Database },
     { id: 'backup', label: 'النسخ', icon: Download },
   ];
 
@@ -267,7 +288,7 @@ const SuperAdmin = () => {
             </div>
             <div>
               <h1 className="font-display font-bold text-lg">لوحة المدير العام</h1>
-              <p className="text-xs text-muted-foreground">SmartResto Super Admin</p>
+              <p className="text-xs text-muted-foreground">SmartPOS Super Admin</p>
             </div>
           </div>
           <div className="flex items-center gap-2">
@@ -678,6 +699,44 @@ const SuperAdmin = () => {
               </div>
             ))}
             {receipts.length === 0 && <p className="text-muted-foreground text-center py-12">لا توجد إيصالات</p>}
+          </div>
+        )}
+
+        {/* ===== SYSTEM TAB ===== */}
+        {tab === 'system' && (
+          <div className="space-y-6">
+            <h2 className="font-display text-xl font-bold">معلومات النظام</h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="glass-card p-5">
+                <h3 className="font-display font-bold mb-4 flex items-center gap-2"><Store className="w-4 h-4 text-primary" /> توزيع الأنشطة حسب النوع</h3>
+                {stats.byBusinessType.length > 0 ? (
+                  <div className="space-y-3">
+                    {stats.byBusinessType.map(bt => (
+                      <div key={bt.name} className="flex items-center gap-3">
+                        <span className="text-xl">{bt.icon}</span>
+                        <span className="text-sm flex-1">{bt.name}</span>
+                        <span className="font-bold text-primary">{bt.value}</span>
+                        <div className="w-24 h-2 bg-secondary rounded-full overflow-hidden">
+                          <div className="h-full gradient-bg rounded-full" style={{ width: `${(bt.value / restaurants.length) * 100}%` }} />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : <p className="text-muted-foreground text-center py-8">لا توجد بيانات</p>}
+              </div>
+              <div className="glass-card p-5">
+                <h3 className="font-display font-bold mb-4 flex items-center gap-2"><Database className="w-4 h-4 text-primary" /> ملخص البيانات</h3>
+                <div className="space-y-3 text-sm">
+                  <div className="flex justify-between py-2 border-b border-border"><span className="text-muted-foreground">إجمالي الأنشطة</span><span className="font-bold">{restaurants.length}</span></div>
+                  <div className="flex justify-between py-2 border-b border-border"><span className="text-muted-foreground">الأنشطة النشطة</span><span className="font-bold text-success">{stats.activeRests}</span></div>
+                  <div className="flex justify-between py-2 border-b border-border"><span className="text-muted-foreground">إجمالي الطلبات</span><span className="font-bold">{stats.totalOrders}</span></div>
+                  <div className="flex justify-between py-2 border-b border-border"><span className="text-muted-foreground">إيرادات الشهر</span><span className="font-bold text-primary">{stats.thisMonth.toLocaleString()} ج.م</span></div>
+                  <div className="flex justify-between py-2 border-b border-border"><span className="text-muted-foreground">التراخيص المُستخدمة</span><span className="font-bold">{stats.usedLicenses} / {licenses.length}</span></div>
+                  <div className="flex justify-between py-2 border-b border-border"><span className="text-muted-foreground">إيصالات معلّقة</span><span className="font-bold text-warning">{stats.pendingReceipts}</span></div>
+                  <div className="flex justify-between py-2"><span className="text-muted-foreground">المناديب</span><span className="font-bold">{agents.length} ({stats.busyAgents} مشغول)</span></div>
+                </div>
+              </div>
+            </div>
           </div>
         )}
 
