@@ -702,6 +702,44 @@ const SuperAdmin = () => {
           </div>
         )}
 
+        {/* ===== SYSTEM TAB ===== */}
+        {tab === 'system' && (
+          <div className="space-y-6">
+            <h2 className="font-display text-xl font-bold">معلومات النظام</h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="glass-card p-5">
+                <h3 className="font-display font-bold mb-4 flex items-center gap-2"><Store className="w-4 h-4 text-primary" /> توزيع الأنشطة حسب النوع</h3>
+                {stats.byBusinessType.length > 0 ? (
+                  <div className="space-y-3">
+                    {stats.byBusinessType.map(bt => (
+                      <div key={bt.name} className="flex items-center gap-3">
+                        <span className="text-xl">{bt.icon}</span>
+                        <span className="text-sm flex-1">{bt.name}</span>
+                        <span className="font-bold text-primary">{bt.value}</span>
+                        <div className="w-24 h-2 bg-secondary rounded-full overflow-hidden">
+                          <div className="h-full gradient-bg rounded-full" style={{ width: `${(bt.value / restaurants.length) * 100}%` }} />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : <p className="text-muted-foreground text-center py-8">لا توجد بيانات</p>}
+              </div>
+              <div className="glass-card p-5">
+                <h3 className="font-display font-bold mb-4 flex items-center gap-2"><Database className="w-4 h-4 text-primary" /> ملخص البيانات</h3>
+                <div className="space-y-3 text-sm">
+                  <div className="flex justify-between py-2 border-b border-border"><span className="text-muted-foreground">إجمالي الأنشطة</span><span className="font-bold">{restaurants.length}</span></div>
+                  <div className="flex justify-between py-2 border-b border-border"><span className="text-muted-foreground">الأنشطة النشطة</span><span className="font-bold text-success">{stats.activeRests}</span></div>
+                  <div className="flex justify-between py-2 border-b border-border"><span className="text-muted-foreground">إجمالي الطلبات</span><span className="font-bold">{stats.totalOrders}</span></div>
+                  <div className="flex justify-between py-2 border-b border-border"><span className="text-muted-foreground">إيرادات الشهر</span><span className="font-bold text-primary">{stats.thisMonth.toLocaleString()} ج.م</span></div>
+                  <div className="flex justify-between py-2 border-b border-border"><span className="text-muted-foreground">التراخيص المُستخدمة</span><span className="font-bold">{stats.usedLicenses} / {licenses.length}</span></div>
+                  <div className="flex justify-between py-2 border-b border-border"><span className="text-muted-foreground">إيصالات معلّقة</span><span className="font-bold text-warning">{stats.pendingReceipts}</span></div>
+                  <div className="flex justify-between py-2"><span className="text-muted-foreground">المناديب</span><span className="font-bold">{agents.length} ({stats.busyAgents} مشغول)</span></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* ===== BACKUP TAB ===== */}
         {tab === 'backup' && (
           <div className="glass-card p-8 text-center max-w-md mx-auto">
