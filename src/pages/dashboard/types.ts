@@ -57,6 +57,7 @@ export interface Restaurant {
   logo_url: string | null;
   currency: string;
   license_key: string | null;
+  business_type: string;
 }
 
 export interface HeldInvoice {
