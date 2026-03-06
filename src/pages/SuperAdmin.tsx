@@ -288,7 +288,7 @@ const SuperAdmin = () => {
             </div>
             <div>
               <h1 className="font-display font-bold text-lg">لوحة المدير العام</h1>
-              <p className="text-xs text-muted-foreground">SmartResto Super Admin</p>
+              <p className="text-xs text-muted-foreground">SmartPOS Super Admin</p>
             </div>
           </div>
           <div className="flex items-center gap-2">
