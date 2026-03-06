@@ -467,13 +467,13 @@ export default function Dashboard() {
           {restaurant.logo_url ? (
             <img src={restaurant.logo_url} alt="logo" className="w-10 h-10 rounded-xl object-contain bg-secondary/50" />
           ) : (
-            <div className="w-10 h-10 rounded-xl gradient-bg flex items-center justify-center">
-              <ChefHat className="w-6 h-6 text-primary-foreground" />
+            <div className="w-10 h-10 rounded-xl gradient-bg flex items-center justify-center text-lg">
+              {BUSINESS_TYPES[businessType]?.icon || '🏢'}
             </div>
           )}
           <div className="min-w-0">
             <p className="font-display font-bold text-sm truncate">{restaurant.name}</p>
-            <p className="text-xs text-muted-foreground truncate">{profileName}</p>
+            <p className="text-xs text-muted-foreground truncate">{BUSINESS_TYPES[businessType]?.label} — {profileName}</p>
           </div>
         </div>
         <nav className="flex-1 p-3 space-y-1 overflow-y-auto">
