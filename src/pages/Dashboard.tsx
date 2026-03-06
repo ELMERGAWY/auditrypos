@@ -34,7 +34,22 @@ import { STATUS_CONFIG, ORDER_TYPE_CONFIG } from './dashboard/types';
 
 function CreateRestaurantForm({ userId, onCreated }: { userId: string; onCreated: () => void }) {
   const [name, setName] = useState('');
+  const [bizType, setBizType] = useState<BusinessType>('restaurant');
   const [loading, setLoading] = useState(false);
+
+  // Check localStorage for pending business from registration
+  useState(() => {
+    const pending = localStorage.getItem('pending_business');
+    if (pending) {
+      try {
+        const { name: bName, type } = JSON.parse(pending);
+        if (bName) setName(bName);
+        if (type) setBizType(type as BusinessType);
+        localStorage.removeItem('pending_business');
+      } catch {}
+    }
+  });
+
   const handleCreate = async () => {
     if (!name.trim()) return;
     setLoading(true);
@@ -45,16 +60,28 @@ function CreateRestaurantForm({ userId, onCreated }: { userId: string; onCreated
       name,
       status: 'active',
       subscription_end: trialEnd.toISOString(),
+      business_type: bizType,
     });
     setLoading(false);
     onCreated();
   };
   return (
-    <div className="flex gap-2">
-      <Input value={name} onChange={e => setName(e.target.value)} placeholder="اسم المطعم أو المحل" />
-      <Button onClick={handleCreate} disabled={loading} className="gradient-bg text-primary-foreground border-0">
-        {loading ? '...' : 'إنشاء'}
-      </Button>
+    <div className="space-y-3">
+      <div className="grid grid-cols-4 gap-2">
+        {(Object.entries(BUSINESS_TYPES) as [BusinessType, typeof BUSINESS_TYPES[BusinessType]][]).slice(0, 8).map(([key, bt]) => (
+          <button key={key} onClick={() => setBizType(key)}
+            className={`p-2 rounded-lg text-center transition-all text-xs ${bizType === key ? 'gradient-bg text-primary-foreground' : 'bg-secondary'}`}>
+            <span className="text-lg block">{bt.icon}</span>
+            {bt.label}
+          </button>
+        ))}
+      </div>
+      <div className="flex gap-2">
+        <Input value={name} onChange={e => setName(e.target.value)} placeholder="اسم النشاط" />
+        <Button onClick={handleCreate} disabled={loading} className="gradient-bg text-primary-foreground border-0">
+          {loading ? '...' : 'إنشاء'}
+        </Button>
+      </div>
     </div>
   );
 }
