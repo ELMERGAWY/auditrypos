@@ -6,7 +6,8 @@ import {
   Play, Pause, Copy, ChefHat, Clock, BarChart3, TrendingUp,
   Truck, Ban, AlertTriangle, UserX, Search, Filter,
   DollarSign, ShoppingCart, MapPin, Phone, Eye, EyeOff,
-  Calendar, ArrowUpRight, ArrowDownRight, Activity
+  Calendar, ArrowUpRight, ArrowDownRight, Activity,
+  Package, Store, Wallet, Settings, Bell, Globe, Database
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -15,12 +16,13 @@ import { useAuth } from '@/lib/AuthContext';
 import { useDarkMode } from '@/lib/useDarkMode';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { BUSINESS_TYPES, type BusinessType } from '@/lib/businessTypes';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line, Area, AreaChart
 } from 'recharts';
 
-type Tab = 'overview' | 'restaurants' | 'agents' | 'bans' | 'licenses' | 'receipts' | 'backup';
+type Tab = 'overview' | 'restaurants' | 'agents' | 'bans' | 'licenses' | 'receipts' | 'backup' | 'system';
 
 const CHART_COLORS = [
   'hsl(25, 95%, 53%)', 'hsl(38, 92%, 50%)', 'hsl(142, 71%, 45%)',
