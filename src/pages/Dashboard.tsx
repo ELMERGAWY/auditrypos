@@ -7,7 +7,7 @@ import {
   BarChart3, Pause, Play, Printer, Users, Hash, Percent,
   Clock, TrendingUp, UtensilsCrossed, AlertCircle, CheckCircle,
   Timer, StickyNote, DollarSign, Truck, CalendarClock, MapPin, Phone, Lock, CreditCard,
-  Volume2, VolumeX
+  Volume2, VolumeX, Package, Wallet, Store
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -22,6 +22,11 @@ import { DeliveryTab } from './dashboard/DeliveryTab';
 import { ShiftsTab } from './dashboard/ShiftsTab';
 import { MenuTab } from './dashboard/MenuTab';
 import { TableGrid } from './dashboard/TableGrid';
+import { InventoryTab } from './dashboard/InventoryTab';
+import { CustomersTab } from './dashboard/CustomersTab';
+import { SuppliersTab } from './dashboard/SuppliersTab';
+import { ExpensesTab } from './dashboard/ExpensesTab';
+import { BUSINESS_TYPES, BUSINESS_TABS, getBusinessLabel, type BusinessType } from '@/lib/businessTypes';
 import type {
   DashboardTab, OrderStatus, OrderType, MenuItem, Order, OrderItem, HeldInvoice
 } from './dashboard/types';
