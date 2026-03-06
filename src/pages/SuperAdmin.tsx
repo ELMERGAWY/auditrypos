@@ -97,6 +97,13 @@ const SuperAdmin = () => {
     const busyAgents = agents.filter(a => a.status === 'busy').length;
     const activeBans = bans.filter(b => b.is_active).length;
 
+    // Business type distribution
+    const byBusinessType = Object.entries(BUSINESS_TYPES).map(([key, bt]) => ({
+      name: bt.label,
+      icon: bt.icon,
+      value: restaurants.filter(r => (r.business_type || 'restaurant') === key).length,
+    })).filter(d => d.value > 0);
+
     // Last 7 days revenue
     const last7Days = Array.from({ length: 7 }, (_, i) => {
       const date = new Date(); date.setDate(date.getDate() - (6 - i));
@@ -126,11 +133,22 @@ const SuperAdmin = () => {
     const yesterdayRevenue = orders.filter(o => o.status !== 'cancelled' && new Date(o.created_at).toDateString() === yesterday.toDateString()).reduce((s, o) => s + Number(o.total), 0);
     const revenueChange = yesterdayRevenue > 0 ? ((todayRevenue - yesterdayRevenue) / yesterdayRevenue * 100) : 0;
 
+    // Monthly revenue
+    const thisMonth = orders.filter(o => {
+      const d = new Date(o.created_at);
+      const now = new Date();
+      return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear() && o.status !== 'cancelled';
+    }).reduce((s, o) => s + Number(o.total), 0);
+
     return {
       activeRests, suspendedRests, trialRests, totalRevenue, todayRevenue, todayOrders: todayOrders.length,
-      activeAgents, busyAgents, activeBans, last7Days, revenueByRestaurant, ordersByType, revenueChange
+      activeAgents, busyAgents, activeBans, last7Days, revenueByRestaurant, ordersByType, revenueChange,
+      byBusinessType, thisMonth,
+      totalOrders: orders.length,
+      usedLicenses: licenses.filter(l => l.used).length,
+      pendingReceipts: receipts.filter(r => r.status === 'pending').length,
     };
-  }, [restaurants, orders, agents, bans]);
+  }, [restaurants, orders, agents, bans, licenses, receipts]);
 
   // ===== ACTIONS =====
   const handleStatusChange = async (id: string, status: string) => {
