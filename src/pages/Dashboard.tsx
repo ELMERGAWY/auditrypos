@@ -942,6 +942,26 @@ export default function Dashboard() {
             </div>
           )}
 
+          {/* ===================== INVENTORY TAB ===================== */}
+          {activeTab === 'inventory' && (
+            <InventoryTab restaurantId={restaurant.id} currency={currency} />
+          )}
+
+          {/* ===================== CUSTOMERS TAB ===================== */}
+          {activeTab === 'customers' && (
+            <CustomersTab restaurantId={restaurant.id} currency={currency} />
+          )}
+
+          {/* ===================== SUPPLIERS TAB ===================== */}
+          {activeTab === 'suppliers' && (
+            <SuppliersTab restaurantId={restaurant.id} currency={currency} />
+          )}
+
+          {/* ===================== EXPENSES TAB ===================== */}
+          {activeTab === 'expenses' && (
+            <ExpensesTab restaurantId={restaurant.id} currency={currency} />
+          )}
+
           {/* ===================== SETTINGS TAB ===================== */}
           {activeTab === 'settings' && (
             <div className="p-4 max-w-lg space-y-4">
@@ -956,7 +976,10 @@ export default function Dashboard() {
                     </div>
                   </div>
                 )}
-                <div><p className="text-sm text-muted-foreground">اسم المطعم</p><p className="font-medium">{restaurant.name}</p></div>
+                <div><p className="text-sm text-muted-foreground">نوع النشاط</p>
+                  <p className="font-medium">{BUSINESS_TYPES[businessType]?.icon} {BUSINESS_TYPES[businessType]?.label}</p>
+                </div>
+                <div><p className="text-sm text-muted-foreground">اسم النشاط</p><p className="font-medium">{restaurant.name}</p></div>
                 <div><p className="text-sm text-muted-foreground">المالك</p><p className="font-medium">{profileName}</p></div>
                 <div><p className="text-sm text-muted-foreground">البريد</p><p className="font-medium">{user?.email}</p></div>
                 <div><p className="text-sm text-muted-foreground">العملة</p><p className="font-medium">{restaurant.currency || 'ج.م'}</p></div>
