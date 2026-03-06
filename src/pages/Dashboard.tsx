@@ -298,9 +298,16 @@ export default function Dashboard() {
     setWaiterCalls(prev => prev.map(c => c.id === id ? { ...c, acknowledged: true } : c));
   };
 
-  const tabs: { id: DashboardTab; label: string; icon: typeof LayoutGrid; badge?: number; locked?: boolean }[] = [
+  const businessType = (restaurant?.business_type || 'restaurant') as BusinessType;
+  const allowedTabs = BUSINESS_TABS[businessType] || BUSINESS_TABS.restaurant;
+
+  const allTabs: { id: DashboardTab; label: string; icon: typeof LayoutGrid; badge?: number; locked?: boolean }[] = [
     { id: 'pos', label: 'نقطة البيع', icon: LayoutGrid },
     { id: 'orders', label: 'الطلبات', icon: Receipt, badge: pendingOrders.length, locked: lockedTabs.includes('orders') },
+    { id: 'inventory', label: 'المخزون', icon: Package },
+    { id: 'customers', label: 'العملاء', icon: Users },
+    { id: 'suppliers', label: 'الموردين', icon: Store },
+    { id: 'expenses', label: 'المصروفات', icon: Wallet },
     { id: 'delivery', label: 'المناديب', icon: Truck, badge: deliveryOrders.length, locked: lockedTabs.includes('delivery') },
     { id: 'shifts', label: 'الشفتات', icon: CalendarClock, locked: lockedTabs.includes('shifts') },
     { id: 'stats', label: 'الإحصائيات', icon: BarChart3, locked: lockedTabs.includes('stats') },
@@ -309,6 +316,8 @@ export default function Dashboard() {
     { id: 'waiter', label: 'ويتر', icon: Bell, badge: unackCalls.length },
     { id: 'settings', label: 'الإعدادات', icon: Settings },
   ];
+
+  const tabs = allTabs.filter(t => allowedTabs.includes(t.id));
 
   const handleTabClick = (tabId: DashboardTab) => {
     const t = tabs.find(x => x.id === tabId);
