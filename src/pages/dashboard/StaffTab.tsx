@@ -58,7 +58,7 @@ export function StaffTab({ restaurantId }: Props) {
 
   const handleDelete = async (id: string) => {
     if (!confirm('حذف هذا الموظف؟')) return;
-    await supabase.from('restaurant_staff').delete().eq('id', id);
+    await (supabase.from as any)('restaurant_staff').delete().eq('id', id);
     toast.success('تم الحذف');
     load();
   };
