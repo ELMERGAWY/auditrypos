@@ -36,7 +36,7 @@ export function StaffTab({ restaurantId }: Props) {
   const [showPin, setShowPin] = useState<string | null>(null);
 
   const load = async () => {
-    const { data } = await supabase.from('restaurant_staff').select('*').eq('restaurant_id', restaurantId).order('created_at', { ascending: false });
+    const { data } = await (supabase.from as any)('restaurant_staff').select('*').eq('restaurant_id', restaurantId).order('created_at', { ascending: false });
     setStaff((data || []) as StaffMember[]);
   };
 
