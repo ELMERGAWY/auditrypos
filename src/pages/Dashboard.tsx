@@ -1008,6 +1008,11 @@ export default function Dashboard() {
             <ExpensesTab restaurantId={restaurant.id} currency={currency} />
           )}
 
+          {/* ===================== STAFF TAB ===================== */}
+          {activeTab === 'staff' && (
+            <StaffTab restaurantId={restaurant.id} />
+          )}
+
           {/* ===================== SETTINGS TAB ===================== */}
           {activeTab === 'settings' && (
             <div className="p-4 max-w-lg space-y-4">

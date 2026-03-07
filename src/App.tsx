@@ -31,6 +31,7 @@ const App = () => (
             <Route path="/register" element={<Register />} />
             <Route path="/dashboard" element={<Dashboard />} />
             <Route path="/qr-menu/:restaurantId" element={<QRMenu />} />
+            <Route path="/store/:restaurantId" element={<StoreFront />} />
             <Route path="/payment" element={<Payment />} />
             <Route path="/super-admin-portal" element={<SuperAdmin />} />
             <Route path="/driver-login" element={<DriverLogin />} />
