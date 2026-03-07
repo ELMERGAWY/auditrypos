@@ -385,7 +385,7 @@ export default function Dashboard() {
   );
 
   return (
-    <div className="min-h-screen bg-background flex" dir="rtl">
+    <div className={`min-h-screen bg-background flex theme-${businessType}`} dir="rtl">
       {/* Suspended Overlay */}
       <AnimatePresence>
         {isSuspended && (
