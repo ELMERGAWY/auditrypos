@@ -9,6 +9,7 @@ import Login from "./pages/Login";
 import Register from "./pages/Register";
 import Dashboard from "./pages/Dashboard";
 import QRMenu from "./pages/QRMenu";
+import StoreFront from "./pages/StoreFront";
 import Payment from "./pages/Payment";
 import SuperAdmin from "./pages/SuperAdmin";
 import DriverLogin from "./pages/DriverLogin";
@@ -30,6 +31,7 @@ const App = () => (
             <Route path="/register" element={<Register />} />
             <Route path="/dashboard" element={<Dashboard />} />
             <Route path="/qr-menu/:restaurantId" element={<QRMenu />} />
+            <Route path="/store/:restaurantId" element={<StoreFront />} />
             <Route path="/payment" element={<Payment />} />
             <Route path="/super-admin-portal" element={<SuperAdmin />} />
             <Route path="/driver-login" element={<DriverLogin />} />

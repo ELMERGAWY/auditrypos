@@ -1,1 +1,7 @@
 project_id = "nmkjyweoagbblkbqavdz"
+
+[functions.driver-api]
+verify_jwt = false
+
+[functions.storefront-order]
+verify_jwt = false

@@ -7,7 +7,7 @@ import {
   BarChart3, Pause, Play, Printer, Users, Hash, Percent,
   Clock, TrendingUp, UtensilsCrossed, AlertCircle, CheckCircle,
   Timer, StickyNote, DollarSign, Truck, CalendarClock, MapPin, Phone, Lock, CreditCard,
-  Volume2, VolumeX, Package, Wallet, Store
+  Volume2, VolumeX, Package, Wallet, Store, UsersRound, Camera
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -26,6 +26,8 @@ import { InventoryTab } from './dashboard/InventoryTab';
 import { CustomersTab } from './dashboard/CustomersTab';
 import { SuppliersTab } from './dashboard/SuppliersTab';
 import { ExpensesTab } from './dashboard/ExpensesTab';
+import { StaffTab } from './dashboard/StaffTab';
+import { BarcodeScanner } from './dashboard/BarcodeScanner';
 import { BUSINESS_TYPES, BUSINESS_TABS, getBusinessLabel, type BusinessType } from '@/lib/businessTypes';
 import type {
   DashboardTab, OrderStatus, OrderType, MenuItem, Order, OrderItem, HeldInvoice
@@ -137,14 +139,18 @@ export default function Dashboard() {
     ? restaurant.status === 'suspended' || (restaurant.subscription_end && new Date(restaurant.subscription_end) < new Date())
     : false;
 
-  // Trial detection: created within 14 days and no license key
+  // Trial detection
   const isTrial = restaurant
-    ? !restaurant.license_key && restaurant.status === 'active' && restaurant.subscription_end && new Date(restaurant.subscription_end) >= new Date()
+    ? restaurant.status === 'active' && restaurant.subscription_end && new Date(restaurant.subscription_end) >= new Date()
+      && (new Date(restaurant.subscription_end).getTime() - new Date().getTime()) <= 15 * 86400000
     : false;
 
   const trialDaysLeft = restaurant?.subscription_end
     ? Math.max(0, Math.ceil((new Date(restaurant.subscription_end).getTime() - Date.now()) / (1000 * 60 * 60 * 24)))
     : 0;
+
+  // Barcode scanner state
+  const [showBarcodeScanner, setShowBarcodeScanner] = useState(false);
 
   // Features locked during trial
   const lockedTabs: DashboardTab[] = isTrial ? ['orders', 'delivery', 'shifts', 'stats'] : [];
@@ -339,8 +345,9 @@ export default function Dashboard() {
     { id: 'shifts', label: 'الشفتات', icon: CalendarClock, locked: lockedTabs.includes('shifts') },
     { id: 'stats', label: 'الإحصائيات', icon: BarChart3, locked: lockedTabs.includes('stats') },
     { id: 'menu', label: 'القائمة', icon: ShoppingCart },
-    { id: 'qr', label: 'QR Code', icon: QrCode },
+    { id: 'qr', label: 'رابط المتجر', icon: QrCode },
     { id: 'waiter', label: 'ويتر', icon: Bell, badge: unackCalls.length },
+    { id: 'staff', label: 'الموظفين', icon: UsersRound },
     { id: 'settings', label: 'الإعدادات', icon: Settings },
   ];
 
@@ -378,7 +385,7 @@ export default function Dashboard() {
   );
 
   return (
-    <div className="min-h-screen bg-background flex" dir="rtl">
+    <div className={`min-h-screen bg-background flex theme-${businessType}`} dir="rtl">
       {/* Suspended Overlay */}
       <AnimatePresence>
         {isSuspended && (
@@ -928,17 +935,29 @@ export default function Dashboard() {
           {/* ===================== QR TAB ===================== */}
           {activeTab === 'qr' && (
             <div className="p-4 flex flex-col items-center">
-              <h2 className="font-display text-xl font-bold mb-6">رمز QR للقائمة</h2>
+              <h2 className="font-display text-xl font-bold mb-6">رابط المتجر الإلكتروني</h2>
               {restaurant.logo_url && (
                 <img src={restaurant.logo_url} alt="logo" className="w-24 h-24 object-contain rounded-2xl mb-4 border border-border" />
               )}
               <div className="glass-card p-8 text-center">
-                <QRCodeSVG value={`${window.location.origin}/qr-menu/${restaurant.id}`} size={220} bgColor="transparent" fgColor="hsl(25, 95%, 53%)" level="H" />
+                <QRCodeSVG value={`${window.location.origin}/store/${restaurant.id}`} size={220} bgColor="transparent" fgColor="hsl(25, 95%, 53%)" level="H" />
                 <p className="text-muted-foreground text-sm mt-4">{restaurant.name}</p>
-                <p className="text-xs text-muted-foreground mt-1 break-all">{window.location.origin}/qr-menu/{restaurant.id}</p>
-                <Button onClick={() => navigator.clipboard.writeText(`${window.location.origin}/qr-menu/${restaurant.id}`).then(() => toast.success('تم نسخ الرابط'))} variant="outline" className="mt-4">
-                  نسخ الرابط
-                </Button>
+                <p className="text-xs text-muted-foreground mt-2">رابط المتجر — شاركه مع عملائك للطلب مباشرة</p>
+                <p className="text-xs text-primary mt-1 break-all font-mono">{window.location.origin}/store/{restaurant.id}</p>
+                <div className="flex gap-2 mt-4 justify-center">
+                  <Button onClick={() => navigator.clipboard.writeText(`${window.location.origin}/store/${restaurant.id}`).then(() => toast.success('تم نسخ الرابط'))} variant="outline">
+                    نسخ الرابط
+                  </Button>
+                  <Button onClick={() => window.open(`${window.location.origin}/store/${restaurant.id}`, '_blank')} className="gradient-bg text-primary-foreground border-0">
+                    معاينة المتجر
+                  </Button>
+                </div>
+              </div>
+              {/* QR Menu link (legacy) */}
+              <div className="glass-card p-4 mt-4 text-center">
+                <p className="text-xs text-muted-foreground mb-2">رابط قائمة QR (للعرض فقط)</p>
+                <QRCodeSVG value={`${window.location.origin}/qr-menu/${restaurant.id}`} size={120} bgColor="transparent" fgColor="hsl(var(--muted-foreground))" level="H" />
+                <p className="text-[10px] text-muted-foreground mt-2 break-all">{window.location.origin}/qr-menu/{restaurant.id}</p>
               </div>
             </div>
           )}
@@ -987,6 +1006,11 @@ export default function Dashboard() {
           {/* ===================== EXPENSES TAB ===================== */}
           {activeTab === 'expenses' && (
             <ExpensesTab restaurantId={restaurant.id} currency={currency} />
+          )}
+
+          {/* ===================== STAFF TAB ===================== */}
+          {activeTab === 'staff' && (
+            <StaffTab restaurantId={restaurant.id} />
           )}
 
           {/* ===================== SETTINGS TAB ===================== */}

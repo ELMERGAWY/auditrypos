@@ -164,4 +164,14 @@
   .floating-btn {
     @apply fixed bottom-6 right-6 z-50 gradient-bg text-primary-foreground rounded-full p-4 shadow-2xl glow-primary;
   }
+
+  /* Business Type Themes */
+  .theme-restaurant { --primary: 25 95% 53%; --accent: 38 92% 50%; --hero-gradient: linear-gradient(135deg, hsl(25,95%,53%), hsl(38,92%,50%)); --ring: 25 95% 53%; }
+  .theme-cafe { --primary: 30 70% 40%; --accent: 25 60% 50%; --hero-gradient: linear-gradient(135deg, hsl(30,70%,40%), hsl(25,60%,50%)); --ring: 30 70% 40%; }
+  .theme-retail { --primary: 210 80% 50%; --accent: 200 70% 55%; --hero-gradient: linear-gradient(135deg, hsl(210,80%,50%), hsl(200,70%,55%)); --ring: 210 80% 50%; }
+  .theme-wholesale { --primary: 142 71% 40%; --accent: 160 60% 45%; --hero-gradient: linear-gradient(135deg, hsl(142,71%,40%), hsl(160,60%,45%)); --ring: 142 71% 40%; }
+  .theme-grocery { --primary: 280 65% 50%; --accent: 300 60% 55%; --hero-gradient: linear-gradient(135deg, hsl(280,65%,50%), hsl(300,60%,55%)); --ring: 280 65% 50%; }
+  .theme-warehouse { --primary: 0 70% 50%; --accent: 15 80% 55%; --hero-gradient: linear-gradient(135deg, hsl(0,70%,50%), hsl(15,80%,55%)); --ring: 0 70% 50%; }
+  .theme-pharmacy { --primary: 170 70% 40%; --accent: 180 65% 45%; --hero-gradient: linear-gradient(135deg, hsl(170,70%,40%), hsl(180,65%,45%)); --ring: 170 70% 40%; }
+  .theme-other { --primary: 220 60% 50%; --accent: 230 55% 55%; --hero-gradient: linear-gradient(135deg, hsl(220,60%,50%), hsl(230,55%,55%)); --ring: 220 60% 50%; }
 }
