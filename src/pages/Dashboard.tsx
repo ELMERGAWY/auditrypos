@@ -345,8 +345,9 @@ export default function Dashboard() {
     { id: 'shifts', label: 'الشفتات', icon: CalendarClock, locked: lockedTabs.includes('shifts') },
     { id: 'stats', label: 'الإحصائيات', icon: BarChart3, locked: lockedTabs.includes('stats') },
     { id: 'menu', label: 'القائمة', icon: ShoppingCart },
-    { id: 'qr', label: 'QR Code', icon: QrCode },
+    { id: 'qr', label: 'رابط المتجر', icon: QrCode },
     { id: 'waiter', label: 'ويتر', icon: Bell, badge: unackCalls.length },
+    { id: 'staff', label: 'الموظفين', icon: UsersRound },
     { id: 'settings', label: 'الإعدادات', icon: Settings },
   ];
 
