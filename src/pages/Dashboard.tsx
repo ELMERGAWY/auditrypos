@@ -139,14 +139,18 @@ export default function Dashboard() {
     ? restaurant.status === 'suspended' || (restaurant.subscription_end && new Date(restaurant.subscription_end) < new Date())
     : false;
 
-  // Trial detection: created within 14 days and no license key
+  // Trial detection
   const isTrial = restaurant
-    ? !restaurant.license_key && restaurant.status === 'active' && restaurant.subscription_end && new Date(restaurant.subscription_end) >= new Date()
+    ? restaurant.status === 'active' && restaurant.subscription_end && new Date(restaurant.subscription_end) >= new Date()
+      && (new Date(restaurant.subscription_end).getTime() - new Date(restaurant.created_at || '').getTime()) <= 15 * 86400000
     : false;
 
   const trialDaysLeft = restaurant?.subscription_end
     ? Math.max(0, Math.ceil((new Date(restaurant.subscription_end).getTime() - Date.now()) / (1000 * 60 * 60 * 24)))
     : 0;
+
+  // Barcode scanner state
+  const [showBarcodeScanner, setShowBarcodeScanner] = useState(false);
 
   // Features locked during trial
   const lockedTabs: DashboardTab[] = isTrial ? ['orders', 'delivery', 'shifts', 'stats'] : [];
