@@ -64,7 +64,7 @@ export function StaffTab({ restaurantId }: Props) {
   };
 
   const handleToggle = async (s: StaffMember) => {
-    await supabase.from('restaurant_staff').update({ is_active: !s.is_active }).eq('id', s.id);
+    await (supabase.from as any)('restaurant_staff').update({ is_active: !s.is_active }).eq('id', s.id);
     load();
   };
 

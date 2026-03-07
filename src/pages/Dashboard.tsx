@@ -142,7 +142,7 @@ export default function Dashboard() {
   // Trial detection
   const isTrial = restaurant
     ? restaurant.status === 'active' && restaurant.subscription_end && new Date(restaurant.subscription_end) >= new Date()
-      && (new Date(restaurant.subscription_end).getTime() - new Date(restaurant.created_at || '').getTime()) <= 15 * 86400000
+      && (new Date(restaurant.subscription_end).getTime() - new Date().getTime()) <= 15 * 86400000
     : false;
 
   const trialDaysLeft = restaurant?.subscription_end
