@@ -935,17 +935,29 @@ export default function Dashboard() {
           {/* ===================== QR TAB ===================== */}
           {activeTab === 'qr' && (
             <div className="p-4 flex flex-col items-center">
-              <h2 className="font-display text-xl font-bold mb-6">رمز QR للقائمة</h2>
+              <h2 className="font-display text-xl font-bold mb-6">رابط المتجر الإلكتروني</h2>
               {restaurant.logo_url && (
                 <img src={restaurant.logo_url} alt="logo" className="w-24 h-24 object-contain rounded-2xl mb-4 border border-border" />
               )}
               <div className="glass-card p-8 text-center">
-                <QRCodeSVG value={`${window.location.origin}/qr-menu/${restaurant.id}`} size={220} bgColor="transparent" fgColor="hsl(25, 95%, 53%)" level="H" />
+                <QRCodeSVG value={`${window.location.origin}/store/${restaurant.id}`} size={220} bgColor="transparent" fgColor="hsl(25, 95%, 53%)" level="H" />
                 <p className="text-muted-foreground text-sm mt-4">{restaurant.name}</p>
-                <p className="text-xs text-muted-foreground mt-1 break-all">{window.location.origin}/qr-menu/{restaurant.id}</p>
-                <Button onClick={() => navigator.clipboard.writeText(`${window.location.origin}/qr-menu/${restaurant.id}`).then(() => toast.success('تم نسخ الرابط'))} variant="outline" className="mt-4">
-                  نسخ الرابط
-                </Button>
+                <p className="text-xs text-muted-foreground mt-2">رابط المتجر — شاركه مع عملائك للطلب مباشرة</p>
+                <p className="text-xs text-primary mt-1 break-all font-mono">{window.location.origin}/store/{restaurant.id}</p>
+                <div className="flex gap-2 mt-4 justify-center">
+                  <Button onClick={() => navigator.clipboard.writeText(`${window.location.origin}/store/${restaurant.id}`).then(() => toast.success('تم نسخ الرابط'))} variant="outline">
+                    نسخ الرابط
+                  </Button>
+                  <Button onClick={() => window.open(`${window.location.origin}/store/${restaurant.id}`, '_blank')} className="gradient-bg text-primary-foreground border-0">
+                    معاينة المتجر
+                  </Button>
+                </div>
+              </div>
+              {/* QR Menu link (legacy) */}
+              <div className="glass-card p-4 mt-4 text-center">
+                <p className="text-xs text-muted-foreground mb-2">رابط قائمة QR (للعرض فقط)</p>
+                <QRCodeSVG value={`${window.location.origin}/qr-menu/${restaurant.id}`} size={120} bgColor="transparent" fgColor="hsl(var(--muted-foreground))" level="H" />
+                <p className="text-[10px] text-muted-foreground mt-2 break-all">{window.location.origin}/qr-menu/{restaurant.id}</p>
               </div>
             </div>
           )}
