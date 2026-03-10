@@ -37,6 +37,7 @@ const App = () => (
             <Route path="/super-admin-portal" element={<SuperAdmin />} />
             <Route path="/driver-login" element={<DriverLogin />} />
             <Route path="/driver" element={<DriverDashboard />} />
+            <Route path="/track/:token" element={<TrackOrder />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </BrowserRouter>
