@@ -14,6 +14,7 @@ import Payment from "./pages/Payment";
 import SuperAdmin from "./pages/SuperAdmin";
 import DriverLogin from "./pages/DriverLogin";
 import DriverDashboard from "./pages/DriverDashboard";
+import TrackOrder from "./pages/TrackOrder";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
