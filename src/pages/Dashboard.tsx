@@ -112,7 +112,10 @@ export default function Dashboard() {
   const [orderNotes, setOrderNotes] = useState('');
   const [discount, setDiscount] = useState('');
   const [discountType, setDiscountType] = useState<'percent' | 'fixed'>('percent');
-  const [orderType, setOrderType] = useState<OrderType>('dine_in');
+  const [orderType, setOrderType] = useState<OrderType>(() => {
+    const bt = 'restaurant'; // will be overridden after restaurant loads
+    return bt === 'restaurant' || bt === 'cafe' ? 'dine_in' : 'pickup' as OrderType;
+  });
   const [deliveryAddress, setDeliveryAddress] = useState('');
   const [selectedDeliveryAgent, setSelectedDeliveryAgent] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('all');
