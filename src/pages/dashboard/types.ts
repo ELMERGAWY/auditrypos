@@ -120,6 +120,7 @@ export const ORDER_TYPE_CONFIG: Record<OrderType, { label: string; icon: string 
   dine_in: { label: 'داخل المحل', icon: '🪑' },
   takeaway: { label: 'تيك أواي', icon: '🛍️' },
   delivery: { label: 'ديليفري', icon: '🛵' },
+  pickup: { label: 'استلام', icon: '🏬' },
 };
 
 export const EMOJI_OPTIONS = ['🍔', '🍕', '🥗', '🍗', '🍟', '🍝', '🧃', '🍰', '🥩', '🌯', '☕', '🍦', '🥤', '🌮', '🍣', '🥘', '🧁', '🍩', '🫕', '🥙', '🍱', '🧆', '🍛', '🫔', '🥐', '🍞'];
