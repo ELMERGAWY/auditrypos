@@ -564,8 +564,8 @@ export default function Dashboard() {
                   ))}
                 </div>
 
-                {/* Table Grid - only for dine-in */}
-                {orderType === 'dine_in' && (
+                {/* Table Grid - only for food sectors with dine_in */}
+                {isFoodSector(businessType) && orderType === 'dine_in' && (
                   <div className="glass-card p-4 mb-4">
                     <TableGrid
                       orders={orders}
