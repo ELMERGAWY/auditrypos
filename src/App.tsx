@@ -14,6 +14,7 @@ import Payment from "./pages/Payment";
 import SuperAdmin from "./pages/SuperAdmin";
 import DriverLogin from "./pages/DriverLogin";
 import DriverDashboard from "./pages/DriverDashboard";
+import TrackOrder from "./pages/TrackOrder";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -36,6 +37,7 @@ const App = () => (
             <Route path="/super-admin-portal" element={<SuperAdmin />} />
             <Route path="/driver-login" element={<DriverLogin />} />
             <Route path="/driver" element={<DriverDashboard />} />
+            <Route path="/track/:token" element={<TrackOrder />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </BrowserRouter>

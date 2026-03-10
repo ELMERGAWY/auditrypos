@@ -1,6 +1,6 @@
 export type DashboardTab = 'pos' | 'orders' | 'menu' | 'delivery' | 'shifts' | 'qr' | 'waiter' | 'stats' | 'settings' | 'inventory' | 'customers' | 'suppliers' | 'expenses' | 'staff';
 export type OrderStatus = 'pending' | 'preparing' | 'ready' | 'completed' | 'cancelled';
-export type OrderType = 'dine_in' | 'takeaway' | 'delivery';
+export type OrderType = 'dine_in' | 'takeaway' | 'delivery' | 'pickup';
 export type AgentStatus = 'available' | 'busy' | 'offline';
 
 export interface MenuItem {
@@ -120,6 +120,7 @@ export const ORDER_TYPE_CONFIG: Record<OrderType, { label: string; icon: string 
   dine_in: { label: 'داخل المحل', icon: '🪑' },
   takeaway: { label: 'تيك أواي', icon: '🛍️' },
   delivery: { label: 'ديليفري', icon: '🛵' },
+  pickup: { label: 'استلام', icon: '🏬' },
 };
 
 export const EMOJI_OPTIONS = ['🍔', '🍕', '🥗', '🍗', '🍟', '🍝', '🧃', '🍰', '🥩', '🌯', '☕', '🍦', '🥤', '🌮', '🍣', '🥘', '🧁', '🍩', '🫕', '🥙', '🍱', '🧆', '🍛', '🫔', '🥐', '🍞'];

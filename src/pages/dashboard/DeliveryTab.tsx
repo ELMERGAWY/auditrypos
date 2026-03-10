@@ -65,12 +65,18 @@ export function DeliveryTab({ restaurantId, agents, setAgents, deliveryOrders, o
     }
   };
 
-  const generateTrackingLink = async (orderId: string) => {
+  const generateTrackingLink = async (orderId: string, customerPhone?: string) => {
     const token = crypto.randomUUID();
     await supabase.from('orders').update({ tracking_token: token }).eq('id', orderId);
     const link = `${window.location.origin}/track/${token}`;
     navigator.clipboard.writeText(link);
-    toast.success('تم نسخ رابط التتبع! شاركه مع العميل');
+    toast.success('تم نسخ رابط التتبع!');
+    // Open WhatsApp if phone available
+    if (customerPhone) {
+      const phone = customerPhone.replace(/^0/, '20'); // Egypt format
+      const text = `تتبع طلبك من هنا:\n${link}`;
+      window.open(`https://wa.me/${phone}?text=${encodeURIComponent(text)}`, '_blank');
+    }
   };
 
   const agentsWithLocation = agents.filter(a => a.current_lat && a.current_lng);
@@ -206,8 +212,8 @@ export function DeliveryTab({ restaurantId, agents, setAgents, deliveryOrders, o
                       {availableAgents.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
                     </select>
                   )}
-                  <Button size="sm" variant="outline" className="text-primary" onClick={() => generateTrackingLink(order.id)}>
-                    <Copy className="w-3 h-3 ml-1" /> نسخ رابط التتبع
+                  <Button size="sm" variant="outline" className="text-primary" onClick={() => generateTrackingLink(order.id, order.customer_phone)}>
+                    <Copy className="w-3 h-3 ml-1" /> إرسال رابط التتبع
                   </Button>
                 </div>
               </div>
