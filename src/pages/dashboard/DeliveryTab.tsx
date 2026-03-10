@@ -212,8 +212,8 @@ export function DeliveryTab({ restaurantId, agents, setAgents, deliveryOrders, o
                       {availableAgents.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
                     </select>
                   )}
-                  <Button size="sm" variant="outline" className="text-primary" onClick={() => generateTrackingLink(order.id)}>
-                    <Copy className="w-3 h-3 ml-1" /> نسخ رابط التتبع
+                  <Button size="sm" variant="outline" className="text-primary" onClick={() => generateTrackingLink(order.id, order.customer_phone)}>
+                    <Copy className="w-3 h-3 ml-1" /> إرسال رابط التتبع
                   </Button>
                 </div>
               </div>
