@@ -624,15 +624,19 @@ export default function Dashboard() {
                     </div>
                   </div>
 
-                  {/* Order Type selector */}
+                  {/* Order Type selector - sector specific */}
                   <div className="flex gap-1 rounded-lg bg-secondary p-1">
-                    {(['dine_in', 'takeaway', 'delivery'] as OrderType[]).map(t => (
-                      <button key={t} onClick={() => setOrderType(t)}
-                        className={`flex-1 flex items-center justify-center gap-1 py-1.5 rounded-md text-xs transition-all ${orderType === t ? 'gradient-bg text-primary-foreground' : 'text-muted-foreground'}`}>
-                        <span>{ORDER_TYPE_CONFIG[t].icon}</span>
-                        <span>{ORDER_TYPE_CONFIG[t].label}</span>
-                      </button>
-                    ))}
+                    {(BUSINESS_TYPES[businessType]?.orderTypes || ['pickup', 'delivery']).map(t => {
+                      const label = t === 'dine_in' ? 'داخلي' : t === 'takeaway' ? 'تيك أواي' : t === 'delivery' ? 'توصيل' : 'استلام';
+                      const icon = t === 'dine_in' ? '🍽️' : t === 'takeaway' ? '🛍️' : t === 'delivery' ? '🛵' : '🏬';
+                      return (
+                        <button key={t} onClick={() => setOrderType(t as OrderType)}
+                          className={`flex-1 flex items-center justify-center gap-1 py-1.5 rounded-md text-xs transition-all ${orderType === t ? 'gradient-bg text-primary-foreground' : 'text-muted-foreground'}`}>
+                          <span>{icon}</span>
+                          <span>{label}</span>
+                        </button>
+                      );
+                    })}
                   </div>
                 </div>
 
