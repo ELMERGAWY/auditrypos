@@ -1025,15 +1025,36 @@ export default function Dashboard() {
             <div className="p-4 max-w-lg space-y-4">
               <h2 className="font-display text-xl font-bold">الإعدادات</h2>
               <div className="glass-card p-4 space-y-3">
-                {restaurant.logo_url && (
-                  <div className="flex items-center gap-3 pb-3 border-b border-border">
-                    <img src={restaurant.logo_url} alt="logo" className="w-16 h-16 object-contain rounded-xl border border-border" />
-                    <div>
-                      <p className="font-bold">{restaurant.name}</p>
-                      <p className="text-xs text-muted-foreground">يمكنك تغيير الشعار من تبويب القائمة</p>
+                {/* Logo Upload */}
+                <div className="flex items-center gap-4 pb-3 border-b border-border">
+                  {restaurant.logo_url ? (
+                    <img src={restaurant.logo_url} alt="logo" className="w-20 h-20 object-contain rounded-xl border border-border" />
+                  ) : (
+                    <div className="w-20 h-20 rounded-xl bg-secondary flex items-center justify-center text-3xl">
+                      {BUSINESS_TYPES[businessType]?.icon || '🏢'}
                     </div>
+                  )}
+                  <div className="flex-1">
+                    <p className="font-bold mb-1">{restaurant.name}</p>
+                    <label className="cursor-pointer">
+                      <input type="file" accept="image/*" className="hidden" onChange={async (e) => {
+                        const file = e.target.files?.[0];
+                        if (!file) return;
+                        const ext = file.name.split('.').pop();
+                        const path = `logos/${restaurant.id}.${ext}`;
+                        const { error: upErr } = await supabase.storage.from('restaurant-assets').upload(path, file, { upsert: true });
+                        if (upErr) { toast.error('خطأ في رفع الشعار'); return; }
+                        const { data: urlData } = supabase.storage.from('restaurant-assets').getPublicUrl(path);
+                        await supabase.from('restaurants').update({ logo_url: urlData.publicUrl }).eq('id', restaurant.id);
+                        toast.success('تم تحديث الشعار');
+                        loadData();
+                      }} />
+                      <span className="text-sm text-primary hover:underline cursor-pointer">
+                        {restaurant.logo_url ? 'تغيير الشعار' : 'رفع شعار'}
+                      </span>
+                    </label>
                   </div>
-                )}
+                </div>
                 <div><p className="text-sm text-muted-foreground">نوع النشاط</p>
                   <p className="font-medium">{BUSINESS_TYPES[businessType]?.icon} {BUSINESS_TYPES[businessType]?.label}</p>
                 </div>
@@ -1048,6 +1069,16 @@ export default function Dashboard() {
                   <div><p className="text-sm text-muted-foreground">ينتهي في</p><p className="font-medium">{new Date(restaurant.subscription_end).toLocaleDateString('ar-EG')}</p></div>
                 )}
                 <div><p className="text-sm text-muted-foreground">المناديب المسجلون</p><p className="font-medium">{agents.length} مندوب</p></div>
+                {/* Store Link */}
+                <div className="pt-3 border-t border-border">
+                  <p className="text-sm text-muted-foreground mb-1">رابط المتجر الإلكتروني</p>
+                  <div className="flex gap-2">
+                    <code className="text-xs bg-secondary px-2 py-1 rounded flex-1 truncate">{window.location.origin}/store/{restaurant.id}</code>
+                    <Button size="sm" variant="outline" onClick={() => navigator.clipboard.writeText(`${window.location.origin}/store/${restaurant.id}`).then(() => toast.success('تم نسخ الرابط'))}>
+                      نسخ
+                    </Button>
+                  </div>
+                </div>
               </div>
             </div>
           )}
