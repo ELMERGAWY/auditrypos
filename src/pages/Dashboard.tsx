@@ -28,7 +28,7 @@ import { SuppliersTab } from './dashboard/SuppliersTab';
 import { ExpensesTab } from './dashboard/ExpensesTab';
 import { StaffTab } from './dashboard/StaffTab';
 import { BarcodeScanner } from './dashboard/BarcodeScanner';
-import { BUSINESS_TYPES, BUSINESS_TABS, getBusinessLabel, type BusinessType } from '@/lib/businessTypes';
+import { BUSINESS_TYPES, BUSINESS_TABS, getBusinessLabel, isFoodSector, type BusinessType } from '@/lib/businessTypes';
 import type {
   DashboardTab, OrderStatus, OrderType, MenuItem, Order, OrderItem, HeldInvoice
 } from './dashboard/types';
