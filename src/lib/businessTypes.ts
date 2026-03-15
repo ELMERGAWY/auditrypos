@@ -7,7 +7,10 @@ export interface BusinessTypeConfig {
   features: string[];
   color: string;
   theme: { primary: string; accent: string; gradient: string };
-  orderTypes: string[]; // which order types this sector supports
+  orderTypes: string[];
+  menuLabel: string; // contextual label for the menu/catalog tab
+  itemLabel: string; // what items are called (أصناف، خدمات، منتجات)
+  orderLabel: string; // what orders are called
 }
 
 export const BUSINESS_TYPES: Record<BusinessType, BusinessTypeConfig> = {
@@ -19,6 +22,9 @@ export const BUSINESS_TYPES: Record<BusinessType, BusinessTypeConfig> = {
     color: 'hsl(25, 95%, 53%)',
     theme: { primary: '25 95% 53%', accent: '38 92% 50%', gradient: 'linear-gradient(135deg, hsl(25, 95%, 53%), hsl(38, 92%, 50%))' },
     orderTypes: ['dine_in', 'takeaway', 'delivery'],
+    menuLabel: 'القائمة',
+    itemLabel: 'صنف',
+    orderLabel: 'طلب',
   },
   cafe: {
     label: 'كافيه',
@@ -28,15 +34,21 @@ export const BUSINESS_TYPES: Record<BusinessType, BusinessTypeConfig> = {
     color: 'hsl(30, 70%, 40%)',
     theme: { primary: '30 70% 40%', accent: '25 60% 50%', gradient: 'linear-gradient(135deg, hsl(30, 70%, 40%), hsl(25, 60%, 50%))' },
     orderTypes: ['dine_in', 'takeaway', 'delivery'],
+    menuLabel: 'القائمة',
+    itemLabel: 'صنف',
+    orderLabel: 'طلب',
   },
   retail: {
     label: 'تجزئة',
     icon: '🏪',
     description: 'محلات ملابس، إلكترونيات، أحذية',
-    features: ['باركود', 'إدارة مخزون', 'حسابات عملاء', 'فواتير ضريبية'],
+    features: ['باركود', 'إدارة مخزون', 'حسابات عملاء', 'فواتير'],
     color: 'hsl(210, 80%, 50%)',
     theme: { primary: '210 80% 50%', accent: '200 70% 55%', gradient: 'linear-gradient(135deg, hsl(210, 80%, 50%), hsl(200, 70%, 55%))' },
     orderTypes: ['pickup', 'delivery'],
+    menuLabel: 'المنتجات',
+    itemLabel: 'منتج',
+    orderLabel: 'فاتورة',
   },
   wholesale: {
     label: 'جملة',
@@ -46,6 +58,9 @@ export const BUSINESS_TYPES: Record<BusinessType, BusinessTypeConfig> = {
     color: 'hsl(142, 71%, 40%)',
     theme: { primary: '142 71% 40%', accent: '160 60% 45%', gradient: 'linear-gradient(135deg, hsl(142, 71%, 40%), hsl(160, 60%, 45%))' },
     orderTypes: ['pickup', 'delivery'],
+    menuLabel: 'المنتجات',
+    itemLabel: 'منتج',
+    orderLabel: 'فاتورة',
   },
   grocery: {
     label: 'بقالة / سوبر ماركت',
@@ -55,6 +70,9 @@ export const BUSINESS_TYPES: Record<BusinessType, BusinessTypeConfig> = {
     color: 'hsl(280, 65%, 50%)',
     theme: { primary: '280 65% 50%', accent: '300 60% 55%', gradient: 'linear-gradient(135deg, hsl(280, 65%, 50%), hsl(300, 60%, 55%))' },
     orderTypes: ['pickup', 'delivery'],
+    menuLabel: 'المنتجات',
+    itemLabel: 'منتج',
+    orderLabel: 'طلب',
   },
   warehouse: {
     label: 'مخزن / مستودع',
@@ -64,6 +82,9 @@ export const BUSINESS_TYPES: Record<BusinessType, BusinessTypeConfig> = {
     color: 'hsl(0, 70%, 50%)',
     theme: { primary: '0 70% 50%', accent: '15 80% 55%', gradient: 'linear-gradient(135deg, hsl(0, 70%, 50%), hsl(15, 80%, 55%))' },
     orderTypes: ['pickup', 'delivery'],
+    menuLabel: 'المنتجات',
+    itemLabel: 'منتج',
+    orderLabel: 'طلب شحن',
   },
   pharmacy: {
     label: 'صيدلية',
@@ -73,15 +94,21 @@ export const BUSINESS_TYPES: Record<BusinessType, BusinessTypeConfig> = {
     color: 'hsl(170, 70%, 40%)',
     theme: { primary: '170 70% 40%', accent: '180 65% 45%', gradient: 'linear-gradient(135deg, hsl(170, 70%, 40%), hsl(180, 65%, 45%))' },
     orderTypes: ['pickup', 'delivery'],
+    menuLabel: 'الأدوية',
+    itemLabel: 'دواء',
+    orderLabel: 'طلب',
   },
   services: {
     label: 'خدمات',
     icon: '🧺',
     description: 'مغاسل ملابس، صيانة، خدمات متنوعة',
-    features: ['إدارة طلبات', 'حسابات عملاء', 'توصيل', 'تتبع حالة الخدمة'],
+    features: ['إدارة خدمات', 'حسابات عملاء', 'توصيل', 'تتبع حالة الخدمة'],
     color: 'hsl(45, 85%, 50%)',
-    theme: { primary: '45 85% 50%', accent: '55 80% 55%', gradient: 'linear-gradient(135deg, hsl(45, 85%, 50%), hsl(55, 80%, 55%))' },
+    theme: { primary: '45 85% 50%', accent: '55 80% 55%', gradient: 'linear-gradient(135deg, hsl(45, 85%, 50%), hsl(55, 80% 55%))' },
     orderTypes: ['pickup', 'delivery'],
+    menuLabel: 'الخدمات',
+    itemLabel: 'خدمة',
+    orderLabel: 'طلب خدمة',
   },
   other: {
     label: 'نشاط آخر',
@@ -91,23 +118,26 @@ export const BUSINESS_TYPES: Record<BusinessType, BusinessTypeConfig> = {
     color: 'hsl(220, 60%, 50%)',
     theme: { primary: '220 60% 50%', accent: '230 55% 55%', gradient: 'linear-gradient(135deg, hsl(220, 60%, 50%), hsl(230, 55%, 55%))' },
     orderTypes: ['pickup', 'delivery'],
+    menuLabel: 'المنتجات',
+    itemLabel: 'منتج',
+    orderLabel: 'طلب',
   },
 };
 
-// Food sectors get menu/waiter/qr, all sectors get delivery
+// Tab configuration per business type
 export const BUSINESS_TABS: Record<BusinessType, string[]> = {
-  restaurant: ['pos', 'orders', 'menu', 'delivery', 'shifts', 'stats', 'qr', 'waiter', 'inventory', 'customers', 'expenses', 'staff', 'settings'],
-  cafe: ['pos', 'orders', 'menu', 'delivery', 'shifts', 'stats', 'qr', 'waiter', 'inventory', 'customers', 'expenses', 'staff', 'settings'],
-  retail: ['pos', 'orders', 'inventory', 'delivery', 'customers', 'suppliers', 'shifts', 'stats', 'expenses', 'staff', 'settings'],
-  wholesale: ['pos', 'orders', 'inventory', 'delivery', 'customers', 'suppliers', 'shifts', 'stats', 'expenses', 'staff', 'settings'],
-  grocery: ['pos', 'orders', 'inventory', 'delivery', 'customers', 'suppliers', 'shifts', 'stats', 'expenses', 'staff', 'settings'],
-  warehouse: ['inventory', 'orders', 'delivery', 'customers', 'suppliers', 'shifts', 'stats', 'expenses', 'staff', 'settings'],
-  pharmacy: ['pos', 'orders', 'inventory', 'delivery', 'customers', 'suppliers', 'shifts', 'stats', 'expenses', 'staff', 'settings'],
-  services: ['pos', 'orders', 'delivery', 'customers', 'shifts', 'stats', 'expenses', 'staff', 'settings'],
-  other: ['pos', 'orders', 'inventory', 'delivery', 'customers', 'suppliers', 'shifts', 'stats', 'expenses', 'staff', 'settings'],
+  restaurant: ['pos', 'orders', 'menu', 'delivery', 'shifts', 'stats', 'qr', 'waiter', 'inventory', 'customers', 'expenses', 'staff', 'notifications', 'settings'],
+  cafe: ['pos', 'orders', 'menu', 'delivery', 'shifts', 'stats', 'qr', 'waiter', 'inventory', 'customers', 'expenses', 'staff', 'notifications', 'settings'],
+  retail: ['pos', 'orders', 'menu', 'inventory', 'delivery', 'customers', 'suppliers', 'shifts', 'stats', 'expenses', 'staff', 'notifications', 'settings'],
+  wholesale: ['pos', 'orders', 'menu', 'inventory', 'delivery', 'customers', 'suppliers', 'shifts', 'stats', 'expenses', 'staff', 'notifications', 'settings'],
+  grocery: ['pos', 'orders', 'menu', 'inventory', 'delivery', 'customers', 'suppliers', 'shifts', 'stats', 'expenses', 'staff', 'notifications', 'settings'],
+  warehouse: ['inventory', 'orders', 'menu', 'delivery', 'customers', 'suppliers', 'shifts', 'stats', 'expenses', 'staff', 'notifications', 'settings'],
+  pharmacy: ['pos', 'orders', 'menu', 'inventory', 'delivery', 'customers', 'suppliers', 'shifts', 'stats', 'expenses', 'staff', 'notifications', 'settings'],
+  services: ['pos', 'orders', 'menu', 'delivery', 'customers', 'shifts', 'stats', 'expenses', 'staff', 'notifications', 'settings'],
+  other: ['pos', 'orders', 'menu', 'inventory', 'delivery', 'customers', 'suppliers', 'shifts', 'stats', 'expenses', 'staff', 'notifications', 'settings'],
 };
 
-// Which sectors are "food" (show menu, waiter, tables, QR menu)
+// Which sectors are "food" (show waiter, tables, QR menu)
 export const FOOD_SECTORS: BusinessType[] = ['restaurant', 'cafe'];
 
 export function isFoodSector(type: BusinessType): boolean {
@@ -124,6 +154,11 @@ export function getEntityLabel(type: BusinessType): string {
   if (type === 'warehouse') return 'مخزنك';
   if (type === 'services') return 'نشاطك الخدمي';
   return 'نشاطك';
+}
+
+export function getDefaultOrderType(type: BusinessType): string {
+  if (type === 'restaurant' || type === 'cafe') return 'dine_in';
+  return 'pickup';
 }
 
 export function getOrderTypeLabel(type: string): { label: string; icon: string } {
