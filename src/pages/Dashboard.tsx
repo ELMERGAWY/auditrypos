@@ -291,10 +291,19 @@ export default function Dashboard() {
       }))
     );
 
-    // Update agent status if delivery
+    // Update agent status if delivery + notify agent
     if (orderType === 'delivery' && selectedDeliveryAgent) {
       await supabase.from('delivery_agents').update({ status: 'busy' }).eq('id', selectedDeliveryAgent);
       setAgents(agents.map(a => a.id === selectedDeliveryAgent ? { ...a, status: 'busy' } : a));
+      // Notify delivery agent
+      await supabase.from('notifications').insert({
+        restaurant_id: restaurant!.id,
+        title: `🆕 طلب توصيل جديد #${orderNum.slice(-4)}`,
+        body: `${customerName || 'عميل'} — ${deliveryAddress || ''} — ${cartTotal.toFixed(2)} ${currency}`,
+        type: 'order',
+        target_type: 'agent',
+        target_id: selectedDeliveryAgent,
+      } as any);
     }
 
     // Remove from held tabs if was held
