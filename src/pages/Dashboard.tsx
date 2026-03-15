@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
@@ -27,8 +27,9 @@ import { CustomersTab } from './dashboard/CustomersTab';
 import { SuppliersTab } from './dashboard/SuppliersTab';
 import { ExpensesTab } from './dashboard/ExpensesTab';
 import { StaffTab } from './dashboard/StaffTab';
+import { NotificationsTab } from './dashboard/NotificationsTab';
 import { BarcodeScanner } from './dashboard/BarcodeScanner';
-import { BUSINESS_TYPES, BUSINESS_TABS, getBusinessLabel, isFoodSector, type BusinessType } from '@/lib/businessTypes';
+import { BUSINESS_TYPES, BUSINESS_TABS, getBusinessLabel, isFoodSector, getDefaultOrderType, type BusinessType } from '@/lib/businessTypes';
 import type {
   DashboardTab, OrderStatus, OrderType, MenuItem, Order, OrderItem, HeldInvoice
 } from './dashboard/types';
@@ -112,10 +113,7 @@ export default function Dashboard() {
   const [orderNotes, setOrderNotes] = useState('');
   const [discount, setDiscount] = useState('');
   const [discountType, setDiscountType] = useState<'percent' | 'fixed'>('percent');
-  const [orderType, setOrderType] = useState<OrderType>(() => {
-    const bt = 'restaurant'; // will be overridden after restaurant loads
-    return bt === 'restaurant' || bt === 'cafe' ? 'dine_in' : 'pickup' as OrderType;
-  });
+  const [orderType, setOrderType] = useState<OrderType>('pickup');
   const [deliveryAddress, setDeliveryAddress] = useState('');
   const [selectedDeliveryAgent, setSelectedDeliveryAgent] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('all');
@@ -293,10 +291,19 @@ export default function Dashboard() {
       }))
     );
 
-    // Update agent status if delivery
+    // Update agent status if delivery + notify agent
     if (orderType === 'delivery' && selectedDeliveryAgent) {
       await supabase.from('delivery_agents').update({ status: 'busy' }).eq('id', selectedDeliveryAgent);
       setAgents(agents.map(a => a.id === selectedDeliveryAgent ? { ...a, status: 'busy' } : a));
+      // Notify delivery agent
+      await supabase.from('notifications').insert({
+        restaurant_id: restaurant!.id,
+        title: `🆕 طلب توصيل جديد #${orderNum.slice(-4)}`,
+        body: `${customerName || 'عميل'} — ${deliveryAddress || ''} — ${cartTotal.toFixed(2)} ${currency}`,
+        type: 'order',
+        target_type: 'agent',
+        target_id: selectedDeliveryAgent,
+      } as any);
     }
 
     // Remove from held tabs if was held
@@ -336,7 +343,15 @@ export default function Dashboard() {
 
   const businessType = (restaurant?.business_type || 'restaurant') as BusinessType;
   const allowedTabs = BUSINESS_TABS[businessType] || BUSINESS_TABS.restaurant;
+  const btConfig = BUSINESS_TYPES[businessType];
 
+  // Reset orderType when restaurant loads to match sector
+  useEffect(() => {
+    if (restaurant) {
+      const bt = (restaurant.business_type || 'restaurant') as BusinessType;
+      setOrderType(getDefaultOrderType(bt) as OrderType);
+    }
+  }, [restaurant?.id]);
   const allTabs: { id: DashboardTab; label: string; icon: typeof LayoutGrid; badge?: number; locked?: boolean }[] = [
     { id: 'pos', label: 'نقطة البيع', icon: LayoutGrid },
     { id: 'orders', label: 'الطلبات', icon: Receipt, badge: pendingOrders.length, locked: lockedTabs.includes('orders') },
@@ -347,10 +362,11 @@ export default function Dashboard() {
     { id: 'delivery', label: 'المناديب', icon: Truck, badge: deliveryOrders.length, locked: lockedTabs.includes('delivery') },
     { id: 'shifts', label: 'الشفتات', icon: CalendarClock, locked: lockedTabs.includes('shifts') },
     { id: 'stats', label: 'الإحصائيات', icon: BarChart3, locked: lockedTabs.includes('stats') },
-    { id: 'menu', label: 'القائمة', icon: ShoppingCart },
+    { id: 'menu', label: btConfig?.menuLabel || 'القائمة', icon: ShoppingCart },
     { id: 'qr', label: 'رابط المتجر', icon: QrCode },
     { id: 'waiter', label: 'ويتر', icon: Bell, badge: unackCalls.length },
     { id: 'staff', label: 'الموظفين', icon: UsersRound },
+    { id: 'notifications', label: 'الإشعارات', icon: Bell },
     { id: 'settings', label: 'الإعدادات', icon: Settings },
   ];
 
@@ -1018,6 +1034,11 @@ export default function Dashboard() {
           {/* ===================== STAFF TAB ===================== */}
           {activeTab === 'staff' && (
             <StaffTab restaurantId={restaurant.id} />
+          )}
+
+          {/* ===================== NOTIFICATIONS TAB ===================== */}
+          {activeTab === 'notifications' && (
+            <NotificationsTab restaurantId={restaurant.id} />
           )}
 
           {/* ===================== SETTINGS TAB ===================== */}

@@ -77,7 +77,7 @@ export function useDashboardData() {
     loadData();
   }, [user, authLoading, loadData, navigate]);
 
-  // Realtime: waiter calls + agent locations + new orders
+  // Realtime: waiter calls + agent locations + new orders + notifications
   useEffect(() => {
     if (!restaurant) return;
     const channel = supabase
@@ -91,7 +91,6 @@ export function useDashboardData() {
       )
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'orders', filter: `restaurant_id=eq.${restaurant.id}` },
         async (payload) => {
-          // Load order items for the new order
           const { data: items } = await supabase.from('order_items').select('*').eq('order_id', payload.new.id);
           const newOrder = { ...payload.new, items: (items || []) as OrderItem[] } as unknown as Order;
           setOrders(prev => [newOrder, ...prev]);
@@ -102,6 +101,15 @@ export function useDashboardData() {
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'delivery_agents', filter: `restaurant_id=eq.${restaurant.id}` },
         (payload) => {
           setAgents(prev => prev.map(a => a.id === payload.new.id ? payload.new as DeliveryAgent : a));
+        }
+      )
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'notifications', filter: `restaurant_id=eq.${restaurant.id}` },
+        (payload) => {
+          const n = payload.new as any;
+          if (n.target_type === 'owner') {
+            if (soundEnabled) playOrderSound();
+            toast.info(n.title, { description: n.body, duration: 6000 });
+          }
         }
       )
       .subscribe();
