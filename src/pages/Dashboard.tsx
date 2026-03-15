@@ -334,7 +334,15 @@ export default function Dashboard() {
 
   const businessType = (restaurant?.business_type || 'restaurant') as BusinessType;
   const allowedTabs = BUSINESS_TABS[businessType] || BUSINESS_TABS.restaurant;
+  const btConfig = BUSINESS_TYPES[businessType];
 
+  // Reset orderType when restaurant loads to match sector
+  useEffect(() => {
+    if (restaurant) {
+      const bt = (restaurant.business_type || 'restaurant') as BusinessType;
+      setOrderType(getDefaultOrderType(bt) as OrderType);
+    }
+  }, [restaurant?.id]);
   const allTabs: { id: DashboardTab; label: string; icon: typeof LayoutGrid; badge?: number; locked?: boolean }[] = [
     { id: 'pos', label: 'نقطة البيع', icon: LayoutGrid },
     { id: 'orders', label: 'الطلبات', icon: Receipt, badge: pendingOrders.length, locked: lockedTabs.includes('orders') },
