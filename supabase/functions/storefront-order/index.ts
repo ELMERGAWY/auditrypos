@@ -69,6 +69,15 @@ Deno.serve(async (req) => {
       }))
     );
 
+    // Create notification for owner
+    await supabase.from("notifications").insert({
+      restaurant_id,
+      title: `🆕 طلب جديد من المتجر #${orderNum.slice(-4)}`,
+      body: `${customer_name || 'عميل'} — ${total} — ${order_type === 'delivery' ? 'توصيل' : 'استلام'}`,
+      type: 'order',
+      target_type: 'owner',
+    });
+
     return new Response(JSON.stringify({ order_number: orderNum, order_id: order.id }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" }
     });
