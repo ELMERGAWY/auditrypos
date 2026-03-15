@@ -353,10 +353,11 @@ export default function Dashboard() {
     { id: 'delivery', label: 'المناديب', icon: Truck, badge: deliveryOrders.length, locked: lockedTabs.includes('delivery') },
     { id: 'shifts', label: 'الشفتات', icon: CalendarClock, locked: lockedTabs.includes('shifts') },
     { id: 'stats', label: 'الإحصائيات', icon: BarChart3, locked: lockedTabs.includes('stats') },
-    { id: 'menu', label: 'القائمة', icon: ShoppingCart },
+    { id: 'menu', label: btConfig?.menuLabel || 'القائمة', icon: ShoppingCart },
     { id: 'qr', label: 'رابط المتجر', icon: QrCode },
     { id: 'waiter', label: 'ويتر', icon: Bell, badge: unackCalls.length },
     { id: 'staff', label: 'الموظفين', icon: UsersRound },
+    { id: 'notifications', label: 'الإشعارات', icon: Bell },
     { id: 'settings', label: 'الإعدادات', icon: Settings },
   ];
 
