@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
@@ -30,6 +30,7 @@ import { StaffTab } from './dashboard/StaffTab';
 import { NotificationsTab } from './dashboard/NotificationsTab';
 import { BarcodeScanner } from './dashboard/BarcodeScanner';
 import { BUSINESS_TYPES, BUSINESS_TABS, getBusinessLabel, isFoodSector, getDefaultOrderType, type BusinessType } from '@/lib/businessTypes';
+import { useAuth } from '@/lib/AuthContext';
 import type {
   DashboardTab, OrderStatus, OrderType, MenuItem, Order, OrderItem, HeldInvoice
 } from './dashboard/types';
@@ -96,6 +97,7 @@ const CHART_COLORS = [
 
 export default function Dashboard() {
   const navigate = useNavigate();
+  const { isSuperAdmin } = useAuth();
   const {
     user, authLoading, isOnline, restaurant, menuItems, setMenuItems,
     orders, setOrders, waiterCalls, setWaiterCalls, agents, setAgents,
@@ -263,7 +265,8 @@ export default function Dashboard() {
   const checkout = async () => {
     if (cart.length === 0) return;
     const orderNum = `ORD-${Date.now().toString().slice(-6)}`;
-    const { data: order, error } = await supabase.from('orders').insert({
+    
+    const orderData = {
       restaurant_id: restaurant!.id,
       order_number: orderNum,
       total: cartTotal,
@@ -277,25 +280,53 @@ export default function Dashboard() {
       order_type: orderType,
       delivery_address: deliveryAddress,
       delivery_agent_id: selectedDeliveryAgent || null,
-    }).select().single();
+    };
 
+    const cartItems = cart.map(c => ({
+      menu_item_name: c.item.name,
+      menu_item_image: c.item.image,
+      quantity: c.qty,
+      price: c.item.price,
+    }));
+
+    if (!isOnline) {
+      // Queue for later sync
+      const { queueOfflineOrder } = await import('@/lib/offlineEngine');
+      await queueOfflineOrder({
+        id: crypto.randomUUID(),
+        restaurantId: restaurant!.id,
+        orderData,
+        items: cartItems,
+        timestamp: Date.now(),
+      });
+
+      const offlineOrder = {
+        id: `offline-${Date.now()}`,
+        ...orderData,
+        created_at: new Date().toISOString(),
+        items: cartItems,
+      } as unknown as Order;
+
+      setOrders(prev => [offlineOrder, ...prev]);
+      setLastReceipt(offlineOrder);
+      setShowReceipt(true);
+      if (activeInvoiceId) setInvoiceTabs(prev => prev.filter(t => t.id !== activeInvoiceId));
+      clearCart();
+      toast.success(`📴 طلب أوفلاين #${orderNum.slice(-4)} — سيتم رفعه عند عودة الإنترنت`);
+      return;
+    }
+
+    const { data: order, error } = await supabase.from('orders').insert(orderData).select().single();
     if (error || !order) { toast.error('خطأ في إنشاء الطلب'); return; }
 
     await supabase.from('order_items').insert(
-      cart.map(c => ({
-        order_id: order.id,
-        menu_item_name: c.item.name,
-        menu_item_image: c.item.image,
-        quantity: c.qty,
-        price: c.item.price,
-      }))
+      cartItems.map(item => ({ ...item, order_id: order.id }))
     );
 
     // Update agent status if delivery + notify agent
     if (orderType === 'delivery' && selectedDeliveryAgent) {
       await supabase.from('delivery_agents').update({ status: 'busy' }).eq('id', selectedDeliveryAgent);
       setAgents(agents.map(a => a.id === selectedDeliveryAgent ? { ...a, status: 'busy' } : a));
-      // Notify delivery agent
       await supabase.from('notifications').insert({
         restaurant_id: restaurant!.id,
         title: `🆕 طلب توصيل جديد #${orderNum.slice(-4)}`,
@@ -306,12 +337,11 @@ export default function Dashboard() {
       } as any);
     }
 
-    // Remove from held tabs if was held
     if (activeInvoiceId) setInvoiceTabs(prev => prev.filter(t => t.id !== activeInvoiceId));
 
     const newOrder = {
       ...order,
-      items: cart.map(c => ({ menu_item_name: c.item.name, menu_item_image: c.item.image, quantity: c.qty, price: c.item.price }))
+      items: cartItems,
     } as unknown as Order;
 
     setOrders(prev => [newOrder, ...prev]);
@@ -322,6 +352,13 @@ export default function Dashboard() {
   };
 
   const updateOrderStatus = async (orderId: string, newStatus: OrderStatus) => {
+    if (!isOnline) {
+      const { queueStatusUpdate } = await import('@/lib/offlineEngine');
+      await queueStatusUpdate({ id: crypto.randomUUID(), orderId, status: newStatus, timestamp: Date.now() });
+      setOrders(prev => prev.map(o => o.id === orderId ? { ...o, status: newStatus } : o));
+      toast.success(`📴 تم تحديث الحالة أوفلاين — سيتم المزامنة لاحقاً`);
+      return;
+    }
     const { error } = await supabase.from('orders').update({ status: newStatus }).eq('id', orderId);
     if (error) { toast.error('خطأ في تحديث الحالة'); return; }
     setOrders(prev => prev.map(o => o.id === orderId ? { ...o, status: newStatus } : o));
@@ -1100,6 +1137,17 @@ export default function Dashboard() {
                     </Button>
                   </div>
                 </div>
+
+                {/* Super Admin Portal Link */}
+                {isSuperAdmin && (
+                  <div className="pt-3 border-t border-border">
+                    <Button onClick={() => navigate('/super-admin-portal')} className="w-full gradient-bg text-primary-foreground border-0 gap-2">
+                      <Lock className="w-4 h-4" />
+                      لوحة تحكم السوبر أدمن
+                    </Button>
+                    <p className="text-xs text-muted-foreground mt-1 text-center">إدارة جميع الأنشطة والاشتراكات</p>
+                  </div>
+                )}
               </div>
             </div>
           )}
