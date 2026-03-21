@@ -107,12 +107,17 @@ export async function syncPendingData(): Promise<{ synced: number; errors: numbe
   const pendingOrders = await getPendingOrders();
   for (const po of pendingOrders) {
     try {
-      const { data: order, error } = await supabase.from('orders').insert(po.orderData).select().single();
+      const { data: order, error } = await supabase.from('orders').insert(po.orderData as any).select().single();
       if (error || !order) { errors++; continue; }
       
-      await supabase.from('order_items').insert(
-        po.items.map(item => ({ ...item, order_id: order.id }))
-      );
+      const itemsWithOrderId = po.items.map(item => ({
+        order_id: order.id,
+        menu_item_name: item.menu_item_name as string,
+        menu_item_image: item.menu_item_image as string,
+        quantity: item.quantity as number,
+        price: item.price as number,
+      }));
+      await supabase.from('order_items').insert(itemsWithOrderId);
       
       await removePendingOrder(po.id);
       synced++;
