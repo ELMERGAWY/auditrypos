@@ -352,6 +352,13 @@ export default function Dashboard() {
   };
 
   const updateOrderStatus = async (orderId: string, newStatus: OrderStatus) => {
+    if (!isOnline) {
+      const { queueStatusUpdate } = await import('@/lib/offlineEngine');
+      await queueStatusUpdate({ id: crypto.randomUUID(), orderId, status: newStatus, timestamp: Date.now() });
+      setOrders(prev => prev.map(o => o.id === orderId ? { ...o, status: newStatus } : o));
+      toast.success(`📴 تم تحديث الحالة أوفلاين — سيتم المزامنة لاحقاً`);
+      return;
+    }
     const { error } = await supabase.from('orders').update({ status: newStatus }).eq('id', orderId);
     if (error) { toast.error('خطأ في تحديث الحالة'); return; }
     setOrders(prev => prev.map(o => o.id === orderId ? { ...o, status: newStatus } : o));
