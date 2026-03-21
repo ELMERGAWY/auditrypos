@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
@@ -30,6 +30,7 @@ import { StaffTab } from './dashboard/StaffTab';
 import { NotificationsTab } from './dashboard/NotificationsTab';
 import { BarcodeScanner } from './dashboard/BarcodeScanner';
 import { BUSINESS_TYPES, BUSINESS_TABS, getBusinessLabel, isFoodSector, getDefaultOrderType, type BusinessType } from '@/lib/businessTypes';
+import { useAuth } from '@/lib/AuthContext';
 import type {
   DashboardTab, OrderStatus, OrderType, MenuItem, Order, OrderItem, HeldInvoice
 } from './dashboard/types';
@@ -96,6 +97,7 @@ const CHART_COLORS = [
 
 export default function Dashboard() {
   const navigate = useNavigate();
+  const { isSuperAdmin } = useAuth();
   const {
     user, authLoading, isOnline, restaurant, menuItems, setMenuItems,
     orders, setOrders, waiterCalls, setWaiterCalls, agents, setAgents,
@@ -1100,6 +1102,17 @@ export default function Dashboard() {
                     </Button>
                   </div>
                 </div>
+
+                {/* Super Admin Portal Link */}
+                {isSuperAdmin && (
+                  <div className="pt-3 border-t border-border">
+                    <Button onClick={() => navigate('/super-admin-portal')} className="w-full gradient-bg text-primary-foreground border-0 gap-2">
+                      <Lock className="w-4 h-4" />
+                      لوحة تحكم السوبر أدمن
+                    </Button>
+                    <p className="text-xs text-muted-foreground mt-1 text-center">إدارة جميع الأنشطة والاشتراكات</p>
+                  </div>
+                )}
               </div>
             </div>
           )}
