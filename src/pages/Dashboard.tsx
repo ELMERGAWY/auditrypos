@@ -29,7 +29,7 @@ import { ExpensesTab } from './dashboard/ExpensesTab';
 import { StaffTab } from './dashboard/StaffTab';
 import { NotificationsTab } from './dashboard/NotificationsTab';
 import { BarcodeScanner } from './dashboard/BarcodeScanner';
-import { BUSINESS_TYPES, BUSINESS_TABS, getBusinessLabel, isFoodSector, getDefaultOrderType, type BusinessType } from '@/lib/businessTypes';
+import { BUSINESS_TYPES, BUSINESS_TABS, getAddressPlaceholder, getCheckoutButtonLabel, getCustomerPlaceholder, getDefaultOrderType, getNotesPlaceholder, getPosSearchPlaceholder, isFoodSector, isInventoryDrivenBusiness, type BusinessType } from '@/lib/businessTypes';
 import { useAuth } from '@/lib/AuthContext';
 import type {
   DashboardTab, OrderStatus, OrderType, MenuItem, Order, OrderItem, HeldInvoice
@@ -212,7 +212,33 @@ export default function Dashboard() {
   const clearCart = () => {
     setCart([]); setTableNumber(''); setCustomerName(''); setCustomerPhone('');
     setOrderNotes(''); setDiscount(''); setDeliveryAddress(''); setSelectedDeliveryAgent('');
-    setOrderType('dine_in'); setActiveInvoiceId(null);
+    setOrderType(getDefaultOrderType(businessType) as OrderType); setActiveInvoiceId(null);
+  };
+
+  const queueOrderOffline = async (orderData: typeof restaurant extends never ? never : Record<string, any>, cartItems: Record<string, any>[], orderNum: string) => {
+    const { queueOfflineOrder } = await import('@/lib/offlineEngine');
+    await queueOfflineOrder({
+      id: crypto.randomUUID(),
+      restaurantId: restaurant!.id,
+      orderData,
+      items: cartItems,
+      timestamp: Date.now(),
+    });
+
+    const offlineOrder = {
+      id: `offline-${Date.now()}`,
+      ...orderData,
+      synced: false,
+      created_at: new Date().toISOString(),
+      items: cartItems,
+    } as unknown as Order;
+
+    setOrders(prev => [offlineOrder, ...prev]);
+    setLastReceipt(offlineOrder);
+    setShowReceipt(true);
+    if (activeInvoiceId) setInvoiceTabs(prev => prev.filter(t => t.id !== activeInvoiceId));
+    clearCart();
+    toast.success(`📴 تم حفظ الطلب محلياً #${orderNum.slice(-4)} وسيتم رفعه تلقائياً عند عودة الإنترنت`);
   };
 
   // Save current state as an invoice tab / hold
@@ -283,6 +309,8 @@ export default function Dashboard() {
     };
 
     const cartItems = cart.map(c => ({
+      menu_item_id: isInventoryDrivenBusiness(businessType) ? null : c.item.id,
+      product_id: isInventoryDrivenBusiness(businessType) ? (c.item.product_id || c.item.id) : null,
       menu_item_name: c.item.name,
       menu_item_image: c.item.image,
       quantity: c.qty,
@@ -290,65 +318,57 @@ export default function Dashboard() {
     }));
 
     if (!isOnline) {
-      // Queue for later sync
-      const { queueOfflineOrder } = await import('@/lib/offlineEngine');
-      await queueOfflineOrder({
-        id: crypto.randomUUID(),
-        restaurantId: restaurant!.id,
-        orderData,
-        items: cartItems,
-        timestamp: Date.now(),
-      });
-
-      const offlineOrder = {
-        id: `offline-${Date.now()}`,
-        ...orderData,
-        created_at: new Date().toISOString(),
-        items: cartItems,
-      } as unknown as Order;
-
-      setOrders(prev => [offlineOrder, ...prev]);
-      setLastReceipt(offlineOrder);
-      setShowReceipt(true);
-      if (activeInvoiceId) setInvoiceTabs(prev => prev.filter(t => t.id !== activeInvoiceId));
-      clearCart();
-      toast.success(`📴 طلب أوفلاين #${orderNum.slice(-4)} — سيتم رفعه عند عودة الإنترنت`);
+      await queueOrderOffline(orderData, cartItems, orderNum);
       return;
     }
 
-    const { data: order, error } = await supabase.from('orders').insert(orderData).select().single();
-    if (error || !order) { toast.error('خطأ في إنشاء الطلب'); return; }
+    try {
+      const { data: order, error } = await supabase.from('orders').insert(orderData).select().single();
+      if (error || !order) {
+        const message = error?.message || '';
+        if (!navigator.onLine || /fetch|network|offline|failed/i.test(message)) {
+          await queueOrderOffline(orderData, cartItems, orderNum);
+          return;
+        }
+        toast.error('خطأ في إنشاء الطلب');
+        return;
+      }
 
-    await supabase.from('order_items').insert(
-      cartItems.map(item => ({ ...item, order_id: order.id }))
-    );
+      const { error: orderItemsError } = await supabase.from('order_items').insert(
+        cartItems.map(item => ({ ...item, order_id: order.id }))
+      );
+      if (orderItemsError) {
+        toast.error('تم إنشاء الطلب لكن حدثت مشكلة في حفظ الأصناف');
+      }
 
-    // Update agent status if delivery + notify agent
-    if (orderType === 'delivery' && selectedDeliveryAgent) {
-      await supabase.from('delivery_agents').update({ status: 'busy' }).eq('id', selectedDeliveryAgent);
-      setAgents(agents.map(a => a.id === selectedDeliveryAgent ? { ...a, status: 'busy' } : a));
-      await supabase.from('notifications').insert({
-        restaurant_id: restaurant!.id,
-        title: `🆕 طلب توصيل جديد #${orderNum.slice(-4)}`,
-        body: `${customerName || 'عميل'} — ${deliveryAddress || ''} — ${cartTotal.toFixed(2)} ${currency}`,
-        type: 'order',
-        target_type: 'agent',
-        target_id: selectedDeliveryAgent,
-      } as any);
+      if (orderType === 'delivery' && selectedDeliveryAgent) {
+        await supabase.from('delivery_agents').update({ status: 'busy' }).eq('id', selectedDeliveryAgent);
+        setAgents(agents.map(a => a.id === selectedDeliveryAgent ? { ...a, status: 'busy' } : a));
+        await supabase.from('notifications').insert({
+          restaurant_id: restaurant!.id,
+          title: `🆕 طلب توصيل جديد #${orderNum.slice(-4)}`,
+          body: `${customerName || 'عميل'} — ${deliveryAddress || ''} — ${cartTotal.toFixed(2)} ${currency}`,
+          type: 'order',
+          target_type: 'agent',
+          target_id: selectedDeliveryAgent,
+        } as any);
+      }
+
+      if (activeInvoiceId) setInvoiceTabs(prev => prev.filter(t => t.id !== activeInvoiceId));
+
+      const newOrder = {
+        ...order,
+        items: cartItems,
+      } as unknown as Order;
+
+      setOrders(prev => [newOrder, ...prev]);
+      setLastReceipt(newOrder);
+      setShowReceipt(true);
+      clearCart();
+      toast.success(`✅ تم إنشاء الطلب #${orderNum.slice(-4)} — ${cartTotal.toFixed(2)} ${currency}`);
+    } catch {
+      await queueOrderOffline(orderData, cartItems, orderNum);
     }
-
-    if (activeInvoiceId) setInvoiceTabs(prev => prev.filter(t => t.id !== activeInvoiceId));
-
-    const newOrder = {
-      ...order,
-      items: cartItems,
-    } as unknown as Order;
-
-    setOrders(prev => [newOrder, ...prev]);
-    setLastReceipt(newOrder);
-    setShowReceipt(true);
-    clearCart();
-    toast.success(`✅ تم إنشاء الطلب #${orderNum.slice(-4)} — ${cartTotal.toFixed(2)} ${currency}`);
   };
 
   const updateOrderStatus = async (orderId: string, newStatus: OrderStatus) => {
@@ -639,7 +659,7 @@ export default function Dashboard() {
                     <button key={cat} onClick={() => setSelectedCategory(cat)} className={`px-4 py-2 rounded-lg text-sm whitespace-nowrap transition-colors ${selectedCategory === cat ? 'gradient-bg text-primary-foreground' : 'bg-secondary text-secondary-foreground'}`}>{cat}</button>
                   ))}
                 </div>
-                <Input placeholder="🔍 بحث في القائمة..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)} className="mb-4" />
+                <Input placeholder={getPosSearchPlaceholder(businessType)} value={searchQuery} onChange={e => setSearchQuery(e.target.value)} className="mb-4" />
 
                 <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
                   {filteredItems.map(item => (
@@ -707,7 +727,7 @@ export default function Dashboard() {
                     )}
                     <div className="relative">
                       <Users className="w-3.5 h-3.5 absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
-                      <Input value={customerName} onChange={e => setCustomerName(e.target.value)} placeholder="اسم العميل" className="pr-8 h-9 text-xs" />
+                      <Input value={customerName} onChange={e => setCustomerName(e.target.value)} placeholder={getCustomerPlaceholder(businessType)} className="pr-8 h-9 text-xs" />
                     </div>
                     {(orderType === 'delivery' || orderType === 'takeaway') && (
                       <div className="relative">
@@ -720,7 +740,7 @@ export default function Dashboard() {
                     <>
                       <div className="relative">
                         <MapPin className="w-3.5 h-3.5 absolute right-2.5 top-2.5 text-muted-foreground" />
-                        <Input value={deliveryAddress} onChange={e => setDeliveryAddress(e.target.value)} placeholder="عنوان التوصيل" className="pr-8 h-9 text-xs" />
+                        <Input value={deliveryAddress} onChange={e => setDeliveryAddress(e.target.value)} placeholder={getAddressPlaceholder(businessType)} className="pr-8 h-9 text-xs" />
                       </div>
                       {agents.filter(a => a.status === 'available').length > 0 && (
                         <select value={selectedDeliveryAgent} onChange={e => setSelectedDeliveryAgent(e.target.value)}
@@ -735,7 +755,7 @@ export default function Dashboard() {
                   )}
                   <div className="relative">
                     <StickyNote className="w-3.5 h-3.5 absolute right-2.5 top-2.5 text-muted-foreground" />
-                    <Input value={orderNotes} onChange={e => setOrderNotes(e.target.value)} placeholder="ملاحظات الطلب..." className="pr-8 h-9 text-xs" />
+                    <Input value={orderNotes} onChange={e => setOrderNotes(e.target.value)} placeholder={getNotesPlaceholder(businessType)} className="pr-8 h-9 text-xs" />
                   </div>
                   <div className="flex gap-2">
                     <div className="flex-1 relative">
@@ -782,7 +802,7 @@ export default function Dashboard() {
                   </div>
                   <Button onClick={checkout} className="w-full gradient-bg text-primary-foreground border-0 h-12 text-base" disabled={cart.length === 0}>
                     <Receipt className="w-5 h-5 ml-2" />
-                    {orderType === 'delivery' ? '🛵 إرسال للتوصيل' : orderType === 'takeaway' ? '🛍️ تيك أواي' : 'إتمام الطلب'}
+                    {getCheckoutButtonLabel(businessType, orderType)}
                   </Button>
                 </div>
               </div>

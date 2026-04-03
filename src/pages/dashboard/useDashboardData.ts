@@ -8,6 +8,7 @@ import { toast } from 'sonner';
 import { cacheData, getCachedData, syncPendingData } from '@/lib/offlineEngine';
 import type { MenuItem, Order, OrderItem, WaiterCall, Restaurant, DeliveryAgent, Shift } from './types';
 import { useOrderNotificationSound, useWaiterCallSound } from './SoundNotifications';
+import { getDefaultItemIcon, isInventoryDrivenBusiness, type BusinessType } from '@/lib/businessTypes';
 
 const CACHE_KEY_PREFIX = 'dashboard_';
 
@@ -84,15 +85,33 @@ export function useDashboardData() {
 
     const suspended = rest.status === 'suspended' || (rest.subscription_end && new Date(rest.subscription_end) < new Date());
 
+    const businessType = (rest.business_type || 'restaurant') as BusinessType;
+    const usesProductsCatalog = isInventoryDrivenBusiness(businessType);
+
     const [itemsRes, ordersRes, callsRes, agentsRes, shiftRes] = await Promise.all([
-      supabase.from('menu_items').select('*').eq('restaurant_id', rest.id).order('sort_order'),
+      usesProductsCatalog
+        ? supabase.from('products').select('*').eq('restaurant_id', rest.id).order('sort_order')
+        : supabase.from('menu_items').select('*').eq('restaurant_id', rest.id).order('sort_order'),
       supabase.from('orders').select('*').eq('restaurant_id', rest.id).order('created_at', { ascending: false }).limit(200),
       supabase.from('waiter_calls').select('*').eq('restaurant_id', rest.id).order('created_at', { ascending: false }),
       supabase.from('delivery_agents').select('*').eq('restaurant_id', rest.id),
       supabase.from('shifts').select('*').eq('restaurant_id', rest.id).eq('status', 'open').maybeSingle(),
     ]);
 
-    const loadedMenuItems = (itemsRes.data || []) as MenuItem[];
+    const loadedMenuItems = usesProductsCatalog
+      ? ((itemsRes.data || []).map((product: any) => ({
+          id: product.id,
+          name: product.name,
+          price: Number(product.price || 0),
+          category: product.category || 'عام',
+          image: product.image || getDefaultItemIcon(businessType),
+          available: product.available,
+          restaurant_id: product.restaurant_id,
+          sort_order: product.sort_order || 0,
+          product_id: product.id,
+          inventory_mode: 'direct',
+        })) as MenuItem[])
+      : ((itemsRes.data || []) as MenuItem[]);
     const loadedAgents = (agentsRes.data || []) as DeliveryAgent[];
     const loadedShift = shiftRes.data as unknown as Shift | null;
     const loadedCalls = (callsRes.data || []) as WaiterCall[];
