@@ -1,5 +1,17 @@
 export type BusinessType = 'restaurant' | 'retail' | 'wholesale' | 'warehouse' | 'cafe' | 'grocery' | 'pharmacy' | 'services' | 'other';
 
+const BUSINESS_ITEM_ICONS: Record<BusinessType, string[]> = {
+  restaurant: ['🍔', '🍕', '🥗', '🍗', '🍟', '🍝', '🧃', '🍰', '🥩', '🌯', '☕', '🍦'],
+  cafe: ['☕', '🥐', '🍰', '🧁', '🥤', '🍵', '🍪', '🥛', '🍩', '🫖', '🍫', '🧋'],
+  retail: ['🛍️', '👕', '👟', '⌚', '🎧', '🧴', '🎒', '🕶️', '💼', '🏷️', '📦', '🧢'],
+  wholesale: ['📦', '🚚', '🏷️', '🧴', '🛒', '📋', '🧰', '📚', '🪑', '🛍️', '🧃', '🥫'],
+  grocery: ['🛒', '🥛', '🍞', '🥚', '🧀', '🍎', '🥫', '🧴', '🍚', '🧂', '🍪', '🧃'],
+  warehouse: ['📦', '🏭', '🧱', '🪵', '🧰', '🚚', '🏷️', '🗂️', '🪜', '📋', '🔩', '⚙️'],
+  pharmacy: ['💊', '🩹', '🧴', '🩺', '🧪', '🌡️', '🧼', '🦷', '👓', '📦', '🩻', '💉'],
+  services: ['🧺', '🧼', '🧽', '🪛', '🔧', '💇', '🚗', '🧹', '🧯', '🪙', '📋', '🛎️'],
+  other: ['🏢', '📦', '🛍️', '🧰', '📋', '🏷️', '🪑', '🧴', '📚', '🪙', '⚙️', '🧺'],
+};
+
 export interface BusinessTypeConfig {
   label: string;
   icon: string;
@@ -169,4 +181,47 @@ export function getOrderTypeLabel(type: string): { label: string; icon: string }
     pickup: { label: 'استلام', icon: '🏬' },
   };
   return map[type] || { label: type, icon: '📋' };
+}
+
+export function isInventoryDrivenBusiness(type: BusinessType): boolean {
+  return ['retail', 'wholesale', 'grocery', 'warehouse', 'pharmacy', 'other'].includes(type);
+}
+
+export function getDefaultItemIcon(type: BusinessType): string {
+  return BUSINESS_ITEM_ICONS[type]?.[0] || '📦';
+}
+
+export function getItemIconOptions(type: BusinessType): string[] {
+  return BUSINESS_ITEM_ICONS[type] || BUSINESS_ITEM_ICONS.other;
+}
+
+export function getPosSearchPlaceholder(type: BusinessType): string {
+  if (type === 'services') return '🔍 بحث في الخدمات أو الباقات...';
+  if (isInventoryDrivenBusiness(type)) return '🔍 بحث في المنتجات أو الباركود...';
+  return '🔍 بحث في القائمة...';
+}
+
+export function getCustomerPlaceholder(type: BusinessType): string {
+  if (type === 'services') return 'اسم العميل أو المستفيد';
+  if (isInventoryDrivenBusiness(type)) return 'اسم العميل أو المشتري';
+  return 'اسم العميل';
+}
+
+export function getNotesPlaceholder(type: BusinessType): string {
+  if (type === 'services') return 'ملاحظات الخدمة أو تفاصيل الاستلام...';
+  if (isInventoryDrivenBusiness(type)) return 'ملاحظات الطلب أو الفاتورة...';
+  return 'ملاحظات الطلب...';
+}
+
+export function getAddressPlaceholder(type: BusinessType): string {
+  if (type === 'services') return 'عنوان الاستلام أو التسليم';
+  if (isInventoryDrivenBusiness(type)) return 'عنوان التسليم';
+  return 'عنوان التوصيل';
+}
+
+export function getCheckoutButtonLabel(type: BusinessType, orderType: string): string {
+  if (orderType === 'delivery') return type === 'services' ? '🛵 إرسال الخدمة للتوصيل' : '🛵 إرسال للتوصيل';
+  if (orderType === 'takeaway') return '🛍️ تيك أواي';
+  if (orderType === 'pickup') return type === 'services' ? '✅ تسجيل طلب الخدمة' : '✅ إتمام الفاتورة';
+  return '✅ إتمام الطلب';
 }

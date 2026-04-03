@@ -340,6 +340,48 @@ export type Database = {
           },
         ]
       }
+      menu_item_components: {
+        Row: {
+          created_at: string
+          id: string
+          menu_item_id: string
+          product_id: string
+          quantity_required: number
+          unit_label: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          menu_item_id: string
+          product_id: string
+          quantity_required?: number
+          unit_label?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          menu_item_id?: string
+          product_id?: string
+          quantity_required?: number
+          unit_label?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "menu_item_components_menu_item_id_fkey"
+            columns: ["menu_item_id"]
+            isOneToOne: false
+            referencedRelation: "menu_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "menu_item_components_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       menu_items: {
         Row: {
           available: boolean
@@ -347,8 +389,10 @@ export type Database = {
           created_at: string
           id: string
           image: string
+          inventory_mode: string
           name: string
           price: number
+          product_id: string | null
           restaurant_id: string
           sort_order: number
         }
@@ -358,8 +402,10 @@ export type Database = {
           created_at?: string
           id?: string
           image?: string
+          inventory_mode?: string
           name: string
           price?: number
+          product_id?: string | null
           restaurant_id: string
           sort_order?: number
         }
@@ -369,12 +415,21 @@ export type Database = {
           created_at?: string
           id?: string
           image?: string
+          inventory_mode?: string
           name?: string
           price?: number
+          product_id?: string | null
           restaurant_id?: string
           sort_order?: number
         }
         Relationships: [
+          {
+            foreignKeyName: "menu_items_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "menu_items_restaurant_id_fkey"
             columns: ["restaurant_id"]
@@ -448,34 +503,54 @@ export type Database = {
       order_items: {
         Row: {
           id: string
+          menu_item_id: string | null
           menu_item_image: string
           menu_item_name: string
           order_id: string
           price: number
+          product_id: string | null
           quantity: number
         }
         Insert: {
           id?: string
+          menu_item_id?: string | null
           menu_item_image?: string
           menu_item_name: string
           order_id: string
           price?: number
+          product_id?: string | null
           quantity?: number
         }
         Update: {
           id?: string
+          menu_item_id?: string | null
           menu_item_image?: string
           menu_item_name?: string
           order_id?: string
           price?: number
+          product_id?: string | null
           quantity?: number
         }
         Relationships: [
+          {
+            foreignKeyName: "order_items_menu_item_id_fkey"
+            columns: ["menu_item_id"]
+            isOneToOne: false
+            referencedRelation: "menu_items"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "order_items_order_id_fkey"
             columns: ["order_id"]
             isOneToOne: false
             referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "order_items_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
             referencedColumns: ["id"]
           },
         ]
@@ -1054,6 +1129,17 @@ export type Database = {
       }
     }
     Functions: {
+      adjust_product_stock: {
+        Args: {
+          _movement_type: string
+          _product_id: string
+          _quantity: number
+          _reason: string
+          _reference_id: string
+          _restaurant_id: string
+        }
+        Returns: undefined
+      }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]

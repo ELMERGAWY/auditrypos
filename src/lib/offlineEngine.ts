@@ -4,8 +4,16 @@ const DB_NAME = 'smartpos_offline';
 const DB_VERSION = 1;
 const STORES = ['pendingOrders', 'pendingStatusUpdates', 'cachedData'] as const;
 
+function isIndexedDbAvailable() {
+  return typeof window !== 'undefined' && typeof indexedDB !== 'undefined';
+}
+
 function openDB(): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
+    if (!isIndexedDbAvailable()) {
+      reject(new Error('IndexedDB unavailable'));
+      return;
+    }
     const req = indexedDB.open(DB_NAME, DB_VERSION);
     req.onupgradeneeded = () => {
       const db = req.result;
@@ -37,10 +45,14 @@ export async function queueOfflineOrder(order: PendingOrder) {
 }
 
 export async function getPendingOrders(): Promise<PendingOrder[]> {
-  const db = await openDB();
-  const tx = db.transaction('pendingOrders', 'readonly');
-  const req = tx.objectStore('pendingOrders').getAll();
-  return new Promise((res, rej) => { req.onsuccess = () => res(req.result); req.onerror = () => rej(req.error); });
+  try {
+    const db = await openDB();
+    const tx = db.transaction('pendingOrders', 'readonly');
+    const req = tx.objectStore('pendingOrders').getAll();
+    return await new Promise((res, rej) => { req.onsuccess = () => res(req.result); req.onerror = () => rej(req.error); });
+  } catch {
+    return [];
+  }
 }
 
 export async function removePendingOrder(id: string) {
@@ -64,10 +76,14 @@ export async function queueStatusUpdate(update: PendingStatusUpdate) {
 }
 
 export async function getPendingStatusUpdates(): Promise<PendingStatusUpdate[]> {
-  const db = await openDB();
-  const tx = db.transaction('pendingStatusUpdates', 'readonly');
-  const req = tx.objectStore('pendingStatusUpdates').getAll();
-  return new Promise((res, rej) => { req.onsuccess = () => res(req.result); req.onerror = () => rej(req.error); });
+  try {
+    const db = await openDB();
+    const tx = db.transaction('pendingStatusUpdates', 'readonly');
+    const req = tx.objectStore('pendingStatusUpdates').getAll();
+    return await new Promise((res, rej) => { req.onsuccess = () => res(req.result); req.onerror = () => rej(req.error); });
+  } catch {
+    return [];
+  }
 }
 
 export async function removePendingStatusUpdate(id: string) {
