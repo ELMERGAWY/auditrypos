@@ -12,9 +12,13 @@ export interface MenuItem {
   available: boolean;
   restaurant_id: string;
   sort_order: number;
+  product_id?: string | null;
+  inventory_mode?: 'none' | 'direct' | 'recipe';
 }
 
 export interface OrderItem {
+  menu_item_id?: string | null;
+  product_id?: string | null;
   menu_item_name: string;
   menu_item_image: string;
   quantity: number;
