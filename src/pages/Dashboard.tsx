@@ -302,7 +302,7 @@ export default function Dashboard() {
       restaurant_id: restaurant!.id,
       order_number: orderNum,
       total: cartTotal,
-      status: 'pending',
+      status: sendToPrep ? 'pending' : 'completed',
       synced: isOnline,
       table_number: tableNumber ? Number(tableNumber) : null,
       discount: discountAmount,
