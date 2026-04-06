@@ -817,10 +817,17 @@ export default function Dashboard() {
                   <div className="flex justify-between font-display font-bold text-lg">
                     <span>الإجمالي</span><span className="text-primary">{cartTotal.toFixed(2)} {currency}</span>
                   </div>
-                  <Button onClick={checkout} className="w-full gradient-bg text-primary-foreground border-0 h-12 text-base" disabled={cart.length === 0}>
-                    <Receipt className="w-5 h-5 ml-2" />
-                    {getCheckoutButtonLabel(businessType, orderType)}
-                  </Button>
+                  <div className="grid grid-cols-3 gap-2">
+                    <Button onClick={() => checkout(true)} className="gradient-bg text-primary-foreground border-0 h-10 text-xs" disabled={cart.length === 0}>
+                      <Send className="w-4 h-4 ml-1" /> إرسال للتحضير
+                    </Button>
+                    <Button onClick={() => checkout(false)} className="bg-success text-success-foreground hover:bg-success/90 border-0 h-10 text-xs" disabled={cart.length === 0}>
+                      <Receipt className="w-4 h-4 ml-1" /> بيع مباشر
+                    </Button>
+                    <Button onClick={holdCurrentInvoice} variant="outline" className="h-10 text-xs" disabled={cart.length === 0}>
+                      <Pause className="w-4 h-4 ml-1" /> تعليق
+                    </Button>
+                  </div>
                 </div>
               </div>
             </div>
