@@ -1,0 +1,83 @@
+import { useState, useEffect, useRef } from 'react';
+import { supabase } from '@/integrations/supabase/client';
+import { Users } from 'lucide-react';
+import { Input } from '@/components/ui/input';
+
+interface Customer {
+  id: string;
+  name: string;
+  phone: string;
+  balance: number;
+  customer_type: string;
+}
+
+interface Props {
+  restaurantId: string;
+  value: string;
+  onChange: (name: string) => void;
+  placeholder?: string;
+}
+
+export function CustomerSearch({ restaurantId, value, onChange, placeholder }: Props) {
+  const [suggestions, setSuggestions] = useState<Customer[]>([]);
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const wrapperRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (wrapperRef.current && !wrapperRef.current.contains(e.target as Node)) {
+        setShowSuggestions(false);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, []);
+
+  const handleSearch = async (query: string) => {
+    onChange(query);
+    if (query.length < 1) { setSuggestions([]); setShowSuggestions(false); return; }
+    
+    const { data } = await supabase.from('customers')
+      .select('id, name, phone, balance, customer_type')
+      .eq('restaurant_id', restaurantId)
+      .or(`name.ilike.%${query}%,phone.ilike.%${query}%`)
+      .limit(8);
+    
+    setSuggestions((data || []) as Customer[]);
+    setShowSuggestions(true);
+  };
+
+  const selectCustomer = (c: Customer) => {
+    onChange(c.name);
+    setShowSuggestions(false);
+  };
+
+  return (
+    <div ref={wrapperRef} className="relative">
+      <Users className="w-3.5 h-3.5 absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground z-10" />
+      <Input
+        value={value}
+        onChange={e => handleSearch(e.target.value)}
+        onFocus={() => value.length >= 1 && suggestions.length > 0 && setShowSuggestions(true)}
+        placeholder={placeholder || 'بحث عن عميل...'}
+        className="pr-8 h-9 text-xs"
+      />
+      {showSuggestions && suggestions.length > 0 && (
+        <div className="absolute top-full right-0 left-0 z-50 mt-1 bg-card border border-border rounded-lg shadow-lg max-h-48 overflow-auto">
+          {suggestions.map(c => (
+            <button key={c.id} onClick={() => selectCustomer(c)}
+              className="w-full px-3 py-2 text-right text-xs hover:bg-secondary transition-colors flex items-center gap-2">
+              <span className="font-medium">{c.name}</span>
+              {c.phone && <span className="text-muted-foreground">{c.phone}</span>}
+              {c.balance !== 0 && (
+                <span className={`mr-auto text-[10px] font-bold ${c.balance > 0 ? 'text-destructive' : 'text-success'}`}>
+                  {c.balance > 0 ? 'مدين' : 'دائن'}: {Math.abs(c.balance)}
+                </span>
+              )}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
