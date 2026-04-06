@@ -100,6 +100,7 @@ const CHART_COLORS = [
 export default function Dashboard() {
   const navigate = useNavigate();
   const { isSuperAdmin } = useAuth();
+  const { isDark, toggleDarkMode } = useDarkMode(true);
   const {
     user, authLoading, isOnline, restaurant, menuItems, setMenuItems,
     orders, setOrders, waiterCalls, setWaiterCalls, agents, setAgents,
