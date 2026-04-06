@@ -912,6 +912,9 @@ export default function Dashboard() {
                         <Button size="sm" variant="outline" onClick={() => { setLastReceipt(order); setShowReceipt(true); }}>
                           <Printer className="w-3 h-3" />
                         </Button>
+                        <Button size="sm" variant="outline" className="text-destructive hover:bg-destructive/10" onClick={() => deleteOrder(order.id)} title="حذف الطلب">
+                          <Trash2 className="w-3 h-3" />
+                        </Button>
                       </div>
                     </div>
                   </motion.div>
