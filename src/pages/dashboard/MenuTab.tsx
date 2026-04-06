@@ -31,6 +31,10 @@ export function MenuTab({
 }: Props) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const logoInputRef = useRef<HTMLInputElement>(null);
+  const businessType = (restaurant.business_type || 'restaurant') as BusinessType;
+  const btConfig = BUSINESS_TYPES[businessType];
+  const EMOJI_OPTIONS = getItemIconOptions(businessType);
+  const defaultIcon = getDefaultItemIcon(businessType);
 
   const categories = [...new Set(menuItems.map(i => i.category))];
 
