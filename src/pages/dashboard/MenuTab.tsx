@@ -212,9 +212,9 @@ export function MenuTab({
         {showAddItem && (
           <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} className="overflow-hidden">
             <div className="glass-card p-4 mb-4 space-y-3">
-              <h3 className="font-display font-bold">{editingItem ? 'تعديل العنصر' : 'إضافة عنصر جديد'}</h3>
+              <h3 className="font-display font-bold">{editingItem ? `تعديل ${btConfig?.itemLabel || 'العنصر'}` : `إضافة ${btConfig?.itemLabel || 'عنصر'} جديد`}</h3>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div><Label>اسم العنصر</Label><Input value={menuForm.name} onChange={e => setMenuForm({ ...menuForm, name: e.target.value })} placeholder="مثال: برجر كلاسيك" /></div>
+                <div><Label>اسم {btConfig?.itemLabel || 'العنصر'}</Label><Input value={menuForm.name} onChange={e => setMenuForm({ ...menuForm, name: e.target.value })} placeholder={`مثال: ${businessType === 'services' ? 'غسيل وكوي' : businessType === 'pharmacy' ? 'باراسيتامول' : 'منتج جديد'}`} /></div>
                 <div><Label>السعر ({restaurant.currency || 'ج.م'})</Label><Input type="number" value={menuForm.price} onChange={e => setMenuForm({ ...menuForm, price: e.target.value })} placeholder="0" /></div>
                 <div>
                   <Label>الفئة</Label>
