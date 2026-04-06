@@ -210,7 +210,10 @@ export default function Dashboard() {
   };
 
   const updateQty = (id: string, d: number) =>
-    setCart(prev => prev.map(c => c.item.id === id ? { ...c, qty: Math.max(0, c.qty + d) } : c).filter(c => c.qty > 0));
+    setCart(prev => prev.map(c => c.item.id === id ? { ...c, qty: Math.max(0, Math.round((c.qty + d) * 100) / 100) } : c).filter(c => c.qty > 0));
+
+  const setCartItemQty = (id: string, newQty: number) =>
+    setCart(prev => prev.map(c => c.item.id === id ? { ...c, qty: Math.max(0, newQty) } : c).filter(c => c.qty > 0));
 
   const clearCart = () => {
     setCart([]); setTableNumber(''); setCustomerName(''); setCustomerPhone('');
