@@ -789,9 +789,18 @@ export default function Dashboard() {
                         <p className="text-xs text-primary">{(c.item.price * c.qty).toFixed(2)} {currency}</p>
                       </div>
                       <div className="flex items-center gap-1">
+                        <button onClick={() => updateQty(c.item.id, -0.5)} className="w-7 h-7 rounded-md bg-secondary flex items-center justify-center hover:bg-destructive/20 transition-colors text-[10px] font-bold">-½</button>
                         <button onClick={() => updateQty(c.item.id, -1)} className="w-7 h-7 rounded-md bg-secondary flex items-center justify-center hover:bg-destructive/20 transition-colors"><Minus className="w-3 h-3" /></button>
-                        <span className="w-6 text-center text-sm font-medium">{c.qty}</span>
+                        <input
+                          type="number"
+                          value={c.qty}
+                          onChange={e => setCartItemQty(c.item.id, Number(e.target.value) || 0)}
+                          className="w-12 text-center text-sm font-medium bg-transparent border border-border rounded-md h-7"
+                          step="0.25"
+                          min="0"
+                        />
                         <button onClick={() => updateQty(c.item.id, 1)} className="w-7 h-7 rounded-md bg-secondary flex items-center justify-center hover:bg-primary/20 transition-colors"><Plus className="w-3 h-3" /></button>
+                        <button onClick={() => updateQty(c.item.id, 0.5)} className="w-7 h-7 rounded-md bg-secondary flex items-center justify-center hover:bg-primary/20 transition-colors text-[10px] font-bold">+½</button>
                       </div>
                     </motion.div>
                   ))}
