@@ -611,6 +611,10 @@ export default function Dashboard() {
             {soundEnabled ? <Volume2 className="w-5 h-5 text-success" /> : <VolumeX className="w-5 h-5 text-muted-foreground" />}
             <span>{soundEnabled ? 'الصوت مفعّل' : 'الصوت مغلق'}</span>
           </button>
+          <button onClick={toggleDarkMode} className="sidebar-nav-item w-full">
+            {isDark ? <Sun className="w-5 h-5 text-warning" /> : <Moon className="w-5 h-5 text-muted-foreground" />}
+            <span>{isDark ? 'الوضع الفاتح' : 'الوضع الداكن'}</span>
+          </button>
           <motion.div animate={{ backgroundColor: isOnline ? 'hsl(142 71% 45% / 0.1)' : 'hsl(0 84% 60% / 0.1)' }}
             className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm">
             {isOnline ? <Wifi className="w-4 h-4 text-success" /> : <WifiOff className="w-4 h-4 text-destructive" />}
