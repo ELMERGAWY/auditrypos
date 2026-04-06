@@ -731,10 +731,12 @@ export default function Dashboard() {
                         <Input value={tableNumber} onChange={e => setTableNumber(e.target.value)} placeholder="رقم الطاولة" className="pr-8 h-9 text-xs" type="number" />
                       </div>
                     )}
-                    <div className="relative">
-                      <Users className="w-3.5 h-3.5 absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
-                      <Input value={customerName} onChange={e => setCustomerName(e.target.value)} placeholder={getCustomerPlaceholder(businessType)} className="pr-8 h-9 text-xs" />
-                    </div>
+                    <CustomerSearch
+                      restaurantId={restaurant.id}
+                      value={customerName}
+                      onChange={setCustomerName}
+                      placeholder={getCustomerPlaceholder(businessType)}
+                    />
                     {(orderType === 'delivery' || orderType === 'takeaway') && (
                       <div className="relative">
                         <Phone className="w-3.5 h-3.5 absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
