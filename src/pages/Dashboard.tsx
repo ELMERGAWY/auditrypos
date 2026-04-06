@@ -294,7 +294,7 @@ export default function Dashboard() {
     toast.success('تم حذف الفاتورة المعلّقة');
   };
 
-  const checkout = async () => {
+  const checkout = async (sendToPrep: boolean = false) => {
     if (cart.length === 0) return;
     const orderNum = `ORD-${Date.now().toString().slice(-6)}`;
     
