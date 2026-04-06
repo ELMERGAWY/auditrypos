@@ -391,6 +391,23 @@ export default function Dashboard() {
     toast.success(`تم تحديث الطلب إلى: ${STATUS_CONFIG[newStatus].label}`);
   };
 
+  const deleteOrder = async (orderId: string) => {
+    if (!confirm('هل تريد حذف هذا الطلب؟ سيتم إرجاع الكميات للمخزون.')) return;
+    const order = orders.find(o => o.id === orderId);
+    if (!order) return;
+    
+    // First cancel it (triggers stock restore) if not already cancelled
+    if (order.status !== 'cancelled') {
+      await supabase.from('orders').update({ status: 'cancelled' }).eq('id', orderId);
+    }
+    // Delete items then order
+    await supabase.from('order_items').delete().eq('order_id', orderId);
+    const { error } = await supabase.from('orders').delete().eq('id', orderId);
+    if (error) { toast.error('خطأ في حذف الطلب'); return; }
+    setOrders(prev => prev.filter(o => o.id !== orderId));
+    toast.success('تم حذف الطلب وإرجاع الكميات للمخزون');
+  };
+
   const handleAssignAgent = async (orderId: string, agentId: string) => {
     await supabase.from('orders').update({ delivery_agent_id: agentId }).eq('id', orderId);
     await supabase.from('delivery_agents').update({ status: 'busy' }).eq('id', agentId);
