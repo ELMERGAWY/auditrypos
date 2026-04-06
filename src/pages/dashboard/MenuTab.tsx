@@ -202,9 +202,9 @@ export function MenuTab({
 
       {/* Add/Edit Form */}
       <div className="flex items-center justify-between mb-4">
-        <h2 className="font-display text-xl font-bold">إدارة القائمة ({menuItems.length} عنصر)</h2>
+        <h2 className="font-display text-xl font-bold">إدارة {btConfig?.menuLabel || 'القائمة'} ({menuItems.length} {btConfig?.itemLabel || 'عنصر'})</h2>
         <Button onClick={() => { resetForm(); setShowAddItem(true); }} className="gradient-bg text-primary-foreground border-0">
-          <Plus className="w-4 h-4 ml-1" /> إضافة عنصر
+          <Plus className="w-4 h-4 ml-1" /> إضافة {btConfig?.itemLabel || 'عنصر'}
         </Button>
       </div>
 
