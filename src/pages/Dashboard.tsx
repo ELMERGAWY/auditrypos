@@ -31,6 +31,8 @@ import { NotificationsTab } from './dashboard/NotificationsTab';
 import { BarcodeScanner } from './dashboard/BarcodeScanner';
 import { BUSINESS_TYPES, BUSINESS_TABS, getAddressPlaceholder, getCheckoutButtonLabel, getCustomerPlaceholder, getDefaultOrderType, getNotesPlaceholder, getPosSearchPlaceholder, isFoodSector, isInventoryDrivenBusiness, type BusinessType } from '@/lib/businessTypes';
 import { useAuth } from '@/lib/AuthContext';
+import { useDarkMode } from '@/lib/useDarkMode';
+import { CustomerSearch } from './dashboard/CustomerSearch';
 import type {
   DashboardTab, OrderStatus, OrderType, MenuItem, Order, OrderItem, HeldInvoice
 } from './dashboard/types';
