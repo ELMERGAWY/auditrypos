@@ -8,8 +8,8 @@ import { Badge } from '@/components/ui/badge';
 import { Upload, Plus, Save, Trash2, Edit, ToggleLeft, ToggleRight, FileSpreadsheet, Image } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import type { MenuItem, Restaurant } from './types';
-import { EMOJI_OPTIONS } from './types';
 import { AnimatePresence, motion } from 'framer-motion';
+import { getItemIconOptions, getDefaultItemIcon, type BusinessType, BUSINESS_TYPES } from '@/lib/businessTypes';
 
 interface Props {
   restaurant: Restaurant;
