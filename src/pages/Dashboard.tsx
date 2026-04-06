@@ -7,7 +7,7 @@ import {
   BarChart3, Pause, Play, Printer, Users, Hash, Percent,
   Clock, TrendingUp, UtensilsCrossed, AlertCircle, CheckCircle,
   Timer, StickyNote, DollarSign, Truck, CalendarClock, MapPin, Phone, Lock, CreditCard,
-  Volume2, VolumeX, Package, Wallet, Store, UsersRound, Camera
+  Volume2, VolumeX, Package, Wallet, Store, UsersRound, Camera, Sun, Moon, Send
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -31,6 +31,8 @@ import { NotificationsTab } from './dashboard/NotificationsTab';
 import { BarcodeScanner } from './dashboard/BarcodeScanner';
 import { BUSINESS_TYPES, BUSINESS_TABS, getAddressPlaceholder, getCheckoutButtonLabel, getCustomerPlaceholder, getDefaultOrderType, getNotesPlaceholder, getPosSearchPlaceholder, isFoodSector, isInventoryDrivenBusiness, type BusinessType } from '@/lib/businessTypes';
 import { useAuth } from '@/lib/AuthContext';
+import { useDarkMode } from '@/lib/useDarkMode';
+import { CustomerSearch } from './dashboard/CustomerSearch';
 import type {
   DashboardTab, OrderStatus, OrderType, MenuItem, Order, OrderItem, HeldInvoice
 } from './dashboard/types';
@@ -98,6 +100,7 @@ const CHART_COLORS = [
 export default function Dashboard() {
   const navigate = useNavigate();
   const { isSuperAdmin } = useAuth();
+  const { isDark, toggleDarkMode } = useDarkMode(true);
   const {
     user, authLoading, isOnline, restaurant, menuItems, setMenuItems,
     orders, setOrders, waiterCalls, setWaiterCalls, agents, setAgents,
@@ -207,7 +210,10 @@ export default function Dashboard() {
   };
 
   const updateQty = (id: string, d: number) =>
-    setCart(prev => prev.map(c => c.item.id === id ? { ...c, qty: Math.max(0, c.qty + d) } : c).filter(c => c.qty > 0));
+    setCart(prev => prev.map(c => c.item.id === id ? { ...c, qty: Math.max(0, Math.round((c.qty + d) * 100) / 100) } : c).filter(c => c.qty > 0));
+
+  const setCartItemQty = (id: string, newQty: number) =>
+    setCart(prev => prev.map(c => c.item.id === id ? { ...c, qty: Math.max(0, newQty) } : c).filter(c => c.qty > 0));
 
   const clearCart = () => {
     setCart([]); setTableNumber(''); setCustomerName(''); setCustomerPhone('');
@@ -288,7 +294,7 @@ export default function Dashboard() {
     toast.success('تم حذف الفاتورة المعلّقة');
   };
 
-  const checkout = async () => {
+  const checkout = async (sendToPrep: boolean = false) => {
     if (cart.length === 0) return;
     const orderNum = `ORD-${Date.now().toString().slice(-6)}`;
     
@@ -296,7 +302,7 @@ export default function Dashboard() {
       restaurant_id: restaurant!.id,
       order_number: orderNum,
       total: cartTotal,
-      status: 'pending',
+      status: sendToPrep ? 'pending' : 'completed',
       synced: isOnline,
       table_number: tableNumber ? Number(tableNumber) : null,
       discount: discountAmount,
@@ -383,6 +389,23 @@ export default function Dashboard() {
     if (error) { toast.error('خطأ في تحديث الحالة'); return; }
     setOrders(prev => prev.map(o => o.id === orderId ? { ...o, status: newStatus } : o));
     toast.success(`تم تحديث الطلب إلى: ${STATUS_CONFIG[newStatus].label}`);
+  };
+
+  const deleteOrder = async (orderId: string) => {
+    if (!confirm('هل تريد حذف هذا الطلب؟ سيتم إرجاع الكميات للمخزون.')) return;
+    const order = orders.find(o => o.id === orderId);
+    if (!order) return;
+    
+    // First cancel it (triggers stock restore) if not already cancelled
+    if (order.status !== 'cancelled') {
+      await supabase.from('orders').update({ status: 'cancelled' }).eq('id', orderId);
+    }
+    // Delete items then order
+    await supabase.from('order_items').delete().eq('order_id', orderId);
+    const { error } = await supabase.from('orders').delete().eq('id', orderId);
+    if (error) { toast.error('خطأ في حذف الطلب'); return; }
+    setOrders(prev => prev.filter(o => o.id !== orderId));
+    toast.success('تم حذف الطلب وإرجاع الكميات للمخزون');
   };
 
   const handleAssignAgent = async (orderId: string, agentId: string) => {
@@ -588,6 +611,10 @@ export default function Dashboard() {
             {soundEnabled ? <Volume2 className="w-5 h-5 text-success" /> : <VolumeX className="w-5 h-5 text-muted-foreground" />}
             <span>{soundEnabled ? 'الصوت مفعّل' : 'الصوت مغلق'}</span>
           </button>
+          <button onClick={toggleDarkMode} className="sidebar-nav-item w-full">
+            {isDark ? <Sun className="w-5 h-5 text-warning" /> : <Moon className="w-5 h-5 text-muted-foreground" />}
+            <span>{isDark ? 'الوضع الفاتح' : 'الوضع الداكن'}</span>
+          </button>
           <motion.div animate={{ backgroundColor: isOnline ? 'hsl(142 71% 45% / 0.1)' : 'hsl(0 84% 60% / 0.1)' }}
             className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm">
             {isOnline ? <Wifi className="w-4 h-4 text-success" /> : <WifiOff className="w-4 h-4 text-destructive" />}
@@ -725,10 +752,12 @@ export default function Dashboard() {
                         <Input value={tableNumber} onChange={e => setTableNumber(e.target.value)} placeholder="رقم الطاولة" className="pr-8 h-9 text-xs" type="number" />
                       </div>
                     )}
-                    <div className="relative">
-                      <Users className="w-3.5 h-3.5 absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
-                      <Input value={customerName} onChange={e => setCustomerName(e.target.value)} placeholder={getCustomerPlaceholder(businessType)} className="pr-8 h-9 text-xs" />
-                    </div>
+                    <CustomerSearch
+                      restaurantId={restaurant.id}
+                      value={customerName}
+                      onChange={setCustomerName}
+                      placeholder={getCustomerPlaceholder(businessType)}
+                    />
                     {(orderType === 'delivery' || orderType === 'takeaway') && (
                       <div className="relative">
                         <Phone className="w-3.5 h-3.5 absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
@@ -781,9 +810,18 @@ export default function Dashboard() {
                         <p className="text-xs text-primary">{(c.item.price * c.qty).toFixed(2)} {currency}</p>
                       </div>
                       <div className="flex items-center gap-1">
+                        <button onClick={() => updateQty(c.item.id, -0.5)} className="w-7 h-7 rounded-md bg-secondary flex items-center justify-center hover:bg-destructive/20 transition-colors text-[10px] font-bold">-½</button>
                         <button onClick={() => updateQty(c.item.id, -1)} className="w-7 h-7 rounded-md bg-secondary flex items-center justify-center hover:bg-destructive/20 transition-colors"><Minus className="w-3 h-3" /></button>
-                        <span className="w-6 text-center text-sm font-medium">{c.qty}</span>
+                        <input
+                          type="number"
+                          value={c.qty}
+                          onChange={e => setCartItemQty(c.item.id, Number(e.target.value) || 0)}
+                          className="w-12 text-center text-sm font-medium bg-transparent border border-border rounded-md h-7"
+                          step="0.25"
+                          min="0"
+                        />
                         <button onClick={() => updateQty(c.item.id, 1)} className="w-7 h-7 rounded-md bg-secondary flex items-center justify-center hover:bg-primary/20 transition-colors"><Plus className="w-3 h-3" /></button>
+                        <button onClick={() => updateQty(c.item.id, 0.5)} className="w-7 h-7 rounded-md bg-secondary flex items-center justify-center hover:bg-primary/20 transition-colors text-[10px] font-bold">+½</button>
                       </div>
                     </motion.div>
                   ))}
@@ -800,10 +838,17 @@ export default function Dashboard() {
                   <div className="flex justify-between font-display font-bold text-lg">
                     <span>الإجمالي</span><span className="text-primary">{cartTotal.toFixed(2)} {currency}</span>
                   </div>
-                  <Button onClick={checkout} className="w-full gradient-bg text-primary-foreground border-0 h-12 text-base" disabled={cart.length === 0}>
-                    <Receipt className="w-5 h-5 ml-2" />
-                    {getCheckoutButtonLabel(businessType, orderType)}
-                  </Button>
+                  <div className="grid grid-cols-3 gap-2">
+                    <Button onClick={() => checkout(true)} className="gradient-bg text-primary-foreground border-0 h-10 text-xs" disabled={cart.length === 0}>
+                      <Send className="w-4 h-4 ml-1" /> إرسال للتحضير
+                    </Button>
+                    <Button onClick={() => checkout(false)} className="bg-success text-success-foreground hover:bg-success/90 border-0 h-10 text-xs" disabled={cart.length === 0}>
+                      <Receipt className="w-4 h-4 ml-1" /> بيع مباشر
+                    </Button>
+                    <Button onClick={holdCurrentInvoice} variant="outline" className="h-10 text-xs" disabled={cart.length === 0}>
+                      <Pause className="w-4 h-4 ml-1" /> تعليق
+                    </Button>
+                  </div>
                 </div>
               </div>
             </div>
@@ -870,6 +915,9 @@ export default function Dashboard() {
                         )}
                         <Button size="sm" variant="outline" onClick={() => { setLastReceipt(order); setShowReceipt(true); }}>
                           <Printer className="w-3 h-3" />
+                        </Button>
+                        <Button size="sm" variant="outline" className="text-destructive hover:bg-destructive/10" onClick={() => deleteOrder(order.id)} title="حذف الطلب">
+                          <Trash2 className="w-3 h-3" />
                         </Button>
                       </div>
                     </div>

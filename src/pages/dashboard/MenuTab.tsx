@@ -8,8 +8,8 @@ import { Badge } from '@/components/ui/badge';
 import { Upload, Plus, Save, Trash2, Edit, ToggleLeft, ToggleRight, FileSpreadsheet, Image } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import type { MenuItem, Restaurant } from './types';
-import { EMOJI_OPTIONS } from './types';
 import { AnimatePresence, motion } from 'framer-motion';
+import { getItemIconOptions, getDefaultItemIcon, type BusinessType, BUSINESS_TYPES } from '@/lib/businessTypes';
 
 interface Props {
   restaurant: Restaurant;
@@ -31,11 +31,15 @@ export function MenuTab({
 }: Props) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const logoInputRef = useRef<HTMLInputElement>(null);
+  const businessType = (restaurant.business_type || 'restaurant') as BusinessType;
+  const btConfig = BUSINESS_TYPES[businessType];
+  const EMOJI_OPTIONS = getItemIconOptions(businessType);
+  const defaultIcon = getDefaultItemIcon(businessType);
 
   const categories = [...new Set(menuItems.map(i => i.category))];
 
   const resetForm = () => {
-    setMenuForm({ name: '', price: '', category: '', image: '🍔' });
+    setMenuForm({ name: '', price: '', category: '', image: defaultIcon });
     setShowAddItem(false);
     setEditingItem(null);
   };
@@ -167,8 +171,8 @@ export function MenuTab({
           )}
         </div>
         <div className="flex-1">
-          <p className="font-bold mb-1">شعار المطعم</p>
-          <p className="text-xs text-muted-foreground mb-2">يظهر في الفاتورة وواجهة QR</p>
+          <p className="font-bold mb-1">شعار {btConfig?.label || 'النشاط'}</p>
+          <p className="text-xs text-muted-foreground mb-2">يظهر في الفاتورة وواجهة المتجر</p>
           <Button size="sm" variant="outline" onClick={() => logoInputRef.current?.click()}>
             <Upload className="w-3 h-3 ml-1" /> رفع شعار
           </Button>
@@ -198,9 +202,9 @@ export function MenuTab({
 
       {/* Add/Edit Form */}
       <div className="flex items-center justify-between mb-4">
-        <h2 className="font-display text-xl font-bold">إدارة القائمة ({menuItems.length} عنصر)</h2>
+        <h2 className="font-display text-xl font-bold">إدارة {btConfig?.menuLabel || 'القائمة'} ({menuItems.length} {btConfig?.itemLabel || 'عنصر'})</h2>
         <Button onClick={() => { resetForm(); setShowAddItem(true); }} className="gradient-bg text-primary-foreground border-0">
-          <Plus className="w-4 h-4 ml-1" /> إضافة عنصر
+          <Plus className="w-4 h-4 ml-1" /> إضافة {btConfig?.itemLabel || 'عنصر'}
         </Button>
       </div>
 
@@ -208,9 +212,9 @@ export function MenuTab({
         {showAddItem && (
           <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} className="overflow-hidden">
             <div className="glass-card p-4 mb-4 space-y-3">
-              <h3 className="font-display font-bold">{editingItem ? 'تعديل العنصر' : 'إضافة عنصر جديد'}</h3>
+              <h3 className="font-display font-bold">{editingItem ? `تعديل ${btConfig?.itemLabel || 'العنصر'}` : `إضافة ${btConfig?.itemLabel || 'عنصر'} جديد`}</h3>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div><Label>اسم العنصر</Label><Input value={menuForm.name} onChange={e => setMenuForm({ ...menuForm, name: e.target.value })} placeholder="مثال: برجر كلاسيك" /></div>
+                <div><Label>اسم {btConfig?.itemLabel || 'العنصر'}</Label><Input value={menuForm.name} onChange={e => setMenuForm({ ...menuForm, name: e.target.value })} placeholder={`مثال: ${businessType === 'services' ? 'غسيل وكوي' : businessType === 'pharmacy' ? 'باراسيتامول' : 'منتج جديد'}`} /></div>
                 <div><Label>السعر ({restaurant.currency || 'ج.م'})</Label><Input type="number" value={menuForm.price} onChange={e => setMenuForm({ ...menuForm, price: e.target.value })} placeholder="0" /></div>
                 <div>
                   <Label>الفئة</Label>
