@@ -39,7 +39,7 @@ export function MenuTab({
   const categories = [...new Set(menuItems.map(i => i.category))];
 
   const resetForm = () => {
-    setMenuForm({ name: '', price: '', category: '', image: '🍔' });
+    setMenuForm({ name: '', price: '', category: '', image: defaultIcon });
     setShowAddItem(false);
     setEditingItem(null);
   };
