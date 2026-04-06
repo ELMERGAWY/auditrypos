@@ -171,8 +171,8 @@ export function MenuTab({
           )}
         </div>
         <div className="flex-1">
-          <p className="font-bold mb-1">شعار المطعم</p>
-          <p className="text-xs text-muted-foreground mb-2">يظهر في الفاتورة وواجهة QR</p>
+          <p className="font-bold mb-1">شعار {btConfig?.label || 'النشاط'}</p>
+          <p className="text-xs text-muted-foreground mb-2">يظهر في الفاتورة وواجهة المتجر</p>
           <Button size="sm" variant="outline" onClick={() => logoInputRef.current?.click()}>
             <Upload className="w-3 h-3 ml-1" /> رفع شعار
           </Button>
