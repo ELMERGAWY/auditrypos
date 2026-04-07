@@ -111,7 +111,7 @@ export default function Dashboard() {
   const [activeTab, setActiveTab] = useState<DashboardTab>('pos');
 
   // POS State
-  const [cart, setCart] = useState<{ item: MenuItem; qty: number }[]>([]);
+  const [cart, setCart] = useState<{ item: MenuItem; qty: number; qtyText: string; unitMode: string }[]>([]);
   const [tableNumber, setTableNumber] = useState('');
   const [customerName, setCustomerName] = useState('');
   const [customerPhone, setCustomerPhone] = useState('');
@@ -123,6 +123,8 @@ export default function Dashboard() {
   const [selectedDeliveryAgent, setSelectedDeliveryAgent] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
+  const [paymentMethod, setPaymentMethod] = useState('cash');
+  const [paidAmount, setPaidAmount] = useState('');
 
   // Invoices (multiple held tabs)
   const [invoiceTabs, setInvoiceTabs] = useState<HeldInvoice[]>([]);
@@ -166,9 +168,17 @@ export default function Dashboard() {
   const categories = [...new Set(menuItems.map(i => i.category))];
   const filteredItems = menuItems.filter(i => {
     if (selectedCategory !== 'all' && i.category !== selectedCategory) return false;
-    if (searchQuery && !i.name.toLowerCase().includes(searchQuery.toLowerCase())) return false;
+    if (searchQuery) {
+      const q = searchQuery.toLowerCase();
+      const matchName = i.name.toLowerCase().includes(q);
+      const matchBarcode = (i as any).barcode && (i as any).barcode.includes(q);
+      const matchSku = (i as any).sku && (i as any).sku.includes(q);
+      if (!matchName && !matchBarcode && !matchSku) return false;
+    }
     return i.available;
   });
+  const paidNum = Number(paidAmount) || 0;
+  const remaining = Math.max(0, cartTotal - paidNum);
 
   const cartSubtotal = cart.reduce((s, c) => s + c.item.price * c.qty, 0);
   const discountAmount = discountType === 'percent'
