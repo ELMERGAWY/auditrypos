@@ -185,6 +185,8 @@ export default function Dashboard() {
     ? cartSubtotal * (Number(discount) || 0) / 100
     : Number(discount) || 0;
   const cartTotal = Math.max(0, cartSubtotal - discountAmount);
+  const paidNum = Number(paidAmount) || 0;
+  const remaining = Math.max(0, cartTotal - paidNum);
 
   const pendingOrders = orders.filter(o => o.status === 'pending' || o.status === 'preparing');
   const unackCalls = waiterCalls.filter(c => !c.acknowledged);
@@ -210,24 +212,66 @@ export default function Dashboard() {
   const topItems = [...itemSales.entries()].sort((a, b) => b[1] - a[1]).slice(0, 5);
   const filteredOrders = orderFilter === 'all' ? orders : orders.filter(o => o.status === orderFilter);
 
+  // Unit conversion helpers
+  const UNIT_CONVERSIONS: Record<string, { label: string; factor: number }[]> = {
+    'كيلو': [{ label: 'كيلو', factor: 1 }, { label: 'جرام', factor: 0.001 }],
+    'kg': [{ label: 'kg', factor: 1 }, { label: 'g', factor: 0.001 }],
+    'كارتونة': [{ label: 'كارتونة', factor: 1 }, { label: 'علبة', factor: 1/12 }, { label: 'قطعة', factor: 1/144 }],
+    'علبة': [{ label: 'علبة', factor: 1 }, { label: 'قطعة', factor: 1/12 }],
+    'متر': [{ label: 'متر', factor: 1 }, { label: 'سم', factor: 0.01 }],
+    'لتر': [{ label: 'لتر', factor: 1 }, { label: 'مل', factor: 0.001 }],
+    'قطعة': [{ label: 'قطعة', factor: 1 }],
+    'وحدة': [{ label: 'وحدة', factor: 1 }],
+  };
+
+  const getUnitOptions = (item: MenuItem) => {
+    const unit = (item as any).unit || 'قطعة';
+    return UNIT_CONVERSIONS[unit] || [{ label: unit, factor: 1 }];
+  };
+
   // Cart actions
   const addToCart = (item: MenuItem) => {
     setCart(prev => {
       const existing = prev.find(c => c.item.id === item.id);
-      if (existing) return prev.map(c => c.item.id === item.id ? { ...c, qty: c.qty + 1 } : c);
-      return [...prev, { item, qty: 1 }];
+      if (existing) return prev.map(c => c.item.id === item.id ? { ...c, qty: c.qty + 1, qtyText: String(c.qty + 1) } : c);
+      const defaultUnit = getUnitOptions(item)[0]?.label || 'قطعة';
+      return [...prev, { item, qty: 1, qtyText: '1', unitMode: defaultUnit }];
     });
   };
 
   const updateQty = (id: string, d: number) =>
-    setCart(prev => prev.map(c => c.item.id === id ? { ...c, qty: Math.max(0, Math.round((c.qty + d) * 100) / 100) } : c).filter(c => c.qty > 0));
+    setCart(prev => prev.map(c => c.item.id === id ? { ...c, qty: Math.max(0, Math.round((c.qty + d) * 100) / 100), qtyText: String(Math.max(0, Math.round((c.qty + d) * 100) / 100)) } : c).filter(c => c.qty > 0));
 
-  const setCartItemQty = (id: string, newQty: number) =>
-    setCart(prev => prev.map(c => c.item.id === id ? { ...c, qty: Math.max(0, newQty) } : c).filter(c => c.qty > 0));
+  const setCartItemQty = (id: string, text: string) => {
+    setCart(prev => prev.map(c => {
+      if (c.item.id !== id) return c;
+      // Allow typing "0." or "1." etc
+      if (text === '' || text === '0' || /^\d*\.?\d*$/.test(text)) {
+        const num = parseFloat(text);
+        return { ...c, qtyText: text, qty: isNaN(num) ? 0 : num };
+      }
+      return c;
+    }));
+  };
+
+  const setCartItemUnit = (id: string, unitLabel: string) => {
+    setCart(prev => prev.map(c => {
+      if (c.item.id !== id) return c;
+      const units = getUnitOptions(c.item);
+      const oldUnit = units.find(u => u.label === c.unitMode);
+      const newUnit = units.find(u => u.label === unitLabel);
+      if (!oldUnit || !newUnit) return { ...c, unitMode: unitLabel };
+      // Convert qty: e.g. 1 kg → 1000 grams
+      const baseQty = c.qty * oldUnit.factor;
+      const newQty = Math.round((baseQty / newUnit.factor) * 100) / 100;
+      return { ...c, unitMode: unitLabel, qty: newQty, qtyText: String(newQty) };
+    }));
+  };
 
   const clearCart = () => {
     setCart([]); setTableNumber(''); setCustomerName(''); setCustomerPhone('');
     setOrderNotes(''); setDiscount(''); setDeliveryAddress(''); setSelectedDeliveryAgent('');
+    setPaymentMethod('cash'); setPaidAmount('');
     setOrderType(getDefaultOrderType(businessType) as OrderType); setActiveInvoiceId(null);
   };
 
