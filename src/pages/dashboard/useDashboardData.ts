@@ -110,6 +110,9 @@ export function useDashboardData() {
           sort_order: product.sort_order || 0,
           product_id: product.id,
           inventory_mode: 'direct',
+          barcode: product.barcode || '',
+          sku: product.sku || '',
+          unit: product.unit || 'قطعة',
         })) as MenuItem[])
       : ((itemsRes.data || []) as MenuItem[]);
     const loadedAgents = (agentsRes.data || []) as DeliveryAgent[];

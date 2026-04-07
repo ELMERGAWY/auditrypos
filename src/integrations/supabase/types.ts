@@ -569,6 +569,8 @@ export type Database = {
           notes: string
           order_number: string
           order_type: string
+          paid_amount: number
+          payment_method: string
           restaurant_id: string
           status: string
           synced: boolean
@@ -589,6 +591,8 @@ export type Database = {
           notes?: string
           order_number: string
           order_type?: string
+          paid_amount?: number
+          payment_method?: string
           restaurant_id: string
           status?: string
           synced?: boolean
@@ -609,6 +613,8 @@ export type Database = {
           notes?: string
           order_number?: string
           order_type?: string
+          paid_amount?: number
+          payment_method?: string
           restaurant_id?: string
           status?: string
           synced?: boolean
@@ -793,6 +799,54 @@ export type Database = {
           user_id?: string
         }
         Relationships: []
+      }
+      restaurant_staff: {
+        Row: {
+          created_at: string
+          id: string
+          is_active: boolean
+          name: string
+          phone: string
+          pin: string
+          restaurant_id: string
+          role: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          name: string
+          phone?: string
+          pin?: string
+          restaurant_id: string
+          role?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          name?: string
+          phone?: string
+          pin?: string
+          restaurant_id?: string
+          role?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "restaurant_staff_restaurant_id_fkey"
+            columns: ["restaurant_id"]
+            isOneToOne: false
+            referencedRelation: "restaurants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "restaurant_staff_restaurant_id_fkey"
+            columns: ["restaurant_id"]
+            isOneToOne: false
+            referencedRelation: "restaurants_public"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       restaurants: {
         Row: {

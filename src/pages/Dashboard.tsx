@@ -111,7 +111,7 @@ export default function Dashboard() {
   const [activeTab, setActiveTab] = useState<DashboardTab>('pos');
 
   // POS State
-  const [cart, setCart] = useState<{ item: MenuItem; qty: number }[]>([]);
+  const [cart, setCart] = useState<{ item: MenuItem; qty: number; qtyText: string; unitMode: string }[]>([]);
   const [tableNumber, setTableNumber] = useState('');
   const [customerName, setCustomerName] = useState('');
   const [customerPhone, setCustomerPhone] = useState('');
@@ -123,6 +123,8 @@ export default function Dashboard() {
   const [selectedDeliveryAgent, setSelectedDeliveryAgent] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
+  const [paymentMethod, setPaymentMethod] = useState('cash');
+  const [paidAmount, setPaidAmount] = useState('');
 
   // Invoices (multiple held tabs)
   const [invoiceTabs, setInvoiceTabs] = useState<HeldInvoice[]>([]);
@@ -166,7 +168,13 @@ export default function Dashboard() {
   const categories = [...new Set(menuItems.map(i => i.category))];
   const filteredItems = menuItems.filter(i => {
     if (selectedCategory !== 'all' && i.category !== selectedCategory) return false;
-    if (searchQuery && !i.name.toLowerCase().includes(searchQuery.toLowerCase())) return false;
+    if (searchQuery) {
+      const q = searchQuery.toLowerCase();
+      const matchName = i.name.toLowerCase().includes(q);
+      const matchBarcode = (i as any).barcode && (i as any).barcode.includes(q);
+      const matchSku = (i as any).sku && (i as any).sku.includes(q);
+      if (!matchName && !matchBarcode && !matchSku) return false;
+    }
     return i.available;
   });
 
@@ -175,6 +183,8 @@ export default function Dashboard() {
     ? cartSubtotal * (Number(discount) || 0) / 100
     : Number(discount) || 0;
   const cartTotal = Math.max(0, cartSubtotal - discountAmount);
+  const paidNum = Number(paidAmount) || 0;
+  const remaining = Math.max(0, cartTotal - paidNum);
 
   const pendingOrders = orders.filter(o => o.status === 'pending' || o.status === 'preparing');
   const unackCalls = waiterCalls.filter(c => !c.acknowledged);
@@ -200,24 +210,66 @@ export default function Dashboard() {
   const topItems = [...itemSales.entries()].sort((a, b) => b[1] - a[1]).slice(0, 5);
   const filteredOrders = orderFilter === 'all' ? orders : orders.filter(o => o.status === orderFilter);
 
+  // Unit conversion helpers
+  const UNIT_CONVERSIONS: Record<string, { label: string; factor: number }[]> = {
+    'كيلو': [{ label: 'كيلو', factor: 1 }, { label: 'جرام', factor: 0.001 }],
+    'kg': [{ label: 'kg', factor: 1 }, { label: 'g', factor: 0.001 }],
+    'كارتونة': [{ label: 'كارتونة', factor: 1 }, { label: 'علبة', factor: 1/12 }, { label: 'قطعة', factor: 1/144 }],
+    'علبة': [{ label: 'علبة', factor: 1 }, { label: 'قطعة', factor: 1/12 }],
+    'متر': [{ label: 'متر', factor: 1 }, { label: 'سم', factor: 0.01 }],
+    'لتر': [{ label: 'لتر', factor: 1 }, { label: 'مل', factor: 0.001 }],
+    'قطعة': [{ label: 'قطعة', factor: 1 }],
+    'وحدة': [{ label: 'وحدة', factor: 1 }],
+  };
+
+  const getUnitOptions = (item: MenuItem) => {
+    const unit = (item as any).unit || 'قطعة';
+    return UNIT_CONVERSIONS[unit] || [{ label: unit, factor: 1 }];
+  };
+
   // Cart actions
   const addToCart = (item: MenuItem) => {
     setCart(prev => {
       const existing = prev.find(c => c.item.id === item.id);
-      if (existing) return prev.map(c => c.item.id === item.id ? { ...c, qty: c.qty + 1 } : c);
-      return [...prev, { item, qty: 1 }];
+      if (existing) return prev.map(c => c.item.id === item.id ? { ...c, qty: c.qty + 1, qtyText: String(c.qty + 1) } : c);
+      const defaultUnit = getUnitOptions(item)[0]?.label || 'قطعة';
+      return [...prev, { item, qty: 1, qtyText: '1', unitMode: defaultUnit }];
     });
   };
 
   const updateQty = (id: string, d: number) =>
-    setCart(prev => prev.map(c => c.item.id === id ? { ...c, qty: Math.max(0, Math.round((c.qty + d) * 100) / 100) } : c).filter(c => c.qty > 0));
+    setCart(prev => prev.map(c => c.item.id === id ? { ...c, qty: Math.max(0, Math.round((c.qty + d) * 100) / 100), qtyText: String(Math.max(0, Math.round((c.qty + d) * 100) / 100)) } : c).filter(c => c.qty > 0));
 
-  const setCartItemQty = (id: string, newQty: number) =>
-    setCart(prev => prev.map(c => c.item.id === id ? { ...c, qty: Math.max(0, newQty) } : c).filter(c => c.qty > 0));
+  const setCartItemQty = (id: string, text: string) => {
+    setCart(prev => prev.map(c => {
+      if (c.item.id !== id) return c;
+      // Allow typing "0." or "1." etc
+      if (text === '' || text === '0' || /^\d*\.?\d*$/.test(text)) {
+        const num = parseFloat(text);
+        return { ...c, qtyText: text, qty: isNaN(num) ? 0 : num };
+      }
+      return c;
+    }));
+  };
+
+  const setCartItemUnit = (id: string, unitLabel: string) => {
+    setCart(prev => prev.map(c => {
+      if (c.item.id !== id) return c;
+      const units = getUnitOptions(c.item);
+      const oldUnit = units.find(u => u.label === c.unitMode);
+      const newUnit = units.find(u => u.label === unitLabel);
+      if (!oldUnit || !newUnit) return { ...c, unitMode: unitLabel };
+      // Convert qty: e.g. 1 kg → 1000 grams
+      const baseQty = c.qty * oldUnit.factor;
+      const newQty = Math.round((baseQty / newUnit.factor) * 100) / 100;
+      return { ...c, unitMode: unitLabel, qty: newQty, qtyText: String(newQty) };
+    }));
+  };
 
   const clearCart = () => {
     setCart([]); setTableNumber(''); setCustomerName(''); setCustomerPhone('');
     setOrderNotes(''); setDiscount(''); setDeliveryAddress(''); setSelectedDeliveryAgent('');
+    setPaymentMethod('cash'); setPaidAmount('');
     setOrderType(getDefaultOrderType(businessType) as OrderType); setActiveInvoiceId(null);
   };
 
@@ -273,7 +325,7 @@ export default function Dashboard() {
   const recallInvoice = (tab: HeldInvoice) => {
     // Save current cart as another tab if not empty
     if (cart.length > 0) holdCurrentInvoice();
-    setCart(tab.cart);
+    setCart(tab.cart.map(c => ({ ...c, qtyText: c.qtyText || String(c.qty), unitMode: c.unitMode || 'قطعة' })));
     setTableNumber(tab.tableNumber);
     setCustomerName(tab.customerName);
     setCustomerPhone(tab.customerPhone || '');
@@ -312,6 +364,8 @@ export default function Dashboard() {
       order_type: orderType,
       delivery_address: deliveryAddress,
       delivery_agent_id: selectedDeliveryAgent || null,
+      payment_method: paymentMethod,
+      paid_amount: paidNum,
     };
 
     const cartItems = cart.map(c => ({
@@ -809,16 +863,22 @@ export default function Dashboard() {
                         <p className="text-sm font-medium truncate">{c.item.name}</p>
                         <p className="text-xs text-primary">{(c.item.price * c.qty).toFixed(2)} {currency}</p>
                       </div>
-                      <div className="flex items-center gap-1">
+                      <div className="flex items-center gap-1 flex-wrap">
+                        {getUnitOptions(c.item).length > 1 && (
+                          <select value={c.unitMode} onChange={e => setCartItemUnit(c.item.id, e.target.value)}
+                            className="h-7 text-[10px] bg-secondary border border-border rounded-md px-1">
+                            {getUnitOptions(c.item).map(u => <option key={u.label} value={u.label}>{u.label}</option>)}
+                          </select>
+                        )}
                         <button onClick={() => updateQty(c.item.id, -0.5)} className="w-7 h-7 rounded-md bg-secondary flex items-center justify-center hover:bg-destructive/20 transition-colors text-[10px] font-bold">-½</button>
                         <button onClick={() => updateQty(c.item.id, -1)} className="w-7 h-7 rounded-md bg-secondary flex items-center justify-center hover:bg-destructive/20 transition-colors"><Minus className="w-3 h-3" /></button>
                         <input
-                          type="number"
-                          value={c.qty}
-                          onChange={e => setCartItemQty(c.item.id, Number(e.target.value) || 0)}
+                          type="text"
+                          inputMode="decimal"
+                          value={c.qtyText}
+                          onChange={e => setCartItemQty(c.item.id, e.target.value)}
+                          onBlur={() => { if (!c.qty || c.qty <= 0) updateQty(c.item.id, 0); }}
                           className="w-12 text-center text-sm font-medium bg-transparent border border-border rounded-md h-7"
-                          step="0.25"
-                          min="0"
                         />
                         <button onClick={() => updateQty(c.item.id, 1)} className="w-7 h-7 rounded-md bg-secondary flex items-center justify-center hover:bg-primary/20 transition-colors"><Plus className="w-3 h-3" /></button>
                         <button onClick={() => updateQty(c.item.id, 0.5)} className="w-7 h-7 rounded-md bg-secondary flex items-center justify-center hover:bg-primary/20 transition-colors text-[10px] font-bold">+½</button>
@@ -838,6 +898,34 @@ export default function Dashboard() {
                   <div className="flex justify-between font-display font-bold text-lg">
                     <span>الإجمالي</span><span className="text-primary">{cartTotal.toFixed(2)} {currency}</span>
                   </div>
+
+                  {/* Payment Method */}
+                  <div className="flex gap-1 rounded-lg bg-secondary p-1">
+                    {[
+                      { key: 'cash', label: '💵 نقدي' },
+                      { key: 'instapay', label: '📱 إنستاباي' },
+                      { key: 'vodafone_cash', label: '📲 فودافون كاش' },
+                      { key: 'bank', label: '🏦 تحويل بنكي' },
+                    ].map(m => (
+                      <button key={m.key} onClick={() => setPaymentMethod(m.key)}
+                        className={`flex-1 py-1.5 rounded-md text-[10px] transition-all ${paymentMethod === m.key ? 'gradient-bg text-primary-foreground' : 'text-muted-foreground'}`}>
+                        {m.label}
+                      </button>
+                    ))}
+                  </div>
+
+                  {/* Paid & Remaining */}
+                  <div className="grid grid-cols-2 gap-2">
+                    <div className="relative">
+                      <DollarSign className="w-3.5 h-3.5 absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                      <Input value={paidAmount} onChange={e => setPaidAmount(e.target.value)} placeholder="المبلغ المدفوع" className="pr-7 h-8 text-xs" type="number" />
+                    </div>
+                    <div className="flex items-center justify-between px-3 py-1.5 rounded-lg bg-secondary/50 text-xs">
+                      <span className="text-muted-foreground">الباقي:</span>
+                      <span className={`font-bold ${remaining > 0 ? 'text-destructive' : 'text-success'}`}>{remaining.toFixed(2)} {currency}</span>
+                    </div>
+                  </div>
+
                   <div className="grid grid-cols-3 gap-2">
                     <Button onClick={() => checkout(true)} className="gradient-bg text-primary-foreground border-0 h-10 text-xs" disabled={cart.length === 0}>
                       <Send className="w-4 h-4 ml-1" /> إرسال للتحضير

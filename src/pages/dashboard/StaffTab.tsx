@@ -46,10 +46,12 @@ export function StaffTab({ restaurantId }: Props) {
     if (!form.name.trim()) { toast.error('أدخل اسم الموظف'); return; }
     const payload = { restaurant_id: restaurantId, name: form.name, role: form.role, phone: form.phone, pin: form.pin };
     if (editing) {
-      await (supabase.from as any)('restaurant_staff').update(payload).eq('id', editing.id);
+      const { error } = await (supabase.from as any)('restaurant_staff').update(payload).eq('id', editing.id);
+      if (error) { toast.error('خطأ في تحديث الموظف: ' + error.message); return; }
       toast.success('تم تحديث الموظف');
     } else {
-      await (supabase.from as any)('restaurant_staff').insert(payload);
+      const { error } = await (supabase.from as any)('restaurant_staff').insert(payload);
+      if (error) { toast.error('خطأ في إضافة الموظف: ' + error.message); return; }
       toast.success('تم إضافة الموظف');
     }
     resetForm();
