@@ -364,6 +364,8 @@ export default function Dashboard() {
       order_type: orderType,
       delivery_address: deliveryAddress,
       delivery_agent_id: selectedDeliveryAgent || null,
+      payment_method: paymentMethod,
+      paid_amount: paidNum,
     };
 
     const cartItems = cart.map(c => ({
