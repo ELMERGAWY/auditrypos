@@ -896,6 +896,34 @@ export default function Dashboard() {
                   <div className="flex justify-between font-display font-bold text-lg">
                     <span>الإجمالي</span><span className="text-primary">{cartTotal.toFixed(2)} {currency}</span>
                   </div>
+
+                  {/* Payment Method */}
+                  <div className="flex gap-1 rounded-lg bg-secondary p-1">
+                    {[
+                      { key: 'cash', label: '💵 نقدي' },
+                      { key: 'instapay', label: '📱 إنستاباي' },
+                      { key: 'vodafone_cash', label: '📲 فودافون كاش' },
+                      { key: 'bank', label: '🏦 تحويل بنكي' },
+                    ].map(m => (
+                      <button key={m.key} onClick={() => setPaymentMethod(m.key)}
+                        className={`flex-1 py-1.5 rounded-md text-[10px] transition-all ${paymentMethod === m.key ? 'gradient-bg text-primary-foreground' : 'text-muted-foreground'}`}>
+                        {m.label}
+                      </button>
+                    ))}
+                  </div>
+
+                  {/* Paid & Remaining */}
+                  <div className="grid grid-cols-2 gap-2">
+                    <div className="relative">
+                      <DollarSign className="w-3.5 h-3.5 absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                      <Input value={paidAmount} onChange={e => setPaidAmount(e.target.value)} placeholder="المبلغ المدفوع" className="pr-7 h-8 text-xs" type="number" />
+                    </div>
+                    <div className="flex items-center justify-between px-3 py-1.5 rounded-lg bg-secondary/50 text-xs">
+                      <span className="text-muted-foreground">الباقي:</span>
+                      <span className={`font-bold ${remaining > 0 ? 'text-destructive' : 'text-success'}`}>{remaining.toFixed(2)} {currency}</span>
+                    </div>
+                  </div>
+
                   <div className="grid grid-cols-3 gap-2">
                     <Button onClick={() => checkout(true)} className="gradient-bg text-primary-foreground border-0 h-10 text-xs" disabled={cart.length === 0}>
                       <Send className="w-4 h-4 ml-1" /> إرسال للتحضير
