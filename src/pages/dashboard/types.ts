@@ -67,7 +67,7 @@ export interface Restaurant {
 export interface HeldInvoice {
   id: string;
   label: string;
-  cart: { item: MenuItem; qty: number }[];
+  cart: { item: MenuItem; qty: number; qtyText?: string; unitMode?: string }[];
   tableNumber: string;
   customerName: string;
   notes: string;
