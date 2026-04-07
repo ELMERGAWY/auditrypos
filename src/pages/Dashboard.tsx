@@ -325,7 +325,7 @@ export default function Dashboard() {
   const recallInvoice = (tab: HeldInvoice) => {
     // Save current cart as another tab if not empty
     if (cart.length > 0) holdCurrentInvoice();
-    setCart(tab.cart);
+    setCart(tab.cart.map(c => ({ ...c, qtyText: c.qtyText || String(c.qty), unitMode: c.unitMode || 'قطعة' })));
     setTableNumber(tab.tableNumber);
     setCustomerName(tab.customerName);
     setCustomerPhone(tab.customerPhone || '');
@@ -865,12 +865,12 @@ export default function Dashboard() {
                         <button onClick={() => updateQty(c.item.id, -0.5)} className="w-7 h-7 rounded-md bg-secondary flex items-center justify-center hover:bg-destructive/20 transition-colors text-[10px] font-bold">-½</button>
                         <button onClick={() => updateQty(c.item.id, -1)} className="w-7 h-7 rounded-md bg-secondary flex items-center justify-center hover:bg-destructive/20 transition-colors"><Minus className="w-3 h-3" /></button>
                         <input
-                          type="number"
-                          value={c.qty}
-                          onChange={e => setCartItemQty(c.item.id, Number(e.target.value) || 0)}
+                          type="text"
+                          inputMode="decimal"
+                          value={c.qtyText}
+                          onChange={e => setCartItemQty(c.item.id, e.target.value)}
+                          onBlur={() => { if (!c.qty || c.qty <= 0) updateQty(c.item.id, 0); }}
                           className="w-12 text-center text-sm font-medium bg-transparent border border-border rounded-md h-7"
-                          step="0.25"
-                          min="0"
                         />
                         <button onClick={() => updateQty(c.item.id, 1)} className="w-7 h-7 rounded-md bg-secondary flex items-center justify-center hover:bg-primary/20 transition-colors"><Plus className="w-3 h-3" /></button>
                         <button onClick={() => updateQty(c.item.id, 0.5)} className="w-7 h-7 rounded-md bg-secondary flex items-center justify-center hover:bg-primary/20 transition-colors text-[10px] font-bold">+½</button>
