@@ -177,8 +177,6 @@ export default function Dashboard() {
     }
     return i.available;
   });
-  const paidNum = Number(paidAmount) || 0;
-  const remaining = Math.max(0, cartTotal - paidNum);
 
   const cartSubtotal = cart.reduce((s, c) => s + c.item.price * c.qty, 0);
   const discountAmount = discountType === 'percent'
