@@ -861,7 +861,13 @@ export default function Dashboard() {
                         <p className="text-sm font-medium truncate">{c.item.name}</p>
                         <p className="text-xs text-primary">{(c.item.price * c.qty).toFixed(2)} {currency}</p>
                       </div>
-                      <div className="flex items-center gap-1">
+                      <div className="flex items-center gap-1 flex-wrap">
+                        {getUnitOptions(c.item).length > 1 && (
+                          <select value={c.unitMode} onChange={e => setCartItemUnit(c.item.id, e.target.value)}
+                            className="h-7 text-[10px] bg-secondary border border-border rounded-md px-1">
+                            {getUnitOptions(c.item).map(u => <option key={u.label} value={u.label}>{u.label}</option>)}
+                          </select>
+                        )}
                         <button onClick={() => updateQty(c.item.id, -0.5)} className="w-7 h-7 rounded-md bg-secondary flex items-center justify-center hover:bg-destructive/20 transition-colors text-[10px] font-bold">-½</button>
                         <button onClick={() => updateQty(c.item.id, -1)} className="w-7 h-7 rounded-md bg-secondary flex items-center justify-center hover:bg-destructive/20 transition-colors"><Minus className="w-3 h-3" /></button>
                         <input
