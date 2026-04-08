@@ -336,11 +336,11 @@ export function CustomersTab({ restaurantId, currency }: Props) {
             className="fixed inset-0 z-50 bg-background/80 backdrop-blur-sm flex items-center justify-center p-4" onClick={() => setShowPayment(null)}>
             <motion.div initial={{ scale: 0.9 }} animate={{ scale: 1 }} exit={{ scale: 0.9 }}
               className="glass-card p-6 max-w-sm w-full space-y-4" onClick={e => e.stopPropagation()}>
-              <h3 className="font-display font-bold">تسجيل دفعة — {showPayment.name}</h3>
+              <h3 className="font-display font-bold">سند قبض — {showPayment.name}</h3>
               <p className="text-sm">الرصيد الحالي: <span className={`font-bold ${showPayment.balance > 0 ? 'text-destructive' : 'text-success'}`}>{showPayment.balance} {currency}</span></p>
               <Input placeholder="المبلغ" type="number" value={paymentAmount} onChange={e => setPaymentAmount(e.target.value)} />
               <Input placeholder="الوصف (اختياري)" value={paymentDesc} onChange={e => setPaymentDesc(e.target.value)} />
-              <Button onClick={handlePayment} className="w-full gradient-bg text-primary-foreground border-0">تسجيل الدفعة</Button>
+              <Button onClick={handlePayment} className="w-full gradient-bg text-primary-foreground border-0">تسجيل الدفعة وطباعة السند</Button>
             </motion.div>
           </motion.div>
         )}
