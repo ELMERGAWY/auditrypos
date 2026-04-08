@@ -51,6 +51,8 @@ export function InventoryTab({ restaurantId, currency }: Props) {
   const [movements, setMovements] = useState<(StockMovement & { product_name?: string })[]>([]);
   const [showProductHistory, setShowProductHistory] = useState<Product | null>(null);
   const [productMovements, setProductMovements] = useState<StockMovement[]>([]);
+  const [pricingMode, setPricingMode] = useState<'fixed' | 'markup_percent' | 'markup_fixed'>('fixed');
+  const [markupValue, setMarkupValue] = useState('');
   const [form, setForm] = useState({
     name: '', barcode: '', sku: '', category: 'عام', price: '', cost_price: '',
     quantity: '', min_quantity: '5', unit: 'قطعة', image: '📦', expiry_date: '',
