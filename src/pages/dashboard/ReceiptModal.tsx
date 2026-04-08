@@ -1,5 +1,5 @@
 import { useRef } from 'react';
-import { Printer, Download } from 'lucide-react';
+import { Printer } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import type { Order, Restaurant } from './types';
 import { ORDER_TYPE_CONFIG } from './types';
@@ -9,6 +9,13 @@ interface ReceiptProps {
   restaurant: Restaurant;
   onClose: () => void;
 }
+
+const PAYMENT_LABELS: Record<string, string> = {
+  cash: 'نقدي',
+  instapay: 'إنستاباي',
+  vodafone_cash: 'فودافون كاش',
+  bank: 'تحويل بنكي',
+};
 
 const THERMAL_STYLES = `
   * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -27,7 +34,11 @@ const THERMAL_STYLES = `
   .info-label { color: #666; font-size: 11px; }
   .footer { font-size: 10px; color: #666; margin-top: 4px; }
   .order-type { display: inline-block; border: 1px solid #333; border-radius: 4px; padding: 2px 8px; font-size: 11px; margin: 4px 0; }
-  .barcode { font-family: 'Libre Barcode 39', monospace; font-size: 36px; letter-spacing: 2px; }
+  table.items-table { width: 100%; border-collapse: collapse; margin: 6px 0; }
+  table.items-table th { font-size: 10px; border-bottom: 1px solid #333; padding: 3px 2px; text-align: right; }
+  table.items-table td { font-size: 11px; padding: 3px 2px; border-bottom: 1px dashed #ccc; }
+  table.items-table td:last-child, table.items-table th:last-child { text-align: left; }
+  .payment-box { border: 1px solid #333; border-radius: 4px; padding: 6px; margin: 6px 0; }
   @media print { body { margin: 0; padding: 4px; } @page { margin: 0; } }
 `;
 
@@ -36,6 +47,9 @@ function ReceiptContent({ order, restaurant }: { order: Order; restaurant: Resta
   const orderTypeInfo = ORDER_TYPE_CONFIG[order.order_type as keyof typeof ORDER_TYPE_CONFIG];
   const subtotal = order.items.reduce((s, i) => s + i.price * i.quantity, 0);
   const itemCount = order.items.reduce((s, i) => s + i.quantity, 0);
+  const paidAmount = Number((order as any).paid_amount) || 0;
+  const paymentMethod = (order as any).payment_method || 'cash';
+  const remaining = Math.max(0, Number(order.total) - paidAmount);
 
   return (
     <div className="receipt">
@@ -74,22 +88,29 @@ function ReceiptContent({ order, restaurant }: { order: Order; restaurant: Resta
 
       <hr className="divider" />
 
-      {/* Items Header */}
-      <div className="row bold" style={{ fontSize: 11, borderBottom: '1px solid #ccc', paddingBottom: 3, marginBottom: 3 }}>
-        <span>الصنف</span>
-        <span>المبلغ</span>
-      </div>
-
-      {/* Items */}
-      {order.items.map((item, idx) => (
-        <div key={idx} className="row-item">
-          <div className="row">
-            <span className="item-name">{item.menu_item_image} {item.menu_item_name}</span>
-            <span className="bold">{(item.price * item.quantity).toFixed(2)}</span>
-          </div>
-          <div className="item-details">{item.quantity} × {item.price.toFixed(2)} {currency}</div>
-        </div>
-      ))}
+      {/* Items Table */}
+      <table className="items-table">
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>الصنف</th>
+            <th>الكمية</th>
+            <th>السعر</th>
+            <th>الإجمالي</th>
+          </tr>
+        </thead>
+        <tbody>
+          {order.items.map((item, idx) => (
+            <tr key={idx}>
+              <td>{idx + 1}</td>
+              <td>{item.menu_item_image} {item.menu_item_name}</td>
+              <td>{item.quantity}</td>
+              <td>{item.price.toFixed(2)}</td>
+              <td className="bold">{(item.price * item.quantity).toFixed(2)}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
 
       <hr className="divider" />
 
@@ -105,6 +126,18 @@ function ReceiptContent({ order, restaurant }: { order: Order; restaurant: Resta
       <div className="row total-row">
         <span>الإجمالي</span>
         <span>{Number(order.total).toFixed(2)} {currency}</span>
+      </div>
+
+      {/* Payment Info Box */}
+      <div className="payment-box">
+        <div className="row"><span className="info-label">طريقة الدفع</span><span className="bold">{PAYMENT_LABELS[paymentMethod] || 'نقدي'}</span></div>
+        <div className="row"><span className="info-label">المبلغ المدفوع</span><span className="bold" style={{ color: '#16a34a' }}>{paidAmount.toFixed(2)} {currency}</span></div>
+        {remaining > 0 && (
+          <div className="row"><span className="info-label">المبلغ المتبقي</span><span className="bold" style={{ color: '#dc2626' }}>{remaining.toFixed(2)} {currency}</span></div>
+        )}
+        {paidAmount > Number(order.total) && (
+          <div className="row"><span className="info-label">الباقي للعميل</span><span className="bold" style={{ color: '#16a34a' }}>{(paidAmount - Number(order.total)).toFixed(2)} {currency}</span></div>
+        )}
       </div>
 
       <hr className="divider-double" />
@@ -129,7 +162,6 @@ function ReceiptContent({ order, restaurant }: { order: Order; restaurant: Resta
 
 export function ReceiptModalWrapper({ order, restaurant, onClose }: ReceiptProps) {
   const ref = useRef<HTMLDivElement>(null);
-  const currency = restaurant.currency || 'ج.م';
 
   const printReceipt = () => {
     if (!ref.current) return;
@@ -151,11 +183,8 @@ export function ReceiptModalWrapper({ order, restaurant, onClose }: ReceiptProps
     printWindow.onload = () => { printWindow.focus(); printWindow.print(); };
   };
 
-  const orderTypeInfo = ORDER_TYPE_CONFIG[order.order_type as keyof typeof ORDER_TYPE_CONFIG];
-
   return (
     <div>
-      {/* Preview in dashboard */}
       <div ref={ref} className="space-y-2 text-xs font-mono bg-card rounded-lg p-4 max-h-[60vh] overflow-auto" dir="rtl"
         style={{ fontFamily: "'Courier New', monospace" }}>
         <ReceiptContent order={order} restaurant={restaurant} />
@@ -171,7 +200,6 @@ export function ReceiptModalWrapper({ order, restaurant, onClose }: ReceiptProps
   );
 }
 
-// Keep the standalone ReceiptModal export for backward compatibility
 export function ReceiptModal({ order, restaurant, onClose }: ReceiptProps) {
   return <ReceiptModalWrapper order={order} restaurant={restaurant} onClose={onClose} />;
 }
