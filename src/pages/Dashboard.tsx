@@ -1261,6 +1261,11 @@ export default function Dashboard() {
             <NotificationsTab restaurantId={restaurant.id} />
           )}
 
+          {/* ===================== FINANCIALS TAB ===================== */}
+          {activeTab === 'financials' && (
+            <FinancialsTab restaurantId={restaurant.id} currency={currency} />
+          )}
+
           {/* ===================== SETTINGS TAB ===================== */}
           {activeTab === 'settings' && (
             <div className="p-4 max-w-lg space-y-4">
