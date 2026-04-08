@@ -100,6 +100,47 @@ export function CustomersTab({ restaurantId, currency }: Props) {
       type: 'payment', amount: -amount, description: paymentDesc || 'دفعة نقدية',
     });
     toast.success(`تم تسجيل دفعة ${amount} ${currency}`);
+
+    // Print payment receipt (سند قبض)
+    const printWindow = window.open('', '_blank', 'width=320,height=600');
+    if (printWindow) {
+      const receiptDate = new Date().toLocaleDateString('ar-EG');
+      const receiptTime = new Date().toLocaleTimeString('ar-EG');
+      printWindow.document.open();
+      printWindow.document.write(`<!DOCTYPE html>
+<html dir="rtl" lang="ar">
+<head><meta charset="UTF-8"><title>سند قبض</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: 'Courier New', monospace; font-size: 12px; padding: 10px; max-width: 300px; margin: 0 auto; }
+  .center { text-align: center; }
+  .bold { font-weight: bold; }
+  .title { font-size: 18px; font-weight: bold; margin: 8px 0; border: 2px solid #000; padding: 4px; }
+  .divider { border-top: 1px dashed #333; margin: 8px 0; }
+  .row { display: flex; justify-content: space-between; padding: 3px 0; }
+  .amount { font-size: 20px; font-weight: bold; text-align: center; margin: 8px 0; }
+  @media print { @page { margin: 0; } }
+</style></head>
+<body>
+  <div class="center title">سند قبض</div>
+  <div class="divider"></div>
+  <div class="row"><span>التاريخ:</span><span>${receiptDate}</span></div>
+  <div class="row"><span>الوقت:</span><span>${receiptTime}</span></div>
+  <div class="divider"></div>
+  <div class="row"><span>اسم العميل:</span><span class="bold">${showPayment.name}</span></div>
+  <div class="row"><span>الهاتف:</span><span>${showPayment.phone || '-'}</span></div>
+  <div class="divider"></div>
+  <div class="amount">${amount.toFixed(2)} ${currency}</div>
+  <div class="row"><span>الرصيد السابق:</span><span>${showPayment.balance.toFixed(2)} ${currency}</span></div>
+  <div class="row"><span>الرصيد الجديد:</span><span class="bold">${newBalance.toFixed(2)} ${currency}</span></div>
+  ${paymentDesc ? `<div class="divider"></div><div>ملاحظات: ${paymentDesc}</div>` : ''}
+  <div class="divider"></div>
+  <div class="center" style="font-size:10px;color:#666;margin-top:8px;">Powered by AuditryPOS</div>
+</body></html>`);
+      printWindow.document.close();
+      printWindow.onload = () => { printWindow.focus(); printWindow.print(); };
+    }
+
     setShowPayment(null); setPaymentAmount(''); setPaymentDesc('');
     load();
   };
