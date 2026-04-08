@@ -526,6 +526,7 @@ export default function Dashboard() {
     { id: 'qr', label: 'رابط المتجر', icon: QrCode },
     { id: 'waiter', label: 'ويتر', icon: Bell, badge: unackCalls.length },
     { id: 'staff', label: 'الموظفين', icon: UsersRound },
+    { id: 'financials', label: 'القوائم المالية', icon: DollarSign },
     { id: 'notifications', label: 'الإشعارات', icon: Bell },
     { id: 'settings', label: 'الإعدادات', icon: Settings },
   ];
