@@ -378,18 +378,12 @@ export function CustomersTab({ restaurantId, currency }: Props) {
       {/* Customers List */}
       <div className="space-y-2">
         {filtered.map(c => (
-          <motion.div key={c.id} initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="glass-card p-4">
-            <div className="flex items-center gap-3">
-              <div className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold ${
-                c.customer_type === 'vip' ? 'bg-accent/20 text-accent' :
-                c.customer_type === 'wholesale' ? 'bg-primary/20 text-primary' :
-                'bg-secondary text-secondary-foreground'
-              }`}>
-                {c.name.charAt(0)}
+              <div className="flex items-center gap-2 mb-2">
+                <Button size="sm" variant="ghost" onClick={() => setShowPayment(c)} title="سند قبض / تسجيل دفعة"><CreditCard className="w-3 h-3" /></Button>
+                <Button size="sm" variant="ghost" onClick={() => openLedger(c)} title="كشف حساب"><FileText className="w-3 h-3" /></Button>
+                <Button size="sm" variant="ghost" onClick={() => startEdit(c)}><Edit2 className="w-3 h-3" /></Button>
+                <Button size="sm" variant="ghost" className="text-destructive" onClick={() => handleDelete(c.id)}><Trash2 className="w-3 h-3" /></Button>
               </div>
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2">
-                  <p className="font-bold text-sm">{c.name}</p>
                   <Badge variant="outline" className="text-[10px]">
                     {c.customer_type === 'wholesale' ? 'جملة' : c.customer_type === 'vip' ? 'VIP' : 'تجزئة'}
                   </Badge>
