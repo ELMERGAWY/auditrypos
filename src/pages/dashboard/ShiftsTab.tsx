@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
@@ -6,8 +6,15 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
-import { DollarSign, Clock, TrendingUp, Receipt, AlertCircle, CheckCircle } from 'lucide-react';
+import { DollarSign, Clock, TrendingUp, Receipt, AlertCircle, CheckCircle, Users } from 'lucide-react';
 import type { Shift, Restaurant } from './types';
+
+interface StaffMember {
+  id: string;
+  name: string;
+  role: string;
+  is_active: boolean;
+}
 
 interface Props {
   restaurant: Restaurant;
@@ -26,6 +33,16 @@ export function ShiftsTab({ restaurant, currentShift, setCurrentShift, profileNa
   const [pastShifts, setPastShifts] = useState<Shift[]>([]);
   const [loadedHistory, setLoadedHistory] = useState(false);
   const [isOpening, setIsOpening] = useState(false);
+  const [staff, setStaff] = useState<StaffMember[]>([]);
+  const [selectedCashier, setSelectedCashier] = useState('');
+
+  useEffect(() => {
+    (supabase.from as any)('restaurant_staff')
+      .select('id, name, role, is_active')
+      .eq('restaurant_id', restaurant.id)
+      .eq('is_active', true)
+      .then(({ data }: any) => setStaff((data || []) as StaffMember[]));
+  }, [restaurant.id]);
 
   const loadHistory = async () => {
     if (loadedHistory) return;
@@ -39,11 +56,15 @@ export function ShiftsTab({ restaurant, currentShift, setCurrentShift, profileNa
 
   const handleOpenShift = async () => {
     if (currentShift) { toast.error('يوجد شفت مفتوح بالفعل'); return; }
+    const cashierName = selectedCashier
+      ? staff.find(s => s.id === selectedCashier)?.name || profileName
+      : profileName;
+    const cashierId = selectedCashier || userId;
     setIsOpening(true);
     const { data, error } = await supabase.from('shifts').insert({
       restaurant_id: restaurant.id,
-      cashier_id: userId,
-      cashier_name: profileName,
+      cashier_id: cashierId,
+      cashier_name: cashierName,
       opening_balance: Number(openingBalance) || 0,
       status: 'open',
     }).select().single();
@@ -51,7 +72,8 @@ export function ShiftsTab({ restaurant, currentShift, setCurrentShift, profileNa
     if (error) { toast.error('خطأ في فتح الشفت'); return; }
     setCurrentShift(data as unknown as Shift);
     setOpeningBalance('');
-    toast.success('تم فتح الشفت بنجاح ✅');
+    setSelectedCashier('');
+    toast.success(`تم فتح الشفت بنجاح — الكاشير: ${cashierName} ✅`);
   };
 
   const handleCloseShift = async () => {
@@ -77,12 +99,12 @@ export function ShiftsTab({ restaurant, currentShift, setCurrentShift, profileNa
     : 0;
 
   const currency = restaurant.currency || 'ج.م';
+  const cashiers = staff.filter(s => s.role === 'cashier' || s.role === 'branch_manager');
 
   return (
     <div className="p-4 space-y-4 max-w-2xl">
       <h2 className="font-display text-xl font-bold flex items-center gap-2">⏰ إدارة الشفتات والخزينة</h2>
 
-      {/* Current Shift Status */}
       {currentShift ? (
         <div className="glass-card p-6 border-success/30 border">
           <div className="flex items-center gap-3 mb-4">
@@ -157,6 +179,20 @@ export function ShiftsTab({ restaurant, currentShift, setCurrentShift, profileNa
             </div>
           </div>
           <div className="space-y-3">
+            {/* Cashier Selection */}
+            <div>
+              <Label className="flex items-center gap-1 mb-1"><Users className="w-3 h-3" /> اختيار الكاشير</Label>
+              <select
+                value={selectedCashier}
+                onChange={e => setSelectedCashier(e.target.value)}
+                className="w-full h-10 bg-background border border-input rounded-md px-3 text-sm"
+              >
+                <option value="">👤 المالك ({profileName})</option>
+                {cashiers.map(s => (
+                  <option key={s.id} value={s.id}>💰 {s.name} ({s.role === 'branch_manager' ? 'مدير فرع' : 'كاشير'})</option>
+                ))}
+              </select>
+            </div>
             <div>
               <Label>رصيد الافتتاح ({currency})</Label>
               <Input type="number" value={openingBalance} onChange={e => setOpeningBalance(e.target.value)} placeholder="المبلغ الموجود في الخزينة" />

@@ -51,6 +51,8 @@ export function InventoryTab({ restaurantId, currency }: Props) {
   const [movements, setMovements] = useState<(StockMovement & { product_name?: string })[]>([]);
   const [showProductHistory, setShowProductHistory] = useState<Product | null>(null);
   const [productMovements, setProductMovements] = useState<StockMovement[]>([]);
+  const [pricingMode, setPricingMode] = useState<'fixed' | 'markup_percent' | 'markup_fixed'>('fixed');
+  const [markupValue, setMarkupValue] = useState('');
   const [form, setForm] = useState({
     name: '', barcode: '', sku: '', category: 'عام', price: '', cost_price: '',
     quantity: '', min_quantity: '5', unit: 'قطعة', image: '📦', expiry_date: '',
@@ -137,8 +139,15 @@ export function InventoryTab({ restaurantId, currency }: Props) {
   };
 
   const resetForm = () => {
-    setShowForm(false); setEditingProduct(null);
+    setShowForm(false); setEditingProduct(null); setPricingMode('fixed'); setMarkupValue('');
     setForm({ name: '', barcode: '', sku: '', category: 'عام', price: '', cost_price: '', quantity: '', min_quantity: '5', unit: 'قطعة', image: '📦', expiry_date: '' });
+  };
+
+  const calcSellingPrice = (costStr: string) => {
+    const cost = Number(costStr) || 0;
+    if (pricingMode === 'markup_percent') return (cost * (1 + (Number(markupValue) || 0) / 100)).toFixed(2);
+    if (pricingMode === 'markup_fixed') return (cost + (Number(markupValue) || 0)).toFixed(2);
+    return form.price;
   };
 
   const startEdit = (p: Product) => {
@@ -339,8 +348,60 @@ export function InventoryTab({ restaurantId, currency }: Props) {
                 <div className="col-span-2"><Input placeholder="اسم المنتج *" value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} /></div>
                 <Input placeholder="باركود" value={form.barcode} onChange={e => setForm(f => ({ ...f, barcode: e.target.value }))} />
                 <Input placeholder="SKU" value={form.sku} onChange={e => setForm(f => ({ ...f, sku: e.target.value }))} />
-                <Input placeholder="سعر البيع" type="number" value={form.price} onChange={e => setForm(f => ({ ...f, price: e.target.value }))} />
-                <Input placeholder="سعر التكلفة" type="number" value={form.cost_price} onChange={e => setForm(f => ({ ...f, cost_price: e.target.value }))} />
+                <Input placeholder="سعر التكلفة" type="number" value={form.cost_price} onChange={e => {
+                  const newCost = e.target.value;
+                  setForm(f => ({ ...f, cost_price: newCost }));
+                  if (pricingMode !== 'fixed') {
+                    const cost = Number(newCost) || 0;
+                    const mv = Number(markupValue) || 0;
+                    const newPrice = pricingMode === 'markup_percent' ? (cost * (1 + mv / 100)).toFixed(2) : (cost + mv).toFixed(2);
+                    setForm(f => ({ ...f, cost_price: newCost, price: newPrice }));
+                  }
+                }} />
+                {/* Pricing Mode */}
+                <div className="col-span-2">
+                  <label className="text-xs text-muted-foreground mb-1 block">طريقة تحديد سعر البيع</label>
+                  <div className="flex gap-1 rounded-lg bg-secondary p-1 mb-2">
+                    {([
+                      { key: 'fixed' as const, label: 'مبلغ ثابت' },
+                      { key: 'markup_percent' as const, label: 'نسبة من التكلفة %' },
+                      { key: 'markup_fixed' as const, label: 'هامش ثابت +' },
+                    ] as const).map(m => (
+                      <button key={m.key} type="button" onClick={() => {
+                        setPricingMode(m.key);
+                        if (m.key !== 'fixed' && form.cost_price) {
+                          const cost = Number(form.cost_price) || 0;
+                          const mv = Number(markupValue) || 0;
+                          const np = m.key === 'markup_percent' ? (cost * (1 + mv / 100)).toFixed(2) : (cost + mv).toFixed(2);
+                          setForm(f => ({ ...f, price: np }));
+                        }
+                      }}
+                        className={`flex-1 py-1.5 rounded-md text-xs transition-all ${pricingMode === m.key ? 'gradient-bg text-primary-foreground' : 'text-muted-foreground'}`}>
+                        {m.label}
+                      </button>
+                    ))}
+                  </div>
+                  {pricingMode !== 'fixed' && (
+                    <div className="flex gap-2 mb-2">
+                      <Input
+                        placeholder={pricingMode === 'markup_percent' ? 'نسبة الربح %' : 'هامش الربح'}
+                        type="number"
+                        value={markupValue}
+                        onChange={e => {
+                          setMarkupValue(e.target.value);
+                          const cost = Number(form.cost_price) || 0;
+                          const mv = Number(e.target.value) || 0;
+                          const newPrice = pricingMode === 'markup_percent' ? (cost * (1 + mv / 100)).toFixed(2) : (cost + mv).toFixed(2);
+                          setForm(f => ({ ...f, price: newPrice }));
+                        }}
+                      />
+                      <div className="flex items-center px-3 bg-secondary/50 rounded-md text-xs text-muted-foreground whitespace-nowrap">
+                        سعر البيع: <span className="font-bold text-primary mr-1">{form.price || '0'}</span>
+                      </div>
+                    </div>
+                  )}
+                </div>
+                <Input placeholder="سعر البيع" type="number" value={form.price} onChange={e => setForm(f => ({ ...f, price: e.target.value }))} disabled={pricingMode !== 'fixed'} />
                 <Input placeholder="الكمية" type="number" value={form.quantity} onChange={e => setForm(f => ({ ...f, quantity: e.target.value }))} step="0.01" />
                 <Input placeholder="الحد الأدنى" type="number" value={form.min_quantity} onChange={e => setForm(f => ({ ...f, min_quantity: e.target.value }))} />
                 <Input placeholder="الفئة" value={form.category} onChange={e => setForm(f => ({ ...f, category: e.target.value }))} />

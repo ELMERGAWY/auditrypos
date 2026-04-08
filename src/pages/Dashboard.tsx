@@ -28,6 +28,7 @@ import { SuppliersTab } from './dashboard/SuppliersTab';
 import { ExpensesTab } from './dashboard/ExpensesTab';
 import { StaffTab } from './dashboard/StaffTab';
 import { NotificationsTab } from './dashboard/NotificationsTab';
+import { FinancialsTab } from './dashboard/FinancialsTab';
 import { BarcodeScanner } from './dashboard/BarcodeScanner';
 import { BUSINESS_TYPES, BUSINESS_TABS, getAddressPlaceholder, getCheckoutButtonLabel, getCustomerPlaceholder, getDefaultOrderType, getNotesPlaceholder, getPosSearchPlaceholder, isFoodSector, isInventoryDrivenBusiness, type BusinessType } from '@/lib/businessTypes';
 import { useAuth } from '@/lib/AuthContext';
@@ -419,11 +420,36 @@ export default function Dashboard() {
       const newOrder = {
         ...order,
         items: cartItems,
+        paid_amount: paidNum,
+        payment_method: paymentMethod,
       } as unknown as Order;
 
       setOrders(prev => [newOrder, ...prev]);
       setLastReceipt(newOrder);
       setShowReceipt(true);
+
+      // Record customer transaction if customer is linked and there's a remaining balance
+      if (customerName.trim() && remaining > 0) {
+        // Find customer by name
+        const { data: custData } = await supabase.from('customers')
+          .select('id, balance')
+          .eq('restaurant_id', restaurant!.id)
+          .ilike('name', customerName.trim())
+          .limit(1);
+        if (custData && custData.length > 0) {
+          const cust = custData[0];
+          await supabase.from('customers').update({ balance: cust.balance + remaining }).eq('id', cust.id);
+          await supabase.from('customer_transactions').insert({
+            customer_id: cust.id,
+            restaurant_id: restaurant!.id,
+            type: 'sale',
+            amount: remaining,
+            description: `فاتورة #${orderNum.slice(-4)} — متبقي`,
+            order_id: order.id,
+          });
+        }
+      }
+
       clearCart();
       toast.success(`✅ تم إنشاء الطلب #${orderNum.slice(-4)} — ${cartTotal.toFixed(2)} ${currency}`);
     } catch {
@@ -500,6 +526,7 @@ export default function Dashboard() {
     { id: 'qr', label: 'رابط المتجر', icon: QrCode },
     { id: 'waiter', label: 'ويتر', icon: Bell, badge: unackCalls.length },
     { id: 'staff', label: 'الموظفين', icon: UsersRound },
+    { id: 'financials', label: 'القوائم المالية', icon: DollarSign },
     { id: 'notifications', label: 'الإشعارات', icon: Bell },
     { id: 'settings', label: 'الإعدادات', icon: Settings },
   ];
@@ -1232,6 +1259,11 @@ export default function Dashboard() {
           {/* ===================== NOTIFICATIONS TAB ===================== */}
           {activeTab === 'notifications' && (
             <NotificationsTab restaurantId={restaurant.id} />
+          )}
+
+          {/* ===================== FINANCIALS TAB ===================== */}
+          {activeTab === 'financials' && (
+            <FinancialsTab restaurantId={restaurant.id} currency={currency} />
           )}
 
           {/* ===================== SETTINGS TAB ===================== */}

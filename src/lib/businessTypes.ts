@@ -138,15 +138,15 @@ export const BUSINESS_TYPES: Record<BusinessType, BusinessTypeConfig> = {
 
 // Tab configuration per business type
 export const BUSINESS_TABS: Record<BusinessType, string[]> = {
-  restaurant: ['pos', 'orders', 'menu', 'delivery', 'shifts', 'stats', 'qr', 'waiter', 'inventory', 'customers', 'expenses', 'staff', 'notifications', 'settings'],
-  cafe: ['pos', 'orders', 'menu', 'delivery', 'shifts', 'stats', 'qr', 'waiter', 'inventory', 'customers', 'expenses', 'staff', 'notifications', 'settings'],
-  retail: ['pos', 'orders', 'menu', 'inventory', 'delivery', 'customers', 'suppliers', 'shifts', 'stats', 'expenses', 'staff', 'notifications', 'settings'],
-  wholesale: ['pos', 'orders', 'menu', 'inventory', 'delivery', 'customers', 'suppliers', 'shifts', 'stats', 'expenses', 'staff', 'notifications', 'settings'],
-  grocery: ['pos', 'orders', 'menu', 'inventory', 'delivery', 'customers', 'suppliers', 'shifts', 'stats', 'expenses', 'staff', 'notifications', 'settings'],
-  warehouse: ['inventory', 'orders', 'menu', 'delivery', 'customers', 'suppliers', 'shifts', 'stats', 'expenses', 'staff', 'notifications', 'settings'],
-  pharmacy: ['pos', 'orders', 'menu', 'inventory', 'delivery', 'customers', 'suppliers', 'shifts', 'stats', 'expenses', 'staff', 'notifications', 'settings'],
-  services: ['pos', 'orders', 'menu', 'delivery', 'customers', 'shifts', 'stats', 'expenses', 'staff', 'notifications', 'settings'],
-  other: ['pos', 'orders', 'menu', 'inventory', 'delivery', 'customers', 'suppliers', 'shifts', 'stats', 'expenses', 'staff', 'notifications', 'settings'],
+  restaurant: ['pos', 'orders', 'menu', 'delivery', 'shifts', 'stats', 'financials', 'qr', 'waiter', 'inventory', 'customers', 'expenses', 'staff', 'notifications', 'settings'],
+  cafe: ['pos', 'orders', 'menu', 'delivery', 'shifts', 'stats', 'financials', 'qr', 'waiter', 'inventory', 'customers', 'expenses', 'staff', 'notifications', 'settings'],
+  retail: ['pos', 'orders', 'menu', 'inventory', 'delivery', 'customers', 'suppliers', 'shifts', 'stats', 'financials', 'expenses', 'staff', 'notifications', 'settings'],
+  wholesale: ['pos', 'orders', 'menu', 'inventory', 'delivery', 'customers', 'suppliers', 'shifts', 'stats', 'financials', 'expenses', 'staff', 'notifications', 'settings'],
+  grocery: ['pos', 'orders', 'menu', 'inventory', 'delivery', 'customers', 'suppliers', 'shifts', 'stats', 'financials', 'expenses', 'staff', 'notifications', 'settings'],
+  warehouse: ['inventory', 'orders', 'menu', 'delivery', 'customers', 'suppliers', 'shifts', 'stats', 'financials', 'expenses', 'staff', 'notifications', 'settings'],
+  pharmacy: ['pos', 'orders', 'menu', 'inventory', 'delivery', 'customers', 'suppliers', 'shifts', 'stats', 'financials', 'expenses', 'staff', 'notifications', 'settings'],
+  services: ['pos', 'orders', 'menu', 'delivery', 'customers', 'shifts', 'stats', 'financials', 'expenses', 'staff', 'notifications', 'settings'],
+  other: ['pos', 'orders', 'menu', 'inventory', 'delivery', 'customers', 'suppliers', 'shifts', 'stats', 'financials', 'expenses', 'staff', 'notifications', 'settings'],
 };
 
 // Which sectors are "food" (show waiter, tables, QR menu)

@@ -1,4 +1,4 @@
-export type DashboardTab = 'pos' | 'orders' | 'menu' | 'delivery' | 'shifts' | 'qr' | 'waiter' | 'stats' | 'settings' | 'inventory' | 'customers' | 'suppliers' | 'expenses' | 'staff' | 'notifications';
+export type DashboardTab = 'pos' | 'orders' | 'menu' | 'delivery' | 'shifts' | 'qr' | 'waiter' | 'stats' | 'settings' | 'inventory' | 'customers' | 'suppliers' | 'expenses' | 'staff' | 'notifications' | 'financials';
 export type OrderStatus = 'pending' | 'preparing' | 'ready' | 'completed' | 'cancelled';
 export type OrderType = 'dine_in' | 'takeaway' | 'delivery' | 'pickup';
 export type AgentStatus = 'available' | 'busy' | 'offline';
