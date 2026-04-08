@@ -139,8 +139,15 @@ export function InventoryTab({ restaurantId, currency }: Props) {
   };
 
   const resetForm = () => {
-    setShowForm(false); setEditingProduct(null);
+    setShowForm(false); setEditingProduct(null); setPricingMode('fixed'); setMarkupValue('');
     setForm({ name: '', barcode: '', sku: '', category: 'عام', price: '', cost_price: '', quantity: '', min_quantity: '5', unit: 'قطعة', image: '📦', expiry_date: '' });
+  };
+
+  const calcSellingPrice = (costStr: string) => {
+    const cost = Number(costStr) || 0;
+    if (pricingMode === 'markup_percent') return (cost * (1 + (Number(markupValue) || 0) / 100)).toFixed(2);
+    if (pricingMode === 'markup_fixed') return (cost + (Number(markupValue) || 0)).toFixed(2);
+    return form.price;
   };
 
   const startEdit = (p: Product) => {
