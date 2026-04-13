@@ -19,26 +19,26 @@ const PAYMENT_LABELS: Record<string, string> = {
 
 const THERMAL_STYLES = `
   * { margin: 0; padding: 0; box-sizing: border-box; }
-  body { font-family: 'Courier New', 'Lucida Console', monospace; font-size: 12px; padding: 8px; max-width: 300px; margin: 0 auto; color: #000; background: #fff; }
+  body { font-family: 'Arial', 'Tahoma', sans-serif; font-size: 13px; padding: 8px; max-width: 300px; margin: 0 auto; color: #000; background: #fff; }
   .receipt { padding: 4px 0; }
   .center { text-align: center; }
   .bold { font-weight: bold; }
   .logo-name { font-size: 20px; font-weight: bold; letter-spacing: 1px; margin-bottom: 2px; }
-  .divider { border: none; border-top: 1px dashed #333; margin: 8px 0; }
-  .divider-double { border: none; border-top: 2px solid #333; margin: 8px 0; }
-  .row { display: flex; justify-content: space-between; align-items: center; padding: 2px 0; }
-  .row-item { padding: 3px 0; }
-  .item-name { font-weight: bold; }
-  .item-details { color: #555; font-size: 11px; padding-right: 12px; }
+  .subtitle { font-size: 11px; color: #333; margin-bottom: 2px; }
+  .divider { border: none; border-top: 2px solid #000; margin: 8px 0; }
+  .divider-thin { border: none; border-top: 1px solid #000; margin: 6px 0; }
+  .row { display: flex; justify-content: space-between; align-items: center; padding: 2px 0; font-size: 12px; }
   .total-row { font-size: 16px; font-weight: bold; padding: 4px 0; }
-  .info-label { color: #666; font-size: 11px; }
-  .footer { font-size: 10px; color: #666; margin-top: 4px; }
-  .order-type { display: inline-block; border: 1px solid #333; border-radius: 4px; padding: 2px 8px; font-size: 11px; margin: 4px 0; }
+  .info-label { color: #333; font-size: 12px; }
+  .footer { font-size: 10px; color: #666; margin-top: 6px; }
   table.items-table { width: 100%; border-collapse: collapse; margin: 6px 0; }
-  table.items-table th { font-size: 10px; border-bottom: 1px solid #333; padding: 3px 2px; text-align: right; }
-  table.items-table td { font-size: 11px; padding: 3px 2px; border-bottom: 1px dashed #ccc; }
+  table.items-table th { font-size: 11px; font-weight: bold; border-top: 2px solid #000; border-bottom: 2px solid #000; padding: 4px 2px; text-align: right; }
+  table.items-table td { font-size: 12px; padding: 4px 2px; border-bottom: 1px solid #000; }
   table.items-table td:last-child, table.items-table th:last-child { text-align: left; }
-  .payment-box { border: 1px solid #333; border-radius: 4px; padding: 6px; margin: 6px 0; }
+  .summary-table { width: 100%; border-collapse: collapse; margin: 6px 0; }
+  .summary-table td { padding: 3px 4px; font-size: 12px; border-bottom: 1px solid #000; }
+  .summary-table td:last-child { text-align: left; font-weight: bold; }
+  .summary-table tr:last-child td { border-bottom: 2px solid #000; }
   @media print { body { margin: 0; padding: 4px; } @page { margin: 0; } }
 `;
 
@@ -50,111 +50,113 @@ function ReceiptContent({ order, restaurant }: { order: Order; restaurant: Resta
   const paidAmount = Number((order as any).paid_amount) || 0;
   const paymentMethod = (order as any).payment_method || 'cash';
   const remaining = Math.max(0, Number(order.total) - paidAmount);
+  const change = paidAmount > Number(order.total) ? paidAmount - Number(order.total) : 0;
 
   return (
     <div className="receipt">
       {/* Header */}
       <div className="center">
         {restaurant.logo_url && (
-          <img src={restaurant.logo_url} alt="" style={{ width: 64, height: 64, objectFit: 'contain', margin: '0 auto 6px' }} />
+          <img src={restaurant.logo_url} alt="" style={{ width: 64, height: 64, objectFit: 'contain', margin: '0 auto 4px' }} />
         )}
         <div className="logo-name">{restaurant.name}</div>
-        <div style={{ fontSize: 11, color: '#666' }}>فاتورة ضريبية مبسطة</div>
       </div>
-
-      <hr className="divider-double" />
-
-      {/* Order Info */}
-      <div className="row"><span className="info-label">رقم الطلب</span><span className="bold">#{order.order_number.slice(-4)}</span></div>
-      <div className="row"><span className="info-label">التاريخ</span><span>{new Date(order.created_at).toLocaleDateString('ar-EG')}</span></div>
-      <div className="row"><span className="info-label">الوقت</span><span>{new Date(order.created_at).toLocaleTimeString('ar-EG')}</span></div>
-      
-      <div className="center" style={{ margin: '4px 0' }}>
-        <span className="order-type">{orderTypeInfo?.icon} {orderTypeInfo?.label}</span>
-      </div>
-
-      {order.table_number && (
-        <div className="row"><span className="info-label">رقم الطاولة</span><span className="bold">🪑 {order.table_number}</span></div>
-      )}
-      {order.customer_name && (
-        <div className="row"><span className="info-label">العميل</span><span>{order.customer_name}</span></div>
-      )}
-      {order.customer_phone && (
-        <div className="row"><span className="info-label">الهاتف</span><span dir="ltr">{order.customer_phone}</span></div>
-      )}
-      {order.delivery_address && (
-        <div className="row"><span className="info-label">عنوان التوصيل</span><span style={{ maxWidth: 150, textAlign: 'left' }}>{order.delivery_address}</span></div>
-      )}
 
       <hr className="divider" />
+
+      {/* Order Info */}
+      <div className="row"><span className="info-label">التاريخ / {new Date(order.created_at).toLocaleDateString('ar-EG')}</span><span>م {new Date(order.created_at).toLocaleTimeString('ar-EG')}</span></div>
+      <div className="row">
+        <span className="info-label">الفاتورة / <span className="bold">{order.order_number.slice(-4)}</span></span>
+        <span className="info-label">عدد الأصناف / <span className="bold">{order.items.length}</span></span>
+      </div>
+      {order.customer_name && (
+        <div className="row"><span className="info-label">إسم العميل / <span className="bold">{order.customer_name}</span></span></div>
+      )}
+      {order.customer_phone && (
+        <div className="row"><span className="info-label">التليفون / <span dir="ltr">{order.customer_phone}</span></span></div>
+      )}
+      {order.delivery_address && (
+        <div className="row"><span className="info-label">العنوان / {order.delivery_address}</span></div>
+      )}
 
       {/* Items Table */}
       <table className="items-table">
         <thead>
           <tr>
-            <th>#</th>
-            <th>الصنف</th>
-            <th>الكمية</th>
+            <th>إسم الصنف</th>
             <th>السعر</th>
+            <th>الكمية</th>
             <th>الإجمالي</th>
           </tr>
         </thead>
         <tbody>
           {order.items.map((item, idx) => (
             <tr key={idx}>
-              <td>{idx + 1}</td>
-              <td>{item.menu_item_image} {item.menu_item_name}</td>
-              <td>{item.quantity}</td>
+              <td>{item.menu_item_name}</td>
               <td>{item.price.toFixed(2)}</td>
+              <td>{item.quantity}</td>
               <td className="bold">{(item.price * item.quantity).toFixed(2)}</td>
             </tr>
           ))}
         </tbody>
       </table>
 
+      {/* Summary Table */}
+      <table className="summary-table">
+        <tbody>
+          <tr>
+            <td>إجمالي الكمية</td>
+            <td>{itemCount.toFixed(2)}</td>
+          </tr>
+          <tr>
+            <td>الإجمالي</td>
+            <td>{subtotal.toFixed(2)}</td>
+          </tr>
+          {Number(order.discount) > 0 && (
+            <tr>
+              <td>الخصم</td>
+              <td>{Number(order.discount).toFixed(2)}</td>
+            </tr>
+          )}
+          <tr>
+            <td className="bold">صافى الفاتورة</td>
+            <td className="bold" style={{ fontSize: 14 }}>{Number(order.total).toFixed(2)}</td>
+          </tr>
+          <tr>
+            <td>طريقة الدفع</td>
+            <td>{PAYMENT_LABELS[paymentMethod] || 'نقدي'}</td>
+          </tr>
+          <tr>
+            <td>المدفوع</td>
+            <td style={{ color: '#16a34a' }}>{paidAmount.toFixed(2)}</td>
+          </tr>
+          {remaining > 0 && (
+            <tr>
+              <td>المتبقي</td>
+              <td style={{ color: '#dc2626' }}>{remaining.toFixed(2)}</td>
+            </tr>
+          )}
+          {change > 0 && (
+            <tr>
+              <td>الباقي للعميل</td>
+              <td style={{ color: '#16a34a' }}>{change.toFixed(2)}</td>
+            </tr>
+          )}
+        </tbody>
+      </table>
+
       <hr className="divider" />
-
-      {/* Totals */}
-      <div className="row"><span>عدد الأصناف</span><span>{itemCount}</span></div>
-      <div className="row"><span>المجموع الفرعي</span><span>{subtotal.toFixed(2)} {currency}</span></div>
-      {Number(order.discount) > 0 && (
-        <div className="row" style={{ color: '#16a34a' }}><span>الخصم</span><span>-{Number(order.discount).toFixed(2)} {currency}</span></div>
-      )}
-
-      <hr className="divider-double" />
-
-      <div className="row total-row">
-        <span>الإجمالي</span>
-        <span>{Number(order.total).toFixed(2)} {currency}</span>
-      </div>
-
-      {/* Payment Info Box */}
-      <div className="payment-box">
-        <div className="row"><span className="info-label">طريقة الدفع</span><span className="bold">{PAYMENT_LABELS[paymentMethod] || 'نقدي'}</span></div>
-        <div className="row"><span className="info-label">المبلغ المدفوع</span><span className="bold" style={{ color: '#16a34a' }}>{paidAmount.toFixed(2)} {currency}</span></div>
-        {remaining > 0 && (
-          <div className="row"><span className="info-label">المبلغ المتبقي</span><span className="bold" style={{ color: '#dc2626' }}>{remaining.toFixed(2)} {currency}</span></div>
-        )}
-        {paidAmount > Number(order.total) && (
-          <div className="row"><span className="info-label">الباقي للعميل</span><span className="bold" style={{ color: '#16a34a' }}>{(paidAmount - Number(order.total)).toFixed(2)} {currency}</span></div>
-        )}
-      </div>
-
-      <hr className="divider-double" />
 
       {/* Notes */}
       {order.notes && (
-        <>
-          <div style={{ fontSize: 11, padding: '3px 0' }}>📝 {order.notes}</div>
-          <hr className="divider" />
-        </>
+        <div style={{ fontSize: 11, padding: '3px 0' }}>📝 {order.notes}</div>
       )}
 
       {/* Footer */}
       <div className="center footer">
-        <p style={{ fontSize: 13, margin: '6px 0' }}>شكراً لزيارتكم ❤️</p>
-        <p>نتمنى لكم تجربة ممتعة</p>
-        <p style={{ marginTop: 6, fontSize: 9, color: '#999' }}>Powered by AuditryPOS</p>
+        <p style={{ fontSize: 12, margin: '6px 0' }}>شكراً لزيارتكم ❤️</p>
+        <p style={{ marginTop: 4, fontSize: 9, color: '#999' }}>Powered by AuditryPOS</p>
       </div>
     </div>
   );
@@ -185,8 +187,8 @@ export function ReceiptModalWrapper({ order, restaurant, onClose }: ReceiptProps
 
   return (
     <div>
-      <div ref={ref} className="space-y-2 text-xs font-mono bg-card rounded-lg p-4 max-h-[60vh] overflow-auto" dir="rtl"
-        style={{ fontFamily: "'Courier New', monospace" }}>
+      <div ref={ref} className="space-y-2 text-xs bg-card rounded-lg p-4 max-h-[60vh] overflow-auto" dir="rtl"
+        style={{ fontFamily: "'Arial', 'Tahoma', sans-serif" }}>
         <ReceiptContent order={order} restaurant={restaurant} />
       </div>
 

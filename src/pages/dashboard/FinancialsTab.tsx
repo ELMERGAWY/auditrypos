@@ -12,6 +12,7 @@ interface Props {
 
 export function FinancialsTab({ restaurantId, currency }: Props) {
   const [orders, setOrders] = useState<any[]>([]);
+  const [orderItems, setOrderItems] = useState<any[]>([]);
   const [expenses, setExpenses] = useState<any[]>([]);
   const [products, setProducts] = useState<any[]>([]);
   const [customers, setCustomers] = useState<any[]>([]);
@@ -19,13 +20,15 @@ export function FinancialsTab({ restaurantId, currency }: Props) {
   const [loaded, setLoaded] = useState(false);
 
   const load = async () => {
-    const [ordersRes, expensesRes, productsRes, customersRes] = await Promise.all([
-      supabase.from('orders').select('total, status, created_at, paid_amount, discount').eq('restaurant_id', restaurantId),
+    const [ordersRes, orderItemsRes, expensesRes, productsRes, customersRes] = await Promise.all([
+      supabase.from('orders').select('id, total, status, created_at, paid_amount, discount, payment_method').eq('restaurant_id', restaurantId),
+      supabase.from('order_items').select('order_id, quantity, price, cost_price_snapshot, unit_factor').order('order_id'),
       supabase.from('expenses').select('amount, category, date').eq('restaurant_id', restaurantId),
       supabase.from('products').select('price, cost_price, quantity').eq('restaurant_id', restaurantId),
       supabase.from('customers').select('balance').eq('restaurant_id', restaurantId),
     ]);
     setOrders(ordersRes.data || []);
+    setOrderItems(orderItemsRes.data || []);
     setExpenses(expensesRes.data || []);
     setProducts(productsRes.data || []);
     setCustomers(customersRes.data || []);
@@ -46,25 +49,40 @@ export function FinancialsTab({ restaurantId, currency }: Props) {
   const filteredOrders = orders.filter(o => o.status !== 'cancelled' && filterDate(o.created_at));
   const filteredExpenses = expenses.filter(e => filterDate(e.date));
 
-  // Income Statement
+  // Revenue
   const totalRevenue = filteredOrders.reduce((s, o) => s + Number(o.total), 0);
   const totalDiscounts = filteredOrders.reduce((s, o) => s + Number(o.discount || 0), 0);
-  const netSales = totalRevenue;
+
+  // COGS - calculated from actual cost_price_snapshot in order_items
+  const filteredOrderIds = new Set(filteredOrders.map(o => o.id));
+  const filteredItems = orderItems.filter(i => filteredOrderIds.has(i.order_id));
+  const totalCOGS = filteredItems.reduce((s, i) => {
+    const costSnapshot = Number(i.cost_price_snapshot) || 0;
+    const qty = Number(i.quantity) || 0;
+    const factor = Number(i.unit_factor) || 1;
+    return s + (costSnapshot * qty * factor);
+  }, 0);
+
+  const grossProfit = totalRevenue - totalCOGS;
   const totalExpenses = filteredExpenses.reduce((s, e) => s + Number(e.amount), 0);
-  
-  // Cost of Goods (inventory cost)
+  const netIncome = grossProfit - totalExpenses;
+
+  // Stock
   const stockCost = products.reduce((s, p) => s + Number(p.cost_price) * Number(p.quantity), 0);
   const stockValue = products.reduce((s, p) => s + Number(p.price) * Number(p.quantity), 0);
-  
-  // Gross profit estimate
-  const grossProfit = netSales - (netSales * 0.6); // Approximate 60% COGS if no exact data
-  const operatingExpenses = totalExpenses;
-  const netIncome = netSales - operatingExpenses;
 
   // Receivables
   const totalReceivables = customers.reduce((s, c) => s + Math.max(0, Number(c.balance)), 0);
   const totalPaid = filteredOrders.reduce((s, o) => s + Number(o.paid_amount || 0), 0);
   const totalUnpaid = totalRevenue - totalPaid;
+
+  // Payment method breakdown
+  const paymentMethods = ['cash', 'instapay', 'vodafone_cash', 'bank'];
+  const paymentLabels: Record<string, string> = { cash: 'نقدي', instapay: 'إنستاباي', vodafone_cash: 'فودافون كاش', bank: 'تحويل بنكي' };
+  const paymentBreakdown = paymentMethods.map(m => ({
+    name: paymentLabels[m] || m,
+    value: filteredOrders.filter(o => (o.payment_method || 'cash') === m).reduce((s, o) => s + Number(o.paid_amount || 0), 0),
+  })).filter(d => d.value > 0);
 
   // Expense breakdown
   const expenseCategories = [...new Set(filteredExpenses.map(e => e.category))];
@@ -116,8 +134,8 @@ export function FinancialsTab({ restaurantId, currency }: Props) {
       {/* Summary Cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         {[
-          { label: 'إجمالي الإيرادات', value: `${netSales.toLocaleString()} ${currency}`, icon: TrendingUp, color: 'text-success', bg: 'bg-success/10' },
-          { label: 'إجمالي المصروفات', value: `${totalExpenses.toLocaleString()} ${currency}`, icon: TrendingDown, color: 'text-destructive', bg: 'bg-destructive/10' },
+          { label: 'إجمالي الإيرادات', value: `${totalRevenue.toLocaleString()} ${currency}`, icon: TrendingUp, color: 'text-success', bg: 'bg-success/10' },
+          { label: 'تكلفة البضاعة المباعة', value: `${totalCOGS.toLocaleString()} ${currency}`, icon: TrendingDown, color: 'text-accent', bg: 'bg-accent/10' },
           { label: 'صافي الدخل', value: `${netIncome.toLocaleString()} ${currency}`, icon: DollarSign, color: netIncome >= 0 ? 'text-success' : 'text-destructive', bg: netIncome >= 0 ? 'bg-success/10' : 'bg-destructive/10' },
           { label: 'الذمم المدينة', value: `${totalReceivables.toLocaleString()} ${currency}`, icon: Wallet, color: 'text-warning', bg: 'bg-warning/10' },
         ].map(s => (
@@ -141,7 +159,7 @@ export function FinancialsTab({ restaurantId, currency }: Props) {
         <div className="space-y-2">
           <div className="flex justify-between items-center p-3 bg-success/5 rounded-lg border border-success/20">
             <span className="font-medium">إجمالي الإيرادات (المبيعات)</span>
-            <span className="font-bold text-success">{netSales.toLocaleString()} {currency}</span>
+            <span className="font-bold text-success">{totalRevenue.toLocaleString()} {currency}</span>
           </div>
           {totalDiscounts > 0 && (
             <div className="flex justify-between items-center p-2 pr-8 text-sm">
@@ -149,6 +167,27 @@ export function FinancialsTab({ restaurantId, currency }: Props) {
               <span className="text-muted-foreground">{totalDiscounts.toLocaleString()} {currency}</span>
             </div>
           )}
+
+          <div className="flex justify-between items-center p-2 pr-8 text-sm">
+            <span className="text-muted-foreground">(-) تكلفة البضاعة المباعة (COGS)</span>
+            <span className="text-destructive">{totalCOGS.toLocaleString()} {currency}</span>
+          </div>
+
+          <div className={`flex justify-between items-center p-3 rounded-lg border ${grossProfit >= 0 ? 'bg-success/5 border-success/20' : 'bg-destructive/5 border-destructive/20'}`}>
+            <span className="font-medium">مجمل الربح</span>
+            <span className={`font-bold ${grossProfit >= 0 ? 'text-success' : 'text-destructive'}`}>{grossProfit.toLocaleString()} {currency}</span>
+          </div>
+
+          {grossProfit > 0 && totalRevenue > 0 && (
+            <div className="flex justify-between items-center p-2 pr-8 text-sm">
+              <span className="text-muted-foreground">هامش الربح الإجمالي</span>
+              <span className="text-primary font-bold">{((grossProfit / totalRevenue) * 100).toFixed(1)}%</span>
+            </div>
+          )}
+
+          <hr className="border-border my-2" />
+
+          {/* Collection info */}
           <div className="flex justify-between items-center p-2 pr-8 text-sm">
             <span className="text-muted-foreground">المبلغ المحصّل</span>
             <span className="text-success">{totalPaid.toLocaleString()} {currency}</span>
@@ -182,11 +221,18 @@ export function FinancialsTab({ restaurantId, currency }: Props) {
               {netIncome.toLocaleString()} {currency}
             </span>
           </div>
+
+          {netIncome > 0 && totalRevenue > 0 && (
+            <div className="flex justify-between items-center p-2 text-sm">
+              <span className="text-muted-foreground">هامش صافي الربح</span>
+              <span className="text-primary font-bold">{((netIncome / totalRevenue) * 100).toFixed(1)}%</span>
+            </div>
+          )}
         </div>
       </div>
 
       {/* Balance Overview */}
-      <div className="grid md:grid-cols-2 gap-4">
+      <div className="grid md:grid-cols-3 gap-4">
         <div className="glass-card p-6">
           <h3 className="font-display font-bold mb-4">قيمة المخزون</h3>
           <div className="space-y-3">
@@ -218,10 +264,20 @@ export function FinancialsTab({ restaurantId, currency }: Props) {
               <span>عدد العملاء المدينين</span>
               <span className="font-bold">{customers.filter(c => Number(c.balance) > 0).length}</span>
             </div>
-            <div className="flex justify-between text-sm">
-              <span>عدد الطلبات ({periodLabels[period]})</span>
-              <span className="font-bold">{filteredOrders.length}</span>
-            </div>
+          </div>
+        </div>
+
+        {/* Payment Method Breakdown */}
+        <div className="glass-card p-6">
+          <h3 className="font-display font-bold mb-4">توزيع التحصيل</h3>
+          <div className="space-y-3">
+            {paymentBreakdown.map(p => (
+              <div key={p.name} className="flex justify-between text-sm">
+                <span>{p.name}</span>
+                <span className="font-bold text-primary">{p.value.toLocaleString()} {currency}</span>
+              </div>
+            ))}
+            {paymentBreakdown.length === 0 && <p className="text-xs text-muted-foreground text-center">لا توجد بيانات</p>}
           </div>
         </div>
       </div>

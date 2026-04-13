@@ -26,6 +26,9 @@ interface Transaction {
   amount: number;
   description: string;
   created_at: string;
+  payment_method?: string;
+  reference_number?: string;
+  order_id?: string;
 }
 
 interface Props {
@@ -45,6 +48,7 @@ export function CustomersTab({ restaurantId, currency }: Props) {
   const [showPayment, setShowPayment] = useState<Customer | null>(null);
   const [paymentAmount, setPaymentAmount] = useState('');
   const [paymentDesc, setPaymentDesc] = useState('');
+  const [paymentMethodLocal, setPaymentMethodLocal] = useState('cash');
   const [showReports, setShowReports] = useState(false);
   const [allTransactions, setAllTransactions] = useState<(Transaction & { customer_name?: string })[]>([]);
   const [form, setForm] = useState({
@@ -98,6 +102,7 @@ export function CustomersTab({ restaurantId, currency }: Props) {
     await supabase.from('customer_transactions').insert({
       customer_id: showPayment.id, restaurant_id: restaurantId,
       type: 'payment', amount: -amount, description: paymentDesc || 'دفعة نقدية',
+      payment_method: paymentMethodLocal,
     });
     toast.success(`تم تسجيل دفعة ${amount} ${currency}`);
 
@@ -141,7 +146,7 @@ export function CustomersTab({ restaurantId, currency }: Props) {
       printWindow.onload = () => { printWindow.focus(); printWindow.print(); };
     }
 
-    setShowPayment(null); setPaymentAmount(''); setPaymentDesc('');
+    setShowPayment(null); setPaymentAmount(''); setPaymentDesc(''); setPaymentMethodLocal('cash');
     load();
   };
 
@@ -339,6 +344,19 @@ export function CustomersTab({ restaurantId, currency }: Props) {
               <h3 className="font-display font-bold">سند قبض — {showPayment.name}</h3>
               <p className="text-sm">الرصيد الحالي: <span className={`font-bold ${showPayment.balance > 0 ? 'text-destructive' : 'text-success'}`}>{showPayment.balance} {currency}</span></p>
               <Input placeholder="المبلغ" type="number" value={paymentAmount} onChange={e => setPaymentAmount(e.target.value)} />
+              <div className="flex gap-1 rounded-lg bg-secondary p-1">
+                {[
+                  { key: 'cash', label: '💵 نقدي' },
+                  { key: 'instapay', label: '📱 إنستاباي' },
+                  { key: 'vodafone_cash', label: '📲 فودافون كاش' },
+                  { key: 'bank', label: '🏦 بنكي' },
+                ].map(m => (
+                  <button key={m.key} onClick={() => setPaymentMethodLocal(m.key)}
+                    className={`flex-1 py-1.5 rounded-md text-[10px] transition-all ${paymentMethodLocal === m.key ? 'gradient-bg text-primary-foreground' : 'text-muted-foreground'}`}>
+                    {m.label}
+                  </button>
+                ))}
+              </div>
               <Input placeholder="الوصف (اختياري)" value={paymentDesc} onChange={e => setPaymentDesc(e.target.value)} />
               <Button onClick={handlePayment} className="w-full gradient-bg text-primary-foreground border-0">تسجيل الدفعة وطباعة السند</Button>
             </motion.div>
@@ -357,19 +375,54 @@ export function CustomersTab({ restaurantId, currency }: Props) {
                 <h3 className="font-display font-bold">كشف حساب — {showLedger.name}</h3>
                 <button onClick={() => setShowLedger(null)}><X className="w-5 h-5" /></button>
               </div>
-              <p className="text-sm">الرصيد: <span className={`font-bold ${showLedger.balance > 0 ? 'text-destructive' : 'text-success'}`}>{showLedger.balance} {currency}</span></p>
+              <div className="flex justify-between text-sm">
+                <span>الرصيد الحالي:</span>
+                <span className={`font-bold ${showLedger.balance > 0 ? 'text-destructive' : 'text-success'}`}>{showLedger.balance.toFixed(2)} {currency}</span>
+              </div>
               {transactions.length === 0 && <p className="text-muted-foreground text-center py-8 text-sm">لا توجد حركات</p>}
-              {transactions.map(t => (
-                <div key={t.id} className="flex items-center justify-between p-3 bg-secondary/30 rounded-lg">
-                  <div>
-                    <p className="text-sm font-medium">{t.description}</p>
-                    <p className="text-xs text-muted-foreground">{new Date(t.created_at).toLocaleDateString('ar-EG')}</p>
-                  </div>
-                  <span className={`font-bold text-sm ${t.amount > 0 ? 'text-destructive' : 'text-success'}`}>
-                    {t.amount > 0 ? '+' : ''}{t.amount} {currency}
-                  </span>
+              
+              {/* Detailed ledger table */}
+              {transactions.length > 0 && (
+                <div className="overflow-auto">
+                  <table className="w-full text-xs border-collapse">
+                    <thead>
+                      <tr className="border-b-2 border-border">
+                        <th className="text-right p-2">التاريخ</th>
+                        <th className="text-right p-2">البيان</th>
+                        <th className="text-right p-2">مدين</th>
+                        <th className="text-right p-2">دائن</th>
+                        <th className="text-right p-2">الرصيد</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {(() => {
+                        let runningBalance = 0;
+                        // Reverse to show oldest first for running balance
+                        const sorted = [...transactions].reverse();
+                        return sorted.map(t => {
+                          const debit = t.amount > 0 ? t.amount : 0;
+                          const credit = t.amount < 0 ? Math.abs(t.amount) : 0;
+                          runningBalance += t.amount;
+                          return (
+                            <tr key={t.id} className="border-b border-border hover:bg-secondary/20">
+                              <td className="p-2 whitespace-nowrap">{new Date(t.created_at).toLocaleDateString('ar-EG')}</td>
+                              <td className="p-2">
+                                <div>{t.description}</div>
+                                {t.payment_method && <span className="text-[10px] text-muted-foreground">({
+                                  t.payment_method === 'cash' ? 'نقدي' : t.payment_method === 'instapay' ? 'إنستاباي' : t.payment_method === 'vodafone_cash' ? 'فودافون كاش' : 'بنكي'
+                                })</span>}
+                              </td>
+                              <td className="p-2 text-destructive font-bold">{debit > 0 ? debit.toFixed(2) : '-'}</td>
+                              <td className="p-2 text-success font-bold">{credit > 0 ? credit.toFixed(2) : '-'}</td>
+                              <td className={`p-2 font-bold ${runningBalance > 0 ? 'text-destructive' : 'text-success'}`}>{runningBalance.toFixed(2)}</td>
+                            </tr>
+                          );
+                        });
+                      })()}
+                    </tbody>
+                  </table>
                 </div>
-              ))}
+              )}
             </motion.div>
           </motion.div>
         )}

@@ -211,21 +211,20 @@ export default function Dashboard() {
   const topItems = [...itemSales.entries()].sort((a, b) => b[1] - a[1]).slice(0, 5);
   const filteredOrders = orderFilter === 'all' ? orders : orders.filter(o => o.status === orderFilter);
 
-  // Unit conversion helpers
-  const UNIT_CONVERSIONS: Record<string, { label: string; factor: number }[]> = {
-    'كيلو': [{ label: 'كيلو', factor: 1 }, { label: 'جرام', factor: 0.001 }],
-    'kg': [{ label: 'kg', factor: 1 }, { label: 'g', factor: 0.001 }],
-    'كارتونة': [{ label: 'كارتونة', factor: 1 }, { label: 'علبة', factor: 1/12 }, { label: 'قطعة', factor: 1/144 }],
-    'علبة': [{ label: 'علبة', factor: 1 }, { label: 'قطعة', factor: 1/12 }],
-    'متر': [{ label: 'متر', factor: 1 }, { label: 'سم', factor: 0.01 }],
-    'لتر': [{ label: 'لتر', factor: 1 }, { label: 'مل', factor: 0.001 }],
-    'قطعة': [{ label: 'قطعة', factor: 1 }],
-    'وحدة': [{ label: 'وحدة', factor: 1 }],
-  };
-
+  // Unit conversion helpers - uses product's own secondary_unit & conversion_factor
   const getUnitOptions = (item: MenuItem) => {
-    const unit = (item as any).unit || 'قطعة';
-    return UNIT_CONVERSIONS[unit] || [{ label: unit, factor: 1 }];
+    const product = (item as any);
+    const baseUnit = product.unit || 'قطعة';
+    const options = [{ label: baseUnit, factor: 1 }];
+    
+    // If product has a secondary unit defined, use it
+    if (product.secondary_unit && product.unit_conversion_factor && Number(product.unit_conversion_factor) > 1) {
+      options.push({
+        label: product.secondary_unit,
+        factor: 1 / Number(product.unit_conversion_factor),
+      });
+    }
+    return options;
   };
 
   // Cart actions
@@ -350,7 +349,19 @@ export default function Dashboard() {
   const checkout = async (sendToPrep: boolean = false) => {
     if (cart.length === 0) return;
     const orderNum = `ORD-${Date.now().toString().slice(-6)}`;
+    const clientOrderId = `${restaurant!.id}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
     
+    // Find customer_id if customer name is provided
+    let customerId: string | null = null;
+    if (customerName.trim() && isOnline) {
+      const { data: custData } = await supabase.from('customers')
+        .select('id')
+        .eq('restaurant_id', restaurant!.id)
+        .ilike('name', customerName.trim())
+        .limit(1);
+      if (custData && custData.length > 0) customerId = custData[0].id;
+    }
+
     const orderData = {
       restaurant_id: restaurant!.id,
       order_number: orderNum,
@@ -367,19 +378,29 @@ export default function Dashboard() {
       delivery_agent_id: selectedDeliveryAgent || null,
       payment_method: paymentMethod,
       paid_amount: paidNum,
+      client_order_id: clientOrderId,
+      customer_id: customerId,
     };
 
-    const cartItems = cart.map(c => ({
-      menu_item_id: isInventoryDrivenBusiness(businessType) ? null : c.item.id,
-      product_id: isInventoryDrivenBusiness(businessType) ? (c.item.product_id || c.item.id) : null,
-      menu_item_name: c.item.name,
-      menu_item_image: c.item.image,
-      quantity: c.qty,
-      price: c.item.price,
-    }));
+    const cartItems = cart.map(c => {
+      const units = getUnitOptions(c.item);
+      const selectedUnit = units.find(u => u.label === c.unitMode);
+      const unitFactor = selectedUnit?.factor || 1;
+      return {
+        menu_item_id: isInventoryDrivenBusiness(businessType) ? null : c.item.id,
+        product_id: isInventoryDrivenBusiness(businessType) ? (c.item.product_id || c.item.id) : null,
+        menu_item_name: c.item.name,
+        menu_item_image: c.item.image,
+        quantity: c.qty,
+        price: c.item.price * unitFactor,
+        sold_unit: c.unitMode || '',
+        unit_factor: unitFactor,
+        cost_price_snapshot: (c.item as any).cost_price || 0,
+      };
+    });
 
     if (!isOnline) {
-      await queueOrderOffline(orderData, cartItems, orderNum);
+      await queueOrderOffline({ ...orderData, client_order_id: clientOrderId } as any, cartItems, orderNum);
       return;
     }
 
@@ -429,25 +450,31 @@ export default function Dashboard() {
       setShowReceipt(true);
 
       // Record customer transaction if customer is linked and there's a remaining balance
-      if (customerName.trim() && remaining > 0) {
-        // Find customer by name
-        const { data: custData } = await supabase.from('customers')
-          .select('id, balance')
-          .eq('restaurant_id', restaurant!.id)
-          .ilike('name', customerName.trim())
-          .limit(1);
-        if (custData && custData.length > 0) {
-          const cust = custData[0];
-          await supabase.from('customers').update({ balance: cust.balance + remaining }).eq('id', cust.id);
+      if (customerId && remaining > 0) {
+        const { data: custData } = await supabase.from('customers').select('balance').eq('id', customerId).single();
+        if (custData) {
+          await supabase.from('customers').update({ balance: custData.balance + remaining }).eq('id', customerId);
           await supabase.from('customer_transactions').insert({
-            customer_id: cust.id,
+            customer_id: customerId,
             restaurant_id: restaurant!.id,
             type: 'sale',
             amount: remaining,
             description: `فاتورة #${orderNum.slice(-4)} — متبقي`,
             order_id: order.id,
+            payment_method: paymentMethod,
           });
         }
+      } else if (customerId && paidNum > 0) {
+        // Record the full sale in customer ledger even if fully paid
+        await supabase.from('customer_transactions').insert({
+          customer_id: customerId,
+          restaurant_id: restaurant!.id,
+          type: 'sale',
+          amount: 0,
+          description: `فاتورة #${orderNum.slice(-4)} — مدفوعة بالكامل (${cartTotal.toFixed(2)} ${currency})`,
+          order_id: order.id,
+          payment_method: paymentMethod,
+        });
       }
 
       clearCart();

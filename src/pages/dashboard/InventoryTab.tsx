@@ -22,6 +22,8 @@ interface Product {
   image: string;
   expiry_date: string | null;
   available: boolean;
+  secondary_unit: string;
+  unit_conversion_factor: number;
 }
 
 interface StockMovement {
@@ -56,6 +58,7 @@ export function InventoryTab({ restaurantId, currency }: Props) {
   const [form, setForm] = useState({
     name: '', barcode: '', sku: '', category: 'عام', price: '', cost_price: '',
     quantity: '', min_quantity: '5', unit: 'قطعة', image: '📦', expiry_date: '',
+    secondary_unit: '', unit_conversion_factor: '',
   });
   const [filterCategory, setFilterCategory] = useState('all');
 
@@ -88,6 +91,8 @@ export function InventoryTab({ restaurantId, currency }: Props) {
       quantity: Number(form.quantity) || 0, min_quantity: Number(form.min_quantity) || 5,
       unit: form.unit, image: form.image,
       expiry_date: form.expiry_date || null,
+      secondary_unit: form.secondary_unit || '',
+      unit_conversion_factor: Number(form.unit_conversion_factor) || 1,
     };
     if (editingProduct) {
       await supabase.from('products').update(data).eq('id', editingProduct.id);
@@ -140,7 +145,7 @@ export function InventoryTab({ restaurantId, currency }: Props) {
 
   const resetForm = () => {
     setShowForm(false); setEditingProduct(null); setPricingMode('fixed'); setMarkupValue('');
-    setForm({ name: '', barcode: '', sku: '', category: 'عام', price: '', cost_price: '', quantity: '', min_quantity: '5', unit: 'قطعة', image: '📦', expiry_date: '' });
+    setForm({ name: '', barcode: '', sku: '', category: 'عام', price: '', cost_price: '', quantity: '', min_quantity: '5', unit: 'قطعة', image: '📦', expiry_date: '', secondary_unit: '', unit_conversion_factor: '' });
   };
 
   const calcSellingPrice = (costStr: string) => {
@@ -157,6 +162,8 @@ export function InventoryTab({ restaurantId, currency }: Props) {
       price: String(p.price), cost_price: String(p.cost_price), quantity: String(p.quantity),
       min_quantity: String(p.min_quantity), unit: p.unit, image: p.image,
       expiry_date: p.expiry_date ? p.expiry_date.split('T')[0] : '',
+      secondary_unit: p.secondary_unit || '',
+      unit_conversion_factor: String(p.unit_conversion_factor || 1),
     });
     setShowForm(true);
   };
@@ -406,6 +413,18 @@ export function InventoryTab({ restaurantId, currency }: Props) {
                 <Input placeholder="الحد الأدنى" type="number" value={form.min_quantity} onChange={e => setForm(f => ({ ...f, min_quantity: e.target.value }))} />
                 <Input placeholder="الفئة" value={form.category} onChange={e => setForm(f => ({ ...f, category: e.target.value }))} />
                 <Input placeholder="الوحدة (مثال: كيلو، قطعة، علبة)" value={form.unit} onChange={e => setForm(f => ({ ...f, unit: e.target.value }))} />
+                {/* Secondary Unit */}
+                <div className="col-span-2 grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-xs text-muted-foreground block mb-1">الوحدة الجزئية (اختياري)</label>
+                    <Input placeholder="مثال: جرام، قطعة، علبة" value={form.secondary_unit} onChange={e => setForm(f => ({ ...f, secondary_unit: e.target.value }))} />
+                  </div>
+                  <div>
+                    <label className="text-xs text-muted-foreground block mb-1">معامل التحويل</label>
+                    <Input placeholder="مثال: 1000 (كيلو→جرام)" type="number" step="any" value={form.unit_conversion_factor} onChange={e => setForm(f => ({ ...f, unit_conversion_factor: e.target.value }))} />
+                    <p className="text-[10px] text-muted-foreground mt-0.5">كم وحدة جزئية في الوحدة الأساسية</p>
+                  </div>
+                </div>
                 <div className="col-span-2">
                   <label className="text-xs text-muted-foreground">تاريخ الصلاحية (اختياري)</label>
                   <Input type="date" value={form.expiry_date} onChange={e => setForm(f => ({ ...f, expiry_date: e.target.value }))} />

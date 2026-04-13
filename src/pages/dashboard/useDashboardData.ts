@@ -158,6 +158,8 @@ export function useDashboardData() {
       syncPendingData().then(({ synced, errors }) => {
         if (synced > 0) {
           toast.success(`✅ تمت مزامنة ${synced} عملية معلقة`);
+          // Remove offline orders from state before reloading
+          setOrders(prev => prev.filter(o => !o.id.startsWith('offline-')));
           loadData(); // Reload fresh data
         }
         if (errors > 0) {
