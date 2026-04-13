@@ -344,6 +344,19 @@ export function CustomersTab({ restaurantId, currency }: Props) {
               <h3 className="font-display font-bold">سند قبض — {showPayment.name}</h3>
               <p className="text-sm">الرصيد الحالي: <span className={`font-bold ${showPayment.balance > 0 ? 'text-destructive' : 'text-success'}`}>{showPayment.balance} {currency}</span></p>
               <Input placeholder="المبلغ" type="number" value={paymentAmount} onChange={e => setPaymentAmount(e.target.value)} />
+              <div className="flex gap-1 rounded-lg bg-secondary p-1">
+                {[
+                  { key: 'cash', label: '💵 نقدي' },
+                  { key: 'instapay', label: '📱 إنستاباي' },
+                  { key: 'vodafone_cash', label: '📲 فودافون كاش' },
+                  { key: 'bank', label: '🏦 بنكي' },
+                ].map(m => (
+                  <button key={m.key} onClick={() => setPaymentMethodLocal(m.key)}
+                    className={`flex-1 py-1.5 rounded-md text-[10px] transition-all ${paymentMethodLocal === m.key ? 'gradient-bg text-primary-foreground' : 'text-muted-foreground'}`}>
+                    {m.label}
+                  </button>
+                ))}
+              </div>
               <Input placeholder="الوصف (اختياري)" value={paymentDesc} onChange={e => setPaymentDesc(e.target.value)} />
               <Button onClick={handlePayment} className="w-full gradient-bg text-primary-foreground border-0">تسجيل الدفعة وطباعة السند</Button>
             </motion.div>
