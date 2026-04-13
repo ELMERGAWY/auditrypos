@@ -85,6 +85,8 @@ export type Database = {
           description: string | null
           id: string
           order_id: string | null
+          payment_method: string | null
+          reference_number: string | null
           restaurant_id: string
           type: string
         }
@@ -95,6 +97,8 @@ export type Database = {
           description?: string | null
           id?: string
           order_id?: string | null
+          payment_method?: string | null
+          reference_number?: string | null
           restaurant_id: string
           type?: string
         }
@@ -105,6 +109,8 @@ export type Database = {
           description?: string | null
           id?: string
           order_id?: string | null
+          payment_method?: string | null
+          reference_number?: string | null
           restaurant_id?: string
           type?: string
         }
@@ -502,6 +508,7 @@ export type Database = {
       }
       order_items: {
         Row: {
+          cost_price_snapshot: number | null
           id: string
           menu_item_id: string | null
           menu_item_image: string
@@ -510,8 +517,11 @@ export type Database = {
           price: number
           product_id: string | null
           quantity: number
+          sold_unit: string | null
+          unit_factor: number | null
         }
         Insert: {
+          cost_price_snapshot?: number | null
           id?: string
           menu_item_id?: string | null
           menu_item_image?: string
@@ -520,8 +530,11 @@ export type Database = {
           price?: number
           product_id?: string | null
           quantity?: number
+          sold_unit?: string | null
+          unit_factor?: number | null
         }
         Update: {
+          cost_price_snapshot?: number | null
           id?: string
           menu_item_id?: string | null
           menu_item_image?: string
@@ -530,6 +543,8 @@ export type Database = {
           price?: number
           product_id?: string | null
           quantity?: number
+          sold_unit?: string | null
+          unit_factor?: number | null
         }
         Relationships: [
           {
@@ -557,7 +572,9 @@ export type Database = {
       }
       orders: {
         Row: {
+          client_order_id: string | null
           created_at: string
+          customer_id: string | null
           customer_name: string
           customer_phone: string
           delivery_address: string
@@ -579,7 +596,9 @@ export type Database = {
           tracking_token: string | null
         }
         Insert: {
+          client_order_id?: string | null
           created_at?: string
+          customer_id?: string | null
           customer_name?: string
           customer_phone?: string
           delivery_address?: string
@@ -601,7 +620,9 @@ export type Database = {
           tracking_token?: string | null
         }
         Update: {
+          client_order_id?: string | null
           created_at?: string
+          customer_id?: string | null
           customer_name?: string
           customer_phone?: string
           delivery_address?: string
@@ -710,9 +731,11 @@ export type Database = {
           price: number
           quantity: number
           restaurant_id: string
+          secondary_unit: string | null
           sku: string | null
           sort_order: number
           unit: string
+          unit_conversion_factor: number | null
           updated_at: string
         }
         Insert: {
@@ -729,9 +752,11 @@ export type Database = {
           price?: number
           quantity?: number
           restaurant_id: string
+          secondary_unit?: string | null
           sku?: string | null
           sort_order?: number
           unit?: string
+          unit_conversion_factor?: number | null
           updated_at?: string
         }
         Update: {
@@ -748,9 +773,11 @@ export type Database = {
           price?: number
           quantity?: number
           restaurant_id?: string
+          secondary_unit?: string | null
           sku?: string | null
           sort_order?: number
           unit?: string
+          unit_conversion_factor?: number | null
           updated_at?: string
         }
         Relationships: [
