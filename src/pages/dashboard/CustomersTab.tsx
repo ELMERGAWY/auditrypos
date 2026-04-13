@@ -375,19 +375,54 @@ export function CustomersTab({ restaurantId, currency }: Props) {
                 <h3 className="font-display font-bold">كشف حساب — {showLedger.name}</h3>
                 <button onClick={() => setShowLedger(null)}><X className="w-5 h-5" /></button>
               </div>
-              <p className="text-sm">الرصيد: <span className={`font-bold ${showLedger.balance > 0 ? 'text-destructive' : 'text-success'}`}>{showLedger.balance} {currency}</span></p>
+              <div className="flex justify-between text-sm">
+                <span>الرصيد الحالي:</span>
+                <span className={`font-bold ${showLedger.balance > 0 ? 'text-destructive' : 'text-success'}`}>{showLedger.balance.toFixed(2)} {currency}</span>
+              </div>
               {transactions.length === 0 && <p className="text-muted-foreground text-center py-8 text-sm">لا توجد حركات</p>}
-              {transactions.map(t => (
-                <div key={t.id} className="flex items-center justify-between p-3 bg-secondary/30 rounded-lg">
-                  <div>
-                    <p className="text-sm font-medium">{t.description}</p>
-                    <p className="text-xs text-muted-foreground">{new Date(t.created_at).toLocaleDateString('ar-EG')}</p>
-                  </div>
-                  <span className={`font-bold text-sm ${t.amount > 0 ? 'text-destructive' : 'text-success'}`}>
-                    {t.amount > 0 ? '+' : ''}{t.amount} {currency}
-                  </span>
+              
+              {/* Detailed ledger table */}
+              {transactions.length > 0 && (
+                <div className="overflow-auto">
+                  <table className="w-full text-xs border-collapse">
+                    <thead>
+                      <tr className="border-b-2 border-border">
+                        <th className="text-right p-2">التاريخ</th>
+                        <th className="text-right p-2">البيان</th>
+                        <th className="text-right p-2">مدين</th>
+                        <th className="text-right p-2">دائن</th>
+                        <th className="text-right p-2">الرصيد</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {(() => {
+                        let runningBalance = 0;
+                        // Reverse to show oldest first for running balance
+                        const sorted = [...transactions].reverse();
+                        return sorted.map(t => {
+                          const debit = t.amount > 0 ? t.amount : 0;
+                          const credit = t.amount < 0 ? Math.abs(t.amount) : 0;
+                          runningBalance += t.amount;
+                          return (
+                            <tr key={t.id} className="border-b border-border hover:bg-secondary/20">
+                              <td className="p-2 whitespace-nowrap">{new Date(t.created_at).toLocaleDateString('ar-EG')}</td>
+                              <td className="p-2">
+                                <div>{t.description}</div>
+                                {t.payment_method && <span className="text-[10px] text-muted-foreground">({
+                                  t.payment_method === 'cash' ? 'نقدي' : t.payment_method === 'instapay' ? 'إنستاباي' : t.payment_method === 'vodafone_cash' ? 'فودافون كاش' : 'بنكي'
+                                })</span>}
+                              </td>
+                              <td className="p-2 text-destructive font-bold">{debit > 0 ? debit.toFixed(2) : '-'}</td>
+                              <td className="p-2 text-success font-bold">{credit > 0 ? credit.toFixed(2) : '-'}</td>
+                              <td className={`p-2 font-bold ${runningBalance > 0 ? 'text-destructive' : 'text-success'}`}>{runningBalance.toFixed(2)}</td>
+                            </tr>
+                          );
+                        });
+                      })()}
+                    </tbody>
+                  </table>
                 </div>
-              ))}
+              )}
             </motion.div>
           </motion.div>
         )}
