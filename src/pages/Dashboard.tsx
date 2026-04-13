@@ -349,7 +349,19 @@ export default function Dashboard() {
   const checkout = async (sendToPrep: boolean = false) => {
     if (cart.length === 0) return;
     const orderNum = `ORD-${Date.now().toString().slice(-6)}`;
+    const clientOrderId = `${restaurant!.id}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
     
+    // Find customer_id if customer name is provided
+    let customerId: string | null = null;
+    if (customerName.trim() && isOnline) {
+      const { data: custData } = await supabase.from('customers')
+        .select('id')
+        .eq('restaurant_id', restaurant!.id)
+        .ilike('name', customerName.trim())
+        .limit(1);
+      if (custData && custData.length > 0) customerId = custData[0].id;
+    }
+
     const orderData = {
       restaurant_id: restaurant!.id,
       order_number: orderNum,
@@ -366,19 +378,29 @@ export default function Dashboard() {
       delivery_agent_id: selectedDeliveryAgent || null,
       payment_method: paymentMethod,
       paid_amount: paidNum,
+      client_order_id: clientOrderId,
+      customer_id: customerId,
     };
 
-    const cartItems = cart.map(c => ({
-      menu_item_id: isInventoryDrivenBusiness(businessType) ? null : c.item.id,
-      product_id: isInventoryDrivenBusiness(businessType) ? (c.item.product_id || c.item.id) : null,
-      menu_item_name: c.item.name,
-      menu_item_image: c.item.image,
-      quantity: c.qty,
-      price: c.item.price,
-    }));
+    const cartItems = cart.map(c => {
+      const units = getUnitOptions(c.item);
+      const selectedUnit = units.find(u => u.label === c.unitMode);
+      const unitFactor = selectedUnit?.factor || 1;
+      return {
+        menu_item_id: isInventoryDrivenBusiness(businessType) ? null : c.item.id,
+        product_id: isInventoryDrivenBusiness(businessType) ? (c.item.product_id || c.item.id) : null,
+        menu_item_name: c.item.name,
+        menu_item_image: c.item.image,
+        quantity: c.qty,
+        price: c.item.price * unitFactor,
+        sold_unit: c.unitMode || '',
+        unit_factor: unitFactor,
+        cost_price_snapshot: (c.item as any).cost_price || 0,
+      };
+    });
 
     if (!isOnline) {
-      await queueOrderOffline(orderData, cartItems, orderNum);
+      await queueOrderOffline({ ...orderData, client_order_id: clientOrderId } as any, cartItems, orderNum);
       return;
     }
 
