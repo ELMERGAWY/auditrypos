@@ -123,7 +123,24 @@ export async function syncPendingData(): Promise<{ synced: number; errors: numbe
   const pendingOrders = await getPendingOrders();
   for (const po of pendingOrders) {
     try {
-      const { data: order, error } = await supabase.from('orders').insert(po.orderData as any).select().single();
+      // Use client_order_id for deduplication
+      const clientOrderId = po.orderData.client_order_id || po.id;
+      const orderPayload = { ...po.orderData, client_order_id: clientOrderId };
+
+      // Check if already synced (dedup)
+      const { data: existing } = await supabase.from('orders')
+        .select('id')
+        .eq('client_order_id', clientOrderId)
+        .limit(1);
+
+      if (existing && existing.length > 0) {
+        // Already synced, just remove local copy
+        await removePendingOrder(po.id);
+        synced++;
+        continue;
+      }
+
+      const { data: order, error } = await supabase.from('orders').insert(orderPayload as any).select().single();
       if (error || !order) { errors++; continue; }
       
       const itemsWithOrderId = po.items.map(item => ({
@@ -132,6 +149,11 @@ export async function syncPendingData(): Promise<{ synced: number; errors: numbe
         menu_item_image: item.menu_item_image as string,
         quantity: item.quantity as number,
         price: item.price as number,
+        menu_item_id: item.menu_item_id || null,
+        product_id: item.product_id || null,
+        sold_unit: item.sold_unit || '',
+        unit_factor: item.unit_factor || 1,
+        cost_price_snapshot: item.cost_price_snapshot || 0,
       }));
       await supabase.from('order_items').insert(itemsWithOrderId);
       
