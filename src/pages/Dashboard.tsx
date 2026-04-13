@@ -450,26 +450,31 @@ export default function Dashboard() {
       setShowReceipt(true);
 
       // Record customer transaction if customer is linked and there's a remaining balance
-      if (customerName.trim() && remaining > 0) {
-        // Find customer by name
-        const { data: custData } = await supabase.from('customers')
-          .select('id, balance')
-          .eq('restaurant_id', restaurant!.id)
-          .ilike('name', customerName.trim())
-          .limit(1);
-        if (custData && custData.length > 0) {
-          const cust = custData[0];
-          await supabase.from('customers').update({ balance: cust.balance + remaining }).eq('id', cust.id);
+      if (customerId && remaining > 0) {
+        const { data: custData } = await supabase.from('customers').select('balance').eq('id', customerId).single();
+        if (custData) {
+          await supabase.from('customers').update({ balance: custData.balance + remaining }).eq('id', customerId);
           await supabase.from('customer_transactions').insert({
-            customer_id: cust.id,
+            customer_id: customerId,
             restaurant_id: restaurant!.id,
             type: 'sale',
             amount: remaining,
             description: `فاتورة #${orderNum.slice(-4)} — متبقي`,
             order_id: order.id,
+            payment_method: paymentMethod,
           });
         }
-      }
+      } else if (customerId && paidNum > 0) {
+        // Record the full sale in customer ledger even if fully paid
+        await supabase.from('customer_transactions').insert({
+          customer_id: customerId,
+          restaurant_id: restaurant!.id,
+          type: 'sale',
+          amount: 0,
+          description: `فاتورة #${orderNum.slice(-4)} — مدفوعة بالكامل (${cartTotal.toFixed(2)} ${currency})`,
+          order_id: order.id,
+          payment_method: paymentMethod,
+        });
 
       clearCart();
       toast.success(`✅ تم إنشاء الطلب #${orderNum.slice(-4)} — ${cartTotal.toFixed(2)} ${currency}`);
