@@ -211,21 +211,20 @@ export default function Dashboard() {
   const topItems = [...itemSales.entries()].sort((a, b) => b[1] - a[1]).slice(0, 5);
   const filteredOrders = orderFilter === 'all' ? orders : orders.filter(o => o.status === orderFilter);
 
-  // Unit conversion helpers
-  const UNIT_CONVERSIONS: Record<string, { label: string; factor: number }[]> = {
-    'كيلو': [{ label: 'كيلو', factor: 1 }, { label: 'جرام', factor: 0.001 }],
-    'kg': [{ label: 'kg', factor: 1 }, { label: 'g', factor: 0.001 }],
-    'كارتونة': [{ label: 'كارتونة', factor: 1 }, { label: 'علبة', factor: 1/12 }, { label: 'قطعة', factor: 1/144 }],
-    'علبة': [{ label: 'علبة', factor: 1 }, { label: 'قطعة', factor: 1/12 }],
-    'متر': [{ label: 'متر', factor: 1 }, { label: 'سم', factor: 0.01 }],
-    'لتر': [{ label: 'لتر', factor: 1 }, { label: 'مل', factor: 0.001 }],
-    'قطعة': [{ label: 'قطعة', factor: 1 }],
-    'وحدة': [{ label: 'وحدة', factor: 1 }],
-  };
-
+  // Unit conversion helpers - uses product's own secondary_unit & conversion_factor
   const getUnitOptions = (item: MenuItem) => {
-    const unit = (item as any).unit || 'قطعة';
-    return UNIT_CONVERSIONS[unit] || [{ label: unit, factor: 1 }];
+    const product = (item as any);
+    const baseUnit = product.unit || 'قطعة';
+    const options = [{ label: baseUnit, factor: 1 }];
+    
+    // If product has a secondary unit defined, use it
+    if (product.secondary_unit && product.unit_conversion_factor && Number(product.unit_conversion_factor) > 1) {
+      options.push({
+        label: product.secondary_unit,
+        factor: 1 / Number(product.unit_conversion_factor),
+      });
+    }
+    return options;
   };
 
   // Cart actions
