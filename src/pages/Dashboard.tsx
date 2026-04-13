@@ -475,6 +475,7 @@ export default function Dashboard() {
           order_id: order.id,
           payment_method: paymentMethod,
         });
+      }
 
       clearCart();
       toast.success(`✅ تم إنشاء الطلب #${orderNum.slice(-4)} — ${cartTotal.toFixed(2)} ${currency}`);
