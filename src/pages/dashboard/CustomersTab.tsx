@@ -26,6 +26,9 @@ interface Transaction {
   amount: number;
   description: string;
   created_at: string;
+  payment_method?: string;
+  reference_number?: string;
+  order_id?: string;
 }
 
 interface Props {
@@ -45,6 +48,7 @@ export function CustomersTab({ restaurantId, currency }: Props) {
   const [showPayment, setShowPayment] = useState<Customer | null>(null);
   const [paymentAmount, setPaymentAmount] = useState('');
   const [paymentDesc, setPaymentDesc] = useState('');
+  const [paymentMethodLocal, setPaymentMethodLocal] = useState('cash');
   const [showReports, setShowReports] = useState(false);
   const [allTransactions, setAllTransactions] = useState<(Transaction & { customer_name?: string })[]>([]);
   const [form, setForm] = useState({
@@ -98,6 +102,7 @@ export function CustomersTab({ restaurantId, currency }: Props) {
     await supabase.from('customer_transactions').insert({
       customer_id: showPayment.id, restaurant_id: restaurantId,
       type: 'payment', amount: -amount, description: paymentDesc || 'دفعة نقدية',
+      payment_method: paymentMethodLocal,
     });
     toast.success(`تم تسجيل دفعة ${amount} ${currency}`);
 
@@ -141,7 +146,7 @@ export function CustomersTab({ restaurantId, currency }: Props) {
       printWindow.onload = () => { printWindow.focus(); printWindow.print(); };
     }
 
-    setShowPayment(null); setPaymentAmount(''); setPaymentDesc('');
+    setShowPayment(null); setPaymentAmount(''); setPaymentDesc(''); setPaymentMethodLocal('cash');
     load();
   };
 
