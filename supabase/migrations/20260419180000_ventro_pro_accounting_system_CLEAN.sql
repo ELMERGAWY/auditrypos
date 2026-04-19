@@ -245,7 +245,8 @@ ALTER TABLE journal_entry_lines ENABLE ROW LEVEL SECURITY;
 ALTER TABLE inventory_cost_layers ENABLE ROW LEVEL SECURITY;
 ALTER TABLE tax_rates ENABLE ROW LEVEL SECURITY;
 ALTER TABLE order_taxes ENABLE ROW LEVEL SECURITY;
-ALTER TABLE audit_log ENABLE ROW LEVEL SECURITY;
+-- Note: audit_log doesn't need RLS as it's written by triggers only
+-- ALTER TABLE audit_log ENABLE ROW LEVEL SECURITY;
 
 DROP POLICY IF EXISTS isolation_chart_of_accounts ON chart_of_accounts;
 CREATE POLICY isolation_chart_of_accounts ON chart_of_accounts 
