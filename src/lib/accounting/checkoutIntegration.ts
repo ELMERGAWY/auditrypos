@@ -136,7 +136,6 @@ class CheckoutIntegration {
         subtotal: taxCalculation.subtotal,
         tax_amount: taxCalculation.taxAmount,
         discount: discountAmount,
-        delivery_fee: deliveryFee,
         status: 'pending' as const,
         table_number: orderData.tableNumber || null,
         order_type: orderData.orderType,
