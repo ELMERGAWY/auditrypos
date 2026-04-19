@@ -155,7 +155,7 @@ export const BUSINESS_TYPES: Record<BusinessType, BusinessTypeConfig> = {
       { id: 'delivery', label: 'توصيل', icon: '🛵', color: '#22c55e', requiresTable: false, requiresAddress: true, requiresPhone: true }
     ],
     
-    features: ['tables', 'kitchen_display', 'waiter_calls', 'qr_menu', 'reservations', 'delivery', 'multi_unit', 'recipes', 'modifiers'],
+    features: ['tables', 'kitchen_display', 'waiter_calls', 'qr_menu', 'reservations', 'delivery', 'inventory', 'multi_unit', 'recipes', 'modifiers'],
     
     labels: {
       menu: 'القائمة',
@@ -235,7 +235,7 @@ export const BUSINESS_TYPES: Record<BusinessType, BusinessTypeConfig> = {
       { id: 'delivery', label: 'توصيل', icon: '🛵', color: '#22c55e', requiresTable: false, requiresAddress: true, requiresPhone: true }
     ],
     
-    features: ['tables', 'kitchen_display', 'waiter_calls', 'qr_menu', 'delivery', 'modifiers'],
+    features: ['tables', 'kitchen_display', 'waiter_calls', 'qr_menu', 'delivery', 'inventory', 'modifiers'],
     
     labels: {
       menu: 'القائمة',
