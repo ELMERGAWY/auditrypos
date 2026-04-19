@@ -18,6 +18,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line } from 'recharts';
 import { useDashboardData } from './dashboard/useDashboardData';
 import { ReceiptModalWrapper } from './dashboard/ReceiptModal';
+import { ProfessionalSidebar, type SidebarTab } from '@/components/professional/ProfessionalSidebar';
 import { DeliveryTab } from './dashboard/DeliveryTab';
 import { ShiftsTab } from './dashboard/ShiftsTab';
 import { MenuTab } from './dashboard/MenuTab';
@@ -109,7 +110,8 @@ export default function Dashboard() {
     soundEnabled, setSoundEnabled,
   } = useDashboardData();
 
-  const [activeTab, setActiveTab] = useState<DashboardTab>('pos');
+  const [activeTab, setActiveTab] = useState<SidebarTab>('pos');
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
   // POS State
   const [cart, setCart] = useState<{ item: MenuItem; qty: number; qtyText: string; unitMode: string }[]>([]);
@@ -549,7 +551,7 @@ export default function Dashboard() {
     { id: 'delivery', label: 'المناديب', icon: Truck, badge: deliveryOrders.length, locked: lockedTabs.includes('delivery') },
     { id: 'shifts', label: 'الشفتات', icon: CalendarClock, locked: lockedTabs.includes('shifts') },
     { id: 'stats', label: 'الإحصائيات', icon: BarChart3, locked: lockedTabs.includes('stats') },
-    { id: 'menu', label: btConfig?.menuLabel || 'القائمة', icon: ShoppingCart },
+    { id: 'menu', label: btConfig?.labels?.menu || 'القائمة', icon: ShoppingCart },
     { id: 'qr', label: 'رابط المتجر', icon: QrCode },
     { id: 'waiter', label: 'ويتر', icon: Bell, badge: unackCalls.length },
     { id: 'staff', label: 'الموظفين', icon: UsersRound },
@@ -675,64 +677,31 @@ export default function Dashboard() {
         )}
       </AnimatePresence>
 
-      {/* Sidebar */}
-      <aside className="w-64 bg-card border-l border-border flex flex-col shrink-0 hidden lg:flex">
-        <div className="p-4 border-b border-border flex items-center gap-3">
-          {restaurant.logo_url ? (
-            <img src={restaurant.logo_url} alt="logo" className="w-10 h-10 rounded-xl object-contain bg-secondary/50" />
-          ) : (
-            <div className="w-10 h-10 rounded-xl gradient-bg flex items-center justify-center text-lg">
-              {BUSINESS_TYPES[businessType]?.icon || '🏢'}
-            </div>
-          )}
-          <div className="min-w-0">
-            <p className="font-display font-bold text-sm truncate">{restaurant.name}</p>
-            <p className="text-xs text-muted-foreground truncate">{BUSINESS_TYPES[businessType]?.label} — {profileName}</p>
-          </div>
-        </div>
-        <nav className="flex-1 p-3 space-y-1 overflow-y-auto">
-          {isTrial && (
-            <div className="mb-3 p-3 rounded-lg bg-warning/10 border border-warning/20 text-xs text-center">
-              <p className="font-bold text-warning">🎁 فترة تجريبية</p>
-              <p className="text-muted-foreground">متبقي {trialDaysLeft} يوم</p>
-              <button onClick={() => navigate('/payment')} className="text-primary underline text-xs mt-1">ترقية الآن</button>
-            </div>
-          )}
-          {tabs.map(tab => (
-            <button key={tab.id} onClick={() => handleTabClick(tab.id)}
-              className={`sidebar-nav-item w-full ${activeTab === tab.id ? 'active' : ''} ${tab.locked ? 'opacity-50' : ''}`}>
-              <tab.icon className="w-5 h-5" />
-              <span className="flex-1 text-right">{tab.label}</span>
-              {tab.locked ? <Lock className="w-3 h-3 text-muted-foreground" /> : null}
-              {tab.badge && !tab.locked ? <span className="w-5 h-5 rounded-full gradient-bg text-primary-foreground text-xs flex items-center justify-center">{tab.badge}</span> : null}
-            </button>
-          ))}
-        </nav>
-        <div className="p-4 border-t border-border space-y-2">
-          {currentShift && (
-            <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-success/10 text-xs text-success">
-              <CalendarClock className="w-3 h-3" /> شفت مفتوح
-            </div>
-          )}
-          <button onClick={() => setSoundEnabled(!soundEnabled)}
-            className="sidebar-nav-item w-full">
-            {soundEnabled ? <Volume2 className="w-5 h-5 text-success" /> : <VolumeX className="w-5 h-5 text-muted-foreground" />}
-            <span>{soundEnabled ? 'الصوت مفعّل' : 'الصوت مغلق'}</span>
-          </button>
-          <button onClick={toggleDarkMode} className="sidebar-nav-item w-full">
-            {isDark ? <Sun className="w-5 h-5 text-warning" /> : <Moon className="w-5 h-5 text-muted-foreground" />}
-            <span>{isDark ? 'الوضع الفاتح' : 'الوضع الداكن'}</span>
-          </button>
-          <motion.div animate={{ backgroundColor: isOnline ? 'hsl(142 71% 45% / 0.1)' : 'hsl(0 84% 60% / 0.1)' }}
-            className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm">
-            {isOnline ? <Wifi className="w-4 h-4 text-success" /> : <WifiOff className="w-4 h-4 text-destructive" />}
-            <span className={isOnline ? 'text-success' : 'text-destructive'}>{isOnline ? 'متصل' : 'غير متصل'}</span>
-          </motion.div>
-          <button onClick={handleLogout} className="sidebar-nav-item w-full">
-            <LogOut className="w-5 h-5" /><span>تسجيل الخروج</span>
-          </button>
-        </div>
-      </aside>
+      {/* Professional Sidebar */}
+      <ProfessionalSidebar
+        businessType={businessType}
+        activeTab={activeTab}
+        onTabChange={(tab) => setActiveTab(tab)}
+        restaurant={restaurant}
+        user={{ email: user?.email, full_name: profileName }}
+        stats={{
+          pendingOrders: pendingOrders.length,
+          deliveryOrders: deliveryOrders.length,
+          unackCalls: unackCalls.length,
+          todayRevenue,
+          isOnline
+        }}
+        isTrial={isTrial}
+        trialDaysLeft={trialDaysLeft}
+        soundEnabled={soundEnabled}
+        onToggleSound={() => setSoundEnabled(!soundEnabled)}
+        isDark={isDark}
+        onToggleDark={toggleDarkMode}
+        onLogout={handleLogout}
+        onUpgrade={() => navigate('/payment')}
+        isCollapsed={sidebarCollapsed}
+        onToggleCollapse={() => setSidebarCollapsed(!sidebarCollapsed)}
+      />
 
       <div className="flex-1 flex flex-col min-w-0">
         {/* Mobile header */}
