@@ -35,6 +35,7 @@ import { BUSINESS_TYPES, BUSINESS_TABS, getAddressPlaceholder, getCheckoutButton
 import { useAuth } from '@/lib/AuthContext';
 import { useDarkMode } from '@/lib/useDarkMode';
 import { CustomerSearch } from './dashboard/CustomerSearch';
+import { checkoutIntegration } from '@/lib/accounting';
 import type {
   DashboardTab, OrderStatus, OrderType, MenuItem, Order, OrderItem, HeldInvoice
 } from './dashboard/types';
@@ -350,139 +351,154 @@ export default function Dashboard() {
 
   const checkout = async (sendToPrep: boolean = false) => {
     if (cart.length === 0) return;
-    const orderNum = `ORD-${Date.now().toString().slice(-6)}`;
-    const clientOrderId = `${restaurant!.id}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-    
-    // Find customer_id if customer name is provided
-    let customerId: string | null = null;
-    if (customerName.trim() && isOnline) {
-      const { data: custData } = await supabase.from('customers')
-        .select('id')
-        .eq('restaurant_id', restaurant!.id)
-        .ilike('name', customerName.trim())
-        .limit(1);
-      if (custData && custData.length > 0) customerId = custData[0].id;
-    }
 
-    const orderData = {
-      restaurant_id: restaurant!.id,
-      order_number: orderNum,
-      total: cartTotal,
-      status: sendToPrep ? 'pending' : 'completed',
-      synced: isOnline,
-      table_number: tableNumber ? Number(tableNumber) : null,
-      discount: discountAmount,
-      notes: orderNotes,
-      customer_name: customerName,
-      customer_phone: customerPhone,
-      order_type: orderType,
-      delivery_address: deliveryAddress,
-      delivery_agent_id: selectedDeliveryAgent || null,
-      payment_method: paymentMethod,
-      paid_amount: paidNum,
-      client_order_id: clientOrderId,
-      customer_id: customerId,
-    };
-
-    const cartItems = cart.map(c => {
-      const units = getUnitOptions(c.item);
-      const selectedUnit = units.find(u => u.label === c.unitMode);
-      const unitFactor = selectedUnit?.factor || 1;
-      return {
-        menu_item_id: isInventoryDrivenBusiness(businessType) ? null : c.item.id,
-        product_id: isInventoryDrivenBusiness(businessType) ? (c.item.product_id || c.item.id) : null,
-        menu_item_name: c.item.name,
-        menu_item_image: c.item.image,
-        quantity: c.qty,
-        price: c.item.price * unitFactor,
-        sold_unit: c.unitMode || '',
-        unit_factor: unitFactor,
-        cost_price_snapshot: (c.item as any).cost_price || 0,
-      };
-    });
-
+    // Handle offline mode with legacy system
     if (!isOnline) {
-      await queueOrderOffline({ ...orderData, client_order_id: clientOrderId } as any, cartItems, orderNum);
+      const orderNum = `ORD-${Date.now().toString().slice(-6)}`;
+      const clientOrderId = `${restaurant!.id}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+      
+      const cartItems = cart.map(c => {
+        const units = getUnitOptions(c.item);
+        const selectedUnit = units.find(u => u.label === c.unitMode);
+        const unitFactor = selectedUnit?.factor || 1;
+        return {
+          menu_item_id: isInventoryDrivenBusiness(businessType) ? null : c.item.id,
+          product_id: isInventoryDrivenBusiness(businessType) ? (c.item.product_id || c.item.id) : null,
+          menu_item_name: c.item.name,
+          menu_item_image: c.item.image,
+          quantity: c.qty,
+          price: c.item.price * unitFactor,
+          sold_unit: c.unitMode || '',
+          unit_factor: unitFactor,
+          cost_price_snapshot: (c.item as any).cost_price || 0,
+        };
+      });
+
+      const orderData = {
+        restaurant_id: restaurant!.id,
+        order_number: orderNum,
+        total: cartTotal,
+        status: sendToPrep ? 'pending' : 'completed',
+        synced: false,
+        table_number: tableNumber ? Number(tableNumber) : null,
+        discount: discountAmount,
+        notes: orderNotes,
+        customer_name: customerName,
+        customer_phone: customerPhone,
+        order_type: orderType,
+        delivery_address: deliveryAddress,
+        delivery_agent_id: selectedDeliveryAgent || null,
+        payment_method: paymentMethod,
+        paid_amount: paidNum,
+        client_order_id: clientOrderId,
+        customer_id: null,
+      };
+
+      await queueOrderOffline(orderData as any, cartItems, orderNum);
       return;
     }
 
+    // Use new accounting-integrated checkout
     try {
-      const { data: order, error } = await supabase.from('orders').insert(orderData).select().single();
-      if (error || !order) {
-        const message = error?.message || '';
-        if (!navigator.onLine || /fetch|network|offline|failed/i.test(message)) {
-          await queueOrderOffline(orderData, cartItems, orderNum);
-          return;
+      const result = await checkoutIntegration.processCheckout(
+        {
+          restaurantId: restaurant!.id,
+          businessType: businessType as any,
+          currency: currency,
+          isOnline: true,
+          userId: user?.id,
+        },
+        {
+          cart: cart.map(c => ({
+            ...c.item,
+            quantity: c.qty,
+            unitMode: c.unitMode,
+            unitFactor: getUnitOptions(c.item).find(u => u.label === c.unitMode)?.factor || 1,
+          })),
+          customerName,
+          customerPhone,
+          tableNumber: tableNumber ? Number(tableNumber) : undefined,
+          orderType: orderType as any,
+          deliveryAddress,
+          deliveryAgentId: selectedDeliveryAgent,
+          paymentMethod: paymentMethod as any,
+          paidAmount: paidNum,
+          discount: discountAmount,
+          discountType: discountType === 'percent' ? 'percentage' : 'fixed',
+          notes: orderNotes,
         }
-        toast.error('خطأ في إنشاء الطلب');
-        return;
-      }
-
-      const { error: orderItemsError } = await supabase.from('order_items').insert(
-        cartItems.map(item => ({ ...item, order_id: order.id }))
       );
-      if (orderItemsError) {
-        toast.error('تم إنشاء الطلب لكن حدثت مشكلة في حفظ الأصناف');
-      }
 
-      if (orderType === 'delivery' && selectedDeliveryAgent) {
-        await supabase.from('delivery_agents').update({ status: 'busy' }).eq('id', selectedDeliveryAgent);
-        setAgents(agents.map(a => a.id === selectedDeliveryAgent ? { ...a, status: 'busy' } : a));
-        await supabase.from('notifications').insert({
-          restaurant_id: restaurant!.id,
-          title: `🆕 طلب توصيل جديد #${orderNum.slice(-4)}`,
-          body: `${customerName || 'عميل'} — ${deliveryAddress || ''} — ${cartTotal.toFixed(2)} ${currency}`,
-          type: 'order',
-          target_type: 'agent',
-          target_id: selectedDeliveryAgent,
-        } as any);
-      }
-
-      if (activeInvoiceId) setInvoiceTabs(prev => prev.filter(t => t.id !== activeInvoiceId));
-
-      const newOrder = {
-        ...order,
-        items: cartItems,
-        paid_amount: paidNum,
-        payment_method: paymentMethod,
-      } as unknown as Order;
-
-      setOrders(prev => [newOrder, ...prev]);
-      setLastReceipt(newOrder);
-      setShowReceipt(true);
-
-      // Record customer transaction if customer is linked and there's a remaining balance
-      if (customerId && remaining > 0) {
-        const { data: custData } = await supabase.from('customers').select('balance').eq('id', customerId).single();
-        if (custData) {
-          await supabase.from('customers').update({ balance: custData.balance + remaining }).eq('id', customerId);
-          await supabase.from('customer_transactions').insert({
-            customer_id: customerId,
-            restaurant_id: restaurant!.id,
-            type: 'sale',
-            amount: remaining,
-            description: `فاتورة #${orderNum.slice(-4)} — متبقي`,
-            order_id: order.id,
-            payment_method: paymentMethod,
-          });
-        }
-      } else if (customerId && paidNum > 0) {
-        // Record the full sale in customer ledger even if fully paid
-        await supabase.from('customer_transactions').insert({
-          customer_id: customerId,
-          restaurant_id: restaurant!.id,
-          type: 'sale',
-          amount: 0,
-          description: `فاتورة #${orderNum.slice(-4)} — مدفوعة بالكامل (${cartTotal.toFixed(2)} ${currency})`,
-          order_id: order.id,
+      if (result.success && result.order) {
+        // Update local state
+        const newOrder = {
+          ...result.order,
+          items: result.order.items || [],
+          paid_amount: paidNum,
           payment_method: paymentMethod,
-        });
-      }
+        } as Order;
 
-      clearCart();
-      toast.success(`✅ تم إنشاء الطلب #${orderNum.slice(-4)} — ${cartTotal.toFixed(2)} ${currency}`);
-    } catch {
-      await queueOrderOffline(orderData, cartItems, orderNum);
+        setOrders(prev => [newOrder, ...prev]);
+        setLastReceipt(newOrder);
+        setShowReceipt(true);
+
+        // Handle delivery agent
+        if (orderType === 'delivery' && selectedDeliveryAgent) {
+          setAgents(agents.map(a => a.id === selectedDeliveryAgent ? { ...a, status: 'busy' } : a));
+          await supabase.from('notifications').insert({
+            restaurant_id: restaurant!.id,
+            title: `🆕 طلب توصيل جديد #${result.order.order_number?.slice(-4)}`,
+            body: `${customerName || 'عميل'} — ${deliveryAddress || ''} — ${result.order.total?.toFixed(2)} ${currency}`,
+            type: 'order',
+            target_type: 'agent',
+            target_id: selectedDeliveryAgent,
+          } as any);
+        }
+
+        // Clear invoice tab if used
+        if (activeInvoiceId) setInvoiceTabs(prev => prev.filter(t => t.id !== activeInvoiceId));
+
+        // Show success message with accounting details
+        let successMsg = `✅ تم إنشاء الطلب #${result.order.order_number?.slice(-4)} — ${result.order.total?.toFixed(2)} ${currency}`;
+        if (result.journalEntryId) {
+          successMsg += ` 📊 (قيد محاسبي: ${result.journalEntryId.slice(-4)})`;
+        }
+        toast.success(successMsg);
+
+        clearCart();
+      } else {
+        toast.error(result.error || 'فشل في إتمام الطلب');
+      }
+    } catch (error: any) {
+      console.error('Checkout error:', error);
+      toast.error(`خطأ في إتمام الطلب: ${error.message}`);
+      
+      // Fallback to offline queue on error
+      const orderNum = `ORD-${Date.now().toString().slice(-6)}`;
+      const clientOrderId = `${restaurant!.id}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+      
+      const cartItems = cart.map(c => ({
+        menu_item_id: c.item.id,
+        menu_item_name: c.item.name,
+        menu_item_image: c.item.image,
+        quantity: c.qty,
+        price: c.item.price,
+        sold_unit: c.unitMode || '',
+        unit_factor: 1,
+        cost_price_snapshot: (c.item as any).cost_price || 0,
+      }));
+
+      await queueOrderOffline(
+        {
+          restaurant_id: restaurant!.id,
+          order_number: orderNum,
+          total: cartTotal,
+          status: sendToPrep ? 'pending' : 'completed',
+          client_order_id: clientOrderId,
+        } as any,
+        cartItems,
+        orderNum
+      );
     }
   };
 

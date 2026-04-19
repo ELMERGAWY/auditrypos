@@ -1140,6 +1140,393 @@ export type Database = {
           },
         ]
       }
+      // VENTRO PRO: NEW ACCOUNTING TABLES
+      chart_of_accounts: {
+        Row: {
+          account_type: string
+          code: string
+          created_at: string
+          currency: string
+          current_balance: number
+          id: string
+          is_active: boolean
+          is_bank_account: boolean
+          is_cash_account: boolean
+          name: string
+          opening_balance: number
+          parent_id: string | null
+          restaurant_id: string
+          subtype: string | null
+          updated_at: string
+        }
+        Insert: {
+          account_type: string
+          code: string
+          created_at?: string
+          currency?: string
+          current_balance?: number
+          id?: string
+          is_active?: boolean
+          is_bank_account?: boolean
+          is_cash_account?: boolean
+          name: string
+          opening_balance?: number
+          parent_id?: string | null
+          restaurant_id: string
+          subtype?: string | null
+          updated_at?: string
+        }
+        Update: {
+          account_type?: string
+          code?: string
+          created_at?: string
+          currency?: string
+          current_balance?: number
+          id?: string
+          is_active?: boolean
+          is_bank_account?: boolean
+          is_cash_account?: boolean
+          name?: string
+          opening_balance?: number
+          parent_id?: string | null
+          restaurant_id?: string
+          subtype?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "chart_of_accounts_parent_id_fkey"
+            columns: ["parent_id"]
+            isOneToOne: false
+            referencedRelation: "chart_of_accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "chart_of_accounts_restaurant_id_fkey"
+            columns: ["restaurant_id"]
+            isOneToOne: false
+            referencedRelation: "restaurants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      journal_entries: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          description: string
+          entry_date: string
+          entry_number: string
+          id: string
+          is_posted: boolean
+          is_recurring: boolean
+          reference_id: string | null
+          reference_type: string | null
+          restaurant_id: string
+          source: string
+          total_credit: number
+          total_debit: number
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          description: string
+          entry_date?: string
+          entry_number: string
+          id?: string
+          is_posted?: boolean
+          is_recurring?: boolean
+          reference_id?: string | null
+          reference_type?: string | null
+          restaurant_id: string
+          source?: string
+          total_credit?: number
+          total_debit?: number
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          description?: string
+          entry_date?: string
+          entry_number?: string
+          id?: string
+          is_posted?: boolean
+          is_recurring?: boolean
+          reference_id?: string | null
+          reference_type?: string | null
+          restaurant_id?: string
+          source?: string
+          total_credit?: number
+          total_debit?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "journal_entries_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "journal_entries_restaurant_id_fkey"
+            columns: ["restaurant_id"]
+            isOneToOne: false
+            referencedRelation: "restaurants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      journal_entry_lines: {
+        Row: {
+          account_id: string
+          created_at: string
+          credit: number
+          debit: number
+          description: string | null
+          entry_id: string
+          id: string
+          line_order: number
+        }
+        Insert: {
+          account_id: string
+          created_at?: string
+          credit?: number
+          debit?: number
+          description?: string | null
+          entry_id: string
+          id?: string
+          line_order?: number
+        }
+        Update: {
+          account_id?: string
+          created_at?: string
+          credit?: number
+          debit?: number
+          description?: string | null
+          entry_id?: string
+          id?: string
+          line_order?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "journal_entry_lines_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "chart_of_accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "journal_entry_lines_entry_id_fkey"
+            columns: ["entry_id"]
+            isOneToOne: false
+            referencedRelation: "journal_entries"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      inventory_cost_layers: {
+        Row: {
+          consumed_at: string | null
+          created_at: string
+          id: string
+          is_consumed: boolean
+          layer_date: string
+          layer_type: string
+          product_id: string
+          quantity: number
+          reference_id: string | null
+          remaining_qty: number
+          restaurant_id: string
+          unit_cost: number
+        }
+        Insert: {
+          consumed_at?: string | null
+          created_at?: string
+          id?: string
+          is_consumed?: boolean
+          layer_date?: string
+          layer_type?: string
+          product_id: string
+          quantity: number
+          reference_id?: string | null
+          remaining_qty?: number
+          restaurant_id: string
+          unit_cost: number
+        }
+        Update: {
+          consumed_at?: string | null
+          created_at?: string
+          id?: string
+          is_consumed?: boolean
+          layer_date?: string
+          layer_type?: string
+          product_id?: string
+          quantity?: number
+          reference_id?: string | null
+          remaining_qty?: number
+          restaurant_id?: string
+          unit_cost?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "inventory_cost_layers_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inventory_cost_layers_restaurant_id_fkey"
+            columns: ["restaurant_id"]
+            isOneToOne: false
+            referencedRelation: "restaurants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      tax_rates: {
+        Row: {
+          applies_to: string[]
+          created_at: string
+          id: string
+          is_active: boolean
+          is_compound: boolean
+          is_included_in_price: boolean
+          name: string
+          rate: number
+          restaurant_id: string
+          type: string
+        }
+        Insert: {
+          applies_to?: string[]
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          is_compound?: boolean
+          is_included_in_price?: boolean
+          name: string
+          rate: number
+          restaurant_id: string
+          type?: string
+        }
+        Update: {
+          applies_to?: string[]
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          is_compound?: boolean
+          is_included_in_price?: boolean
+          name?: string
+          rate?: number
+          restaurant_id?: string
+          type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tax_rates_restaurant_id_fkey"
+            columns: ["restaurant_id"]
+            isOneToOne: false
+            referencedRelation: "restaurants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      order_taxes: {
+        Row: {
+          created_at: string
+          id: string
+          order_id: string
+          tax_amount: number
+          tax_rate_id: string
+          tax_type: string
+          taxable_amount: number
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          order_id: string
+          tax_amount: number
+          tax_rate_id: string
+          tax_type: string
+          taxable_amount: number
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          order_id?: string
+          tax_amount?: number
+          tax_rate_id?: string
+          tax_type?: string
+          taxable_amount?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "order_taxes_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "order_taxes_tax_rate_id_fkey"
+            columns: ["tax_rate_id"]
+            isOneToOne: false
+            referencedRelation: "tax_rates"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      audit_log: {
+        Row: {
+          action: string
+          changed_at: string
+          changed_by: string | null
+          id: string
+          new_data: Json | null
+          old_data: Json | null
+          record_id: string
+          restaurant_id: string
+          table_name: string
+        }
+        Insert: {
+          action: string
+          changed_at?: string
+          changed_by?: string | null
+          id?: string
+          new_data?: Json | null
+          old_data?: Json | null
+          record_id: string
+          restaurant_id: string
+          table_name: string
+        }
+        Update: {
+          action?: string
+          changed_at?: string
+          changed_by?: string | null
+          id?: string
+          new_data?: Json | null
+          old_data?: Json | null
+          record_id?: string
+          restaurant_id?: string
+          table_name?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "audit_log_changed_by_fkey"
+            columns: ["changed_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "audit_log_restaurant_id_fkey"
+            columns: ["restaurant_id"]
+            isOneToOne: false
+            referencedRelation: "restaurants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       delivery_agents_tracking: {
@@ -1231,6 +1618,23 @@ export type Database = {
       is_restaurant_owner: {
         Args: { _restaurant_id: string; _user_id: string }
         Returns: boolean
+      }
+      // VENTRO PRO: ACCOUNTING FUNCTIONS
+      create_default_chart_of_accounts: {
+        Args: { p_restaurant_id: string }
+        Returns: undefined
+      }
+      update_account_balance: {
+        Args: { p_account_id: string; p_amount: number }
+        Returns: undefined
+      }
+      calculate_fifo_cost: {
+        Args: { p_product_id: string; p_quantity: number }
+        Returns: {
+          total_cost: number
+          avg_unit_cost: number
+          layers_used: number
+        }
       }
     }
     Enums: {

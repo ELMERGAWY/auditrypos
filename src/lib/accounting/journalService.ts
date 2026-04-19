@@ -1,0 +1,557 @@
+
+// ============================================================
+// JOURNAL SERVICE - Double Entry Accounting Engine
+// ============================================================
+
+import { supabase } from '@/integrations/supabase/client';
+import { toast } from 'sonner';
+import { 
+  type JournalEntry, 
+  type JournalEntryLine, 
+  type ChartOfAccount,
+  type BusinessAccountMapping,
+  JOURNAL_TEMPLATES,
+  BUSINESS_ACCOUNT_MAPPINGS,
+  type AccountType,
+} from './types';
+import type { Order, OrderItem } from '@/pages/dashboard/types';
+
+// Default account codes for all businesses
+const DEFAULT_ACCOUNTS: BusinessAccountMapping = {
+  cashAccount: '1100',
+  bankAccount: '1400',
+  accountsReceivable: '1200',
+  inventoryAccount: '1300',
+  accountsPayable: '2100',
+  taxPayable: '2150',
+  accruedExpenses: '2200',
+  salesRevenue: '4100',
+  serviceRevenue: '4200',
+  deliveryRevenue: '4300',
+  cogsAccount: '5100',
+  wastageAccount: '5200',
+  salariesExpense: '6100',
+  rentExpense: '6200',
+  utilitiesExpense: '6300',
+  marketingExpense: '6400',
+};
+
+class JournalService {
+  private accountCache: Map<string, Map<string, ChartOfAccount>> = new Map();
+
+  // ============================================================
+  // ACCOUNT MANAGEMENT
+  // ============================================================
+
+  async getAccountByCode(restaurantId: string, code: string): Promise<ChartOfAccount | null> {
+    // Check cache
+    const cached = this.accountCache.get(restaurantId)?.get(code);
+    if (cached) return cached;
+
+    const { data, error } = await supabase
+      .from('chart_of_accounts')
+      .select('*')
+      .eq('restaurant_id', restaurantId)
+      .eq('code', code)
+      .eq('is_active', true)
+      .single();
+
+    if (error || !data) {
+      console.error(`Account ${code} not found for restaurant ${restaurantId}`, error);
+      return null;
+    }
+
+    // Cache the result
+    if (!this.accountCache.has(restaurantId)) {
+      this.accountCache.set(restaurantId, new Map());
+    }
+    this.accountCache.get(restaurantId)!.set(code, data);
+
+    return data;
+  }
+
+  async getAllAccounts(restaurantId: string): Promise<ChartOfAccount[]> {
+    const { data, error } = await supabase
+      .from('chart_of_accounts')
+      .select('*')
+      .eq('restaurant_id', restaurantId)
+      .eq('is_active', true)
+      .order('code');
+
+    if (error) {
+      console.error('Failed to load accounts:', error);
+      return [];
+    }
+
+    // Update cache
+    const cache = new Map<string, ChartOfAccount>();
+    data?.forEach(acc => cache.set(acc.code, acc));
+    this.accountCache.set(restaurantId, cache);
+
+    return data || [];
+  }
+
+  async getAccountsByType(restaurantId: string, type: AccountType): Promise<ChartOfAccount[]> {
+    const { data, error } = await supabase
+      .from('chart_of_accounts')
+      .select('*')
+      .eq('restaurant_id', restaurantId)
+      .eq('account_type', type)
+      .eq('is_active', true);
+
+    if (error) {
+      console.error(`Failed to load ${type} accounts:`, error);
+      return [];
+    }
+
+    return data || [];
+  }
+
+  async getNextEntryNumber(restaurantId: string): Promise<string> {
+    const { data, error } = await supabase
+      .from('journal_entries')
+      .select('entry_number')
+      .eq('restaurant_id', restaurantId)
+      .order('created_at', { ascending: false })
+      .limit(1);
+
+    if (error || !data || data.length === 0) {
+      return 'JE-000001';
+    }
+
+    const lastNumber = data[0].entry_number;
+    const num = parseInt(lastNumber.replace(/\D/g, '')) || 0;
+    return `JE-${String(num + 1).padStart(6, '0')}`;
+  }
+
+  // ============================================================
+  // JOURNAL ENTRY CREATION
+  // ============================================================
+
+  async createJournalEntry(
+    restaurantId: string,
+    entry: Omit<JournalEntry, 'id' | 'entry_number' | 'created_at' | 'lines'> & { lines: Omit<JournalEntryLine, 'id' | 'entry_id'>[] }
+  ): Promise<JournalEntry | null> {
+    try {
+      const entryNumber = await this.getNextEntryNumber(restaurantId);
+      
+      // Validate balance
+      const totalDebit = entry.lines.reduce((sum, l) => sum + (l.debit || 0), 0);
+      const totalCredit = entry.lines.reduce((sum, l) => sum + (l.credit || 0), 0);
+      
+      if (Math.abs(totalDebit - totalCredit) > 0.001) {
+        throw new Error(`Journal entry must balance: Debit ${totalDebit} ≠ Credit ${totalCredit}`);
+      }
+
+      // Insert journal entry
+      const { data: journalData, error: journalError } = await supabase
+        .from('journal_entries')
+        .insert({
+          restaurant_id: restaurantId,
+          entry_number: entryNumber,
+          entry_date: entry.entry_date,
+          reference_type: entry.reference_type,
+          reference_id: entry.reference_id,
+          description: entry.description,
+          source: entry.source,
+          total_debit: totalDebit,
+          total_credit: totalCredit,
+          is_posted: entry.is_posted ?? false,
+          is_recurring: entry.is_recurring ?? false,
+          created_by: entry.created_by,
+        })
+        .select()
+        .single();
+
+      if (journalError || !journalData) {
+        throw new Error(`Failed to create journal entry: ${journalError?.message}`);
+      }
+
+      // Insert journal lines
+      const linesWithEntryId = entry.lines.map((line, index) => ({
+        entry_id: journalData.id,
+        account_id: line.account_id,
+        debit: line.debit || 0,
+        credit: line.credit || 0,
+        description: line.description,
+        cost_center_id: line.cost_center_id,
+        line_order: index,
+      }));
+
+      const { error: linesError } = await supabase
+        .from('journal_entry_lines')
+        .insert(linesWithEntryId);
+
+      if (linesError) {
+        // Rollback - delete the journal entry
+        await supabase.from('journal_entries').delete().eq('id', journalData.id);
+        throw new Error(`Failed to create journal lines: ${linesError.message}`);
+      }
+
+      // Update account balances
+      for (const line of entry.lines) {
+        await this.updateAccountBalance(line.account_id, line.debit || 0, line.credit || 0);
+      }
+
+      toast.success(`تم إنشاء قيد يومية ${entryNumber}`);
+      
+      return {
+        ...journalData,
+        lines: [], // Will be loaded separately if needed
+      } as JournalEntry;
+
+    } catch (error: any) {
+      console.error('Journal entry creation failed:', error);
+      toast.error(`خطأ في إنشاء القيد: ${error.message}`);
+      return null;
+    }
+  }
+
+  private async updateAccountBalance(accountId: string, debit: number, credit: number): Promise<void> {
+    const netChange = debit - credit;
+    
+    const { error } = await supabase.rpc('update_account_balance', {
+      p_account_id: accountId,
+      p_amount: netChange,
+    });
+
+    if (error) {
+      console.error('Failed to update account balance:', error);
+    }
+  }
+
+  // ============================================================
+  // BUSINESS-SPECIFIC JOURNAL ENTRIES
+  // ============================================================
+
+  async createSaleJournalEntry(
+    restaurantId: string,
+    order: Order,
+    businessType: string,
+    cogs?: number,
+    taxAmount: number = 0
+  ): Promise<JournalEntry | null> {
+    const mapping = this.getBusinessMapping(businessType);
+    const lines: Omit<JournalEntryLine, 'id' | 'entry_id'>[] = [];
+
+    // Get account IDs
+    const cashAcc = await this.getAccountByCode(restaurantId, mapping.cashAccount);
+    const arAcc = await this.getAccountByCode(restaurantId, mapping.accountsReceivable);
+    const salesAcc = await this.getAccountByCode(restaurantId, mapping.salesRevenue);
+    const taxAcc = await this.getAccountByCode(restaurantId, mapping.taxPayable);
+
+    if (!cashAcc || !salesAcc) {
+      toast.error('الحسابات المحاسبية غير موجودة');
+      return null;
+    }
+
+    const paidAmount = order.paid_amount || order.total;
+    const remaining = order.total - paidAmount;
+    const totalWithDiscount = order.total + (order.discount || 0);
+
+    // 1. Debit: Cash/Bank for paid amount
+    if (paidAmount > 0) {
+      lines.push({
+        account_id: cashAcc.id,
+        debit: paidAmount,
+        credit: 0,
+        description: `نقدية من فاتورة ${order.order_number}`,
+        line_order: 1,
+      });
+    }
+
+    // 2. Debit: Accounts Receivable for remaining
+    if (remaining > 0 && arAcc) {
+      lines.push({
+        account_id: arAcc.id,
+        debit: remaining,
+        credit: 0,
+        description: `ذمم دائنة - فاتورة ${order.order_number}`,
+        line_order: 2,
+      });
+    }
+
+    // 3. Credit: Sales Revenue
+    lines.push({
+      account_id: salesAcc.id,
+      debit: 0,
+      credit: totalWithDiscount - taxAmount,
+      description: `إيرادات مبيعات - ${order.order_number}`,
+      line_order: 3,
+    });
+
+    // 4. Credit: Tax Payable
+    if (taxAmount > 0 && taxAcc) {
+      lines.push({
+        account_id: taxAcc.id,
+        debit: 0,
+        credit: taxAmount,
+        description: `ضريبة القيمة المضافة`,
+        line_order: 4,
+      });
+    }
+
+    // 5. Debit: Sales Discount (if any)
+    if (order.discount > 0) {
+      const discountAcc = await this.getAccountByCode(restaurantId, '4120') || salesAcc;
+      lines.push({
+        account_id: discountAcc.id,
+        debit: order.discount,
+        credit: 0,
+        description: `خصم مبيعات - ${order.order_number}`,
+        line_order: 5,
+      });
+    }
+
+    // Create the journal entry
+    const entry = await this.createJournalEntry(restaurantId, {
+      entry_date: new Date(),
+      reference_type: 'order',
+      reference_id: order.id,
+      description: `فاتورة مبيعات #${order.order_number} - ${order.customer_name || 'عميل نقدي'}`,
+      source: 'pos',
+      is_posted: true,
+      lines,
+    });
+
+    // Create COGS entry if applicable
+    if (cogs && cogs > 0 && entry) {
+      await this.createCOGSJournalEntry(restaurantId, order, businessType, cogs);
+    }
+
+    return entry;
+  }
+
+  async createCOGSJournalEntry(
+    restaurantId: string,
+    order: Order,
+    businessType: string,
+    cogs: number
+  ): Promise<JournalEntry | null> {
+    // Skip COGS for service businesses
+    if (businessType === 'services') return null;
+
+    const mapping = this.getBusinessMapping(businessType);
+    
+    const cogsAcc = await this.getAccountByCode(restaurantId, mapping.cogsAccount);
+    const inventoryAcc = await this.getAccountByCode(restaurantId, mapping.inventoryAccount);
+
+    if (!cogsAcc || !inventoryAcc) {
+      console.warn('COGS accounts not found, skipping COGS entry');
+      return null;
+    }
+
+    return this.createJournalEntry(restaurantId, {
+      entry_date: new Date(),
+      reference_type: 'order',
+      reference_id: order.id,
+      description: `تكلفة بضاعة مباعة - ${order.order_number}`,
+      source: 'auto',
+      is_posted: true,
+      lines: [
+        {
+          account_id: cogsAcc.id,
+          debit: cogs,
+          credit: 0,
+          description: `COGS لـ ${order.order_number}`,
+          line_order: 1,
+        },
+        {
+          account_id: inventoryAcc.id,
+          debit: 0,
+          credit: cogs,
+          description: `إنقاص مخزون - ${order.order_number}`,
+          line_order: 2,
+        },
+      ],
+    });
+  }
+
+  async createDeliveryJournalEntry(
+    restaurantId: string,
+    order: Order,
+    deliveryFee: number,
+    businessType: string
+  ): Promise<JournalEntry | null> {
+    if (deliveryFee <= 0) return null;
+
+    const mapping = this.getBusinessMapping(businessType);
+    const cashAcc = await this.getAccountByCode(restaurantId, mapping.cashAccount);
+    const deliveryRevAcc = await this.getAccountByCode(restaurantId, mapping.deliveryRevenue || '4300');
+
+    if (!cashAcc || !deliveryRevAcc) return null;
+
+    return this.createJournalEntry(restaurantId, {
+      entry_date: new Date(),
+      reference_type: 'order',
+      reference_id: order.id,
+      description: `رسوم توصيل - ${order.order_number}`,
+      source: 'pos',
+      is_posted: true,
+      lines: [
+        {
+          account_id: cashAcc.id,
+          debit: deliveryFee,
+          credit: 0,
+          description: `استلام رسوم توصيل`,
+          line_order: 1,
+        },
+        {
+          account_id: deliveryRevAcc.id,
+          debit: 0,
+          credit: deliveryFee,
+          description: `إيرادات توصيل`,
+          line_order: 2,
+        },
+      ],
+    });
+  }
+
+  async createExpenseJournalEntry(
+    restaurantId: string,
+    expense: {
+      amount: number;
+      description: string;
+      category: string;
+      payment_method: 'cash' | 'bank' | 'credit';
+      date?: Date;
+    }
+  ): Promise<JournalEntry | null> {
+    const mapping = this.getBusinessMapping('general');
+    
+    // Map expense category to account
+    const categoryToAccount: Record<string, string> = {
+      'salaries': mapping.salariesExpense,
+      'rent': mapping.rentExpense,
+      'utilities': mapping.utilitiesExpense,
+      'marketing': mapping.marketingExpense,
+      'inventory': mapping.cogsAccount,
+    };
+
+    const expenseAccountCode = categoryToAccount[expense.category] || '6500'; // General expenses
+    const expenseAcc = await this.getAccountByCode(restaurantId, expenseAccountCode);
+    const cashAcc = await this.getAccountByCode(restaurantId, mapping.cashAccount);
+    const bankAcc = await this.getAccountByCode(restaurantId, mapping.bankAccount);
+    const apAcc = await this.getAccountByCode(restaurantId, mapping.accountsPayable);
+
+    const lines: Omit<JournalEntryLine, 'id' | 'entry_id'>[] = [];
+
+    // Debit: Expense account
+    if (expenseAcc) {
+      lines.push({
+        account_id: expenseAcc.id,
+        debit: expense.amount,
+        credit: 0,
+        description: expense.description,
+        line_order: 1,
+      });
+    }
+
+    // Credit: Payment method
+    if (expense.payment_method === 'cash' && cashAcc) {
+      lines.push({
+        account_id: cashAcc.id,
+        debit: 0,
+        credit: expense.amount,
+        description: `دفع نقدي - ${expense.description}`,
+        line_order: 2,
+      });
+    } else if (expense.payment_method === 'bank' && bankAcc) {
+      lines.push({
+        account_id: bankAcc.id,
+        debit: 0,
+        credit: expense.amount,
+        description: `دفع بنكي - ${expense.description}`,
+        line_order: 2,
+      });
+    } else if (expense.payment_method === 'credit' && apAcc) {
+      lines.push({
+        account_id: apAcc.id,
+        debit: 0,
+        credit: expense.amount,
+        description: `على الحساب - ${expense.description}`,
+        line_order: 2,
+      });
+    }
+
+    return this.createJournalEntry(restaurantId, {
+      entry_date: expense.date || new Date(),
+      reference_type: 'expense',
+      description: expense.description,
+      source: 'pos',
+      is_posted: true,
+      lines,
+    });
+  }
+
+  // ============================================================
+  // REPORTS
+  // ============================================================
+
+  async getTrialBalance(restaurantId: string, asOfDate?: Date): Promise<any[]> {
+    const { data, error } = await supabase
+      .rpc('get_trial_balance', {
+        p_restaurant_id: restaurantId,
+        p_as_of_date: asOfDate?.toISOString(),
+      });
+
+    if (error) {
+      console.error('Failed to get trial balance:', error);
+      return [];
+    }
+
+    return data || [];
+  }
+
+  async getProfitAndLoss(
+    restaurantId: string, 
+    startDate: Date, 
+    endDate: Date
+  ): Promise<any> {
+    const { data, error } = await supabase
+      .rpc('get_profit_and_loss', {
+        p_restaurant_id: restaurantId,
+        p_start_date: startDate.toISOString(),
+        p_end_date: endDate.toISOString(),
+      });
+
+    if (error) {
+      console.error('Failed to get P&L:', error);
+      return null;
+    }
+
+    return data;
+  }
+
+  async getBalanceSheet(restaurantId: string, asOfDate?: Date): Promise<any> {
+    const { data, error } = await supabase
+      .rpc('get_balance_sheet', {
+        p_restaurant_id: restaurantId,
+        p_as_of_date: asOfDate?.toISOString(),
+      });
+
+    if (error) {
+      console.error('Failed to get balance sheet:', error);
+      return null;
+    }
+
+    return data;
+  }
+
+  // ============================================================
+  // HELPERS
+  // ============================================================
+
+  private getBusinessMapping(businessType: string): BusinessAccountMapping {
+    const specific = BUSINESS_ACCOUNT_MAPPINGS[businessType] || {};
+    return { ...DEFAULT_ACCOUNTS, ...specific };
+  }
+
+  clearCache(): void {
+    this.accountCache.clear();
+  }
+}
+
+// Singleton instance
+export const journalService = new JournalService();
+export default journalService;
