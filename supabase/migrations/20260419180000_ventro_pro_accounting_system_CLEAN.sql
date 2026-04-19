@@ -270,6 +270,83 @@ DROP POLICY IF EXISTS isolation_tax_rates ON tax_rates;
 CREATE POLICY isolation_tax_rates ON tax_rates 
   FOR ALL USING (restaurant_id IN (SELECT id FROM restaurants WHERE owner_id = auth.uid()));
 
+-- 9b. EXTEND EXISTING TABLES
+-- ============================================================
+
+-- Add delivery_fee to restaurants if not exists
+DO $$ 
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
+    WHERE table_name = 'restaurants' AND column_name = 'delivery_fee') THEN
+    ALTER TABLE public.restaurants ADD COLUMN delivery_fee DECIMAL(10,2) DEFAULT 0;
+  END IF;
+END $$;
+
+-- 10. ADDITIONAL TABLES FOR BUSINESS FEATURES
+-- ============================================================
+
+-- Inventory Consumption Tracking
+DROP TABLE IF EXISTS public.inventory_consumption CASCADE;
+CREATE TABLE public.inventory_consumption (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  order_id UUID REFERENCES public.orders(id) ON DELETE CASCADE,
+  product_id UUID REFERENCES public.products(id) ON DELETE CASCADE,
+  quantity DECIMAL(10,3) NOT NULL,
+  unit_cost DECIMAL(10,2) DEFAULT 0,
+  consumed_at TIMESTAMP WITH TIME ZONE DEFAULT now(),
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT now()
+);
+
+-- Enable RLS
+ALTER TABLE public.inventory_consumption ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY isolation_inventory_consumption ON inventory_consumption 
+  FOR ALL USING (order_id IN (SELECT id FROM orders WHERE restaurant_id IN (SELECT id FROM restaurants WHERE owner_id = auth.uid())));
+
+-- Tables Management for Restaurants
+DROP TABLE IF EXISTS public.tables CASCADE;
+CREATE TABLE public.tables (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  restaurant_id UUID REFERENCES public.restaurants(id) ON DELETE CASCADE NOT NULL,
+  table_number INTEGER NOT NULL,
+  capacity INTEGER DEFAULT 4,
+  status VARCHAR(20) DEFAULT 'available' CHECK (status IN ('available', 'occupied', 'reserved', 'cleaning')),
+  location VARCHAR(50),
+  qr_code TEXT,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT now(),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT now(),
+  UNIQUE(restaurant_id, table_number)
+);
+
+-- Enable RLS
+ALTER TABLE public.tables ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY isolation_tables ON tables 
+  FOR ALL USING (restaurant_id IN (SELECT id FROM restaurants WHERE owner_id = auth.uid()));
+
+-- Staff Management
+DROP TABLE IF EXISTS public.staff CASCADE;
+CREATE TABLE public.staff (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  restaurant_id UUID REFERENCES public.restaurants(id) ON DELETE CASCADE NOT NULL,
+  name VARCHAR(100) NOT NULL,
+  phone VARCHAR(20),
+  email VARCHAR(100),
+  role VARCHAR(50) DEFAULT 'waiter' CHECK (role IN ('manager', 'waiter', 'chef', 'cashier', 'delivery', 'barista', 'other')),
+  status VARCHAR(20) DEFAULT 'active' CHECK (status IN ('active', 'inactive', 'on_leave', 'terminated')),
+  hire_date DATE,
+  salary DECIMAL(10,2),
+  commission_rate DECIMAL(5,2) DEFAULT 0,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT now(),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT now()
+);
+
+-- Enable RLS
+ALTER TABLE public.staff ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY isolation_staff ON staff 
+  FOR ALL USING (restaurant_id IN (SELECT id FROM restaurants WHERE owner_id = auth.uid()));
+
 -- SEED DATA FOR EXISTING RESTAURANTS
 -- ============================================================
 -- Run this after migration:

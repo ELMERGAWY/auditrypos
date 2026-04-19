@@ -54,7 +54,7 @@ class CheckoutIntegration {
       // 1. Calculate taxes
       const cartItemsForTax = orderData.cart.map(item => ({
         product_id: (item as any).product_id || item.menu_item_id,
-        category: item.category || 'general',
+        category: (item as any).category || 'general',
         price: item.price,
         quantity: item.quantity,
       }));
@@ -128,13 +128,11 @@ class CheckoutIntegration {
         );
       }
 
-      // 9. Create order
+      // 9. Create order (compatible with existing schema)
       const orderPayload = {
         restaurant_id: context.restaurantId,
         order_number: orderNum,
         total: finalTotal,
-        subtotal: taxCalculation.subtotal,
-        tax_amount: taxCalculation.taxAmount,
         discount: discountAmount,
         status: 'pending' as const,
         table_number: orderData.tableNumber || null,
@@ -165,7 +163,7 @@ class CheckoutIntegration {
         order_id: order.id,
         menu_item_id: (item as any).product_id ? null : item.menu_item_id,
         product_id: (item as any).product_id || null,
-        menu_item_name: item.menu_item_name || item.name,
+        menu_item_name: item.menu_item_name || (item as any).name || 'صنف',
         menu_item_image: item.menu_item_image || '📦',
         quantity: item.quantity,
         price: item.price * (item.unitFactor || 1),
@@ -235,7 +233,7 @@ class CheckoutIntegration {
 
       return {
         success: true,
-        order: order as Order,
+        order: order as unknown as Order,
         journalEntryId,
         cogs,
         taxAmount: taxCalculation.taxAmount,

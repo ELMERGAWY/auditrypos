@@ -880,6 +880,7 @@ export type Database = {
           business_type: Database["public"]["Enums"]["business_type"]
           created_at: string
           currency: string
+          delivery_fee: number | null
           id: string
           license_key: string | null
           logo_url: string | null
@@ -893,6 +894,7 @@ export type Database = {
           business_type?: Database["public"]["Enums"]["business_type"]
           created_at?: string
           currency?: string
+          delivery_fee?: number | null
           id?: string
           license_key?: string | null
           logo_url?: string | null
@@ -906,6 +908,7 @@ export type Database = {
           business_type?: Database["public"]["Enums"]["business_type"]
           created_at?: string
           currency?: string
+          delivery_fee?: number | null
           id?: string
           license_key?: string | null
           logo_url?: string | null
@@ -1520,6 +1523,149 @@ export type Database = {
           },
           {
             foreignKeyName: "audit_log_restaurant_id_fkey"
+            columns: ["restaurant_id"]
+            isOneToOne: false
+            referencedRelation: "restaurants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      // VENTRO PRO: ADDITIONAL BUSINESS TABLES
+      inventory_consumption: {
+        Row: {
+          consumed_at: string
+          created_at: string
+          id: string
+          order_id: string
+          product_id: string
+          quantity: number
+          unit_cost: number
+        }
+        Insert: {
+          consumed_at?: string
+          created_at?: string
+          id?: string
+          order_id: string
+          product_id: string
+          quantity: number
+          unit_cost?: number
+        }
+        Update: {
+          consumed_at?: string
+          created_at?: string
+          id?: string
+          order_id?: string
+          product_id?: string
+          quantity?: number
+          unit_cost?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "inventory_consumption_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inventory_consumption_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      tables: {
+        Row: {
+          capacity: number
+          created_at: string
+          id: string
+          location: string | null
+          qr_code: string | null
+          restaurant_id: string
+          status: string
+          table_number: number
+          updated_at: string
+        }
+        Insert: {
+          capacity?: number
+          created_at?: string
+          id?: string
+          location?: string | null
+          qr_code?: string | null
+          restaurant_id: string
+          status?: string
+          table_number: number
+          updated_at?: string
+        }
+        Update: {
+          capacity?: number
+          created_at?: string
+          id?: string
+          location?: string | null
+          qr_code?: string | null
+          restaurant_id?: string
+          status?: string
+          table_number?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tables_restaurant_id_fkey"
+            columns: ["restaurant_id"]
+            isOneToOne: false
+            referencedRelation: "restaurants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      staff: {
+        Row: {
+          commission_rate: number
+          created_at: string
+          email: string | null
+          hire_date: string | null
+          id: string
+          name: string
+          phone: string | null
+          restaurant_id: string
+          role: string
+          salary: number | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          commission_rate?: number
+          created_at?: string
+          email?: string | null
+          hire_date?: string | null
+          id?: string
+          name: string
+          phone?: string | null
+          restaurant_id: string
+          role?: string
+          salary?: number | null
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          commission_rate?: number
+          created_at?: string
+          email?: string | null
+          hire_date?: string | null
+          id?: string
+          name?: string
+          phone?: string | null
+          restaurant_id?: string
+          role?: string
+          salary?: number | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "staff_restaurant_id_fkey"
             columns: ["restaurant_id"]
             isOneToOne: false
             referencedRelation: "restaurants"
