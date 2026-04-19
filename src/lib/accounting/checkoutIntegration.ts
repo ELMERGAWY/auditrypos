@@ -137,14 +137,14 @@ class CheckoutIntegration {
         status: 'pending' as const,
         table_number: orderData.tableNumber || null,
         order_type: orderData.orderType,
-        customer_name: orderData.customerName || null,
-        customer_phone: orderData.customerPhone || null,
+        customer_name: orderData.customerName || '',
+        customer_phone: orderData.customerPhone || '',
         customer_id: customerId,
-        delivery_address: orderData.deliveryAddress || null,
+        delivery_address: orderData.deliveryAddress || '',
         delivery_agent_id: orderData.deliveryAgentId || null,
         payment_method: orderData.paymentMethod,
         paid_amount: paidAmount,
-        notes: orderData.notes || null,
+        notes: orderData.notes || '',
         client_order_id: clientOrderId,
       };
 
