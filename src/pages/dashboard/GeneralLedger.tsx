@@ -79,8 +79,8 @@ export function GeneralLedger({ restaurantId, currency }: Props) {
         .from('journal_entry_lines')
         .select(`
           id,
-          debit_amount,
-          credit_amount,
+          debit,
+          credit,
           description,
           journal_entries!inner(
             id,
@@ -104,15 +104,15 @@ export function GeneralLedger({ restaurantId, currency }: Props) {
       // Calculate running balance
       let balance = 0;
       const formattedEntries: LedgerEntry[] = (data || []).map((entry: any) => {
-        balance += (entry.debit_amount || 0) - (entry.credit_amount || 0);
+        balance += (entry.debit || 0) - (entry.credit || 0);
         return {
           id: entry.id,
           date: entry.journal_entries.entry_date,
           entry_number: entry.journal_entries.entry_number,
           reference: entry.journal_entries.reference || '',
           description: entry.description || entry.journal_entries.description,
-          debit: entry.debit_amount || 0,
-          credit: entry.credit_amount || 0,
+          debit: entry.debit || 0,
+          credit: entry.credit || 0,
           balance: balance,
           account_name: entry.chart_of_accounts.name,
           account_code: entry.chart_of_accounts.code

@@ -54,8 +54,8 @@ export function TrialBalance({ restaurantId, currency }: Props) {
         .from('journal_entry_lines')
         .select(`
           account_id,
-          debit_amount,
-          credit_amount,
+          debit,
+          credit,
           journal_entries!inner(entry_date)
         `)
         .eq('journal_entries.restaurant_id', restaurantId)
@@ -87,8 +87,8 @@ export function TrialBalance({ restaurantId, currency }: Props) {
           total_credit: 0,
           opening_balance: 0
         };
-        current.total_debit += line.debit_amount || 0;
-        current.total_credit += line.credit_amount || 0;
+        current.total_debit += line.debit || 0;
+        current.total_credit += line.credit || 0;
         balanceMap.set(line.account_id, current);
       });
 
