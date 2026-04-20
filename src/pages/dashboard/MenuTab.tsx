@@ -1,11 +1,12 @@
-import { useRef } from 'react';
+import { useRef, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
-import { Upload, Plus, Save, Trash2, Edit, ToggleLeft, ToggleRight, FileSpreadsheet, Image } from 'lucide-react';
+import { Upload, Plus, Save, Trash2, Edit, ToggleLeft, ToggleRight, FileSpreadsheet, Image, ChefHat } from 'lucide-react';
+import { RecipeManager } from './RecipeManager';
 import * as XLSX from 'xlsx';
 import type { MenuItem, Restaurant } from './types';
 import { AnimatePresence, motion } from 'framer-motion';
@@ -90,6 +91,9 @@ export function MenuTab({
     setShowAddItem(true);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
+
+  // Recipe Manager
+  const [recipeModalItem, setRecipeModalItem] = useState<MenuItem | null>(null);
 
   // Bulk import via Excel/CSV
   const handleBulkImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -254,8 +258,13 @@ export function MenuTab({
               </div>
               <Badge className={item.available ? 'status-active' : 'status-suspended'}>{item.available ? 'متاح' : 'غير متاح'}</Badge>
             </div>
-            <div className="flex gap-2">
+            <div className="flex gap-2 flex-wrap">
               <Button size="sm" variant="outline" onClick={() => startEdit(item)}><Edit className="w-3 h-3 ml-1" /> تعديل</Button>
+              {btConfig?.features?.includes('recipes') && (
+                <Button size="sm" variant="outline" onClick={() => setRecipeModalItem(item)}>
+                  <ChefHat className="w-3 h-3 ml-1" /> تكلفة
+                </Button>
+              )}
               <Button size="sm" variant="outline" onClick={() => handleToggleAvailability(item)}>
                 {item.available ? <ToggleRight className="w-3 h-3 ml-1" /> : <ToggleLeft className="w-3 h-3 ml-1" />}
                 {item.available ? 'إخفاء' : 'إظهار'}
@@ -267,6 +276,22 @@ export function MenuTab({
           </div>
         ))}
       </div>
+
+      {/* Recipe Manager Modal */}
+      {recipeModalItem && (
+        <div className="fixed inset-0 z-50 bg-background/80 backdrop-blur-sm flex items-center justify-center p-4" onClick={() => setRecipeModalItem(null)}>
+          <div onClick={e => e.stopPropagation()}>
+            <RecipeManager
+              menuItemId={recipeModalItem.id}
+              menuItemName={recipeModalItem.name}
+              sellingPrice={recipeModalItem.price}
+              restaurantId={restaurant.id}
+              currency={restaurant.currency || 'ج.م'}
+              onClose={() => setRecipeModalItem(null)}
+            />
+          </div>
+        </div>
+      )}
     </div>
   );
 }
