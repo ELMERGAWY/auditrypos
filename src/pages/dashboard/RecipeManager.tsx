@@ -52,7 +52,7 @@ export function RecipeManager({ menuItemId, menuItemName, sellingPrice, restaura
         .from('products')
         .select('id, name, unit, cost_price')
         .eq('restaurant_id', restaurantId)
-        .eq('is_active', true)
+        .eq('available', true)
         .order('name');
 
       if (productsError) throw productsError;
@@ -131,7 +131,7 @@ export function RecipeManager({ menuItemId, menuItemName, sellingPrice, restaura
       setSaving(true);
 
       // Validate components
-      const validComponents = components.filter(c => c.product_id && c.quantity > 0);
+      const validComponents = components.filter(c => c.product_id && c.quantity_required > 0);
       if (validComponents.length === 0) {
         toast.error('يرجى إضافة مكون واحد على الأقل');
         return;
