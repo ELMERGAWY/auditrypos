@@ -1,4 +1,4 @@
-export type DashboardTab = 'pos' | 'orders' | 'menu' | 'delivery' | 'shifts' | 'qr' | 'waiter' | 'stats' | 'settings' | 'inventory' | 'customers' | 'suppliers' | 'expenses' | 'staff' | 'notifications' | 'financials';
+export type DashboardTab = 'pos' | 'orders' | 'menu' | 'delivery' | 'shifts' | 'qr' | 'waiter' | 'stats' | 'settings' | 'inventory' | 'customers' | 'suppliers' | 'expenses' | 'staff' | 'notifications' | 'financials' | 'overheads';
 export type OrderStatus = 'pending' | 'preparing' | 'ready' | 'completed' | 'cancelled';
 export type OrderType = 'dine_in' | 'takeaway' | 'delivery' | 'pickup';
 export type AgentStatus = 'available' | 'busy' | 'offline';
@@ -14,6 +14,10 @@ export interface MenuItem {
   sort_order: number;
   product_id?: string | null;
   inventory_mode?: 'none' | 'direct' | 'recipe';
+  product_type?: 'inventory' | 'manufactured';
+  pricing_method?: 'fixed' | 'cost_plus';
+  profit_margin_percent?: number;
+  calculated_cost_price?: number;
 }
 
 export interface OrderItem {

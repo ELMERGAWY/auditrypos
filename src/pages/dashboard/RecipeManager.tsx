@@ -157,6 +157,18 @@ export function RecipeManager({ menuItemId, menuItemName, sellingPrice, restaura
 
       if (error) throw error;
 
+      // Update menu_item with calculated cost
+      const calculatedCost = calculateTotalCost();
+      const { error: updateError } = await supabase
+        .from('menu_items')
+        .update({
+          calculated_cost_price: calculatedCost,
+          product_type: 'manufactured'
+        })
+        .eq('id', menuItemId);
+
+      if (updateError) throw updateError;
+
       toast.success('✅ تم حفظ تكلفة الوصفة بنجاح');
       onClose();
     } catch (error: any) {

@@ -348,6 +348,76 @@ ALTER TABLE public.staff ENABLE ROW LEVEL SECURITY;
 CREATE POLICY isolation_staff ON staff 
   FOR ALL USING (restaurant_id IN (SELECT id FROM restaurants WHERE owner_id = auth.uid()));
 
+-- 11. ADVANCED COSTING: MENU ITEM TYPES & PRICING
+-- ============================================================
+
+-- Add product type and pricing columns to menu_items
+DO $$ 
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
+    WHERE table_name = 'menu_items' AND column_name = 'product_type') THEN
+    ALTER TABLE public.menu_items ADD COLUMN product_type VARCHAR(20) DEFAULT 'inventory' CHECK (product_type IN ('inventory', 'manufactured'));
+  END IF;
+  
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
+    WHERE table_name = 'menu_items' AND column_name = 'pricing_method') THEN
+    ALTER TABLE public.menu_items ADD COLUMN pricing_method VARCHAR(20) DEFAULT 'fixed' CHECK (pricing_method IN ('fixed', 'cost_plus'));
+  END IF;
+  
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
+    WHERE table_name = 'menu_items' AND column_name = 'profit_margin_percent') THEN
+    ALTER TABLE public.menu_items ADD COLUMN profit_margin_percent DECIMAL(5,2) DEFAULT 30;
+  END IF;
+  
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
+    WHERE table_name = 'menu_items' AND column_name = 'calculated_cost_price') THEN
+    ALTER TABLE public.menu_items ADD COLUMN calculated_cost_price DECIMAL(10,2) DEFAULT 0;
+  END IF;
+END $$;
+
+-- 12. DAILY OVERHEADS (EXPENSES ALLOCATION)
+-- ============================================================
+
+DROP TABLE IF EXISTS public.daily_overheads CASCADE;
+CREATE TABLE public.daily_overheads (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  restaurant_id UUID REFERENCES public.restaurants(id) ON DELETE CASCADE NOT NULL,
+  date DATE NOT NULL DEFAULT CURRENT_DATE,
+  rent_amount DECIMAL(12,2) DEFAULT 0,
+  electricity_amount DECIMAL(12,2) DEFAULT 0,
+  salaries_amount DECIMAL(12,2) DEFAULT 0,
+  other_amount DECIMAL(12,2) DEFAULT 0,
+  total_amount DECIMAL(12,2) DEFAULT 0,
+  is_distributed BOOLEAN DEFAULT FALSE,
+  notes TEXT,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT now(),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT now(),
+  UNIQUE(restaurant_id, date)
+);
+
+-- Enable RLS
+ALTER TABLE public.daily_overheads ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY isolation_daily_overheads ON daily_overheads 
+  FOR ALL USING (restaurant_id IN (SELECT id FROM restaurants WHERE owner_id = auth.uid()));
+
+-- Function to calculate total overheads
+CREATE OR REPLACE FUNCTION calculate_daily_overhead_total()
+RETURNS TRIGGER AS $$
+BEGIN
+  NEW.total_amount := COALESCE(NEW.rent_amount, 0) + 
+                      COALESCE(NEW.electricity_amount, 0) + 
+                      COALESCE(NEW.salaries_amount, 0) + 
+                      COALESCE(NEW.other_amount, 0);
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS trg_calc_overhead_total ON daily_overheads;
+CREATE TRIGGER trg_calc_overhead_total
+  BEFORE INSERT OR UPDATE ON daily_overheads
+  FOR EACH ROW EXECUTE FUNCTION calculate_daily_overhead_total();
+
 -- SEED DATA FOR EXISTING RESTAURANTS
 -- ============================================================
 -- Run this after migration:

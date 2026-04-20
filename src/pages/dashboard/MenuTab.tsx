@@ -40,7 +40,15 @@ export function MenuTab({
   const categories = [...new Set(menuItems.map(i => i.category))];
 
   const resetForm = () => {
-    setMenuForm({ name: '', price: '', category: '', image: defaultIcon });
+    setMenuForm({ 
+      name: '', 
+      price: '', 
+      category: '', 
+      image: defaultIcon,
+      product_type: 'inventory',
+      pricing_method: 'fixed',
+      profit_margin_percent: '30'
+    });
     setShowAddItem(false);
     setEditingItem(null);
   };
@@ -56,6 +64,9 @@ export function MenuTab({
         price: Number(menuForm.price),
         category: menuForm.category,
         image: menuForm.image,
+        product_type: menuForm.product_type,
+        pricing_method: menuForm.pricing_method,
+        profit_margin_percent: Number(menuForm.profit_margin_percent),
       }).eq('id', editingItem.id);
       if (error) { toast.error('خطأ في التحديث'); return; }
       toast.success('تم تحديث العنصر');
@@ -66,6 +77,9 @@ export function MenuTab({
         price: Number(menuForm.price),
         category: menuForm.category,
         image: menuForm.image,
+        product_type: menuForm.product_type,
+        pricing_method: menuForm.pricing_method,
+        profit_margin_percent: Number(menuForm.profit_margin_percent),
       });
       if (error) { toast.error('خطأ في الإضافة'); return; }
       toast.success('تم إضافة العنصر');
@@ -87,7 +101,15 @@ export function MenuTab({
 
   const startEdit = (item: MenuItem) => {
     setEditingItem(item);
-    setMenuForm({ name: item.name, price: String(item.price), category: item.category, image: item.image });
+    setMenuForm({ 
+      name: item.name, 
+      price: String(item.price), 
+      category: item.category, 
+      image: item.image,
+      product_type: (item as any).product_type || 'inventory',
+      pricing_method: (item as any).pricing_method || 'fixed',
+      profit_margin_percent: String((item as any).profit_margin_percent || 30)
+    });
     setShowAddItem(true);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
@@ -234,6 +256,45 @@ export function MenuTab({
                     ))}
                   </div>
                 </div>
+                
+                {/* Product Type */}
+                <div>
+                  <Label>نوع المنتج</Label>
+                  <select
+                    value={menuForm.product_type}
+                    onChange={e => setMenuForm({ ...menuForm, product_type: e.target.value })}
+                    className="w-full h-9 rounded-md border border-input bg-background px-3 text-sm"
+                  >
+                    <option value="inventory">منتج من المخزون</option>
+                    <option value="manufactured">منتج مصنع (Recipe)</option>
+                  </select>
+                </div>
+                
+                {/* Pricing Method */}
+                <div>
+                  <Label>طريقة التسعير</Label>
+                  <select
+                    value={menuForm.pricing_method}
+                    onChange={e => setMenuForm({ ...menuForm, pricing_method: e.target.value })}
+                    className="w-full h-9 rounded-md border border-input bg-background px-3 text-sm"
+                  >
+                    <option value="fixed">سعر ثابت</option>
+                    <option value="cost_plus">تكلفة + نسبة ربح</option>
+                  </select>
+                </div>
+                
+                {/* Profit Margin (only for cost_plus) */}
+                {menuForm.pricing_method === 'cost_plus' && (
+                  <div>
+                    <Label>نسبة الربح (%)</Label>
+                    <Input 
+                      type="number" 
+                      value={menuForm.profit_margin_percent} 
+                      onChange={e => setMenuForm({ ...menuForm, profit_margin_percent: e.target.value })} 
+                      placeholder="30"
+                    />
+                  </div>
+                )}
               </div>
               <div className="flex gap-2">
                 <Button onClick={handleSaveItem} className="gradient-bg text-primary-foreground border-0">

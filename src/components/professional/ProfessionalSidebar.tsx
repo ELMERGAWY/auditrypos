@@ -19,7 +19,7 @@ import { getBusinessConfig, type BusinessType } from '@/lib/businessTypes';
 export type SidebarTab = 
   | 'pos' | 'orders' | 'menu' | 'delivery' | 'shifts' | 'stats' 
   | 'inventory' | 'customers' | 'suppliers' | 'expenses' | 'qr' 
-  | 'waiter' | 'staff' | 'financials' | 'notifications' | 'settings';
+  | 'waiter' | 'staff' | 'financials' | 'notifications' | 'settings' | 'overheads';
 
 interface NavItem {
   id: SidebarTab;
@@ -123,6 +123,7 @@ export function ProfessionalSidebar({
     { id: 'stats', label: 'الإحصائيات', icon: BarChart3, section: 'analytics', locked: lockedTabs.includes('stats') },
     { id: 'financials', label: 'القوائم المالية', icon: DollarSign, section: 'analytics' },
     { id: 'expenses', label: 'المصروفات', icon: Wallet, section: 'analytics' },
+    { id: 'overheads', label: 'النفقات العامة', icon: TrendingUp, section: 'analytics' },
     { id: 'shifts', label: 'الشفتات', icon: CalendarClock, section: 'analytics', locked: lockedTabs.includes('shifts') },
     
     // System Section

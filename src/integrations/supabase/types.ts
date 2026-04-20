@@ -391,6 +391,7 @@ export type Database = {
       menu_items: {
         Row: {
           available: boolean
+          calculated_cost_price: number | null
           category: string
           created_at: string
           id: string
@@ -398,12 +399,16 @@ export type Database = {
           inventory_mode: string
           name: string
           price: number
+          pricing_method: string | null
           product_id: string | null
+          product_type: string | null
+          profit_margin_percent: number | null
           restaurant_id: string
           sort_order: number
         }
         Insert: {
           available?: boolean
+          calculated_cost_price?: number | null
           category?: string
           created_at?: string
           id?: string
@@ -411,12 +416,16 @@ export type Database = {
           inventory_mode?: string
           name: string
           price?: number
+          pricing_method?: string | null
           product_id?: string | null
+          product_type?: string | null
+          profit_margin_percent?: number | null
           restaurant_id: string
           sort_order?: number
         }
         Update: {
           available?: boolean
+          calculated_cost_price?: number | null
           category?: string
           created_at?: string
           id?: string
@@ -424,7 +433,10 @@ export type Database = {
           inventory_mode?: string
           name?: string
           price?: number
+          pricing_method?: string | null
           product_id?: string | null
+          product_type?: string | null
+          profit_margin_percent?: number | null
           restaurant_id?: string
           sort_order?: number
         }
@@ -1666,6 +1678,59 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "staff_restaurant_id_fkey"
+            columns: ["restaurant_id"]
+            isOneToOne: false
+            referencedRelation: "restaurants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      daily_overheads: {
+        Row: {
+          created_at: string
+          date: string
+          electricity_amount: number | null
+          id: string
+          is_distributed: boolean | null
+          notes: string | null
+          other_amount: number | null
+          rent_amount: number | null
+          restaurant_id: string
+          salaries_amount: number | null
+          total_amount: number | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          date?: string
+          electricity_amount?: number | null
+          id?: string
+          is_distributed?: boolean | null
+          notes?: string | null
+          other_amount?: number | null
+          rent_amount?: number | null
+          restaurant_id: string
+          salaries_amount?: number | null
+          total_amount?: number | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          date?: string
+          electricity_amount?: number | null
+          id?: string
+          is_distributed?: boolean | null
+          notes?: string | null
+          other_amount?: number | null
+          rent_amount?: number | null
+          restaurant_id?: string
+          salaries_amount?: number | null
+          total_amount?: number | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "daily_overheads_restaurant_id_fkey"
             columns: ["restaurant_id"]
             isOneToOne: false
             referencedRelation: "restaurants"

@@ -30,6 +30,7 @@ import { ExpensesTab } from './dashboard/ExpensesTab';
 import { StaffTab } from './dashboard/StaffTab';
 import { NotificationsTab } from './dashboard/NotificationsTab';
 import { FinancialsTab } from './dashboard/FinancialsTab';
+import { OverheadManager } from './dashboard/OverheadManager';
 import { BarcodeScanner } from './dashboard/BarcodeScanner';
 import { BUSINESS_TYPES, BUSINESS_TABS, getAddressPlaceholder, getCheckoutButtonLabel, getCustomerPlaceholder, getDefaultOrderType, getNotesPlaceholder, getPosSearchPlaceholder, isFoodSector, isInventoryDrivenBusiness, type BusinessType } from '@/lib/businessTypes';
 import { useAuth } from '@/lib/AuthContext';
@@ -145,7 +146,15 @@ export default function Dashboard() {
   // Menu form
   const [showAddItem, setShowAddItem] = useState(false);
   const [editingItem, setEditingItem] = useState<MenuItem | null>(null);
-  const [menuForm, setMenuForm] = useState({ name: '', price: '', category: '', image: '🍔' });
+  const [menuForm, setMenuForm] = useState({ 
+    name: '', 
+    price: '', 
+    category: '', 
+    image: '🍔',
+    product_type: 'inventory',
+    pricing_method: 'fixed',
+    profit_margin_percent: '30'
+  });
 
   const isSuspended = restaurant
     ? restaurant.status === 'suspended' || (restaurant.subscription_end && new Date(restaurant.subscription_end) < new Date())
@@ -564,6 +573,7 @@ export default function Dashboard() {
     { id: 'customers', label: 'العملاء', icon: Users },
     { id: 'suppliers', label: 'الموردين', icon: Store },
     { id: 'expenses', label: 'المصروفات', icon: Wallet },
+    { id: 'overheads', label: 'النفقات العامة', icon: TrendingUp },
     { id: 'delivery', label: 'المناديب', icon: Truck, badge: deliveryOrders.length, locked: lockedTabs.includes('delivery') },
     { id: 'shifts', label: 'الشفتات', icon: CalendarClock, locked: lockedTabs.includes('shifts') },
     { id: 'stats', label: 'الإحصائيات', icon: BarChart3, locked: lockedTabs.includes('stats') },
@@ -1276,6 +1286,11 @@ export default function Dashboard() {
           {/* ===================== FINANCIALS TAB ===================== */}
           {activeTab === 'financials' && (
             <FinancialsTab restaurantId={restaurant.id} currency={currency} />
+          )}
+
+          {/* ===================== OVERHEADS TAB ===================== */}
+          {activeTab === 'overheads' && (
+            <OverheadManager restaurantId={restaurant.id} currency={currency} />
           )}
 
           {/* ===================== SETTINGS TAB ===================== */}
