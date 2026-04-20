@@ -153,7 +153,8 @@ export default function Dashboard() {
     image: '🍔',
     product_type: 'inventory',
     pricing_method: 'fixed',
-    profit_margin_percent: '30'
+    profit_margin_percent: '30',
+    product_id: ''
   });
 
   const isSuspended = restaurant

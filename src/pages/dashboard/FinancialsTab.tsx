@@ -1,9 +1,13 @@
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { BarChart3, TrendingUp, TrendingDown, DollarSign, FileText, Wallet } from 'lucide-react';
+import { BarChart3, TrendingUp, TrendingDown, DollarSign, FileText, Wallet, BookOpen, Scale, PieChart } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { supabase } from '@/integrations/supabase/client';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import { GeneralLedger } from './GeneralLedger';
+import { TrialBalance } from './TrialBalance';
+
+type FinancialTab = 'overview' | 'ledger' | 'trial_balance';
 
 interface Props {
   restaurantId: string;
@@ -11,6 +15,7 @@ interface Props {
 }
 
 export function FinancialsTab({ restaurantId, currency }: Props) {
+  const [activeTab, setActiveTab] = useState<FinancialTab>('overview');
   const [orders, setOrders] = useState<any[]>([]);
   const [orderItems, setOrderItems] = useState<any[]>([]);
   const [expenses, setExpenses] = useState<any[]>([]);
@@ -113,194 +118,258 @@ export function FinancialsTab({ restaurantId, currency }: Props) {
 
   const periodLabels: Record<string, string> = { today: 'اليوم', week: 'هذا الأسبوع', month: 'هذا الشهر', all: 'الكل' };
 
-  if (!loaded) return <div className="p-8 text-center text-muted-foreground">جاري التحميل...</div>;
+  if (!loaded) return <div className="flex items-center justify-center py-20"><div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin" /></div>;
+
+  // Sub-tabs for financial reports
+  const tabs = [
+    { id: 'overview' as FinancialTab, label: 'نظرة عامة', icon: PieChart },
+    { id: 'ledger' as FinancialTab, label: 'حساب الاستاذ', icon: BookOpen },
+    { id: 'trial_balance' as FinancialTab, label: 'ميزان المراجعة', icon: Scale },
+  ];
+
+  if (activeTab === 'ledger') {
+    return (
+      <div className="space-y-4">
+        <div className="flex gap-2 mb-4">
+          {tabs.map(tab => (
+            <Button
+              key={tab.id}
+              variant={activeTab === tab.id ? 'default' : 'outline'}
+              onClick={() => setActiveTab(tab.id)}
+              className="flex items-center gap-2"
+            >
+              <tab.icon className="w-4 h-4" />
+              {tab.label}
+            </Button>
+          ))}
+        </div>
+        <GeneralLedger restaurantId={restaurantId} currency={currency} />
+      </div>
+    );
+  }
+
+  if (activeTab === 'trial_balance') {
+    return (
+      <div className="space-y-4">
+        <div className="flex gap-2 mb-4">
+          {tabs.map(tab => (
+            <Button
+              key={tab.id}
+              variant={activeTab === tab.id ? 'default' : 'outline'}
+              onClick={() => setActiveTab(tab.id)}
+              className="flex items-center gap-2"
+            >
+              <tab.icon className="w-4 h-4" />
+              {tab.label}
+            </Button>
+          ))}
+        </div>
+        <TrialBalance restaurantId={restaurantId} currency={currency} />
+      </div>
+    );
+  }
 
   return (
-    <div className="p-4 space-y-6 max-w-4xl">
-      <div className="flex items-center justify-between">
-        <h2 className="font-display text-xl font-bold flex items-center gap-2">
-          <FileText className="w-5 h-5 text-primary" /> القوائم المالية
-        </h2>
-        <div className="flex gap-1 rounded-lg bg-secondary p-1">
-          {(['today', 'week', 'month', 'all'] as const).map(p => (
-            <button key={p} onClick={() => setPeriod(p)}
-              className={`px-3 py-1.5 rounded-md text-xs transition-all ${period === p ? 'gradient-bg text-primary-foreground' : 'text-muted-foreground'}`}>
-              {periodLabels[p]}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {/* Summary Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        {[
-          { label: 'إجمالي الإيرادات', value: `${totalRevenue.toLocaleString()} ${currency}`, icon: TrendingUp, color: 'text-success', bg: 'bg-success/10' },
-          { label: 'تكلفة البضاعة المباعة', value: `${totalCOGS.toLocaleString()} ${currency}`, icon: TrendingDown, color: 'text-accent', bg: 'bg-accent/10' },
-          { label: 'صافي الدخل', value: `${netIncome.toLocaleString()} ${currency}`, icon: DollarSign, color: netIncome >= 0 ? 'text-success' : 'text-destructive', bg: netIncome >= 0 ? 'bg-success/10' : 'bg-destructive/10' },
-          { label: 'الذمم المدينة', value: `${totalReceivables.toLocaleString()} ${currency}`, icon: Wallet, color: 'text-warning', bg: 'bg-warning/10' },
-        ].map(s => (
-          <div key={s.label} className="glass-card p-4 flex items-center gap-3">
-            <div className={`w-10 h-10 rounded-lg ${s.bg} flex items-center justify-center`}>
-              <s.icon className={`w-5 h-5 ${s.color}`} />
-            </div>
-            <div>
-              <p className="text-[10px] text-muted-foreground">{s.label}</p>
-              <p className={`font-display font-bold text-sm ${s.color}`}>{s.value}</p>
-            </div>
-          </div>
+    <div className="space-y-4">
+      <div className="flex gap-2 mb-4">
+        {tabs.map(tab => (
+          <Button
+            key={tab.id}
+            variant={activeTab === tab.id ? 'default' : 'outline'}
+            onClick={() => setActiveTab(tab.id)}
+            className="flex items-center gap-2"
+          >
+            <tab.icon className="w-4 h-4" />
+            {tab.label}
+          </Button>
         ))}
       </div>
-
-      {/* Income Statement */}
-      <div className="glass-card p-6">
-        <h3 className="font-display font-bold text-lg mb-4 flex items-center gap-2">
-          <BarChart3 className="w-5 h-5 text-primary" /> قائمة الدخل — {periodLabels[period]}
-        </h3>
-        <div className="space-y-2">
-          <div className="flex justify-between items-center p-3 bg-success/5 rounded-lg border border-success/20">
-            <span className="font-medium">إجمالي الإيرادات (المبيعات)</span>
-            <span className="font-bold text-success">{totalRevenue.toLocaleString()} {currency}</span>
+      <motion.div className="p-4 space-y-6 max-w-4xl">
+        <div className="flex items-center justify-between">
+          <h2 className="font-display text-xl font-bold flex items-center gap-2">
+            <FileText className="w-5 h-5 text-primary" /> القوائم المالية
+          </h2>
+          <div className="flex gap-1 rounded-lg bg-secondary p-1">
+            {(['today', 'week', 'month', 'all'] as const).map(p => (
+              <button key={p} onClick={() => setPeriod(p)}
+                className={`px-3 py-1.5 rounded-md text-xs transition-all ${period === p ? 'gradient-bg text-primary-foreground' : 'text-muted-foreground'}`}>
+                {periodLabels[p]}
+              </button>
+            ))}
           </div>
-          {totalDiscounts > 0 && (
-            <div className="flex justify-between items-center p-2 pr-8 text-sm">
-              <span className="text-muted-foreground">(-) الخصومات</span>
-              <span className="text-muted-foreground">{totalDiscounts.toLocaleString()} {currency}</span>
-            </div>
-          )}
+        </div>
 
-          <div className="flex justify-between items-center p-2 pr-8 text-sm">
-            <span className="text-muted-foreground">(-) تكلفة البضاعة المباعة (COGS)</span>
-            <span className="text-destructive">{totalCOGS.toLocaleString()} {currency}</span>
-          </div>
-
-          <div className={`flex justify-between items-center p-3 rounded-lg border ${grossProfit >= 0 ? 'bg-success/5 border-success/20' : 'bg-destructive/5 border-destructive/20'}`}>
-            <span className="font-medium">مجمل الربح</span>
-            <span className={`font-bold ${grossProfit >= 0 ? 'text-success' : 'text-destructive'}`}>{grossProfit.toLocaleString()} {currency}</span>
-          </div>
-
-          {grossProfit > 0 && totalRevenue > 0 && (
-            <div className="flex justify-between items-center p-2 pr-8 text-sm">
-              <span className="text-muted-foreground">هامش الربح الإجمالي</span>
-              <span className="text-primary font-bold">{((grossProfit / totalRevenue) * 100).toFixed(1)}%</span>
-            </div>
-          )}
-
-          <hr className="border-border my-2" />
-
-          {/* Collection info */}
-          <div className="flex justify-between items-center p-2 pr-8 text-sm">
-            <span className="text-muted-foreground">المبلغ المحصّل</span>
-            <span className="text-success">{totalPaid.toLocaleString()} {currency}</span>
-          </div>
-          {totalUnpaid > 0 && (
-            <div className="flex justify-between items-center p-2 pr-8 text-sm">
-              <span className="text-muted-foreground">مبالغ غير محصّلة (آجل)</span>
-              <span className="text-warning">{totalUnpaid.toLocaleString()} {currency}</span>
-            </div>
-          )}
-
-          <hr className="border-border my-2" />
-
-          <div className="flex justify-between items-center p-3 bg-destructive/5 rounded-lg border border-destructive/20">
-            <span className="font-medium">إجمالي المصروفات التشغيلية</span>
-            <span className="font-bold text-destructive">{totalExpenses.toLocaleString()} {currency}</span>
-          </div>
-
-          {expenseByCategory.slice(0, 5).map(ec => (
-            <div key={ec.name} className="flex justify-between items-center p-2 pr-8 text-sm">
-              <span className="text-muted-foreground">{ec.name}</span>
-              <span>{ec.value.toLocaleString()} {currency}</span>
+        {/* Summary Cards */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+          {[
+            { label: 'إجمالي الإيرادات', value: `${totalRevenue.toLocaleString()} ${currency}`, icon: TrendingUp, color: 'text-success', bg: 'bg-success/10' },
+            { label: 'تكلفة البضاعة المباعة', value: `${totalCOGS.toLocaleString()} ${currency}`, icon: TrendingDown, color: 'text-accent', bg: 'bg-accent/10' },
+            { label: 'صافي الدخل', value: `${netIncome.toLocaleString()} ${currency}`, icon: DollarSign, color: netIncome >= 0 ? 'text-success' : 'text-destructive', bg: netIncome >= 0 ? 'bg-success/10' : 'bg-destructive/10' },
+            { label: 'الذمم المدينة', value: `${totalReceivables.toLocaleString()} ${currency}`, icon: Wallet, color: 'text-warning', bg: 'bg-warning/10' },
+          ].map(s => (
+            <div key={s.label} className="glass-card p-4 flex items-center gap-3">
+              <div className={`w-10 h-10 rounded-lg ${s.bg} flex items-center justify-center`}>
+                <s.icon className={`w-5 h-5 ${s.color}`} />
+              </div>
+              <div>
+                <p className="text-[10px] text-muted-foreground">{s.label}</p>
+                <p className={`font-display font-bold text-sm ${s.color}`}>{s.value}</p>
+              </div>
             </div>
           ))}
-
-          <hr className="border-border my-2" />
-
-          <div className={`flex justify-between items-center p-4 rounded-lg border-2 ${netIncome >= 0 ? 'bg-success/10 border-success/30' : 'bg-destructive/10 border-destructive/30'}`}>
-            <span className="font-display font-bold text-lg">صافي الدخل</span>
-            <span className={`font-display font-bold text-xl ${netIncome >= 0 ? 'text-success' : 'text-destructive'}`}>
-              {netIncome.toLocaleString()} {currency}
-            </span>
-          </div>
-
-          {netIncome > 0 && totalRevenue > 0 && (
-            <div className="flex justify-between items-center p-2 text-sm">
-              <span className="text-muted-foreground">هامش صافي الربح</span>
-              <span className="text-primary font-bold">{((netIncome / totalRevenue) * 100).toFixed(1)}%</span>
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* Balance Overview */}
-      <div className="grid md:grid-cols-3 gap-4">
-        <div className="glass-card p-6">
-          <h3 className="font-display font-bold mb-4">قيمة المخزون</h3>
-          <div className="space-y-3">
-            <div className="flex justify-between text-sm">
-              <span>قيمة البيع</span>
-              <span className="font-bold text-primary">{stockValue.toLocaleString()} {currency}</span>
-            </div>
-            <div className="flex justify-between text-sm">
-              <span>التكلفة</span>
-              <span className="font-bold">{stockCost.toLocaleString()} {currency}</span>
-            </div>
-            <div className="flex justify-between text-sm border-t border-border pt-2">
-              <span className="font-medium">الربح المتوقع</span>
-              <span className={`font-bold ${stockValue - stockCost >= 0 ? 'text-success' : 'text-destructive'}`}>
-                {(stockValue - stockCost).toLocaleString()} {currency}
-              </span>
-            </div>
-          </div>
         </div>
 
+        {/* Income Statement */}
         <div className="glass-card p-6">
-          <h3 className="font-display font-bold mb-4">الذمم المدينة (العملاء)</h3>
-          <div className="space-y-3">
-            <div className="flex justify-between text-sm">
-              <span>إجمالي المديونيات</span>
-              <span className="font-bold text-destructive">{totalReceivables.toLocaleString()} {currency}</span>
+          <h3 className="font-display font-bold text-lg mb-4 flex items-center gap-2">
+            <BarChart3 className="w-5 h-5 text-primary" /> قائمة الدخل — {periodLabels[period]}
+          </h3>
+          <div className="space-y-2">
+            <div className="flex justify-between items-center p-3 bg-success/5 rounded-lg border border-success/20">
+              <span className="font-medium">إجمالي الإيرادات (المبيعات)</span>
+              <span className="font-bold text-success">{totalRevenue.toLocaleString()} {currency}</span>
             </div>
-            <div className="flex justify-between text-sm">
-              <span>عدد العملاء المدينين</span>
-              <span className="font-bold">{customers.filter(c => Number(c.balance) > 0).length}</span>
-            </div>
-          </div>
-        </div>
+            {totalDiscounts > 0 && (
+              <div className="flex justify-between items-center p-2 pr-8 text-sm">
+                <span className="text-muted-foreground">(-) الخصومات</span>
+                <span className="text-muted-foreground">{totalDiscounts.toLocaleString()} {currency}</span>
+              </div>
+            )}
 
-        {/* Payment Method Breakdown */}
-        <div className="glass-card p-6">
-          <h3 className="font-display font-bold mb-4">توزيع التحصيل</h3>
-          <div className="space-y-3">
-            {paymentBreakdown.map(p => (
-              <div key={p.name} className="flex justify-between text-sm">
-                <span>{p.name}</span>
-                <span className="font-bold text-primary">{p.value.toLocaleString()} {currency}</span>
+            <div className="flex justify-between items-center p-2 pr-8 text-sm">
+              <span className="text-muted-foreground">(-) تكلفة البضاعة المباعة (COGS)</span>
+              <span className="text-destructive">{totalCOGS.toLocaleString()} {currency}</span>
+            </div>
+
+            <div className={`flex justify-between items-center p-3 rounded-lg border ${grossProfit >= 0 ? 'bg-success/5 border-success/20' : 'bg-destructive/5 border-destructive/20'}`}>
+              <span className="font-medium">مجمل الربح</span>
+              <span className={`font-bold ${grossProfit >= 0 ? 'text-success' : 'text-destructive'}`}>{grossProfit.toLocaleString()} {currency}</span>
+            </div>
+
+            {grossProfit > 0 && totalRevenue > 0 && (
+              <div className="flex justify-between items-center p-2 pr-8 text-sm">
+                <span className="text-muted-foreground">هامش الربح الإجمالي</span>
+                <span className="text-primary font-bold">{((grossProfit / totalRevenue) * 100).toFixed(1)}%</span>
+              </div>
+            )}
+
+            <hr className="border-border my-2" />
+
+            {/* Collection info */}
+            <div className="flex justify-between items-center p-2 pr-8 text-sm">
+              <span className="text-muted-foreground">المبلغ المحصّل</span>
+              <span className="text-success">{totalPaid.toLocaleString()} {currency}</span>
+            </div>
+            {totalUnpaid > 0 && (
+              <div className="flex justify-between items-center p-2 pr-8 text-sm">
+                <span className="text-muted-foreground">مبالغ غير محصّلة (آجل)</span>
+                <span className="text-warning">{totalUnpaid.toLocaleString()} {currency}</span>
+              </div>
+            )}
+
+            <hr className="border-border my-2" />
+
+            <div className="flex justify-between items-center p-3 bg-destructive/5 rounded-lg border border-destructive/20">
+              <span className="font-medium">إجمالي المصروفات التشغيلية</span>
+              <span className="font-bold text-destructive">{totalExpenses.toLocaleString()} {currency}</span>
+            </div>
+
+            {expenseByCategory.slice(0, 5).map(ec => (
+              <div key={ec.name} className="flex justify-between items-center p-2 pr-8 text-sm">
+                <span className="text-muted-foreground">{ec.name}</span>
+                <span>{ec.value.toLocaleString()} {currency}</span>
               </div>
             ))}
-            {paymentBreakdown.length === 0 && <p className="text-xs text-muted-foreground text-center">لا توجد بيانات</p>}
+
+            <hr className="border-border my-2" />
+
+            <div className={`flex justify-between items-center p-4 rounded-lg border-2 ${netIncome >= 0 ? 'bg-success/10 border-success/30' : 'bg-destructive/10 border-destructive/30'}`}>
+              <span className="font-display font-bold text-lg">صافي الدخل</span>
+              <span className={`font-display font-bold text-xl ${netIncome >= 0 ? 'text-success' : 'text-destructive'}`}>
+                {netIncome.toLocaleString()} {currency}
+              </span>
+            </div>
+
+            {netIncome > 0 && totalRevenue > 0 && (
+              <div className="flex justify-between items-center p-2 text-sm">
+                <span className="text-muted-foreground">هامش صافي الربح</span>
+                <span className="text-primary font-bold">{((netIncome / totalRevenue) * 100).toFixed(1)}%</span>
+              </div>
+            )}
           </div>
         </div>
-      </div>
 
-      {/* Monthly Chart */}
-      <div className="glass-card p-6">
-        <h3 className="font-display font-bold mb-4">الإيرادات مقابل المصروفات — آخر 6 أشهر</h3>
-        <div className="h-64">
-          <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={monthlyData}>
-              <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-              <XAxis dataKey="month" fontSize={11} stroke="hsl(var(--muted-foreground))" />
-              <YAxis fontSize={11} stroke="hsl(var(--muted-foreground))" />
-              <Tooltip
-                contentStyle={{ backgroundColor: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: '8px' }}
-                formatter={(v: number) => [`${v.toLocaleString()} ${currency}`]}
-              />
-              <Bar dataKey="revenue" fill="hsl(142, 71%, 45%)" radius={[4, 4, 0, 0]} name="الإيرادات" />
-              <Bar dataKey="expenses" fill="hsl(0, 84%, 60%)" radius={[4, 4, 0, 0]} name="المصروفات" />
-            </BarChart>
-          </ResponsiveContainer>
+        {/* Balance Overview */}
+        <div className="grid md:grid-cols-3 gap-4">
+          <div className="glass-card p-6">
+            <h3 className="font-display font-bold mb-4">قيمة المخزون</h3>
+            <div className="space-y-3">
+              <div className="flex justify-between text-sm">
+                <span>قيمة البيع</span>
+                <span className="font-bold text-primary">{stockValue.toLocaleString()} {currency}</span>
+              </div>
+              <div className="flex justify-between text-sm">
+                <span>التكلفة</span>
+                <span className="font-bold">{stockCost.toLocaleString()} {currency}</span>
+              </div>
+              <div className="flex justify-between text-sm border-t border-border pt-2">
+                <span className="font-medium">الربح المتوقع</span>
+                <span className={`font-bold ${stockValue - stockCost >= 0 ? 'text-success' : 'text-destructive'}`}>
+                  {(stockValue - stockCost).toLocaleString()} {currency}
+                </span>
+              </div>
+            </div>
+          </div>
+
+          <div className="glass-card p-6">
+            <h3 className="font-display font-bold mb-4">الذمم المدينة (العملاء)</h3>
+            <div className="space-y-3">
+              <div className="flex justify-between text-sm">
+                <span>إجمالي المديونيات</span>
+                <span className="font-bold text-destructive">{totalReceivables.toLocaleString()} {currency}</span>
+              </div>
+              <div className="flex justify-between text-sm">
+                <span>عدد العملاء المدينين</span>
+                <span className="font-bold">{customers.filter(c => Number(c.balance) > 0).length}</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Payment Method Breakdown */}
+          <div className="glass-card p-6">
+            <h3 className="font-display font-bold mb-4">توزيع التحصيل</h3>
+            <div className="space-y-3">
+              {paymentBreakdown.map(p => (
+                <div key={p.name} className="flex justify-between text-sm">
+                  <span>{p.name}</span>
+                  <span className="font-bold text-primary">{p.value.toLocaleString()} {currency}</span>
+                </div>
+              ))}
+              {paymentBreakdown.length === 0 && <p className="text-xs text-muted-foreground text-center">لا توجد بيانات</p>}
+            </div>
+          </div>
         </div>
-      </div>
+
+        {/* Monthly Chart */}
+        <div className="glass-card p-6">
+          <h3 className="font-display font-bold mb-4">الإيرادات مقابل المصروفات — آخر 6 أشهر</h3>
+          <div className="h-64">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={monthlyData}>
+                <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                <XAxis dataKey="month" fontSize={11} stroke="hsl(var(--muted-foreground))" />
+                <YAxis fontSize={11} stroke="hsl(var(--muted-foreground))" />
+                <Tooltip
+                  contentStyle={{ backgroundColor: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: '8px' }}
+                  formatter={(v: number) => [`${v.toLocaleString()} ${currency}`]}
+                />
+                <Bar dataKey="revenue" fill="hsl(142, 71%, 45%)" radius={[4, 4, 0, 0]} name="الإيرادات" />
+                <Bar dataKey="expenses" fill="hsl(0, 84%, 60%)" radius={[4, 4, 0, 0]} name="المصروفات" />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+      </motion.div>
     </div>
   );
 }
