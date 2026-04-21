@@ -418,7 +418,82 @@ CREATE TRIGGER trg_calc_overhead_total
   BEFORE INSERT OR UPDATE ON daily_overheads
   FOR EACH ROW EXECUTE FUNCTION calculate_daily_overhead_total();
 
--- 13. SALES RETURNS (مردودات المبيعات)
+-- 13. INVENTORY RECEIPTS (فواتير استلام المخزون)
+-- ============================================================
+
+DROP TABLE IF EXISTS public.inventory_receipt_items CASCADE;
+DROP TABLE IF EXISTS public.inventory_receipts CASCADE;
+
+CREATE TABLE public.inventory_receipts (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  restaurant_id UUID REFERENCES public.restaurants(id) ON DELETE CASCADE NOT NULL,
+  receipt_number VARCHAR(20) NOT NULL,
+  supplier_id UUID REFERENCES public.suppliers(id) ON DELETE SET NULL,
+  receipt_date DATE NOT NULL DEFAULT CURRENT_DATE,
+  total_amount DECIMAL(12,2) NOT NULL DEFAULT 0,
+  paid_amount DECIMAL(12,2) DEFAULT 0,
+  discount_amount DECIMAL(12,2) DEFAULT 0,
+  tax_amount DECIMAL(12,2) DEFAULT 0,
+  net_amount DECIMAL(12,2) DEFAULT 0,
+  status VARCHAR(20) DEFAULT 'draft' CHECK (status IN ('draft', 'confirmed', 'posted', 'cancelled')),
+  notes TEXT,
+  -- Accounting integration
+  journal_entry_id UUID REFERENCES public.journal_entries(id) ON DELETE SET NULL,
+  -- Audit fields
+  created_by UUID REFERENCES auth.users(id),
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT now(),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT now(),
+  UNIQUE(restaurant_id, receipt_number)
+);
+
+CREATE TABLE public.inventory_receipt_items (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  inventory_receipt_id UUID REFERENCES public.inventory_receipts(id) ON DELETE CASCADE NOT NULL,
+  product_id UUID REFERENCES public.products(id) ON DELETE SET NULL,
+  quantity DECIMAL(10,3) NOT NULL CHECK (quantity > 0),
+  unit_cost DECIMAL(10,4) NOT NULL,
+  total_cost DECIMAL(12,2) NOT NULL,
+  -- Batch tracking
+  batch_number VARCHAR(50),
+  expiry_date DATE,
+  -- Unit info
+  unit VARCHAR(20),
+  -- Storage
+  warehouse_location VARCHAR(50),
+  notes TEXT,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT now()
+);
+
+-- Enable RLS
+ALTER TABLE public.inventory_receipts ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.inventory_receipt_items ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY isolation_inventory_receipts ON inventory_receipts 
+  FOR ALL USING (restaurant_id IN (SELECT id FROM restaurants WHERE owner_id = auth.uid()));
+
+CREATE POLICY isolation_inventory_receipt_items ON inventory_receipt_items 
+  FOR ALL USING (inventory_receipt_id IN (SELECT id FROM inventory_receipts WHERE restaurant_id IN (SELECT id FROM restaurants WHERE owner_id = auth.uid())));
+
+-- Trigger to calculate receipt totals
+CREATE OR REPLACE FUNCTION calculate_receipt_total()
+RETURNS TRIGGER AS $$
+BEGIN
+  NEW.total_amount := (
+    SELECT COALESCE(SUM(total_cost), 0) 
+    FROM inventory_receipt_items 
+    WHERE inventory_receipt_id = NEW.id
+  );
+  NEW.net_amount := NEW.total_amount - COALESCE(NEW.discount_amount, 0) + COALESCE(NEW.tax_amount, 0);
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS trg_calc_receipt_total ON inventory_receipts;
+CREATE TRIGGER trg_calc_receipt_total
+  BEFORE INSERT OR UPDATE ON inventory_receipts
+  FOR EACH ROW EXECUTE FUNCTION calculate_receipt_total();
+
+-- 14. SALES RETURNS (مردودات المبيعات)
 -- ============================================================
 
 DROP TABLE IF EXISTS public.sales_return_items CASCADE;

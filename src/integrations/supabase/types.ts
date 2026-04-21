@@ -1738,6 +1738,152 @@ export type Database = {
           },
         ]
       }
+      inventory_receipts: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          discount_amount: number | null
+          id: string
+          journal_entry_id: string | null
+          net_amount: number | null
+          notes: string | null
+          paid_amount: number | null
+          receipt_date: string
+          receipt_number: string
+          restaurant_id: string
+          status: string | null
+          supplier_id: string | null
+          tax_amount: number | null
+          total_amount: number | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          discount_amount?: number | null
+          id?: string
+          journal_entry_id?: string | null
+          net_amount?: number | null
+          notes?: string | null
+          paid_amount?: number | null
+          receipt_date?: string
+          receipt_number: string
+          restaurant_id: string
+          status?: string | null
+          supplier_id?: string | null
+          tax_amount?: number | null
+          total_amount?: number | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          discount_amount?: number | null
+          id?: string
+          journal_entry_id?: string | null
+          net_amount?: number | null
+          notes?: string | null
+          paid_amount?: number | null
+          receipt_date?: string
+          receipt_number?: string
+          restaurant_id?: string
+          status?: string | null
+          supplier_id?: string | null
+          tax_amount?: number | null
+          total_amount?: number | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "inventory_receipts_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inventory_receipts_journal_entry_id_fkey"
+            columns: ["journal_entry_id"]
+            isOneToOne: false
+            referencedRelation: "journal_entries"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inventory_receipts_restaurant_id_fkey"
+            columns: ["restaurant_id"]
+            isOneToOne: false
+            referencedRelation: "restaurants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inventory_receipts_supplier_id_fkey"
+            columns: ["supplier_id"]
+            isOneToOne: false
+            referencedRelation: "suppliers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      inventory_receipt_items: {
+        Row: {
+          batch_number: string | null
+          created_at: string
+          expiry_date: string | null
+          id: string
+          inventory_receipt_id: string
+          notes: string | null
+          product_id: string | null
+          quantity: number
+          total_cost: number
+          unit: string | null
+          unit_cost: number
+          warehouse_location: string | null
+        }
+        Insert: {
+          batch_number?: string | null
+          created_at?: string
+          expiry_date?: string | null
+          id?: string
+          inventory_receipt_id: string
+          notes?: string | null
+          product_id?: string | null
+          quantity: number
+          total_cost: number
+          unit?: string | null
+          unit_cost: number
+          warehouse_location?: string | null
+        }
+        Update: {
+          batch_number?: string | null
+          created_at?: string
+          expiry_date?: string | null
+          id?: string
+          inventory_receipt_id?: string
+          notes?: string | null
+          product_id?: string | null
+          quantity?: number
+          total_cost?: number
+          unit?: string | null
+          unit_cost?: number
+          warehouse_location?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "inventory_receipt_items_inventory_receipt_id_fkey"
+            columns: ["inventory_receipt_id"]
+            isOneToOne: false
+            referencedRelation: "inventory_receipts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inventory_receipt_items_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       sales_returns: {
         Row: {
           created_at: string
