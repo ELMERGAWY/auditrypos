@@ -20,7 +20,7 @@ export type SidebarTab =
   | 'pos' | 'orders' | 'menu' | 'delivery' | 'shifts' | 'stats' 
   | 'inventory' | 'customers' | 'suppliers' | 'expenses' | 'qr' 
   | 'waiter' | 'staff' | 'financials' | 'notifications' | 'settings' | 'overheads'
-  | 'customer_accounts' | 'sales_returns' | 'supplier_accounts';
+  | 'customer_accounts' | 'sales_returns' | 'supplier_accounts' | 'inventory_receipts';
 
 interface NavItem {
   id: SidebarTab;

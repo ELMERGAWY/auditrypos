@@ -30,6 +30,7 @@ import { SuppliersTab } from './dashboard/SuppliersTab';
 import { CustomerManager } from './dashboard/CustomerManager';
 import { SupplierManager } from './dashboard/SupplierManager';
 import { SalesReturnsManager } from './dashboard/SalesReturns';
+import { InventoryReceiptsManager } from './dashboard/InventoryReceipts';
 import { ExpensesTab } from './dashboard/ExpensesTab';
 import { StaffTab } from './dashboard/StaffTab';
 import { NotificationsTab } from './dashboard/NotificationsTab';
@@ -580,6 +581,7 @@ export default function Dashboard() {
     { id: 'sales_returns', label: 'مردودات المبيعات', icon: RotateCcw },
     { id: 'suppliers', label: 'الموردين', icon: Store },
     { id: 'supplier_accounts', label: 'حسابات الموردين', icon: FileText },
+    { id: 'inventory_receipts', label: 'فواتير الاستلام', icon: Truck },
     { id: 'expenses', label: 'المصروفات', icon: Wallet },
     { id: 'overheads', label: 'النفقات العامة', icon: TrendingUp },
     { id: 'delivery', label: 'المناديب', icon: Truck, badge: deliveryOrders.length, locked: lockedTabs.includes('delivery') },
@@ -1289,6 +1291,11 @@ export default function Dashboard() {
           {/* ===================== SUPPLIER ACCOUNTS TAB (Professional) ===================== */}
           {activeTab === 'supplier_accounts' && (
             <SupplierManager restaurantId={restaurant.id} currency={currency} />
+          )}
+
+          {/* ===================== INVENTORY RECEIPTS TAB ===================== */}
+          {activeTab === 'inventory_receipts' && (
+            <InventoryReceiptsManager restaurantId={restaurant.id} currency={currency} />
           )}
 
           {/* ===================== EXPENSES TAB ===================== */}
