@@ -17,6 +17,7 @@ export interface CheckoutContext {
   currency: string;
   isOnline: boolean;
   userId?: string;
+  skipPreparation?: boolean; // For direct sell (retail, warehouse, etc.)
 }
 
 export interface CheckoutResult {
@@ -129,12 +130,16 @@ class CheckoutIntegration {
       }
 
       // 9. Create order (compatible with existing schema)
+      // For non-food businesses or direct sell, use 'completed' status
+      const isDirectSell = context.skipPreparation || 
+        ['retail', 'grocery', 'pharmacy', 'wholesale', 'warehouse'].includes(context.businessType);
+      
       const orderPayload = {
         restaurant_id: context.restaurantId,
         order_number: orderNum,
         total: finalTotal,
         discount: discountAmount,
-        status: 'pending' as const,
+        status: isDirectSell ? 'completed' as const : 'pending' as const,
         table_number: orderData.tableNumber || null,
         order_type: orderData.orderType,
         customer_name: orderData.customerName || '',

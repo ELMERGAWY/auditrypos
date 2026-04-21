@@ -422,6 +422,7 @@ export default function Dashboard() {
           currency: currency,
           isOnline: true,
           userId: user?.id,
+          skipPreparation: !sendToPrep, // For direct sell (quick checkout)
         },
         {
           cart: cart.map(c => ({

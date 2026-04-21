@@ -1271,7 +1271,100 @@ CREATE TRIGGER trg_create_order_journal
   FOR EACH ROW EXECUTE FUNCTION create_order_journal_entry();
 
 -- ============================================================
--- 22. BALANCE UPDATE TRIGGERS (تحديث أرصدة الحسابات تلقائياً)
+-- 22. EXPENSES ACCOUNTING INTEGRATION (ربط المصروفات بالحسابات)
+-- ============================================================
+
+-- Add journal_entry_id to expenses if not exists
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'expenses' AND column_name = 'journal_entry_id') THEN
+    ALTER TABLE public.expenses ADD COLUMN journal_entry_id UUID REFERENCES public.journal_entries(id) ON DELETE SET NULL;
+  END IF;
+END $$;
+
+-- Function to create journal entry for expense
+CREATE OR REPLACE FUNCTION create_expense_journal_entry()
+RETURNS TRIGGER AS $$
+DECLARE
+  v_entry_id UUID;
+  v_cash_account UUID;
+  v_expense_account UUID;
+  v_entry_number TEXT;
+  v_account_code TEXT;
+  v_account_name TEXT;
+BEGIN
+  -- Skip if already has journal entry
+  IF NEW.journal_entry_id IS NOT NULL THEN
+    RETURN NEW;
+  END IF;
+  
+  -- Map expense category to account code
+  CASE NEW.category
+    WHEN 'إيجار' THEN 
+      v_account_code := '601';
+      v_account_name := 'إيجار';
+    WHEN 'كهرباء ومياه' THEN 
+      v_account_code := '602';
+      v_account_name := 'كهرباء ومياه';
+    WHEN 'رواتب' THEN 
+      v_account_code := '603';
+      v_account_name := 'رواتب';
+    WHEN 'مشتريات' THEN 
+      v_account_code := '501';
+      v_account_name := 'مشتريات';
+    WHEN 'صيانة' THEN 
+      v_account_code := '606';
+      v_account_name := 'صيانة';
+    WHEN 'نقل' THEN 
+      v_account_code := '607';
+      v_account_name := 'نقل ومواصلات';
+    WHEN 'إعلانات' THEN 
+      v_account_code := '608';
+      v_account_name := 'إعلانات ودعاية';
+    ELSE 
+      v_account_code := '609';
+      v_account_name := 'مصاريف أخرى';
+  END CASE;
+  
+  -- Get accounts
+  v_cash_account := get_cash_account(NEW.restaurant_id);
+  v_expense_account := get_or_create_expense_account(NEW.restaurant_id, v_account_name, v_account_code);
+  
+  -- Generate entry number
+  v_entry_number := generate_entry_number(NEW.restaurant_id);
+  
+  -- Create journal entry header
+  INSERT INTO journal_entries (
+    restaurant_id, entry_number, entry_date, reference_type, reference_id,
+    description, source, total_debit, total_credit, is_posted
+  ) VALUES (
+    NEW.restaurant_id, v_entry_number, NEW.date, 'expense', NEW.id,
+    'مصروف: ' || NEW.category || COALESCE(' - ' || NEW.description, ''), 'auto', 
+    NEW.amount, NEW.amount, true
+  ) RETURNING id INTO v_entry_id;
+  
+  -- Debit expense account
+  INSERT INTO journal_entry_lines (entry_id, account_id, debit, credit, description, line_order)
+  VALUES (v_entry_id, v_expense_account, NEW.amount, 0, NEW.description || ' (' || NEW.category || ')', 1);
+  
+  -- Credit cash account
+  INSERT INTO journal_entry_lines (entry_id, account_id, debit, credit, description, line_order)
+  VALUES (v_entry_id, v_cash_account, 0, NEW.amount, 'دفع نقدي', 2);
+  
+  -- Update journal_entry_id
+  NEW.journal_entry_id := v_entry_id;
+  
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS trg_create_expense_journal ON expenses;
+CREATE TRIGGER trg_create_expense_journal
+  BEFORE INSERT ON expenses
+  FOR EACH ROW EXECUTE FUNCTION create_expense_journal_entry();
+
+-- ============================================================
+-- 23. BALANCE UPDATE TRIGGERS (تحديث أرصدة الحسابات تلقائياً)
 -- ============================================================
 
 -- Function to update account balance when journal line is added
