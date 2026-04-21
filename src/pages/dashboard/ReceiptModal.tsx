@@ -18,28 +18,37 @@ const PAYMENT_LABELS: Record<string, string> = {
 };
 
 const THERMAL_STYLES = `
-  * { margin: 0; padding: 0; box-sizing: border-box; }
-  body { font-family: 'Arial', 'Tahoma', sans-serif; font-size: 13px; padding: 8px; max-width: 300px; margin: 0 auto; color: #000; background: #fff; }
-  .receipt { padding: 4px 0; }
+  * { margin: 0; padding: 0; box-sizing: border-box; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  body { font-family: 'Arial', 'Tahoma', sans-serif; font-size: 13px; padding: 4px; max-width: 80mm; margin: 0 auto; color: #000; background: #fff; }
+  .receipt { padding: 4px 0; width: 100%; }
   .center { text-align: center; }
   .bold { font-weight: bold; }
-  .logo-name { font-size: 20px; font-weight: bold; letter-spacing: 1px; margin-bottom: 2px; }
-  .subtitle { font-size: 11px; color: #333; margin-bottom: 2px; }
-  .divider { border: none; border-top: 2px solid #000; margin: 8px 0; }
-  .divider-thin { border: none; border-top: 1px solid #000; margin: 6px 0; }
+  .logo-name { font-size: 18px; font-weight: bold; letter-spacing: 1px; margin-bottom: 2px; }
+  .subtitle { font-size: 11px; color: #000; margin-bottom: 2px; }
+  .divider { border: none; border-top: 2px solid #000; margin: 6px 0; }
+  .divider-thin { border: none; border-top: 1px solid #000; margin: 4px 0; }
   .row { display: flex; justify-content: space-between; align-items: center; padding: 2px 0; font-size: 12px; }
-  .total-row { font-size: 16px; font-weight: bold; padding: 4px 0; }
-  .info-label { color: #333; font-size: 12px; }
-  .footer { font-size: 10px; color: #666; margin-top: 6px; }
-  table.items-table { width: 100%; border-collapse: collapse; margin: 6px 0; }
-  table.items-table th { font-size: 11px; font-weight: bold; border-top: 2px solid #000; border-bottom: 2px solid #000; padding: 4px 2px; text-align: right; }
-  table.items-table td { font-size: 12px; padding: 4px 2px; border-bottom: 1px solid #000; }
-  table.items-table td:last-child, table.items-table th:last-child { text-align: left; }
+  .total-row { font-size: 14px; font-weight: bold; padding: 4px 0; }
+  .info-label { color: #000; font-size: 12px; }
+  .footer { font-size: 10px; color: #000; margin-top: 6px; }
+  .items-section { margin: 8px 0; }
+  .item-row { display: flex; justify-content: space-between; padding: 4px 0; border-bottom: 1px dashed #000; font-size: 12px; }
+  .item-name { flex: 1; text-align: right; padding-left: 4px; }
+  .item-qty { width: 40px; text-align: center; }
+  .item-price { width: 60px; text-align: left; }
+  .item-total { width: 60px; text-align: left; font-weight: bold; }
+  .items-header { display: flex; justify-content: space-between; padding: 4px 0; border-top: 2px solid #000; border-bottom: 2px solid #000; font-size: 11px; font-weight: bold; }
   .summary-table { width: 100%; border-collapse: collapse; margin: 6px 0; }
   .summary-table td { padding: 3px 4px; font-size: 12px; border-bottom: 1px solid #000; }
   .summary-table td:last-child { text-align: left; font-weight: bold; }
   .summary-table tr:last-child td { border-bottom: 2px solid #000; }
-  @media print { body { margin: 0; padding: 4px; } @page { margin: 0; } }
+  .text-green { font-weight: bold; }
+  .text-red { font-weight: bold; }
+  @media print { 
+    body { margin: 0; padding: 2px; width: 80mm; } 
+    @page { margin: 0; size: 80mm auto; }
+    * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; color: #000 !important; }
+  }
 `;
 
 function ReceiptContent({ order, restaurant }: { order: Order; restaurant: Restaurant }) {
@@ -80,27 +89,29 @@ function ReceiptContent({ order, restaurant }: { order: Order; restaurant: Resta
         <div className="row"><span className="info-label">العنوان / {order.delivery_address}</span></div>
       )}
 
-      {/* Items Table */}
-      <table className="items-table">
-        <thead>
-          <tr>
-            <th>إسم الصنف</th>
-            <th>السعر</th>
-            <th>الكمية</th>
-            <th>الإجمالي</th>
-          </tr>
-        </thead>
-        <tbody>
-          {order.items.map((item, idx) => (
-            <tr key={idx}>
-              <td>{item.menu_item_name}</td>
-              <td>{item.price.toFixed(2)}</td>
-              <td>{item.quantity}</td>
-              <td className="bold">{(item.price * item.quantity).toFixed(2)}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+      {/* Items Section - Using divs instead of table for better thermal printer support */}
+      <div className="items-section">
+        <div className="items-header">
+          <span className="item-name">الصنف</span>
+          <span className="item-qty">كمية</span>
+          <span className="item-price">السعر</span>
+          <span className="item-total">الإجمالي</span>
+        </div>
+        {order.items && order.items.length > 0 ? (
+          order.items.map((item, idx) => (
+            <div key={idx} className="item-row">
+              <span className="item-name">{item.menu_item_name || 'صنف'}</span>
+              <span className="item-qty">{item.quantity}</span>
+              <span className="item-price">{Number(item.price).toFixed(2)}</span>
+              <span className="item-total">{(Number(item.price) * Number(item.quantity)).toFixed(2)}</span>
+            </div>
+          ))
+        ) : (
+          <div className="item-row" style={{ textAlign: 'center', color: '#000' }}>
+            لا توجد أصناف
+          </div>
+        )}
+      </div>
 
       {/* Summary Table */}
       <table className="summary-table">
@@ -129,18 +140,18 @@ function ReceiptContent({ order, restaurant }: { order: Order; restaurant: Resta
           </tr>
           <tr>
             <td>المدفوع</td>
-            <td style={{ color: '#16a34a' }}>{paidAmount.toFixed(2)}</td>
+            <td className="text-green">{paidAmount.toFixed(2)}</td>
           </tr>
           {remaining > 0 && (
             <tr>
               <td>المتبقي</td>
-              <td style={{ color: '#dc2626' }}>{remaining.toFixed(2)}</td>
+              <td className="text-red">{remaining.toFixed(2)}</td>
             </tr>
           )}
           {change > 0 && (
             <tr>
               <td>الباقي للعميل</td>
-              <td style={{ color: '#16a34a' }}>{change.toFixed(2)}</td>
+              <td className="text-green">{change.toFixed(2)}</td>
             </tr>
           )}
         </tbody>
@@ -167,22 +178,43 @@ export function ReceiptModalWrapper({ order, restaurant, onClose }: ReceiptProps
 
   const printReceipt = () => {
     if (!ref.current) return;
+    
+    // Clone the content to avoid modifying the original
     const content = ref.current.innerHTML;
-    const printWindow = window.open('', '_blank', 'width=320,height=800');
-    if (!printWindow) { alert('يرجى السماح بالنوافذ المنبثقة للطباعة'); return; }
+    
+    // Create print window with specific dimensions for 80mm thermal paper
+    const printWindow = window.open('', '_blank', 'width=400,height=800,scrollbars=yes');
+    if (!printWindow) { 
+      alert('يرجى السماح بالنوافذ المنبثقة للطباعة'); 
+      return; 
+    }
 
     printWindow.document.open();
     printWindow.document.write(`<!DOCTYPE html>
 <html dir="rtl" lang="ar">
 <head>
   <meta charset="UTF-8">
-  <title>إيصال #${order.order_number.slice(-4)}</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>فاتورة #${order.order_number.slice(-4)}</title>
   <style>${THERMAL_STYLES}</style>
 </head>
-<body>${content}</body>
+<body>
+  <div class="receipt">
+    ${content}
+  </div>
+  <script>
+    window.onload = function() {
+      setTimeout(function() {
+        window.focus();
+        window.print();
+        // Close after print (optional)
+        // setTimeout(function() { window.close(); }, 1000);
+      }, 250);
+    };
+  </script>
+</body>
 </html>`);
     printWindow.document.close();
-    printWindow.onload = () => { printWindow.focus(); printWindow.print(); };
   };
 
   return (
