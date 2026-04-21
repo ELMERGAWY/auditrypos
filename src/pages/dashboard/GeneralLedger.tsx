@@ -96,14 +96,18 @@ export function GeneralLedger({ restaurantId, currency }: Props) {
         `)
         .eq('account_id', selectedAccount)
         .gte('journal_entries.entry_date', dateFrom)
-        .lte('journal_entries.entry_date', dateTo)
-        .order('journal_entries.entry_date', { ascending: true });
+        .lte('journal_entries.entry_date', dateTo);
 
       if (error) throw error;
 
+      // Sort by date ascending (chronological order for running balance)
+      const sortedData = (data || []).sort((a: any, b: any) => 
+        new Date(a.journal_entries.entry_date).getTime() - new Date(b.journal_entries.entry_date).getTime()
+      );
+
       // Calculate running balance
       let balance = 0;
-      const formattedEntries: LedgerEntry[] = (data || []).map((entry: any) => {
+      const formattedEntries: LedgerEntry[] = sortedData.map((entry: any) => {
         balance += (entry.debit || 0) - (entry.credit || 0);
         return {
           id: entry.id,
