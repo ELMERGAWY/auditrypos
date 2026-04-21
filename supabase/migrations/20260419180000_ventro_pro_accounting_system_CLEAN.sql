@@ -373,6 +373,22 @@ BEGIN
     WHERE table_name = 'menu_items' AND column_name = 'calculated_cost_price') THEN
     ALTER TABLE public.menu_items ADD COLUMN calculated_cost_price DECIMAL(10,2) DEFAULT 0;
   END IF;
+  
+  -- Add columns for daily overhead allocation
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
+    WHERE table_name = 'menu_items' AND column_name = 'daily_overhead_allocation') THEN
+    ALTER TABLE public.menu_items ADD COLUMN daily_overhead_allocation DECIMAL(10,2) DEFAULT 0;
+  END IF;
+  
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
+    WHERE table_name = 'menu_items' AND column_name = 'total_cost_with_overhead') THEN
+    ALTER TABLE public.menu_items ADD COLUMN total_cost_with_overhead DECIMAL(10,2) DEFAULT 0;
+  END IF;
+  
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
+    WHERE table_name = 'menu_items' AND column_name = 'expected_daily_quantity') THEN
+    ALTER TABLE public.menu_items ADD COLUMN expected_daily_quantity DECIMAL(10,2) DEFAULT 0;
+  END IF;
 END $$;
 
 -- 12. DAILY OVERHEADS (EXPENSES ALLOCATION)
@@ -417,6 +433,88 @@ DROP TRIGGER IF EXISTS trg_calc_overhead_total ON daily_overheads;
 CREATE TRIGGER trg_calc_overhead_total
   BEFORE INSERT OR UPDATE ON daily_overheads
   FOR EACH ROW EXECUTE FUNCTION calculate_daily_overhead_total();
+
+-- Function to distribute daily overhead to menu items automatically
+CREATE OR REPLACE FUNCTION distribute_daily_overhead_to_menu_items()
+RETURNS TRIGGER AS $$
+DECLARE
+  v_total_expected_quantity DECIMAL(10,2) := 0;
+  v_menu_item RECORD;
+  v_overhead_per_unit DECIMAL(10,4);
+  v_has_recipe BOOLEAN;
+BEGIN
+  -- Only distribute if there's a total amount and date
+  IF NEW.total_amount > 0 AND NEW.is_distributed = TRUE THEN
+    -- Calculate total expected daily quantity for all menu items with recipes
+    SELECT COALESCE(SUM(expected_daily_quantity), 0)
+    INTO v_total_expected_quantity
+    FROM menu_items
+    WHERE restaurant_id = NEW.restaurant_id
+      AND product_type = 'manufactured'
+      AND expected_daily_quantity > 0;
+    
+    -- If no expected quantities set, use count of items with recipes
+    IF v_total_expected_quantity = 0 THEN
+      SELECT COUNT(*) INTO v_total_expected_quantity
+      FROM menu_items
+      WHERE restaurant_id = NEW.restaurant_id
+        AND product_type = 'manufactured';
+    END IF;
+    
+    -- Calculate overhead per unit
+    IF v_total_expected_quantity > 0 THEN
+      v_overhead_per_unit := NEW.total_amount / v_total_expected_quantity;
+    ELSE
+      v_overhead_per_unit := 0;
+    END IF;
+    
+    -- Update each menu item with overhead allocation
+    FOR v_menu_item IN 
+      SELECT id, expected_daily_quantity, calculated_cost_price
+      FROM menu_items
+      WHERE restaurant_id = NEW.restaurant_id
+        AND product_type = 'manufactured'
+    LOOP
+      -- Calculate allocation based on expected quantity or equal distribution
+      DECLARE
+        v_allocation DECIMAL(10,2);
+      BEGIN
+        IF v_menu_item.expected_daily_quantity > 0 THEN
+          v_allocation := v_overhead_per_unit * v_menu_item.expected_daily_quantity;
+        ELSE
+          v_allocation := v_overhead_per_unit;
+        END IF;
+        
+        -- Update menu item with overhead allocation
+        UPDATE menu_items
+        SET daily_overhead_allocation = v_allocation,
+            total_cost_with_overhead = COALESCE(calculated_cost_price, 0) + v_allocation,
+            updated_at = now()
+        WHERE id = v_menu_item.id;
+      END;
+    END LOOP;
+    
+    -- Also update menu items without recipes but with cost price
+    UPDATE menu_items
+    SET daily_overhead_allocation = v_overhead_per_unit,
+        total_cost_with_overhead = COALESCE(cost_price, 0) + v_overhead_per_unit,
+        updated_at = now()
+    WHERE restaurant_id = NEW.restaurant_id
+      AND (product_type IS NULL OR product_type = 'inventory')
+      AND cost_price > 0;
+  END IF;
+  
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+-- Trigger to auto-distribute overhead when daily_overheads is updated
+DROP TRIGGER IF EXISTS trg_distribute_overhead ON daily_overheads;
+CREATE TRIGGER trg_distribute_overhead
+  AFTER UPDATE ON daily_overheads
+  FOR EACH ROW 
+  WHEN (OLD.is_distributed = FALSE AND NEW.is_distributed = TRUE)
+  EXECUTE FUNCTION distribute_daily_overhead_to_menu_items();
 
 -- 13. INVENTORY RECEIPTS (فواتير استلام المخزون)
 -- ============================================================

@@ -86,7 +86,8 @@ export function GeneralLedger({ restaurantId, currency }: Props) {
             id,
             entry_number,
             entry_date,
-            reference,
+            reference_type,
+            reference_id,
             description
           ),
           chart_of_accounts!inner(
@@ -113,7 +114,7 @@ export function GeneralLedger({ restaurantId, currency }: Props) {
           id: entry.id,
           date: entry.journal_entries.entry_date,
           entry_number: entry.journal_entries.entry_number,
-          reference: entry.journal_entries.reference || '',
+          reference: entry.journal_entries.reference_type || '',
           description: entry.description || entry.journal_entries.description,
           debit: entry.debit || 0,
           credit: entry.credit || 0,

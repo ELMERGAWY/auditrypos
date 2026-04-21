@@ -22,11 +22,18 @@ interface Expense {
 
 interface DailyOverhead {
   id: string;
-  category: string;
-  amount: number;
-  overhead_date: string;
+  category?: string;
+  amount?: number;
+  overhead_date?: string;
+  date?: string;
   is_distributed: boolean;
   parent_expense_id?: string;
+  // Original fields from daily_overheads table
+  rent_amount?: number;
+  electricity_amount?: number;
+  salaries_amount?: number;
+  other_amount?: number;
+  total_amount?: number;
 }
 
 interface Props {
@@ -104,9 +111,10 @@ export function ExpensesTab({ restaurantId, currency }: Props) {
     return count;
   };
 
-  const calculateDistributionDays = (): number => {
+  const calculateDistributionDays = (type?: DistributionType): number => {
     const now = new Date();
-    switch (form.distributionType) {
+    const distType = type || form.distributionType;
+    switch (distType) {
       case 'daily':
         return 1;
       case 'custom':
@@ -118,7 +126,9 @@ export function ExpensesTab({ restaurantId, currency }: Props) {
   };
 
   const calculateDailyCost = (amount: number, days: number): number => {
-    return days > 0 ? amount / days : amount;
+    const validAmount = Number(amount) || 0;
+    const validDays = Number(days) || 1;
+    return validDays > 0 ? validAmount / validDays : validAmount;
   };
 
   const totalExpenses = expenses.reduce((s, e) => s + e.amount, 0);
@@ -509,7 +519,7 @@ export function ExpensesTab({ restaurantId, currency }: Props) {
                 <Input 
                   type="number" 
                   placeholder="0.00"
-                  value={form.amount}
+                  value={form.amount || ''}
                   onChange={e => setForm(f => ({ ...f, amount: e.target.value }))}
                 />
               </div>
@@ -524,13 +534,40 @@ export function ExpensesTab({ restaurantId, currency }: Props) {
               </div>
             </div>
             
+            {/* Quick mode buttons for calculator */}
+            <div className="flex gap-2">
+              <Button
+                type="button"
+                variant={form.distributionType === 'daily' ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => setForm(f => ({ ...f, distributionType: 'daily' }))}
+                className="text-xs"
+              >
+                يوم واحد
+              </Button>
+              <Button
+                type="button"
+                variant={form.distributionType === 'monthly' ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => setForm(f => ({ ...f, distributionType: 'monthly' }))}
+                className="text-xs"
+              >
+                الشهر كامل ({getWorkingDaysInMonth(new Date().getFullYear(), new Date().getMonth(), form.workingDays)} يوم)
+              </Button>
+            </div>
+            
             <div className="border-t pt-3">
               <p className="text-xs text-muted-foreground mb-2">نتيجة الحساب:</p>
               <div className="text-center">
                 <p className="text-3xl font-bold text-primary">
-                  {form.amount ? calculateDailyCost(Number(form.amount), calculateDistributionDays()).toFixed(2) : '0.00'} {currency}
+                  {calculateDailyCost(Number(form.amount || 0), calculateDistributionDays()).toFixed(2)} {currency}
                 </p>
                 <p className="text-xs text-muted-foreground">تكلفة يومية</p>
+                {form.amount && Number(form.amount) > 0 && (
+                  <p className="text-xs text-success mt-1">
+                    {Number(form.amount).toLocaleString()} ÷ {calculateDistributionDays()} = {calculateDailyCost(Number(form.amount), calculateDistributionDays()).toFixed(2)}
+                  </p>
+                )}
               </div>
             </div>
           </Card>
