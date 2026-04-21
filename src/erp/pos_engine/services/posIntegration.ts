@@ -24,7 +24,7 @@ export interface POSOrderItem {
 }
 
 export interface POSOrderContext {
-  company_id: string;
+  restaurant_id: string;
   fiscal_period_id: string;
   warehouse_id: string;
   customer_id?: string;
@@ -65,14 +65,14 @@ export interface POSOrderResult {
 export class POSIntegrationService {
   private postingEngine: PostingEngine;
   private costingEngine: InventoryCostingEngine;
-  private companyId: string;
+  private restaurantId: string;
   private userId: string;
   
-  constructor(companyId: string, userId: string) {
-    this.companyId = companyId;
+  constructor(restaurantId: string, userId: string) {
+    this.restaurantId = restaurantId;
     this.userId = userId;
-    this.postingEngine = new PostingEngine(companyId, userId);
-    this.costingEngine = new InventoryCostingEngine(companyId);
+    this.postingEngine = new PostingEngine(restaurantId, userId);
+    this.costingEngine = new InventoryCostingEngine(restaurantId);
   }
   
   /**

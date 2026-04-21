@@ -12,36 +12,15 @@
 -- LAYER 1: FINANCIAL CORE
 -- ============================================================
 
--- 1.1 COMPANIES (Multi-tenant support)
+-- 1.1 Using existing restaurants table as multi-tenant root
 -- ============================================================
-DROP TABLE IF EXISTS public.companies CASCADE;
-CREATE TABLE public.companies (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  name VARCHAR(200) NOT NULL,
-  legal_name VARCHAR(200),
-  tax_id VARCHAR(50),
-  commercial_registration VARCHAR(50),
-  industry_type VARCHAR(50),
-  currency VARCHAR(3) DEFAULT 'EGP',
-  fiscal_year_start_month INTEGER DEFAULT 1 CHECK (fiscal_year_start_month BETWEEN 1 AND 12),
-  address TEXT,
-  phone VARCHAR(50),
-  email VARCHAR(100),
-  logo_url TEXT,
-  is_active BOOLEAN DEFAULT true,
-  created_at TIMESTAMPTZ DEFAULT NOW(),
-  updated_at TIMESTAMPTZ DEFAULT NOW()
-);
-
--- Link to existing restaurants
-ALTER TABLE public.restaurants ADD COLUMN IF NOT EXISTS company_id UUID REFERENCES public.companies(id);
 
 -- 1.2 FISCAL YEARS
 -- ============================================================
 DROP TABLE IF EXISTS public.fiscal_years CASCADE;
 CREATE TABLE public.fiscal_years (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  company_id UUID REFERENCES public.companies(id) ON DELETE CASCADE NOT NULL,
+  restaurant_id UUID REFERENCES public.restaurants(id) ON DELETE CASCADE NOT NULL,
   year_number INTEGER NOT NULL,
   start_date DATE NOT NULL,
   end_date DATE NOT NULL,
@@ -51,7 +30,7 @@ CREATE TABLE public.fiscal_years (
   closed_by UUID REFERENCES auth.users(id),
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW(),
-  UNIQUE(company_id, year_number)
+  UNIQUE(restaurant_id, year_number)
 );
 
 -- 1.3 FISCAL PERIODS (Monthly)
@@ -59,7 +38,7 @@ CREATE TABLE public.fiscal_years (
 DROP TABLE IF EXISTS public.fiscal_periods CASCADE;
 CREATE TABLE public.fiscal_periods (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  company_id UUID REFERENCES public.companies(id) ON DELETE CASCADE NOT NULL,
+  restaurant_id UUID REFERENCES public.restaurants(id) ON DELETE CASCADE NOT NULL,
   fiscal_year_id UUID REFERENCES public.fiscal_years(id) ON DELETE CASCADE NOT NULL,
   period_number INTEGER NOT NULL CHECK (period_number BETWEEN 1 AND 12),
   period_name VARCHAR(50) NOT NULL,
@@ -78,7 +57,7 @@ CREATE TABLE public.fiscal_periods (
   closed_by UUID REFERENCES auth.users(id),
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW(),
-  UNIQUE(company_id, fiscal_year_id, period_number)
+  UNIQUE(restaurant_id, fiscal_year_id, period_number)
 );
 
 -- 1.4 CHART OF ACCOUNTS (Hierarchical)
@@ -86,7 +65,7 @@ CREATE TABLE public.fiscal_periods (
 DROP TABLE IF EXISTS public.chart_of_accounts CASCADE;
 CREATE TABLE public.chart_of_accounts (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  company_id UUID REFERENCES public.companies(id) ON DELETE CASCADE NOT NULL,
+  restaurant_id UUID REFERENCES public.restaurants(id) ON DELETE CASCADE NOT NULL,
   code VARCHAR(20) NOT NULL,
   name VARCHAR(200) NOT NULL,
   account_type VARCHAR(20) NOT NULL CHECK (account_type IN ('asset', 'liability', 'equity', 'revenue', 'expense', 'cogs')),
@@ -121,7 +100,7 @@ CREATE TABLE public.chart_of_accounts (
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW(),
   
-  UNIQUE(company_id, code)
+  UNIQUE(restaurant_id, code)
 );
 
 -- 1.5 ACCOUNT BALANCES (Period-based)
@@ -151,7 +130,7 @@ CREATE TABLE public.account_balances (
 DROP TABLE IF EXISTS public.journal_entries CASCADE;
 CREATE TABLE public.journal_entries (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  company_id UUID REFERENCES public.companies(id) ON DELETE CASCADE NOT NULL,
+  restaurant_id UUID REFERENCES public.restaurants(id) ON DELETE CASCADE NOT NULL,
   fiscal_period_id UUID REFERENCES public.fiscal_periods(id) ON DELETE CASCADE NOT NULL,
   
   entry_number VARCHAR(50) NOT NULL,
@@ -221,7 +200,7 @@ CREATE TABLE public.journal_entry_lines (
 DROP TABLE IF EXISTS public.cost_centers CASCADE;
 CREATE TABLE public.cost_centers (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  company_id UUID REFERENCES public.companies(id) ON DELETE CASCADE NOT NULL,
+  restaurant_id UUID REFERENCES public.restaurants(id) ON DELETE CASCADE NOT NULL,
   code VARCHAR(20) NOT NULL,
   name VARCHAR(200) NOT NULL,
   parent_id UUID REFERENCES public.cost_centers(id),
@@ -230,7 +209,7 @@ CREATE TABLE public.cost_centers (
   is_active BOOLEAN DEFAULT true,
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW(),
-  UNIQUE(company_id, code)
+  UNIQUE(restaurant_id, code)
 );
 
 -- 1.9 PROJECTS
@@ -238,7 +217,7 @@ CREATE TABLE public.cost_centers (
 DROP TABLE IF EXISTS public.projects CASCADE;
 CREATE TABLE public.projects (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  company_id UUID REFERENCES public.companies(id) ON DELETE CASCADE NOT NULL,
+  restaurant_id UUID REFERENCES public.restaurants(id) ON DELETE CASCADE NOT NULL,
   code VARCHAR(20) NOT NULL,
   name VARCHAR(200) NOT NULL,
   description TEXT,
@@ -259,7 +238,7 @@ CREATE TABLE public.projects (
   
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW(),
-  UNIQUE(company_id, code)
+  UNIQUE(restaurant_id, code)
 );
 
 -- ============================================================
@@ -271,7 +250,7 @@ CREATE TABLE public.projects (
 DROP TABLE IF EXISTS public.warehouses CASCADE;
 CREATE TABLE public.warehouses (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  company_id UUID REFERENCES public.companies(id) ON DELETE CASCADE NOT NULL,
+  restaurant_id UUID REFERENCES public.restaurants(id) ON DELETE CASCADE NOT NULL,
   code VARCHAR(20) NOT NULL,
   name VARCHAR(200) NOT NULL,
   location TEXT,
@@ -282,7 +261,7 @@ CREATE TABLE public.warehouses (
   allow_negative_stock BOOLEAN DEFAULT false,
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW(),
-  UNIQUE(company_id, code)
+  UNIQUE(restaurant_id, code)
 );
 
 -- 2.2 INVENTORY PRODUCTS (extends products table)
@@ -290,7 +269,7 @@ CREATE TABLE public.warehouses (
 DROP TABLE IF EXISTS public.inventory_products CASCADE;
 CREATE TABLE public.inventory_products (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  company_id UUID REFERENCES public.companies(id) ON DELETE CASCADE NOT NULL,
+  restaurant_id UUID REFERENCES public.restaurants(id) ON DELETE CASCADE NOT NULL,
   sku VARCHAR(100) NOT NULL,
   name VARCHAR(200) NOT NULL,
   category_id UUID,
@@ -372,7 +351,7 @@ CREATE TABLE public.cost_layers (
 DROP TABLE IF EXISTS public.inventory_movements CASCADE;
 CREATE TABLE public.inventory_movements (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  company_id UUID REFERENCES public.companies(id) ON DELETE CASCADE NOT NULL,
+  restaurant_id UUID REFERENCES public.restaurants(id) ON DELETE CASCADE NOT NULL,
   product_id UUID REFERENCES public.inventory_products(id) ON DELETE CASCADE NOT NULL,
   warehouse_id UUID REFERENCES public.warehouses(id) ON DELETE CASCADE NOT NULL,
   
@@ -431,7 +410,7 @@ CREATE TABLE public.inventory_batches (
 DROP TABLE IF EXISTS public.bill_of_materials CASCADE;
 CREATE TABLE public.bill_of_materials (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  company_id UUID REFERENCES public.companies(id) ON DELETE CASCADE NOT NULL,
+  restaurant_id UUID REFERENCES public.restaurants(id) ON DELETE CASCADE NOT NULL,
   product_id UUID REFERENCES public.inventory_products(id) NOT NULL,
   version VARCHAR(10) DEFAULT '1.0',
   is_active BOOLEAN DEFAULT true,
@@ -473,7 +452,7 @@ CREATE TABLE public.bom_components (
 DROP TABLE IF EXISTS public.production_orders CASCADE;
 CREATE TABLE public.production_orders (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  company_id UUID REFERENCES public.companies(id) ON DELETE CASCADE NOT NULL,
+  restaurant_id UUID REFERENCES public.restaurants(id) ON DELETE CASCADE NOT NULL,
   bom_id UUID REFERENCES public.bill_of_materials(id) NOT NULL,
   
   order_number VARCHAR(50) NOT NULL,
@@ -511,7 +490,7 @@ CREATE TABLE public.production_orders (
 DROP TABLE IF EXISTS public.customers CASCADE;
 CREATE TABLE public.customers (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  company_id UUID REFERENCES public.companies(id) ON DELETE CASCADE NOT NULL,
+  restaurant_id UUID REFERENCES public.restaurants(id) ON DELETE CASCADE NOT NULL,
   
   customer_code VARCHAR(50),
   name VARCHAR(200) NOT NULL,
@@ -549,7 +528,7 @@ CREATE TABLE public.customers (
 DROP TABLE IF EXISTS public.suppliers CASCADE;
 CREATE TABLE public.suppliers (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  company_id UUID REFERENCES public.companies(id) ON DELETE CASCADE NOT NULL,
+  restaurant_id UUID REFERENCES public.restaurants(id) ON DELETE CASCADE NOT NULL,
   
   supplier_code VARCHAR(50),
   name VARCHAR(200) NOT NULL,
@@ -586,7 +565,7 @@ CREATE TABLE public.suppliers (
 DROP TABLE IF EXISTS public.sales_invoices CASCADE;
 CREATE TABLE public.sales_invoices (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  company_id UUID REFERENCES public.companies(id) ON DELETE CASCADE NOT NULL,
+  restaurant_id UUID REFERENCES public.restaurants(id) ON DELETE CASCADE NOT NULL,
   fiscal_period_id UUID REFERENCES public.fiscal_periods(id) NOT NULL,
   
   invoice_number VARCHAR(50) NOT NULL,
@@ -661,7 +640,7 @@ CREATE TABLE public.sales_invoice_lines (
 DROP TABLE IF EXISTS public.purchase_invoices CASCADE;
 CREATE TABLE public.purchase_invoices (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  company_id UUID REFERENCES public.companies(id) ON DELETE CASCADE NOT NULL,
+  restaurant_id UUID REFERENCES public.restaurants(id) ON DELETE CASCADE NOT NULL,
   fiscal_period_id UUID REFERENCES public.fiscal_periods(id) NOT NULL,
   
   invoice_number VARCHAR(50) NOT NULL,
@@ -730,7 +709,7 @@ CREATE TABLE public.purchase_invoice_lines (
 DROP TABLE IF EXISTS public.payments CASCADE;
 CREATE TABLE public.payments (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  company_id UUID REFERENCES public.companies(id) ON DELETE CASCADE NOT NULL,
+  restaurant_id UUID REFERENCES public.restaurants(id) ON DELETE CASCADE NOT NULL,
   fiscal_period_id UUID REFERENCES public.fiscal_periods(id) NOT NULL,
   
   payment_number VARCHAR(50) NOT NULL,
@@ -769,7 +748,7 @@ CREATE TABLE public.payments (
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW(),
   
-  UNIQUE(company_id, payment_number)
+  UNIQUE(restaurant_id, payment_number)
 );
 
 -- 3.8 EXPENSE VOUCHERS
@@ -777,7 +756,7 @@ CREATE TABLE public.payments (
 DROP TABLE IF EXISTS public.expense_vouchers CASCADE;
 CREATE TABLE public.expense_vouchers (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  company_id UUID REFERENCES public.companies(id) ON DELETE CASCADE NOT NULL,
+  restaurant_id UUID REFERENCES public.restaurants(id) ON DELETE CASCADE NOT NULL,
   fiscal_period_id UUID REFERENCES public.fiscal_periods(id) NOT NULL,
   
   voucher_number VARCHAR(50) NOT NULL,
@@ -899,25 +878,39 @@ ALTER TABLE public.sales_invoices ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.purchase_invoices ENABLE ROW LEVEL SECURITY;
 
 -- Company isolation policy
-CREATE POLICY company_isolation ON public.companies
-  FOR ALL USING (
-    id IN (
-      SELECT company_id FROM public.user_companies WHERE user_id = auth.uid()
-    )
-  );
+-- RLS Policies using restaurant_id
+CREATE POLICY restaurant_isolation ON public.fiscal_years
+  FOR ALL USING (restaurant_id IN (SELECT id FROM restaurants WHERE owner_id = auth.uid()));
 
--- Helper table for user-company relationships
-CREATE TABLE IF NOT EXISTS public.user_companies (
-  user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
-  company_id UUID REFERENCES public.companies(id) ON DELETE CASCADE,
-  role VARCHAR(50) DEFAULT 'user',
-  is_default BOOLEAN DEFAULT false,
-  created_at TIMESTAMPTZ DEFAULT NOW(),
-  PRIMARY KEY (user_id, company_id)
-);
+CREATE POLICY restaurant_isolation ON public.fiscal_periods
+  FOR ALL USING (restaurant_id IN (SELECT id FROM restaurants WHERE owner_id = auth.uid()));
 
--- Enable RLS on user_companies
-ALTER TABLE public.user_companies ENABLE ROW LEVEL SECURITY;
+CREATE POLICY restaurant_isolation ON public.chart_of_accounts
+  FOR ALL USING (restaurant_id IN (SELECT id FROM restaurants WHERE owner_id = auth.uid()));
 
-CREATE POLICY user_companies_isolation ON public.user_companies
-  FOR ALL USING (user_id = auth.uid());
+CREATE POLICY restaurant_isolation ON public.journal_entries
+  FOR ALL USING (restaurant_id IN (SELECT id FROM restaurants WHERE owner_id = auth.uid()));
+
+CREATE POLICY restaurant_isolation ON public.journal_entry_lines
+  FOR ALL USING (entry_id IN (SELECT id FROM journal_entries WHERE restaurant_id IN (SELECT id FROM restaurants WHERE owner_id = auth.uid())));
+
+CREATE POLICY restaurant_isolation ON public.warehouses
+  FOR ALL USING (restaurant_id IN (SELECT id FROM restaurants WHERE owner_id = auth.uid()));
+
+CREATE POLICY restaurant_isolation ON public.inventory_products
+  FOR ALL USING (restaurant_id IN (SELECT id FROM restaurants WHERE owner_id = auth.uid()));
+
+CREATE POLICY restaurant_isolation ON public.inventory_movements
+  FOR ALL USING (restaurant_id IN (SELECT id FROM restaurants WHERE owner_id = auth.uid()));
+
+CREATE POLICY restaurant_isolation ON public.customers
+  FOR ALL USING (restaurant_id IN (SELECT id FROM restaurants WHERE owner_id = auth.uid()));
+
+CREATE POLICY restaurant_isolation ON public.suppliers
+  FOR ALL USING (restaurant_id IN (SELECT id FROM restaurants WHERE owner_id = auth.uid()));
+
+CREATE POLICY restaurant_isolation ON public.sales_invoices
+  FOR ALL USING (restaurant_id IN (SELECT id FROM restaurants WHERE owner_id = auth.uid()));
+
+CREATE POLICY restaurant_isolation ON public.purchase_invoices
+  FOR ALL USING (restaurant_id IN (SELECT id FROM restaurants WHERE owner_id = auth.uid()));

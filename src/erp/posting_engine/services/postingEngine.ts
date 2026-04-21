@@ -22,7 +22,7 @@ import { v4 as uuidv4 } from 'uuid';
 
 // Transaction context - data needed to execute posting rules
 export interface TransactionContext {
-  company_id: string;
+  restaurant_id: string;
   fiscal_period_id: string;
   transaction_type: TransactionType;
   transaction_date: string;
@@ -95,11 +95,11 @@ export interface PostingResult {
  * Main Posting Engine
  */
 export class PostingEngine {
-  private companyId: string;
+  private restaurantId: string;
   private userId: string;
   
   constructor(companyId: string, userId: string) {
-    this.companyId = companyId;
+    this.restaurantId = companyId;
     this.userId = userId;
   }
   
@@ -287,7 +287,7 @@ export class PostingEngine {
     
     return {
       id: uuidv4(),
-      company_id: context.company_id,
+      company_id: context.restaurant_id,
       fiscal_period_id: context.fiscal_period_id,
       entry_number: await this.generateEntryNumber(),
       entry_date: context.transaction_date,
@@ -354,7 +354,7 @@ export class PostingEngine {
           const { data } = await supabase
             .from('chart_of_accounts')
             .select('id')
-            .eq('company_id', this.companyId)
+            .eq('restaurant_id', this.restaurantId)
             .eq('code', rule.account_code)
             .single();
           return data?.id || null;
@@ -431,7 +431,7 @@ export class PostingEngine {
       .from('journal_entries')
       .insert({
         id: entry.id,
-        company_id: entry.company_id,
+        restaurant_id: entry.restaurant_id,
         fiscal_period_id: entry.fiscal_period_id,
         entry_number: entry.entry_number,
         entry_date: entry.entry_date,
@@ -514,7 +514,7 @@ export class PostingEngine {
     const { count } = await supabase
       .from('journal_entries')
       .select('*', { count: 'exact', head: true })
-      .eq('company_id', this.companyId)
+      .eq('restaurant_id', this.restaurantId)
       .gte('entry_date', `${year}-01-01`)
       .lte('entry_date', `${year}-12-31`);
     
@@ -529,7 +529,7 @@ export class PostingEngine {
     const { data } = await supabase
       .from('chart_of_accounts')
       .select('id')
-      .eq('company_id', this.companyId)
+      .eq('restaurant_id', this.restaurantId)
       .eq('code', accountCode)
       .single();
     

@@ -38,10 +38,10 @@ export interface ConsumptionResult {
  * Main Costing Engine
  */
 export class InventoryCostingEngine {
-  private companyId: string;
+  private restaurantId: string;
   
-  constructor(companyId: string) {
-    this.companyId = companyId;
+  constructor(restaurantId: string) {
+    this.restaurantId = restaurantId;
   }
   
   /**
@@ -399,7 +399,7 @@ export class InventoryCostingEngine {
     await supabase
       .from('inventory_movements')
       .insert({
-        company_id: this.companyId,
+        restaurant_id: this.restaurantId,
         product_id: params.product_id,
         warehouse_id: params.warehouse_id,
         movement_type: params.movement_type,
