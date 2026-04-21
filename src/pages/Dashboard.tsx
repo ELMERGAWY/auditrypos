@@ -7,7 +7,8 @@ import {
   BarChart3, Pause, Play, Printer, Users, Hash, Percent,
   Clock, TrendingUp, UtensilsCrossed, AlertCircle, CheckCircle,
   Timer, StickyNote, DollarSign, Truck, CalendarClock, MapPin, Phone, Lock, CreditCard,
-  Volume2, VolumeX, Package, Wallet, Store, UsersRound, Camera, Sun, Moon, Send
+  Volume2, VolumeX, Package, Wallet, Store, UsersRound, Camera, Sun, Moon, Send,
+  FileText, RotateCcw
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -26,6 +27,9 @@ import { TableGrid } from './dashboard/TableGrid';
 import { InventoryTab } from './dashboard/InventoryTab';
 import { CustomersTab } from './dashboard/CustomersTab';
 import { SuppliersTab } from './dashboard/SuppliersTab';
+import { CustomerManager } from './dashboard/CustomerManager';
+import { SupplierManager } from './dashboard/SupplierManager';
+import { SalesReturnsManager } from './dashboard/SalesReturns';
 import { ExpensesTab } from './dashboard/ExpensesTab';
 import { StaffTab } from './dashboard/StaffTab';
 import { NotificationsTab } from './dashboard/NotificationsTab';
@@ -572,7 +576,10 @@ export default function Dashboard() {
     { id: 'orders', label: 'الطلبات', icon: Receipt, badge: pendingOrders.length, locked: lockedTabs.includes('orders') },
     { id: 'inventory', label: 'المخزون', icon: Package },
     { id: 'customers', label: 'العملاء', icon: Users },
+    { id: 'customer_accounts', label: 'حسابات العملاء', icon: FileText },
+    { id: 'sales_returns', label: 'مردودات المبيعات', icon: RotateCcw },
     { id: 'suppliers', label: 'الموردين', icon: Store },
+    { id: 'supplier_accounts', label: 'حسابات الموردين', icon: FileText },
     { id: 'expenses', label: 'المصروفات', icon: Wallet },
     { id: 'overheads', label: 'النفقات العامة', icon: TrendingUp },
     { id: 'delivery', label: 'المناديب', icon: Truck, badge: deliveryOrders.length, locked: lockedTabs.includes('delivery') },
@@ -1267,6 +1274,21 @@ export default function Dashboard() {
           {/* ===================== SUPPLIERS TAB ===================== */}
           {activeTab === 'suppliers' && (
             <SuppliersTab restaurantId={restaurant.id} currency={currency} />
+          )}
+
+          {/* ===================== CUSTOMER ACCOUNTS TAB (Professional) ===================== */}
+          {activeTab === 'customer_accounts' && (
+            <CustomerManager restaurantId={restaurant.id} currency={currency} />
+          )}
+
+          {/* ===================== SALES RETURNS TAB ===================== */}
+          {activeTab === 'sales_returns' && (
+            <SalesReturnsManager restaurantId={restaurant.id} currency={currency} />
+          )}
+
+          {/* ===================== SUPPLIER ACCOUNTS TAB (Professional) ===================== */}
+          {activeTab === 'supplier_accounts' && (
+            <SupplierManager restaurantId={restaurant.id} currency={currency} />
           )}
 
           {/* ===================== EXPENSES TAB ===================== */}

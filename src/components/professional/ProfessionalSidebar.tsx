@@ -19,7 +19,8 @@ import { getBusinessConfig, type BusinessType } from '@/lib/businessTypes';
 export type SidebarTab = 
   | 'pos' | 'orders' | 'menu' | 'delivery' | 'shifts' | 'stats' 
   | 'inventory' | 'customers' | 'suppliers' | 'expenses' | 'qr' 
-  | 'waiter' | 'staff' | 'financials' | 'notifications' | 'settings' | 'overheads';
+  | 'waiter' | 'staff' | 'financials' | 'notifications' | 'settings' | 'overheads'
+  | 'customer_accounts' | 'sales_returns' | 'supplier_accounts';
 
 interface NavItem {
   id: SidebarTab;

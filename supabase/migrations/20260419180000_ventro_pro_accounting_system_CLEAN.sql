@@ -418,6 +418,177 @@ CREATE TRIGGER trg_calc_overhead_total
   BEFORE INSERT OR UPDATE ON daily_overheads
   FOR EACH ROW EXECUTE FUNCTION calculate_daily_overhead_total();
 
+-- 13. SALES RETURNS (مردودات المبيعات)
+-- ============================================================
+
+DROP TABLE IF EXISTS public.sales_return_items CASCADE;
+DROP TABLE IF EXISTS public.sales_returns CASCADE;
+
+CREATE TABLE public.sales_returns (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  restaurant_id UUID REFERENCES public.restaurants(id) ON DELETE CASCADE NOT NULL,
+  return_number VARCHAR(20) NOT NULL,
+  original_order_id UUID REFERENCES public.orders(id) ON DELETE SET NULL,
+  customer_id UUID REFERENCES public.customers(id) ON DELETE SET NULL,
+  return_date DATE NOT NULL DEFAULT CURRENT_DATE,
+  total_amount DECIMAL(12,2) NOT NULL DEFAULT 0,
+  reason TEXT,
+  status VARCHAR(20) DEFAULT 'pending' CHECK (status IN ('pending', 'approved', 'completed', 'cancelled')),
+  -- Financial integration
+  journal_entry_id UUID REFERENCES public.journal_entries(id) ON DELETE SET NULL,
+  -- Inventory tracking
+  inventory_adjusted BOOLEAN DEFAULT FALSE,
+  -- Audit fields
+  created_by UUID REFERENCES auth.users(id),
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT now(),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT now(),
+  UNIQUE(restaurant_id, return_number)
+);
+
+CREATE TABLE public.sales_return_items (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  sales_return_id UUID REFERENCES public.sales_returns(id) ON DELETE CASCADE NOT NULL,
+  original_order_item_id UUID REFERENCES public.order_items(id) ON DELETE SET NULL,
+  menu_item_id UUID REFERENCES public.menu_items(id) ON DELETE SET NULL,
+  product_id UUID REFERENCES public.products(id) ON DELETE SET NULL,
+  quantity_returned INTEGER NOT NULL CHECK (quantity_returned > 0),
+  unit_price DECIMAL(10,2) NOT NULL,
+  total_price DECIMAL(10,2) NOT NULL,
+  -- Cost tracking for COGS adjustment
+  cost_price_at_return DECIMAL(10,2),
+  -- Condition of returned item
+  condition VARCHAR(20) DEFAULT 'good' CHECK (condition IN ('good', 'damaged', 'expired', 'defective')),
+  -- Where to return stock
+  return_to_inventory BOOLEAN DEFAULT TRUE,
+  notes TEXT,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT now()
+);
+
+-- Enable RLS
+ALTER TABLE public.sales_returns ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.sales_return_items ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY isolation_sales_returns ON sales_returns 
+  FOR ALL USING (restaurant_id IN (SELECT id FROM restaurants WHERE owner_id = auth.uid()));
+
+CREATE POLICY isolation_sales_return_items ON sales_return_items 
+  FOR ALL USING (sales_return_id IN (SELECT id FROM sales_returns WHERE restaurant_id IN (SELECT id FROM restaurants WHERE owner_id = auth.uid())));
+
+-- 14. PURCHASE RETURNS (مردودات المشتريات)
+-- ============================================================
+
+DROP TABLE IF EXISTS public.purchase_return_items CASCADE;
+DROP TABLE IF EXISTS public.purchase_returns CASCADE;
+
+CREATE TABLE public.purchase_returns (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  restaurant_id UUID REFERENCES public.restaurants(id) ON DELETE CASCADE NOT NULL,
+  return_number VARCHAR(20) NOT NULL,
+  supplier_id UUID REFERENCES public.suppliers(id) ON DELETE SET NULL,
+  -- Can be linked to inventory receipt or standalone
+  inventory_receipt_id UUID REFERENCES public.inventory_receipts(id) ON DELETE SET NULL,
+  return_date DATE NOT NULL DEFAULT CURRENT_DATE,
+  total_amount DECIMAL(12,2) NOT NULL DEFAULT 0,
+  reason TEXT,
+  status VARCHAR(20) DEFAULT 'pending' CHECK (status IN ('pending', 'approved', 'completed', 'cancelled')),
+  -- Financial integration
+  journal_entry_id UUID REFERENCES public.journal_entries(id) ON DELETE SET NULL,
+  -- How return is handled
+  refund_method VARCHAR(20) DEFAULT 'credit' CHECK (refund_method IN ('cash', 'credit', 'bank_transfer', 'deduct_from_future')),
+  -- Supplier credit tracking
+  supplier_credit_applied BOOLEAN DEFAULT FALSE,
+  -- Audit fields
+  created_by UUID REFERENCES auth.users(id),
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT now(),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT now(),
+  UNIQUE(restaurant_id, return_number)
+);
+
+CREATE TABLE public.purchase_return_items (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  purchase_return_id UUID REFERENCES public.purchase_returns(id) ON DELETE CASCADE NOT NULL,
+  product_id UUID REFERENCES public.products(id) ON DELETE SET NULL,
+  quantity_returned DECIMAL(10,3) NOT NULL CHECK (quantity_returned > 0),
+  unit_cost DECIMAL(10,4) NOT NULL,
+  total_cost DECIMAL(12,2) NOT NULL,
+  -- Batch/lot tracking
+  batch_number VARCHAR(50),
+  expiry_date DATE,
+  -- Reason
+  reason VARCHAR(100),
+  notes TEXT,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT now()
+);
+
+-- Enable RLS
+ALTER TABLE public.purchase_returns ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.purchase_return_items ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY isolation_purchase_returns ON purchase_returns 
+  FOR ALL USING (restaurant_id IN (SELECT id FROM restaurants WHERE owner_id = auth.uid()));
+
+CREATE POLICY isolation_purchase_return_items ON purchase_return_items 
+  FOR ALL USING (purchase_return_id IN (SELECT id FROM purchase_returns WHERE restaurant_id IN (SELECT id FROM restaurants WHERE owner_id = auth.uid())));
+
+-- 15. FUNCTIONS FOR RETURNS
+-- ============================================================
+
+-- Function to calculate sales return total
+CREATE OR REPLACE FUNCTION calculate_sales_return_total()
+RETURNS TRIGGER AS $$
+BEGIN
+  NEW.total_amount := (
+    SELECT COALESCE(SUM(total_price), 0) 
+    FROM sales_return_items 
+    WHERE sales_return_id = NEW.id
+  );
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS trg_calc_sales_return_total ON sales_returns;
+CREATE TRIGGER trg_calc_sales_return_total
+  BEFORE INSERT OR UPDATE ON sales_returns
+  FOR EACH ROW EXECUTE FUNCTION calculate_sales_return_total();
+
+-- Function to calculate purchase return total
+CREATE OR REPLACE FUNCTION calculate_purchase_return_total()
+RETURNS TRIGGER AS $$
+BEGIN
+  NEW.total_amount := (
+    SELECT COALESCE(SUM(total_cost), 0) 
+    FROM purchase_return_items 
+    WHERE purchase_return_id = NEW.id
+  );
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS trg_calc_purchase_return_total ON purchase_returns;
+CREATE TRIGGER trg_calc_purchase_return_total
+  BEFORE INSERT OR UPDATE ON purchase_returns
+  FOR EACH ROW EXECUTE FUNCTION calculate_purchase_return_total();
+
+-- Function to generate return numbers
+CREATE OR REPLACE FUNCTION generate_return_number(return_type TEXT, restaurant_id UUID)
+RETURNS TEXT AS $$
+DECLARE
+  prefix TEXT;
+  next_number INTEGER;
+  result TEXT;
+BEGIN
+  IF return_type = 'sales' THEN
+    prefix := 'SR-';
+    SELECT COUNT(*) + 1 INTO next_number FROM sales_returns WHERE restaurant_id = restaurant_id;
+  ELSE
+    prefix := 'PR-';
+    SELECT COUNT(*) + 1 INTO next_number FROM purchase_returns WHERE restaurant_id = restaurant_id;
+  END IF;
+  result := prefix || TO_CHAR(CURRENT_DATE, 'YYYYMMDD') || '-' || LPAD(next_number::TEXT, 4, '0');
+  RETURN result;
+END;
+$$ LANGUAGE plpgsql;
+
 -- SEED DATA FOR EXISTING RESTAURANTS
 -- ============================================================
 -- Run this after migration:

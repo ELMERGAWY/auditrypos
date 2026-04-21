@@ -1738,6 +1738,317 @@ export type Database = {
           },
         ]
       }
+      sales_returns: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          customer_id: string | null
+          id: string
+          inventory_adjusted: boolean | null
+          journal_entry_id: string | null
+          original_order_id: string | null
+          reason: string | null
+          restaurant_id: string
+          return_date: string
+          return_number: string
+          status: string | null
+          total_amount: number | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          customer_id?: string | null
+          id?: string
+          inventory_adjusted?: boolean | null
+          journal_entry_id?: string | null
+          original_order_id?: string | null
+          reason?: string | null
+          restaurant_id: string
+          return_date?: string
+          return_number: string
+          status?: string | null
+          total_amount?: number | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          customer_id?: string | null
+          id?: string
+          inventory_adjusted?: boolean | null
+          journal_entry_id?: string | null
+          original_order_id?: string | null
+          reason?: string | null
+          restaurant_id?: string
+          return_date?: string
+          return_number?: string
+          status?: string | null
+          total_amount?: number | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sales_returns_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sales_returns_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sales_returns_journal_entry_id_fkey"
+            columns: ["journal_entry_id"]
+            isOneToOne: false
+            referencedRelation: "journal_entries"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sales_returns_original_order_id_fkey"
+            columns: ["original_order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sales_returns_restaurant_id_fkey"
+            columns: ["restaurant_id"]
+            isOneToOne: false
+            referencedRelation: "restaurants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      sales_return_items: {
+        Row: {
+          condition: string | null
+          cost_price_at_return: number | null
+          created_at: string
+          id: string
+          menu_item_id: string | null
+          notes: string | null
+          original_order_item_id: string | null
+          product_id: string | null
+          quantity_returned: number
+          return_to_inventory: boolean | null
+          sales_return_id: string
+          total_price: number
+          unit_price: number
+        }
+        Insert: {
+          condition?: string | null
+          cost_price_at_return?: number | null
+          created_at?: string
+          id?: string
+          menu_item_id?: string | null
+          notes?: string | null
+          original_order_item_id?: string | null
+          product_id?: string | null
+          quantity_returned: number
+          return_to_inventory?: boolean | null
+          sales_return_id: string
+          total_price: number
+          unit_price: number
+        }
+        Update: {
+          condition?: string | null
+          cost_price_at_return?: number | null
+          created_at?: string
+          id?: string
+          menu_item_id?: string | null
+          notes?: string | null
+          original_order_item_id?: string | null
+          product_id?: string | null
+          quantity_returned?: number
+          return_to_inventory?: boolean | null
+          sales_return_id?: string
+          total_price?: number
+          unit_price?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sales_return_items_menu_item_id_fkey"
+            columns: ["menu_item_id"]
+            isOneToOne: false
+            referencedRelation: "menu_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sales_return_items_original_order_item_id_fkey"
+            columns: ["original_order_item_id"]
+            isOneToOne: false
+            referencedRelation: "order_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sales_return_items_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sales_return_items_sales_return_id_fkey"
+            columns: ["sales_return_id"]
+            isOneToOne: false
+            referencedRelation: "sales_returns"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      purchase_returns: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          id: string
+          inventory_receipt_id: string | null
+          journal_entry_id: string | null
+          reason: string | null
+          refund_method: string | null
+          restaurant_id: string
+          return_date: string
+          return_number: string
+          status: string | null
+          supplier_credit_applied: boolean | null
+          supplier_id: string | null
+          total_amount: number | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          inventory_receipt_id?: string | null
+          journal_entry_id?: string | null
+          reason?: string | null
+          refund_method?: string | null
+          restaurant_id: string
+          return_date?: string
+          return_number: string
+          status?: string | null
+          supplier_credit_applied?: boolean | null
+          supplier_id?: string | null
+          total_amount?: number | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          inventory_receipt_id?: string | null
+          journal_entry_id?: string | null
+          reason?: string | null
+          refund_method?: string | null
+          restaurant_id?: string
+          return_date?: string
+          return_number?: string
+          status?: string | null
+          supplier_credit_applied?: boolean | null
+          supplier_id?: string | null
+          total_amount?: number | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "purchase_returns_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "purchase_returns_inventory_receipt_id_fkey"
+            columns: ["inventory_receipt_id"]
+            isOneToOne: false
+            referencedRelation: "inventory_receipts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "purchase_returns_journal_entry_id_fkey"
+            columns: ["journal_entry_id"]
+            isOneToOne: false
+            referencedRelation: "journal_entries"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "purchase_returns_restaurant_id_fkey"
+            columns: ["restaurant_id"]
+            isOneToOne: false
+            referencedRelation: "restaurants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "purchase_returns_supplier_id_fkey"
+            columns: ["supplier_id"]
+            isOneToOne: false
+            referencedRelation: "suppliers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      purchase_return_items: {
+        Row: {
+          batch_number: string | null
+          created_at: string
+          expiry_date: string | null
+          id: string
+          notes: string | null
+          product_id: string | null
+          purchase_return_id: string
+          quantity_returned: number
+          reason: string | null
+          total_cost: number
+          unit_cost: number
+        }
+        Insert: {
+          batch_number?: string | null
+          created_at?: string
+          expiry_date?: string | null
+          id?: string
+          notes?: string | null
+          product_id?: string | null
+          purchase_return_id: string
+          quantity_returned: number
+          reason?: string | null
+          total_cost: number
+          unit_cost: number
+        }
+        Update: {
+          batch_number?: string | null
+          created_at?: string
+          expiry_date?: string | null
+          id?: string
+          notes?: string | null
+          product_id?: string | null
+          purchase_return_id?: string
+          quantity_returned?: number
+          reason?: string | null
+          total_cost?: number
+          unit_cost?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "purchase_return_items_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "purchase_return_items_purchase_return_id_fkey"
+            columns: ["purchase_return_id"]
+            isOneToOne: false
+            referencedRelation: "purchase_returns"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       delivery_agents_tracking: {

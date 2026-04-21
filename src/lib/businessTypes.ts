@@ -192,7 +192,7 @@ export const BUSINESS_TYPES: Record<BusinessType, BusinessTypeConfig> = {
       requireCustomer: false
     },
     
-    tabs: ['pos', 'orders', 'menu', 'delivery', 'shifts', 'stats', 'financials', 'qr', 'waiter', 'inventory', 'customers', 'expenses', 'staff', 'notifications', 'settings'],
+    tabs: ['pos', 'orders', 'menu', 'delivery', 'shifts', 'stats', 'financials', 'qr', 'waiter', 'inventory', 'customers', 'customer_accounts', 'sales_returns', 'expenses', 'staff', 'notifications', 'settings'],
     
     specialFields: [
       { name: 'guest_count', type: 'number', label: 'عدد الضيوف', required: false },
@@ -272,7 +272,7 @@ export const BUSINESS_TYPES: Record<BusinessType, BusinessTypeConfig> = {
       requireCustomer: false
     },
     
-    tabs: ['pos', 'orders', 'menu', 'delivery', 'shifts', 'stats', 'financials', 'qr', 'waiter', 'inventory', 'customers', 'expenses', 'staff', 'notifications', 'settings']
+    tabs: ['pos', 'orders', 'menu', 'delivery', 'shifts', 'stats', 'financials', 'qr', 'waiter', 'inventory', 'customers', 'customer_accounts', 'sales_returns', 'expenses', 'staff', 'notifications', 'settings']
   },
   
   retail: {
@@ -346,7 +346,7 @@ export const BUSINESS_TYPES: Record<BusinessType, BusinessTypeConfig> = {
       requireCustomer: false
     },
     
-    tabs: ['pos', 'orders', 'menu', 'inventory', 'delivery', 'customers', 'suppliers', 'shifts', 'stats', 'financials', 'expenses', 'staff', 'notifications', 'settings'],
+    tabs: ['pos', 'orders', 'menu', 'inventory', 'delivery', 'customers', 'customer_accounts', 'sales_returns', 'suppliers', 'supplier_accounts', 'shifts', 'stats', 'financials', 'expenses', 'staff', 'notifications', 'settings'],
     
     specialFields: [
       { name: 'size', type: 'select', label: 'المقاس', required: false },
@@ -424,7 +424,7 @@ export const BUSINESS_TYPES: Record<BusinessType, BusinessTypeConfig> = {
       requireCustomer: false
     },
     
-    tabs: ['pos', 'orders', 'menu', 'inventory', 'customers', 'suppliers', 'shifts', 'stats', 'financials', 'expenses', 'staff', 'notifications', 'settings'],
+    tabs: ['pos', 'orders', 'menu', 'inventory', 'customers', 'customer_accounts', 'sales_returns', 'suppliers', 'supplier_accounts', 'shifts', 'stats', 'financials', 'expenses', 'staff', 'notifications', 'settings'],
     
     specialFields: [
       { name: 'expiry_date', type: 'date', label: 'تاريخ الصلاحية', required: false },
@@ -503,7 +503,7 @@ export const BUSINESS_TYPES: Record<BusinessType, BusinessTypeConfig> = {
       requireCustomer: true
     },
     
-    tabs: ['pos', 'orders', 'menu', 'inventory', 'delivery', 'customers', 'suppliers', 'shifts', 'stats', 'financials', 'expenses', 'staff', 'notifications', 'settings'],
+    tabs: ['pos', 'orders', 'menu', 'inventory', 'delivery', 'customers', 'customer_accounts', 'sales_returns', 'suppliers', 'supplier_accounts', 'shifts', 'stats', 'financials', 'expenses', 'staff', 'notifications', 'settings'],
     
     specialFields: [
       { name: 'prescription_number', type: 'text', label: 'رقم الروشتة', required: false },
@@ -583,7 +583,7 @@ export const BUSINESS_TYPES: Record<BusinessType, BusinessTypeConfig> = {
       requireCustomer: true
     },
     
-    tabs: ['pos', 'orders', 'menu', 'inventory', 'delivery', 'customers', 'suppliers', 'shifts', 'stats', 'financials', 'expenses', 'staff', 'notifications', 'settings'],
+    tabs: ['pos', 'orders', 'menu', 'inventory', 'delivery', 'customers', 'customer_accounts', 'sales_returns', 'suppliers', 'supplier_accounts', 'shifts', 'stats', 'financials', 'expenses', 'staff', 'notifications', 'settings'],
     
     specialFields: [
       { name: 'credit_limit', type: 'number', label: 'حد الائتمان', required: false },
@@ -662,7 +662,7 @@ export const BUSINESS_TYPES: Record<BusinessType, BusinessTypeConfig> = {
       requireCustomer: true
     },
     
-    tabs: ['inventory', 'orders', 'menu', 'delivery', 'customers', 'suppliers', 'shifts', 'stats', 'financials', 'expenses', 'staff', 'notifications', 'settings']
+    tabs: ['inventory', 'orders', 'menu', 'delivery', 'customers', 'customer_accounts', 'sales_returns', 'suppliers', 'supplier_accounts', 'shifts', 'stats', 'financials', 'expenses', 'staff', 'notifications', 'settings']
   },
   
   services: {
@@ -736,7 +736,7 @@ export const BUSINESS_TYPES: Record<BusinessType, BusinessTypeConfig> = {
       requireCustomer: true
     },
     
-    tabs: ['pos', 'orders', 'menu', 'delivery', 'customers', 'shifts', 'stats', 'financials', 'expenses', 'staff', 'notifications', 'settings'],
+    tabs: ['pos', 'orders', 'menu', 'delivery', 'customers', 'customer_accounts', 'sales_returns', 'shifts', 'stats', 'financials', 'expenses', 'staff', 'notifications', 'settings'],
     
     specialFields: [
       { name: 'pickup_date', type: 'date', label: 'تاريخ الاستلام', required: true },
@@ -816,7 +816,7 @@ export const BUSINESS_TYPES: Record<BusinessType, BusinessTypeConfig> = {
       requireCustomer: false
     },
     
-    tabs: ['pos', 'orders', 'menu', 'inventory', 'delivery', 'customers', 'suppliers', 'shifts', 'stats', 'financials', 'expenses', 'staff', 'notifications', 'settings']
+    tabs: ['pos', 'orders', 'menu', 'inventory', 'delivery', 'customers', 'customer_accounts', 'sales_returns', 'suppliers', 'supplier_accounts', 'shifts', 'stats', 'financials', 'expenses', 'staff', 'notifications', 'settings']
   }
 };
 
