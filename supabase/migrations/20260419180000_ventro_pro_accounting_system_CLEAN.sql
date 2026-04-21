@@ -664,6 +664,635 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
+-- 16. ACCOUNTING INTEGRATION FUNCTIONS (الربط المحاسبي الكامل)
+-- ============================================================
+
+-- Function to get or create default expense account
+CREATE OR REPLACE FUNCTION get_or_create_expense_account(
+  p_restaurant_id UUID,
+  p_account_name TEXT,
+  p_code TEXT
+) RETURNS UUID AS $$
+DECLARE
+  v_account_id UUID;
+BEGIN
+  -- Try to find existing account
+  SELECT id INTO v_account_id 
+  FROM chart_of_accounts 
+  WHERE restaurant_id = p_restaurant_id AND name = p_account_name AND account_type = 'expense';
+  
+  -- Create if not exists
+  IF v_account_id IS NULL THEN
+    INSERT INTO chart_of_accounts (restaurant_id, code, name, account_type, subtype)
+    VALUES (p_restaurant_id, p_code, p_account_name, 'expense', 'operating_expense')
+    RETURNING id INTO v_account_id;
+  END IF;
+  
+  RETURN v_account_id;
+END;
+$$ LANGUAGE plpgsql;
+
+-- Function to get cash account
+CREATE OR REPLACE FUNCTION get_cash_account(p_restaurant_id UUID)
+RETURNS UUID AS $$
+DECLARE
+  v_account_id UUID;
+BEGIN
+  SELECT id INTO v_account_id 
+  FROM chart_of_accounts 
+  WHERE restaurant_id = p_restaurant_id AND is_cash_account = true;
+  
+  IF v_account_id IS NULL THEN
+    INSERT INTO chart_of_accounts (restaurant_id, code, name, account_type, is_cash_account, subtype)
+    VALUES (p_restaurant_id, '101', 'الصندوق', 'asset', true, 'current_asset')
+    RETURNING id INTO v_account_id;
+  END IF;
+  
+  RETURN v_account_id;
+END;
+$$ LANGUAGE plpgsql;
+
+-- Function to get accounts payable (موردين) account
+CREATE OR REPLACE FUNCTION get_accounts_payable(p_restaurant_id UUID)
+RETURNS UUID AS $$
+DECLARE
+  v_account_id UUID;
+BEGIN
+  SELECT id INTO v_account_id 
+  FROM chart_of_accounts 
+  WHERE restaurant_id = p_restaurant_id AND code = '201';
+  
+  IF v_account_id IS NULL THEN
+    INSERT INTO chart_of_accounts (restaurant_id, code, name, account_type, subtype)
+    VALUES (p_restaurant_id, '201', 'الموردين', 'liability', 'current_liability')
+    RETURNING id INTO v_account_id;
+  END IF;
+  
+  RETURN v_account_id;
+END;
+$$ LANGUAGE plpgsql;
+
+-- Function to get accounts receivable (عملاء) account
+CREATE OR REPLACE FUNCTION get_accounts_receivable(p_restaurant_id UUID)
+RETURNS UUID AS $$
+DECLARE
+  v_account_id UUID;
+BEGIN
+  SELECT id INTO v_account_id 
+  FROM chart_of_accounts 
+  WHERE restaurant_id = p_restaurant_id AND code = '102';
+  
+  IF v_account_id IS NULL THEN
+    INSERT INTO chart_of_accounts (restaurant_id, code, name, account_type, subtype)
+    VALUES (p_restaurant_id, '102', 'العملاء', 'asset', 'current_asset')
+    RETURNING id INTO v_account_id;
+  END IF;
+  
+  RETURN v_account_id;
+END;
+$$ LANGUAGE plpgsql;
+
+-- Function to get inventory account
+CREATE OR REPLACE FUNCTION get_inventory_account(p_restaurant_id UUID)
+RETURNS UUID AS $$
+DECLARE
+  v_account_id UUID;
+BEGIN
+  SELECT id INTO v_account_id 
+  FROM chart_of_accounts 
+  WHERE restaurant_id = p_restaurant_id AND code = '103';
+  
+  IF v_account_id IS NULL THEN
+    INSERT INTO chart_of_accounts (restaurant_id, code, name, account_type, subtype)
+    VALUES (p_restaurant_id, '103', 'المخزون', 'asset', 'current_asset')
+    RETURNING id INTO v_account_id;
+  END IF;
+  
+  RETURN v_account_id;
+END;
+$$ LANGUAGE plpgsql;
+
+-- Function to get sales account
+CREATE OR REPLACE FUNCTION get_sales_account(p_restaurant_id UUID)
+RETURNS UUID AS $$
+DECLARE
+  v_account_id UUID;
+BEGIN
+  SELECT id INTO v_account_id 
+  FROM chart_of_accounts 
+  WHERE restaurant_id = p_restaurant_id AND code = '401';
+  
+  IF v_account_id IS NULL THEN
+    INSERT INTO chart_of_accounts (restaurant_id, code, name, account_type, subtype)
+    VALUES (p_restaurant_id, '401', 'المبيعات', 'revenue', 'operating_revenue')
+    RETURNING id INTO v_account_id;
+  END IF;
+  
+  RETURN v_account_id;
+END;
+$$ LANGUAGE plpgsql;
+
+-- Function to get sales returns account
+CREATE OR REPLACE FUNCTION get_sales_returns_account(p_restaurant_id UUID)
+RETURNS UUID AS $$
+DECLARE
+  v_account_id UUID;
+BEGIN
+  SELECT id INTO v_account_id 
+  FROM chart_of_accounts 
+  WHERE restaurant_id = p_restaurant_id AND code = '402';
+  
+  IF v_account_id IS NULL THEN
+    INSERT INTO chart_of_accounts (restaurant_id, code, name, account_type, subtype)
+    VALUES (p_restaurant_id, '402', 'مردودات المبيعات', 'revenue', 'sales_returns')
+    RETURNING id INTO v_account_id;
+  END IF;
+  
+  RETURN v_account_id;
+END;
+$$ LANGUAGE plpgsql;
+
+-- Function to get COGS account (تكلفة البضاعة المباعة)
+CREATE OR REPLACE FUNCTION get_cogs_account(p_restaurant_id UUID)
+RETURNS UUID AS $$
+DECLARE
+  v_account_id UUID;
+BEGIN
+  SELECT id INTO v_account_id 
+  FROM chart_of_accounts 
+  WHERE restaurant_id = p_restaurant_id AND code = '501';
+  
+  IF v_account_id IS NULL THEN
+    INSERT INTO chart_of_accounts (restaurant_id, code, name, account_type, subtype)
+    VALUES (p_restaurant_id, '501', 'تكلفة المبيعات', 'cogs', 'direct_cogs')
+    RETURNING id INTO v_account_id;
+  END IF;
+  
+  RETURN v_account_id;
+END;
+$$ LANGUAGE plpgsql;
+
+-- Function to generate journal entry number
+CREATE OR REPLACE FUNCTION generate_entry_number(p_restaurant_id UUID)
+RETURNS TEXT AS $$
+DECLARE
+  v_count INTEGER;
+  v_result TEXT;
+BEGIN
+  SELECT COUNT(*) + 1 INTO v_count 
+  FROM journal_entries 
+  WHERE restaurant_id = p_restaurant_id 
+  AND DATE(created_at) = CURRENT_DATE;
+  
+  v_result := 'JE-' || TO_CHAR(CURRENT_DATE, 'YYYYMMDD') || '-' || LPAD(v_count::TEXT, 4, '0');
+  RETURN v_result;
+END;
+$$ LANGUAGE plpgsql;
+
+-- ============================================================
+-- 17. DAILY OVERHEADS ACCOUNTING INTEGRATION
+-- ============================================================
+
+-- Function to create journal entry for daily overheads
+CREATE OR REPLACE FUNCTION create_overhead_journal_entry()
+RETURNS TRIGGER AS $$
+DECLARE
+  v_entry_id UUID;
+  v_cash_account UUID;
+  v_rent_account UUID;
+  v_electricity_account UUID;
+  v_salaries_account UUID;
+  v_other_account UUID;
+  v_entry_number TEXT;
+  v_line_order INTEGER := 0;
+BEGIN
+  -- Only process when is_distributed changes from false to true
+  IF OLD.is_distributed = TRUE OR NEW.is_distributed = FALSE THEN
+    RETURN NEW;
+  END IF;
+  
+  -- Get accounts
+  v_cash_account := get_cash_account(NEW.restaurant_id);
+  v_rent_account := get_or_create_expense_account(NEW.restaurant_id, 'إيجار', '601');
+  v_electricity_account := get_or_create_expense_account(NEW.restaurant_id, 'كهرباء', '602');
+  v_salaries_account := get_or_create_expense_account(NEW.restaurant_id, 'رواتب', '603');
+  v_other_account := get_or_create_expense_account(NEW.restaurant_id, 'مصاريف أخرى', '609');
+  
+  -- Generate entry number
+  v_entry_number := generate_entry_number(NEW.restaurant_id);
+  
+  -- Create journal entry header
+  INSERT INTO journal_entries (
+    restaurant_id, entry_number, entry_date, reference_type, reference_id,
+    description, source, total_debit, total_credit, is_posted
+  ) VALUES (
+    NEW.restaurant_id, v_entry_number, NEW.date, 'daily_overheads', NEW.id,
+    'تسجيل النفقات اليومية - ' || NEW.date, 'auto', NEW.total_amount, NEW.total_amount, true
+  ) RETURNING id INTO v_entry_id;
+  
+  -- Create journal entry lines (Debit expenses)
+  IF NEW.rent_amount > 0 THEN
+    v_line_order := v_line_order + 1;
+    INSERT INTO journal_entry_lines (entry_id, account_id, debit, credit, description, line_order)
+    VALUES (v_entry_id, v_rent_account, NEW.rent_amount, 0, 'إيجار', v_line_order);
+  END IF;
+  
+  IF NEW.electricity_amount > 0 THEN
+    v_line_order := v_line_order + 1;
+    INSERT INTO journal_entry_lines (entry_id, account_id, debit, credit, description, line_order)
+    VALUES (v_entry_id, v_electricity_account, NEW.electricity_amount, 0, 'كهرباء', v_line_order);
+  END IF;
+  
+  IF NEW.salaries_amount > 0 THEN
+    v_line_order := v_line_order + 1;
+    INSERT INTO journal_entry_lines (entry_id, account_id, debit, credit, description, line_order)
+    VALUES (v_entry_id, v_salaries_account, NEW.salaries_amount, 0, 'رواتب', v_line_order);
+  END IF;
+  
+  IF NEW.other_amount > 0 THEN
+    v_line_order := v_line_order + 1;
+    INSERT INTO journal_entry_lines (entry_id, account_id, debit, credit, description, line_order)
+    VALUES (v_entry_id, v_other_account, NEW.other_amount, 0, COALESCE(NEW.notes, 'مصاريف أخرى'), v_line_order);
+  END IF;
+  
+  -- Credit cash (one line for total)
+  v_line_order := v_line_order + 1;
+  INSERT INTO journal_entry_lines (entry_id, account_id, debit, credit, description, line_order)
+  VALUES (v_entry_id, v_cash_account, 0, NEW.total_amount, 'دفع نقدي', v_line_order);
+  
+  -- Update journal_entry_id
+  NEW.journal_entry_id := v_entry_id;
+  
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS trg_create_overhead_journal ON daily_overheads;
+CREATE TRIGGER trg_create_overhead_journal
+  BEFORE UPDATE ON daily_overheads
+  FOR EACH ROW EXECUTE FUNCTION create_overhead_journal_entry();
+
+-- ============================================================
+-- 18. INVENTORY RECEIPTS ACCOUNTING INTEGRATION
+-- ============================================================
+
+-- Function to create journal entry for inventory receipt
+CREATE OR REPLACE FUNCTION create_receipt_journal_entry()
+RETURNS TRIGGER AS $$
+DECLARE
+  v_entry_id UUID;
+  v_inventory_account UUID;
+  v_payable_account UUID;
+  v_entry_number TEXT;
+BEGIN
+  -- Only process when status changes to 'posted'
+  IF NEW.status != 'posted' OR (OLD.status = 'posted' AND NEW.status = 'posted') THEN
+    RETURN NEW;
+  END IF;
+  
+  -- Skip if already has journal entry
+  IF NEW.journal_entry_id IS NOT NULL THEN
+    RETURN NEW;
+  END IF;
+  
+  -- Get accounts
+  v_inventory_account := get_inventory_account(NEW.restaurant_id);
+  v_payable_account := get_accounts_payable(NEW.restaurant_id);
+  
+  -- Generate entry number
+  v_entry_number := generate_entry_number(NEW.restaurant_id);
+  
+  -- Create journal entry header
+  INSERT INTO journal_entries (
+    restaurant_id, entry_number, entry_date, reference_type, reference_id,
+    description, source, total_debit, total_credit, is_posted
+  ) VALUES (
+    NEW.restaurant_id, v_entry_number, NEW.receipt_date, 'inventory_receipt', NEW.id,
+    'استلام مخزون - فاتورة ' || NEW.receipt_number || COALESCE(' - ' || NEW.notes, ''), 'auto', 
+    NEW.net_amount, NEW.net_amount, true
+  ) RETURNING id INTO v_entry_id;
+  
+  -- Debit inventory (asset increases)
+  INSERT INTO journal_entry_lines (entry_id, account_id, debit, credit, description, line_order)
+  VALUES (v_entry_id, v_inventory_account, NEW.total_amount - COALESCE(NEW.discount_amount, 0), 0, 'بضاعة مستلمة', 1);
+  
+  -- Debit tax (if any)
+  IF COALESCE(NEW.tax_amount, 0) > 0 THEN
+    INSERT INTO journal_entry_lines (entry_id, account_id, debit, credit, description, line_order)
+    VALUES (v_entry_id, get_or_create_expense_account(NEW.restaurant_id, 'ضريبة قيمة مضافة', '604'), NEW.tax_amount, 0, 'ضريبة', 2);
+  END IF;
+  
+  -- Credit accounts payable (liability increases)
+  INSERT INTO journal_entry_lines (entry_id, account_id, debit, credit, description, line_order)
+  VALUES (v_entry_id, v_payable_account, 0, NEW.net_amount, 'مستحق للمورد', 3);
+  
+  -- Update journal_entry_id
+  NEW.journal_entry_id := v_entry_id;
+  
+  -- Update supplier balance (increase payable)
+  IF NEW.supplier_id IS NOT NULL THEN
+    UPDATE suppliers SET balance = COALESCE(balance, 0) + NEW.net_amount WHERE id = NEW.supplier_id;
+  END IF;
+  
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS trg_create_receipt_journal ON inventory_receipts;
+CREATE TRIGGER trg_create_receipt_journal
+  BEFORE UPDATE ON inventory_receipts
+  FOR EACH ROW EXECUTE FUNCTION create_receipt_journal_entry();
+
+-- ============================================================
+-- 19. SALES RETURNS ACCOUNTING INTEGRATION
+-- ============================================================
+
+-- Function to create journal entry for sales return
+CREATE OR REPLACE FUNCTION create_sales_return_journal_entry()
+RETURNS TRIGGER AS $$
+DECLARE
+  v_entry_id UUID;
+  v_sales_returns_account UUID;
+  v_receivable_account UUID;
+  v_cash_account UUID;
+  v_cogs_account UUID;
+  v_inventory_account UUID;
+  v_entry_number TEXT;
+  v_total_cost DECIMAL(15,2) := 0;
+BEGIN
+  -- Only process when status changes to 'approved' or 'completed'
+  IF NEW.status NOT IN ('approved', 'completed') OR OLD.status IN ('approved', 'completed') THEN
+    RETURN NEW;
+  END IF;
+  
+  -- Skip if already has journal entry
+  IF NEW.journal_entry_id IS NOT NULL THEN
+    RETURN NEW;
+  END IF;
+  
+  -- Get accounts
+  v_sales_returns_account := get_sales_returns_account(NEW.restaurant_id);
+  v_receivable_account := get_accounts_receivable(NEW.restaurant_id);
+  v_cash_account := get_cash_account(NEW.restaurant_id);
+  v_cogs_account := get_cogs_account(NEW.restaurant_id);
+  v_inventory_account := get_inventory_account(NEW.restaurant_id);
+  
+  -- Calculate total cost from return items
+  SELECT COALESCE(SUM(cost_price_at_return * quantity_returned), 0) INTO v_total_cost
+  FROM sales_return_items 
+  WHERE sales_return_id = NEW.id AND return_to_inventory = true;
+  
+  -- Generate entry number
+  v_entry_number := generate_entry_number(NEW.restaurant_id);
+  
+  -- Create journal entry header
+  INSERT INTO journal_entries (
+    restaurant_id, entry_number, entry_date, reference_type, reference_id,
+    description, source, total_debit, total_credit, is_posted
+  ) VALUES (
+    NEW.restaurant_id, v_entry_number, NEW.return_date, 'sales_return', NEW.id,
+    'مردود مبيعات - ' || NEW.return_number || COALESCE(' - ' || NEW.reason, ''), 'auto', 
+    NEW.total_amount + v_total_cost, NEW.total_amount + v_total_cost, true
+  ) RETURNING id INTO v_entry_id;
+  
+  -- Debit sales returns (reduces revenue)
+  INSERT INTO journal_entry_lines (entry_id, account_id, debit, credit, description, line_order)
+  VALUES (v_entry_id, v_sales_returns_account, NEW.total_amount, 0, 'مردود مبيعات', 1);
+  
+  -- Credit accounts receivable (if credit sale) or cash (if cash refund)
+  IF NEW.customer_id IS NOT NULL THEN
+    INSERT INTO journal_entry_lines (entry_id, account_id, debit, credit, description, line_order)
+    VALUES (v_entry_id, v_receivable_account, 0, NEW.total_amount, 'مستحق من العميل', 2);
+    
+    -- Update customer balance (reduce receivable)
+    UPDATE customers SET balance = COALESCE(balance, 0) - NEW.total_amount WHERE id = NEW.customer_id;
+  ELSE
+    INSERT INTO journal_entry_lines (entry_id, account_id, debit, credit, description, line_order)
+    VALUES (v_entry_id, v_cash_account, 0, NEW.total_amount, 'استرداد نقدي', 2);
+  END IF;
+  
+  -- If returning to inventory, reverse COGS
+  IF v_total_cost > 0 THEN
+    INSERT INTO journal_entry_lines (entry_id, account_id, debit, credit, description, line_order)
+    VALUES (v_entry_id, v_inventory_account, v_total_cost, 0, 'إعادة للمخزون', 3);
+    
+    INSERT INTO journal_entry_lines (entry_id, account_id, debit, credit, description, line_order)
+    VALUES (v_entry_id, v_cogs_account, 0, v_total_cost, 'عكس تكلفة', 4);
+  END IF;
+  
+  -- Update journal_entry_id
+  NEW.journal_entry_id := v_entry_id;
+  NEW.inventory_adjusted := true;
+  
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS trg_create_sales_return_journal ON sales_returns;
+CREATE TRIGGER trg_create_sales_return_journal
+  BEFORE UPDATE ON sales_returns
+  FOR EACH ROW EXECUTE FUNCTION create_sales_return_journal_entry();
+
+-- ============================================================
+-- 20. PURCHASE RETURNS ACCOUNTING INTEGRATION
+-- ============================================================
+
+-- Function to create journal entry for purchase return
+CREATE OR REPLACE FUNCTION create_purchase_return_journal_entry()
+RETURNS TRIGGER AS $$
+DECLARE
+  v_entry_id UUID;
+  v_payable_account UUID;
+  v_inventory_account UUID;
+  v_cash_account UUID;
+  v_entry_number TEXT;
+BEGIN
+  -- Only process when status changes to 'approved' or 'completed'
+  IF NEW.status NOT IN ('approved', 'completed') OR OLD.status IN ('approved', 'completed') THEN
+    RETURN NEW;
+  END IF;
+  
+  -- Skip if already has journal entry
+  IF NEW.journal_entry_id IS NOT NULL THEN
+    RETURN NEW;
+  END IF;
+  
+  -- Get accounts
+  v_payable_account := get_accounts_payable(NEW.restaurant_id);
+  v_inventory_account := get_inventory_account(NEW.restaurant_id);
+  v_cash_account := get_cash_account(NEW.restaurant_id);
+  
+  -- Generate entry number
+  v_entry_number := generate_entry_number(NEW.restaurant_id);
+  
+  -- Create journal entry header
+  INSERT INTO journal_entries (
+    restaurant_id, entry_number, entry_date, reference_type, reference_id,
+    description, source, total_debit, total_credit, is_posted
+  ) VALUES (
+    NEW.restaurant_id, v_entry_number, NEW.return_date, 'purchase_return', NEW.id,
+    'مردود مشتريات - ' || NEW.return_number || COALESCE(' - ' || NEW.reason, ''), 'auto', 
+    NEW.total_amount, NEW.total_amount, true
+  ) RETURNING id INTO v_entry_id;
+  
+  -- Debit accounts payable (reduce liability)
+  INSERT INTO journal_entry_lines (entry_id, account_id, debit, credit, description, line_order)
+  VALUES (v_entry_id, v_payable_account, NEW.total_amount, 0, 'تخفيض ذمم الموردين', 1);
+  
+  -- Credit inventory (reduce asset)
+  INSERT INTO journal_entry_lines (entry_id, account_id, debit, credit, description, line_order)
+  VALUES (v_entry_id, v_inventory_account, 0, NEW.total_amount, 'إخراج من المخزون', 2);
+  
+  -- Update journal_entry_id
+  NEW.journal_entry_id := v_entry_id;
+  
+  -- Update supplier balance (reduce payable)
+  IF NEW.supplier_id IS NOT NULL THEN
+    UPDATE suppliers SET balance = COALESCE(balance, 0) - NEW.total_amount WHERE id = NEW.supplier_id;
+  END IF;
+  
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS trg_create_purchase_return_journal ON purchase_returns;
+CREATE TRIGGER trg_create_purchase_return_journal
+  BEFORE UPDATE ON purchase_returns
+  FOR EACH ROW EXECUTE FUNCTION create_purchase_return_journal_entry();
+
+-- ============================================================
+-- 21. ORDER CHECKOUT ACCOUNTING INTEGRATION (مبيعات نقاط البيع)
+-- ============================================================
+
+-- Function to create journal entry for order completion
+CREATE OR REPLACE FUNCTION create_order_journal_entry()
+RETURNS TRIGGER AS $$
+DECLARE
+  v_entry_id UUID;
+  v_cash_account UUID;
+  v_receivable_account UUID;
+  v_sales_account UUID;
+  v_tax_account UUID;
+  v_cogs_account UUID;
+  v_inventory_account UUID;
+  v_entry_number TEXT;
+  v_tax_amount DECIMAL(15,2);
+  v_total_cost DECIMAL(15,2);
+BEGIN
+  -- Only process when status changes to 'completed' and not already processed
+  IF NEW.status != 'completed' OR OLD.status = 'completed' OR NEW.journal_entry_id IS NOT NULL THEN
+    RETURN NEW;
+  END IF;
+  
+  -- Check if we have the required column
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'orders' AND column_name = 'journal_entry_id') THEN
+    RETURN NEW;
+  END IF;
+  
+  -- Get accounts
+  v_cash_account := get_cash_account(NEW.restaurant_id);
+  v_receivable_account := get_accounts_receivable(NEW.restaurant_id);
+  v_sales_account := get_sales_account(NEW.restaurant_id);
+  v_tax_account := get_or_create_expense_account(NEW.restaurant_id, 'ضريبة مبيعات', '605');
+  v_cogs_account := get_cogs_account(NEW.restaurant_id);
+  v_inventory_account := get_inventory_account(NEW.restaurant_id);
+  
+  -- Calculate tax (14% of total)
+  v_tax_amount := ROUND(NEW.total * 0.14 / 1.14, 2);
+  
+  -- Calculate COGS from order items
+  SELECT COALESCE(SUM(COALESCE(cost_price_snapshot, 0) * quantity), 0) INTO v_total_cost
+  FROM order_items WHERE order_id = NEW.id;
+  
+  -- Generate entry number
+  v_entry_number := generate_entry_number(NEW.restaurant_id);
+  
+  -- Create journal entry header
+  INSERT INTO journal_entries (
+    restaurant_id, entry_number, entry_date, reference_type, reference_id,
+    description, source, total_debit, total_credit, is_posted
+  ) VALUES (
+    NEW.restaurant_id, v_entry_number, COALESCE(NEW.created_at::DATE, CURRENT_DATE), 'order', NEW.id,
+    'بيع - طلب #' || COALESCE(NEW.order_number, NEW.id::TEXT), 'auto', 
+    NEW.total + v_total_cost, NEW.total + v_total_cost, true
+  ) RETURNING id INTO v_entry_id;
+  
+  -- Debit cash (if paid) or accounts receivable (if credit)
+  IF COALESCE(NEW.paid_amount, 0) >= NEW.total THEN
+    INSERT INTO journal_entry_lines (entry_id, account_id, debit, credit, description, line_order)
+    VALUES (v_entry_id, v_cash_account, NEW.total, 0, 'نقدي', 1);
+  ELSE
+    INSERT INTO journal_entry_lines (entry_id, account_id, debit, credit, description, line_order)
+    VALUES (v_entry_id, v_receivable_account, NEW.total, 0, 'آجل', 1);
+    
+    -- Update customer balance if customer_id exists
+    IF NEW.customer_id IS NOT NULL THEN
+      UPDATE customers SET balance = COALESCE(balance, 0) + NEW.total WHERE id = NEW.customer_id;
+    END IF;
+  END IF;
+  
+  -- Credit sales
+  INSERT INTO journal_entry_lines (entry_id, account_id, debit, credit, description, line_order)
+  VALUES (v_entry_id, v_sales_account, 0, NEW.total - v_tax_amount, 'مبيعات', 2);
+  
+  -- Credit tax payable
+  IF v_tax_amount > 0 THEN
+    INSERT INTO journal_entry_lines (entry_id, account_id, debit, credit, description, line_order)
+    VALUES (v_entry_id, v_tax_account, 0, v_tax_amount, 'ضريبة مبيعات', 3);
+  END IF;
+  
+  -- COGS entry (debit COGS, credit inventory)
+  IF v_total_cost > 0 THEN
+    INSERT INTO journal_entry_lines (entry_id, account_id, debit, credit, description, line_order)
+    VALUES (v_entry_id, v_cogs_account, v_total_cost, 0, 'تكلفة البضاعة المباعة', 4);
+    
+    INSERT INTO journal_entry_lines (entry_id, account_id, debit, credit, description, line_order)
+    VALUES (v_entry_id, v_inventory_account, 0, v_total_cost, 'إنقاص مخزون', 5);
+  END IF;
+  
+  -- Update order with journal entry reference
+  UPDATE orders SET journal_entry_id = v_entry_id WHERE id = NEW.id;
+  
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+-- Add journal_entry_id to orders if not exists
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'orders' AND column_name = 'journal_entry_id') THEN
+    ALTER TABLE public.orders ADD COLUMN journal_entry_id UUID REFERENCES public.journal_entries(id) ON DELETE SET NULL;
+  END IF;
+END $$;
+
+DROP TRIGGER IF EXISTS trg_create_order_journal ON orders;
+CREATE TRIGGER trg_create_order_journal
+  AFTER UPDATE ON orders
+  FOR EACH ROW EXECUTE FUNCTION create_order_journal_entry();
+
+-- ============================================================
+-- 22. BALANCE UPDATE TRIGGERS (تحديث أرصدة الحسابات تلقائياً)
+-- ============================================================
+
+-- Function to update account balance when journal line is added
+CREATE OR REPLACE FUNCTION update_account_balance()
+RETURNS TRIGGER AS $$
+BEGIN
+  UPDATE chart_of_accounts
+  SET current_balance = COALESCE(current_balance, 0) + COALESCE(NEW.debit, 0) - COALESCE(NEW.credit, 0),
+      updated_at = NOW()
+  WHERE id = NEW.account_id;
+  
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS trg_update_account_balance ON journal_entry_lines;
+CREATE TRIGGER trg_update_account_balance
+  AFTER INSERT ON journal_entry_lines
+  FOR EACH ROW EXECUTE FUNCTION update_account_balance();
+
+-- ============================================================
 -- SEED DATA FOR EXISTING RESTAURANTS
 -- ============================================================
 -- Run this after migration:
