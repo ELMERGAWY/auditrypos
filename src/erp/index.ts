@@ -6,21 +6,24 @@
 // Financial Core
 export * from './financial_core/types';
 
-// Posting Engine
+// Professional Posting Engine (New)
+export {
+  ProfessionalPostingEngine,
+  createPostingEngine,
+  BusinessType,
+  JournalEntry,
+  JournalEntryLine,
+  PostingResult
+} from './posting_engine/professionalPostingEngine';
+
+// Legacy Posting Engine
 export { 
   PostingEngine, 
-  createPostingEngine,
+  createPostingEngine as createLegacyPostingEngine,
   TransactionContext,
   TransactionLineItem,
-  PostingResult
+  PostingResult as LegacyPostingResult
 } from './posting_engine/services/postingEngine';
-
-export {
-  STANDARD_POSTING_RULES,
-  getPostingRule,
-  TransactionType,
-  PostingRule
-} from './posting_engine/rules/postingRules';
 
 // Inventory Costing Engine
 export {
@@ -40,4 +43,12 @@ export * from './operations_modules/retail/retailOperations';
 export * from './operations_modules/restaurant/restaurantOperations';
 
 // Reporting Engine
-export * from './reporting_engine/services/financialReports';
+export {
+  FinancialReportingEngine,
+  createFinancialReporting,
+  TrialBalanceReport,
+  ProfitLossReport,
+  BalanceSheetReport,
+  CashFlowReport,
+  FinancialIndicators
+} from './reporting_engine/financialReports';
