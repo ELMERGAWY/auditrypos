@@ -327,7 +327,7 @@ CREATE TABLE public.inventory_batches (
   initial_qty DECIMAL(15,3) NOT NULL,
   remaining_qty DECIMAL(15,3) NOT NULL DEFAULT 0,
   unit_cost DECIMAL(15,4) NOT NULL,
-  is_expired BOOLEAN GENERATED ALWAYS AS (expiry_date < CURRENT_DATE) STORED,
+  -- is_expired removed: use view or check expiry_date directly
   status VARCHAR(20) DEFAULT 'active' CHECK (status IN ('active', 'expired', 'consumed')),
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
