@@ -24,7 +24,7 @@ BEGIN
       SELECT 1 FROM information_schema.columns
       WHERE table_schema='public' AND table_name='business_profiles' AND column_name='company_id'
     ) THEN
-      EXECUTE 'ALTER TABLE public.business_profiles ADD COLUMN company_id uuid REFERENCES public.companies(id) ON DELETE CASCADE';
+      EXECUTE 'ALTER TABLE public.business_profiles ADD COLUMN company_id uuid REFERENCES public.companies ON DELETE CASCADE';
     END IF;
 
     -- Ensure required columns exist for re-runs (partial table definition from older attempts)
@@ -74,7 +74,7 @@ BEGIN
       AND table_name = 'restaurants'
       AND column_name = 'company_id'
   ) THEN
-    EXECUTE 'ALTER TABLE public.restaurants ADD COLUMN company_id uuid REFERENCES public.companies(id) ON DELETE SET NULL';
+    EXECUTE 'ALTER TABLE public.restaurants ADD COLUMN company_id uuid REFERENCES public.companies ON DELETE SET NULL';
   END IF;
 
   -- index (safe if column exists)
@@ -116,7 +116,7 @@ BEGIN
       AND table_name = 'workspaces'
       AND column_name = 'company_id'
   ) THEN
-    EXECUTE 'ALTER TABLE public.workspaces ADD COLUMN company_id uuid REFERENCES public.companies(id) ON DELETE SET NULL';
+    EXECUTE 'ALTER TABLE public.workspaces ADD COLUMN company_id uuid REFERENCES public.companies ON DELETE SET NULL';
   END IF;
 
   -- index (safe if column exists)
@@ -141,7 +141,7 @@ END $$;
 -- 1) Business profiles (company scope)
 CREATE TABLE IF NOT EXISTS public.business_profiles (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  company_id uuid NOT NULL REFERENCES public.companies(id) ON DELETE CASCADE,
+  company_id uuid NOT NULL REFERENCES public.companies ON DELETE CASCADE,
 
   -- Identity
   name text NOT NULL,
@@ -180,7 +180,7 @@ WHERE is_default = true;
 -- 2) Workspace override (optional)
 CREATE TABLE IF NOT EXISTS public.workspace_business_profiles (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  workspace_id uuid NOT NULL REFERENCES public.workspaces(id) ON DELETE CASCADE,
+  workspace_id uuid NOT NULL REFERENCES public.workspaces ON DELETE CASCADE,
   profile_id uuid NOT NULL REFERENCES public.business_profiles(id) ON DELETE CASCADE,
   is_active boolean NOT NULL DEFAULT true,
   created_at timestamptz NOT NULL DEFAULT now(),
