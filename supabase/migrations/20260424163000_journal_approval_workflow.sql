@@ -17,6 +17,8 @@ BEGIN;
 ALTER TABLE public.journal_entries
   ADD COLUMN IF NOT EXISTS workflow_status text NOT NULL DEFAULT 'draft'
     CHECK (workflow_status IN ('draft', 'submitted', 'approved', 'rejected', 'posted')),
+  ADD COLUMN IF NOT EXISTS posted_at timestamptz,
+  ADD COLUMN IF NOT EXISTS posted_by uuid REFERENCES auth.users(id),
   ADD COLUMN IF NOT EXISTS submitted_at timestamptz,
   ADD COLUMN IF NOT EXISTS submitted_by uuid REFERENCES auth.users(id),
   ADD COLUMN IF NOT EXISTS approved_at timestamptz,
