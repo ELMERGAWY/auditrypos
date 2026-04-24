@@ -138,113 +138,109 @@ BEGIN
   $SQL$;
 END $$;
 
--- 1) Business profiles (company scope)
-CREATE TABLE IF NOT EXISTS public.business_profiles (
+-- ============================================================
+-- Company-level business configuration (compatible with existing global business_profiles(code))
+-- ============================================================
+-- Many environments already have `public.business_profiles` as a GLOBAL catalog with:
+--   code (text PK), name_ar/name_en, features...
+-- So we do NOT recreate it here.
+
+-- 1) Company business profile (tenant-scoped) referencing global business_profiles(code)
+CREATE TABLE IF NOT EXISTS public.company_business_profiles (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   company_id uuid NOT NULL REFERENCES public.companies ON DELETE CASCADE,
+  profile_code text NOT NULL REFERENCES public.business_profiles(code) ON DELETE RESTRICT,
 
-  -- Identity
-  name text NOT NULL,
-  business_type text NOT NULL DEFAULT 'restaurant' CHECK (business_type IN ('retail','restaurant','services')),
-
-  -- Accounting policies (high-signal controls)
+  -- Policies / rules (per company)
   accounting_basis text NOT NULL DEFAULT 'accrual' CHECK (accounting_basis IN ('accrual','cash')),
   inventory_cost_method text NOT NULL DEFAULT 'avg' CHECK (inventory_cost_method IN ('fifo','avg','specific')),
   revenue_recognition text NOT NULL DEFAULT 'at_invoice' CHECK (revenue_recognition IN ('at_invoice','at_delivery','at_payment')),
 
-  -- Tax policy
   tax_enabled boolean NOT NULL DEFAULT false,
   tax_included boolean NOT NULL DEFAULT true,
   default_tax_rate numeric(6,3) NOT NULL DEFAULT 0,
 
-  -- Operational rules (kept flexible)
   pos_rules jsonb NOT NULL DEFAULT '{}'::jsonb,
   accounting_rules jsonb NOT NULL DEFAULT '{}'::jsonb,
 
-  is_default boolean NOT NULL DEFAULT false,
+  is_default boolean NOT NULL DEFAULT true,
   is_active boolean NOT NULL DEFAULT true,
 
   created_at timestamptz NOT NULL DEFAULT now(),
-  updated_at timestamptz NOT NULL DEFAULT now()
+  updated_at timestamptz NOT NULL DEFAULT now(),
+
+  UNIQUE(company_id)
 );
 
-ALTER TABLE public.business_profiles ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.company_business_profiles ENABLE ROW LEVEL SECURITY;
+CREATE INDEX IF NOT EXISTS idx_company_business_profiles_company_id ON public.company_business_profiles(company_id);
 
-CREATE INDEX IF NOT EXISTS idx_business_profiles_company_id ON public.business_profiles(company_id);
-
--- One default profile per company
-CREATE UNIQUE INDEX IF NOT EXISTS uq_business_profiles_one_default_per_company
-ON public.business_profiles(company_id)
-WHERE is_default = true;
-
--- 2) Workspace override (optional)
--- IMPORTANT: In some existing databases, business_profiles primary key is `code` (text), not `id` (uuid).
--- To be compatible, we link workspaces to business_profiles via profile_code (text) referencing business_profiles(code).
+-- 2) Workspace mapping to company profile (override-ready)
 DO $$
 BEGIN
-  -- If a previous partial run created workspace_business_profiles with incompatible types, rebuild it.
   IF EXISTS (
     SELECT 1 FROM information_schema.tables
     WHERE table_schema='public' AND table_name='workspace_business_profiles'
   ) THEN
+    -- Old table name from earlier attempts; keep DB clean to avoid confusion
     EXECUTE 'DROP TABLE public.workspace_business_profiles CASCADE';
   END IF;
 
-  EXECUTE $SQL$
-    CREATE TABLE public.workspace_business_profiles (
-      id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-      workspace_id uuid NOT NULL REFERENCES public.workspaces ON DELETE CASCADE,
-      profile_code text NOT NULL REFERENCES public.business_profiles(code) ON DELETE CASCADE,
-      is_active boolean NOT NULL DEFAULT true,
-      created_at timestamptz NOT NULL DEFAULT now(),
-      UNIQUE(workspace_id)
-    )
-  $SQL$;
-
-  EXECUTE 'ALTER TABLE public.workspace_business_profiles ENABLE ROW LEVEL SECURITY';
-  EXECUTE 'CREATE INDEX IF NOT EXISTS idx_workspace_business_profiles_profile_code ON public.workspace_business_profiles(profile_code)';
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.tables
+    WHERE table_schema='public' AND table_name='workspace_company_profiles'
+  ) THEN
+    EXECUTE $SQL$
+      CREATE TABLE public.workspace_company_profiles (
+        workspace_id uuid PRIMARY KEY REFERENCES public.workspaces ON DELETE CASCADE,
+        company_profile_id uuid NOT NULL REFERENCES public.company_business_profiles(id) ON DELETE CASCADE,
+        is_active boolean NOT NULL DEFAULT true,
+        created_at timestamptz NOT NULL DEFAULT now()
+      )
+    $SQL$;
+    EXECUTE 'ALTER TABLE public.workspace_company_profiles ENABLE ROW LEVEL SECURITY';
+    EXECUTE 'CREATE INDEX idx_workspace_company_profiles_company_profile_id ON public.workspace_company_profiles(company_profile_id)';
+  END IF;
 END $$;
 
--- 3) Minimal RLS based on company membership
+-- 3) RLS: company members read; owners/admins write
 DO $$
 BEGIN
-  -- business_profiles: members read
   IF NOT EXISTS (
     SELECT 1 FROM pg_policies
-    WHERE schemaname='public' AND tablename='business_profiles' AND policyname='business_profiles_members_can_read'
+    WHERE schemaname='public' AND tablename='company_business_profiles' AND policyname='cbp_members_can_read'
   ) THEN
     EXECUTE $POL$
-      CREATE POLICY business_profiles_members_can_read
-      ON public.business_profiles
+      CREATE POLICY cbp_members_can_read
+      ON public.company_business_profiles
       FOR SELECT
       USING (EXISTS (
         SELECT 1 FROM public.company_users cu
-        WHERE cu.company_id = business_profiles.company_id
+        WHERE cu.company_id = company_business_profiles.company_id
           AND cu.user_id = auth.uid()
           AND cu.is_active = true
       ));
     $POL$;
   END IF;
 
-  -- business_profiles: owners/admins write
   IF NOT EXISTS (
     SELECT 1 FROM pg_policies
-    WHERE schemaname='public' AND tablename='business_profiles' AND policyname='business_profiles_owners_admins_can_write'
+    WHERE schemaname='public' AND tablename='company_business_profiles' AND policyname='cbp_owners_admins_can_write'
   ) THEN
     EXECUTE $POL$
-      CREATE POLICY business_profiles_owners_admins_can_write
-      ON public.business_profiles
+      CREATE POLICY cbp_owners_admins_can_write
+      ON public.company_business_profiles
       FOR ALL
       USING (EXISTS (
         SELECT 1 FROM public.company_users cu
-        WHERE cu.company_id = business_profiles.company_id
+        WHERE cu.company_id = company_business_profiles.company_id
           AND cu.user_id = auth.uid()
           AND cu.is_active = true
           AND cu.role IN ('owner','admin')
       ))
       WITH CHECK (EXISTS (
         SELECT 1 FROM public.company_users cu
-        WHERE cu.company_id = business_profiles.company_id
+        WHERE cu.company_id = company_business_profiles.company_id
           AND cu.user_id = auth.uid()
           AND cu.is_active = true
           AND cu.role IN ('owner','admin')
@@ -252,85 +248,48 @@ BEGIN
     $POL$;
   END IF;
 
-  -- workspace_business_profiles: members read (through workspace->company)
+  -- workspace_company_profiles: members read/write through workspace->restaurant->company
   IF NOT EXISTS (
     SELECT 1 FROM pg_policies
-    WHERE schemaname='public' AND tablename='workspace_business_profiles' AND policyname='workspace_profiles_members_can_read'
+    WHERE schemaname='public' AND tablename='workspace_company_profiles' AND policyname='wcp_members_can_read'
   ) THEN
     EXECUTE $POL$
-      CREATE POLICY workspace_profiles_members_can_read
-      ON public.workspace_business_profiles
+      CREATE POLICY wcp_members_can_read
+      ON public.workspace_company_profiles
       FOR SELECT
       USING (EXISTS (
         SELECT 1
         FROM public.workspaces w
         JOIN public.restaurants r ON r.id = w.restaurant_id
         JOIN public.company_users cu ON cu.company_id = r.company_id
-        WHERE w.id = workspace_business_profiles.workspace_id
+        WHERE w.id = workspace_company_profiles.workspace_id
           AND cu.user_id = auth.uid()
           AND cu.is_active = true
-      ));
-    $POL$;
-  END IF;
-
-  -- workspace_business_profiles: owners/admins write (through workspace->company)
-  IF NOT EXISTS (
-    SELECT 1 FROM pg_policies
-    WHERE schemaname='public' AND tablename='workspace_business_profiles' AND policyname='workspace_profiles_owners_admins_can_write'
-  ) THEN
-    EXECUTE $POL$
-      CREATE POLICY workspace_profiles_owners_admins_can_write
-      ON public.workspace_business_profiles
-      FOR ALL
-      USING (EXISTS (
-        SELECT 1
-        FROM public.workspaces w
-        JOIN public.restaurants r ON r.id = w.restaurant_id
-        JOIN public.company_users cu ON cu.company_id = r.company_id
-        WHERE w.id = workspace_business_profiles.workspace_id
-          AND cu.user_id = auth.uid()
-          AND cu.is_active = true
-          AND cu.role IN ('owner','admin')
-      ))
-      WITH CHECK (EXISTS (
-        SELECT 1
-        FROM public.workspaces w
-        JOIN public.restaurants r ON r.id = w.restaurant_id
-        JOIN public.company_users cu ON cu.company_id = r.company_id
-        WHERE w.id = workspace_business_profiles.workspace_id
-          AND cu.user_id = auth.uid()
-          AND cu.is_active = true
-          AND cu.role IN ('owner','admin')
       ));
     $POL$;
   END IF;
 END $$;
 
--- 4) Attach restaurants to a profile (company default)
-ALTER TABLE public.restaurants
-  ADD COLUMN IF NOT EXISTS business_profile_code text;
-
-CREATE INDEX IF NOT EXISTS idx_restaurants_business_profile_code ON public.restaurants(business_profile_code);
-
--- 5) Backfill: create a default profile per company (if missing)
--- We infer business_type from restaurants.business_type / restaurants.business_category when present.
-INSERT INTO public.business_profiles (
-  company_id, name, business_type, tax_enabled, tax_included, default_tax_rate, is_default, is_active, pos_rules, accounting_rules
+-- 4) Backfill: create default company profile per company
+-- Prefer restaurant_business_profiles.profile_code if present; otherwise infer from restaurants fields.
+INSERT INTO public.company_business_profiles (
+  company_id, profile_code, tax_enabled, tax_included, default_tax_rate, pos_rules, accounting_rules, is_default, is_active
 )
 SELECT
   c.id AS company_id,
-  'Default Profile' AS name,
-  COALESCE(NULLIF(lower(r.business_type), ''), NULLIF(lower(r.business_category), ''), 'restaurant') AS business_type,
-  -- tax hints (if existing restaurants have tax_settings JSON)
+  COALESCE(rbp.profile_code,
+           NULLIF(lower(r.business_type), ''),
+           NULLIF(lower(r.business_category), ''),
+           'restaurant') AS profile_code,
   COALESCE((r.tax_settings->>'enabled')::boolean, false) AS tax_enabled,
   COALESCE((r.tax_settings->>'included')::boolean, true) AS tax_included,
   COALESCE((r.tax_settings->>'rate')::numeric, 0) AS default_tax_rate,
-  true AS is_default,
-  true AS is_active,
   jsonb_build_object(
-    'uses_tables', (COALESCE(NULLIF(lower(r.business_type), ''), NULLIF(lower(r.business_category), ''), 'restaurant') = 'restaurant')
+    'uses_tables', (COALESCE(rbp.profile_code, NULLIF(lower(r.business_type), ''), NULLIF(lower(r.business_category), ''), 'restaurant') = 'restaurant')
   ) AS pos_rules,
-  '{}'::jsonb AS accounting_rules
+  '{}'::jsonb AS accounting_rules,
+  true AS is_default,
+  true AS is_active
 FROM public.companies c
 LEFT JOIN LATERAL (
   SELECT r2.*
@@ -339,41 +298,28 @@ LEFT JOIN LATERAL (
   ORDER BY r2.created_at ASC NULLS LAST
   LIMIT 1
 ) r ON true
+LEFT JOIN LATERAL (
+  SELECT rbp2.profile_code
+  FROM public.restaurant_business_profiles rbp2
+  WHERE rbp2.restaurant_id = r.id
+  LIMIT 1
+) rbp ON true
 WHERE NOT EXISTS (
-  SELECT 1 FROM public.business_profiles bp
-  WHERE bp.company_id = c.id AND bp.is_default = true
+  SELECT 1 FROM public.company_business_profiles cbp
+  WHERE cbp.company_id = c.id
 );
 
--- Normalize any unexpected business_type values to allowed set
-UPDATE public.business_profiles
-SET business_type = CASE
-  WHEN business_type IN ('retail','restaurant','services') THEN business_type
-  WHEN business_type IN ('trade','shop','grocery','pharmacy') THEN 'retail'
-  WHEN business_type IN ('service','services_business') THEN 'services'
-  ELSE 'restaurant'
-END
-WHERE business_type NOT IN ('retail','restaurant','services');
-
--- 6) Backfill restaurants.business_profile_id from company default
-UPDATE public.restaurants r
-SET business_profile_code = bp.code
-FROM public.business_profiles bp
-WHERE bp.company_id = r.company_id
-  AND bp.is_default = true
-  AND (r.business_profile_code IS NULL OR r.business_profile_code = '');
-
--- 7) Workspace-level default: attach each workspace to the company default profile (unless overridden)
-INSERT INTO public.workspace_business_profiles (workspace_id, profile_code)
+-- 5) Backfill: attach each workspace to the company profile
+INSERT INTO public.workspace_company_profiles (workspace_id, company_profile_id)
 SELECT
   w.id,
-  bp.code
+  cbp.id
 FROM public.workspaces w
-JOIN public.business_profiles bp
-  ON bp.company_id = COALESCE(w.company_id, (SELECT r.company_id FROM public.restaurants r WHERE r.id = w.restaurant_id LIMIT 1))
- AND bp.is_default = true
+JOIN public.restaurants r ON r.id = w.restaurant_id
+JOIN public.company_business_profiles cbp ON cbp.company_id = r.company_id
 WHERE NOT EXISTS (
-  SELECT 1 FROM public.workspace_business_profiles wbp
-  WHERE wbp.workspace_id = w.id
+  SELECT 1 FROM public.workspace_company_profiles wcp
+  WHERE wcp.workspace_id = w.id
 );
 
 COMMIT;
