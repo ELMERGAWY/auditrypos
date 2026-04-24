@@ -178,18 +178,32 @@ ON public.business_profiles(company_id)
 WHERE is_default = true;
 
 -- 2) Workspace override (optional)
-CREATE TABLE IF NOT EXISTS public.workspace_business_profiles (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  workspace_id uuid NOT NULL REFERENCES public.workspaces ON DELETE CASCADE,
-  profile_id uuid NOT NULL REFERENCES public.business_profiles ON DELETE CASCADE,
-  is_active boolean NOT NULL DEFAULT true,
-  created_at timestamptz NOT NULL DEFAULT now(),
-  UNIQUE(workspace_id)
-);
+-- IMPORTANT: In some existing databases, business_profiles primary key is `code` (text), not `id` (uuid).
+-- To be compatible, we link workspaces to business_profiles via profile_code (text) referencing business_profiles(code).
+DO $$
+BEGIN
+  -- If a previous partial run created workspace_business_profiles with incompatible types, rebuild it.
+  IF EXISTS (
+    SELECT 1 FROM information_schema.tables
+    WHERE table_schema='public' AND table_name='workspace_business_profiles'
+  ) THEN
+    EXECUTE 'DROP TABLE public.workspace_business_profiles CASCADE';
+  END IF;
 
-ALTER TABLE public.workspace_business_profiles ENABLE ROW LEVEL SECURITY;
+  EXECUTE $SQL$
+    CREATE TABLE public.workspace_business_profiles (
+      id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+      workspace_id uuid NOT NULL REFERENCES public.workspaces ON DELETE CASCADE,
+      profile_code text NOT NULL REFERENCES public.business_profiles(code) ON DELETE CASCADE,
+      is_active boolean NOT NULL DEFAULT true,
+      created_at timestamptz NOT NULL DEFAULT now(),
+      UNIQUE(workspace_id)
+    )
+  $SQL$;
 
-CREATE INDEX IF NOT EXISTS idx_workspace_business_profiles_profile_id ON public.workspace_business_profiles(profile_id);
+  EXECUTE 'ALTER TABLE public.workspace_business_profiles ENABLE ROW LEVEL SECURITY';
+  EXECUTE 'CREATE INDEX IF NOT EXISTS idx_workspace_business_profiles_profile_code ON public.workspace_business_profiles(profile_code)';
+END $$;
 
 -- 3) Minimal RLS based on company membership
 DO $$
@@ -294,9 +308,9 @@ END $$;
 
 -- 4) Attach restaurants to a profile (company default)
 ALTER TABLE public.restaurants
-  ADD COLUMN IF NOT EXISTS business_profile_id uuid REFERENCES public.business_profiles ON DELETE SET NULL;
+  ADD COLUMN IF NOT EXISTS business_profile_code text;
 
-CREATE INDEX IF NOT EXISTS idx_restaurants_business_profile_id ON public.restaurants(business_profile_id);
+CREATE INDEX IF NOT EXISTS idx_restaurants_business_profile_code ON public.restaurants(business_profile_code);
 
 -- 5) Backfill: create a default profile per company (if missing)
 -- We infer business_type from restaurants.business_type / restaurants.business_category when present.
@@ -342,17 +356,17 @@ WHERE business_type NOT IN ('retail','restaurant','services');
 
 -- 6) Backfill restaurants.business_profile_id from company default
 UPDATE public.restaurants r
-SET business_profile_id = bp.id
+SET business_profile_code = bp.code
 FROM public.business_profiles bp
 WHERE bp.company_id = r.company_id
   AND bp.is_default = true
-  AND r.business_profile_id IS NULL;
+  AND (r.business_profile_code IS NULL OR r.business_profile_code = '');
 
 -- 7) Workspace-level default: attach each workspace to the company default profile (unless overridden)
-INSERT INTO public.workspace_business_profiles (workspace_id, profile_id)
+INSERT INTO public.workspace_business_profiles (workspace_id, profile_code)
 SELECT
   w.id,
-  bp.id
+  bp.code
 FROM public.workspaces w
 JOIN public.business_profiles bp
   ON bp.company_id = COALESCE(w.company_id, (SELECT r.company_id FROM public.restaurants r WHERE r.id = w.restaurant_id LIMIT 1))
