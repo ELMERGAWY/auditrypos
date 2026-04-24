@@ -13,6 +13,48 @@
 
 BEGIN;
 
+-- Ensure restaurants has company_id (in case step-1 was applied partially / older schema)
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1
+    FROM information_schema.columns
+    WHERE table_schema = 'public'
+      AND table_name = 'restaurants'
+      AND column_name = 'company_id'
+  ) THEN
+    EXECUTE 'ALTER TABLE public.restaurants ADD COLUMN company_id uuid REFERENCES public.companies(id) ON DELETE SET NULL';
+  END IF;
+
+  -- index (safe if column exists)
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_class c
+    JOIN pg_namespace n ON n.oid = c.relnamespace
+    WHERE n.nspname = 'public' AND c.relname = 'idx_restaurants_company_id'
+  ) THEN
+    EXECUTE 'CREATE INDEX idx_restaurants_company_id ON public.restaurants(company_id)';
+  END IF;
+
+  -- Best-effort backfill: by companies.primary_owner_id = restaurants.owner_id
+  -- (works if companies table has primary_owner_id from our foundation migration)
+  IF EXISTS (
+    SELECT 1
+    FROM information_schema.columns
+    WHERE table_schema = 'public'
+      AND table_name = 'companies'
+      AND column_name = 'primary_owner_id'
+  ) THEN
+    EXECUTE $SQL$
+      UPDATE public.restaurants r
+      SET company_id = c.id
+      FROM public.companies c
+      WHERE c.primary_owner_id = r.owner_id
+        AND r.company_id IS NULL
+        AND r.owner_id IS NOT NULL
+    $SQL$;
+  END IF;
+END $$;
+
 -- Ensure workspaces has company_id (some older migrations created workspaces without it)
 DO $$
 BEGIN
