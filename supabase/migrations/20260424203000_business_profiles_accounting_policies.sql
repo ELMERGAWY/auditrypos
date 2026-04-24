@@ -14,17 +14,36 @@
 BEGIN;
 
 -- Ensure workspaces has company_id (some older migrations created workspaces without it)
-ALTER TABLE public.workspaces
-  ADD COLUMN IF NOT EXISTS company_id uuid REFERENCES public.companies(id) ON DELETE SET NULL;
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1
+    FROM information_schema.columns
+    WHERE table_schema = 'public'
+      AND table_name = 'workspaces'
+      AND column_name = 'company_id'
+  ) THEN
+    EXECUTE 'ALTER TABLE public.workspaces ADD COLUMN company_id uuid REFERENCES public.companies(id) ON DELETE SET NULL';
+  END IF;
 
-CREATE INDEX IF NOT EXISTS idx_workspaces_company_id ON public.workspaces(company_id);
+  -- index (safe if column exists)
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_class c
+    JOIN pg_namespace n ON n.oid = c.relnamespace
+    WHERE n.nspname = 'public' AND c.relname = 'idx_workspaces_company_id'
+  ) THEN
+    EXECUTE 'CREATE INDEX idx_workspaces_company_id ON public.workspaces(company_id)';
+  END IF;
 
--- Backfill workspaces.company_id from restaurants.company_id
-UPDATE public.workspaces w
-SET company_id = r.company_id
-FROM public.restaurants r
-WHERE w.restaurant_id = r.id
-  AND w.company_id IS NULL;
+  -- Backfill (safe even if already filled)
+  EXECUTE $SQL$
+    UPDATE public.workspaces w
+    SET company_id = r.company_id
+    FROM public.restaurants r
+    WHERE w.restaurant_id = r.id
+      AND w.company_id IS NULL
+  $SQL$;
+END $$;
 
 -- 1) Business profiles (company scope)
 CREATE TABLE IF NOT EXISTS public.business_profiles (
@@ -138,7 +157,8 @@ BEGIN
       USING (EXISTS (
         SELECT 1
         FROM public.workspaces w
-        JOIN public.company_users cu ON cu.company_id = w.company_id
+        JOIN public.restaurants r ON r.id = w.restaurant_id
+        JOIN public.company_users cu ON cu.company_id = r.company_id
         WHERE w.id = workspace_business_profiles.workspace_id
           AND cu.user_id = auth.uid()
           AND cu.is_active = true
@@ -158,7 +178,8 @@ BEGIN
       USING (EXISTS (
         SELECT 1
         FROM public.workspaces w
-        JOIN public.company_users cu ON cu.company_id = w.company_id
+        JOIN public.restaurants r ON r.id = w.restaurant_id
+        JOIN public.company_users cu ON cu.company_id = r.company_id
         WHERE w.id = workspace_business_profiles.workspace_id
           AND cu.user_id = auth.uid()
           AND cu.is_active = true
@@ -167,7 +188,8 @@ BEGIN
       WITH CHECK (EXISTS (
         SELECT 1
         FROM public.workspaces w
-        JOIN public.company_users cu ON cu.company_id = w.company_id
+        JOIN public.restaurants r ON r.id = w.restaurant_id
+        JOIN public.company_users cu ON cu.company_id = r.company_id
         WHERE w.id = workspace_business_profiles.workspace_id
           AND cu.user_id = auth.uid()
           AND cu.is_active = true
@@ -240,7 +262,8 @@ SELECT
   bp.id
 FROM public.workspaces w
 JOIN public.business_profiles bp
-  ON bp.company_id = w.company_id AND bp.is_default = true
+  ON bp.company_id = COALESCE(w.company_id, (SELECT r.company_id FROM public.restaurants r WHERE r.id = w.restaurant_id LIMIT 1))
+ AND bp.is_default = true
 WHERE NOT EXISTS (
   SELECT 1 FROM public.workspace_business_profiles wbp
   WHERE wbp.workspace_id = w.id
