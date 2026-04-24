@@ -278,14 +278,14 @@ INSERT INTO public.company_business_profiles (
 SELECT
   c.id AS company_id,
   COALESCE(rbp.profile_code,
-           NULLIF(lower(r.business_type), ''),
-           NULLIF(lower(r.business_category), ''),
+           NULLIF(lower(r.business_type::text), ''),
+           NULLIF(lower(r.business_category::text), ''),
            'restaurant') AS profile_code,
   COALESCE((r.tax_settings->>'enabled')::boolean, false) AS tax_enabled,
   COALESCE((r.tax_settings->>'included')::boolean, true) AS tax_included,
   COALESCE((r.tax_settings->>'rate')::numeric, 0) AS default_tax_rate,
   jsonb_build_object(
-    'uses_tables', (COALESCE(rbp.profile_code, NULLIF(lower(r.business_type), ''), NULLIF(lower(r.business_category), ''), 'restaurant') = 'restaurant')
+    'uses_tables', (COALESCE(rbp.profile_code, NULLIF(lower(r.business_type::text), ''), NULLIF(lower(r.business_category::text), ''), 'restaurant') = 'restaurant')
   ) AS pos_rules,
   '{}'::jsonb AS accounting_rules,
   true AS is_default,
