@@ -116,6 +116,12 @@ $$;
 -- ============================================================
 -- 4) Resolve posting setting (workspace override first)
 -- ============================================================
+-- Compatibility note:
+-- Existing environments may already have fn_resolve_posting_setting()
+-- with the same arguments but a different RETURN type. PostgreSQL does
+-- not allow changing return type via CREATE OR REPLACE, so we drop first.
+DROP FUNCTION IF EXISTS public.fn_resolve_posting_setting(uuid, uuid, text, text, text, text);
+
 CREATE OR REPLACE FUNCTION public.fn_resolve_posting_setting(
   p_company_id uuid,
   p_workspace_id uuid,
