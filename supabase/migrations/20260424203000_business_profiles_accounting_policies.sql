@@ -13,6 +13,22 @@
 
 BEGIN;
 
+-- If business_profiles table already exists (partial/previous run), ensure it has company_id
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM information_schema.tables
+    WHERE table_schema='public' AND table_name='business_profiles'
+  ) THEN
+    IF NOT EXISTS (
+      SELECT 1 FROM information_schema.columns
+      WHERE table_schema='public' AND table_name='business_profiles' AND column_name='company_id'
+    ) THEN
+      EXECUTE 'ALTER TABLE public.business_profiles ADD COLUMN company_id uuid REFERENCES public.companies(id) ON DELETE CASCADE';
+    END IF;
+  END IF;
+END $$;
+
 -- Ensure restaurants has company_id (in case step-1 was applied partially / older schema)
 DO $$
 BEGIN
