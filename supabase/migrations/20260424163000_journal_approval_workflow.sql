@@ -5,38 +5,13 @@
 -- - Optional rejection path with reason
 -- ============================================================
 
+-- NOTE:
+-- Enum values must be committed before using them in casts.
+-- Keep these statements outside explicit BEGIN/COMMIT block.
+ALTER TYPE public.app_role ADD VALUE IF NOT EXISTS 'accountant';
+ALTER TYPE public.app_role ADD VALUE IF NOT EXISTS 'finance_manager';
+
 BEGIN;
-
--- 1) Extend app roles for accounting approval flow
-DO $$
-BEGIN
-  IF NOT EXISTS (
-    SELECT 1
-    FROM pg_enum e
-    JOIN pg_type t ON t.oid = e.enumtypid
-    JOIN pg_namespace n ON n.oid = t.typnamespace
-    WHERE n.nspname = 'public'
-      AND t.typname = 'app_role'
-      AND e.enumlabel = 'accountant'
-  ) THEN
-    ALTER TYPE public.app_role ADD VALUE 'accountant';
-  END IF;
-END $$;
-
-DO $$
-BEGIN
-  IF NOT EXISTS (
-    SELECT 1
-    FROM pg_enum e
-    JOIN pg_type t ON t.oid = e.enumtypid
-    JOIN pg_namespace n ON n.oid = t.typnamespace
-    WHERE n.nspname = 'public'
-      AND t.typname = 'app_role'
-      AND e.enumlabel = 'finance_manager'
-  ) THEN
-    ALTER TYPE public.app_role ADD VALUE 'finance_manager';
-  END IF;
-END $$;
 
 -- 2) Journal workflow columns
 ALTER TABLE public.journal_entries
@@ -86,7 +61,12 @@ AS $$
   SELECT (
     public.is_restaurant_owner(p_user_id, p_restaurant_id)
     OR public.has_role(p_user_id, 'super_admin'::public.app_role)
-    OR public.has_role(p_user_id, 'finance_manager'::public.app_role)
+    OR EXISTS (
+      SELECT 1
+      FROM public.user_roles ur
+      WHERE ur.user_id = p_user_id
+        AND ur.role::text = 'finance_manager'
+    )
   );
 $$;
 
