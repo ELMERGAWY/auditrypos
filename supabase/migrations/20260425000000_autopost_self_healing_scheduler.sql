@@ -148,7 +148,7 @@ BEGIN
     PERFORM cron.schedule(
       'auditry_autopost_self_heal_every_5m',
       '*/5 * * * *',
-      $$SELECT * FROM public.fn_run_posting_self_heal(50);$$
+      'SELECT * FROM public.fn_run_posting_self_heal(50);'
     );
   END IF;
 END $$;
