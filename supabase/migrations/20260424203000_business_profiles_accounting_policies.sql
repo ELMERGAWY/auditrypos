@@ -26,6 +26,30 @@ BEGIN
     ) THEN
       EXECUTE 'ALTER TABLE public.business_profiles ADD COLUMN company_id uuid REFERENCES public.companies(id) ON DELETE CASCADE';
     END IF;
+
+    -- Ensure required columns exist for re-runs (partial table definition from older attempts)
+    IF NOT EXISTS (
+      SELECT 1 FROM information_schema.columns
+      WHERE table_schema='public' AND table_name='business_profiles' AND column_name='is_default'
+    ) THEN
+      EXECUTE 'ALTER TABLE public.business_profiles ADD COLUMN is_default boolean NOT NULL DEFAULT false';
+    END IF;
+
+    IF NOT EXISTS (
+      SELECT 1 FROM information_schema.columns
+      WHERE table_schema='public' AND table_name='business_profiles' AND column_name='is_active'
+    ) THEN
+      EXECUTE 'ALTER TABLE public.business_profiles ADD COLUMN is_active boolean NOT NULL DEFAULT true';
+    END IF;
+
+    IF NOT EXISTS (
+      SELECT 1 FROM information_schema.columns
+      WHERE table_schema='public' AND table_name='business_profiles' AND column_name='business_type'
+    ) THEN
+      EXECUTE $$ALTER TABLE public.business_profiles
+               ADD COLUMN business_type text NOT NULL DEFAULT 'restaurant'
+               CHECK (business_type IN ('retail','restaurant','services'))$$;
+    END IF;
   END IF;
 END $$;
 
