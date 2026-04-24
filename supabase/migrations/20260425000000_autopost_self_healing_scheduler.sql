@@ -60,8 +60,8 @@ BEGIN
       0::int,
       (
         SELECT COUNT(*)::int
-        FROM public.gl_posting_failures
-        WHERE status = 'pending'
+        FROM public.gl_posting_failures f
+        WHERE f.status = 'pending'
       ),
       'skipped_locked'::text;
     RETURN;
@@ -84,8 +84,8 @@ BEGIN
 
     SELECT COUNT(*)::int
     INTO v_pending_after
-    FROM public.gl_posting_failures
-    WHERE status = 'pending';
+    FROM public.gl_posting_failures f
+    WHERE f.status = 'pending';
 
     UPDATE public.gl_posting_retry_runs
     SET finished_at = now(),
@@ -100,8 +100,8 @@ BEGIN
   EXCEPTION WHEN OTHERS THEN
     SELECT COUNT(*)::int
     INTO v_pending_after
-    FROM public.gl_posting_failures
-    WHERE status = 'pending';
+    FROM public.gl_posting_failures f
+    WHERE f.status = 'pending';
 
     UPDATE public.gl_posting_retry_runs
     SET finished_at = now(),
