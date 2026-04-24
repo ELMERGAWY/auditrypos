@@ -46,9 +46,20 @@ BEGIN
       SELECT 1 FROM information_schema.columns
       WHERE table_schema='public' AND table_name='business_profiles' AND column_name='business_type'
     ) THEN
-      EXECUTE $$ALTER TABLE public.business_profiles
-               ADD COLUMN business_type text NOT NULL DEFAULT 'restaurant'
-               CHECK (business_type IN ('retail','restaurant','services'))$$;
+      EXECUTE 'ALTER TABLE public.business_profiles ADD COLUMN business_type text NOT NULL DEFAULT ''restaurant''';
+    END IF;
+
+    -- Add/ensure CHECK constraint separately (no IF NOT EXISTS support for constraints)
+    IF NOT EXISTS (
+      SELECT 1
+      FROM pg_constraint c
+      JOIN pg_class t ON t.oid = c.conrelid
+      JOIN pg_namespace n ON n.oid = t.relnamespace
+      WHERE n.nspname = 'public'
+        AND t.relname = 'business_profiles'
+        AND c.conname = 'business_profiles_business_type_chk'
+    ) THEN
+      EXECUTE 'ALTER TABLE public.business_profiles ADD CONSTRAINT business_profiles_business_type_chk CHECK (business_type IN (''retail'',''restaurant'',''services''))';
     END IF;
   END IF;
 END $$;
