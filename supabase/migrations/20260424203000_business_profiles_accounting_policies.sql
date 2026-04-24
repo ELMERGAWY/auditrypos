@@ -13,6 +13,19 @@
 
 BEGIN;
 
+-- Ensure workspaces has company_id (some older migrations created workspaces without it)
+ALTER TABLE public.workspaces
+  ADD COLUMN IF NOT EXISTS company_id uuid REFERENCES public.companies(id) ON DELETE SET NULL;
+
+CREATE INDEX IF NOT EXISTS idx_workspaces_company_id ON public.workspaces(company_id);
+
+-- Backfill workspaces.company_id from restaurants.company_id
+UPDATE public.workspaces w
+SET company_id = r.company_id
+FROM public.restaurants r
+WHERE w.restaurant_id = r.id
+  AND w.company_id IS NULL;
+
 -- 1) Business profiles (company scope)
 CREATE TABLE IF NOT EXISTS public.business_profiles (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
