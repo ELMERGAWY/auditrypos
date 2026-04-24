@@ -181,7 +181,7 @@ WHERE is_default = true;
 CREATE TABLE IF NOT EXISTS public.workspace_business_profiles (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   workspace_id uuid NOT NULL REFERENCES public.workspaces ON DELETE CASCADE,
-  profile_id uuid NOT NULL REFERENCES public.business_profiles(id) ON DELETE CASCADE,
+  profile_id uuid NOT NULL REFERENCES public.business_profiles ON DELETE CASCADE,
   is_active boolean NOT NULL DEFAULT true,
   created_at timestamptz NOT NULL DEFAULT now(),
   UNIQUE(workspace_id)
@@ -294,7 +294,7 @@ END $$;
 
 -- 4) Attach restaurants to a profile (company default)
 ALTER TABLE public.restaurants
-  ADD COLUMN IF NOT EXISTS business_profile_id uuid REFERENCES public.business_profiles(id) ON DELETE SET NULL;
+  ADD COLUMN IF NOT EXISTS business_profile_id uuid REFERENCES public.business_profiles ON DELETE SET NULL;
 
 CREATE INDEX IF NOT EXISTS idx_restaurants_business_profile_id ON public.restaurants(business_profile_id);
 
