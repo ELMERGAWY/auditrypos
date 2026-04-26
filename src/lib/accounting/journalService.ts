@@ -319,7 +319,180 @@ class JournalService {
       await this.createCOGSJournalEntry(restaurantId, order, businessType, cogs);
     }
 
+    // 6. Update Customer Balance if credit sale
+    if (remaining > 0 && order.customer_id) {
+      await supabase.rpc('update_customer_balance', {
+        p_customer_id: order.customer_id,
+        p_amount: remaining
+      });
+    }
+
     return entry;
+  }
+
+  async createSalesReturnJournalEntry(
+    restaurantId: string,
+    returnData: {
+      orderId: string;
+      orderNumber: string;
+      amount: number;
+      taxAmount: number;
+      cogs?: number;
+      customerId?: string;
+      reason: string;
+    },
+    businessType: string
+  ): Promise<JournalEntry | null> {
+    const mapping = this.getBusinessMapping(businessType);
+    const lines: Omit<JournalEntryLine, 'id' | 'entry_id'>[] = [];
+
+    const cashAcc = await this.getAccountByCode(restaurantId, mapping.cashAccount);
+    const arAcc = await this.getAccountByCode(restaurantId, mapping.accountsReceivable);
+    const salesAcc = await this.getAccountByCode(restaurantId, mapping.salesRevenue);
+    const taxAcc = await this.getAccountByCode(restaurantId, mapping.taxPayable);
+
+    // Debit: Sales (Return)
+    lines.push({
+      account_id: salesAcc?.id || '',
+      debit: returnData.amount - returnData.taxAmount,
+      credit: 0,
+      description: `مردودات مبيعات - فاتورة ${returnData.orderNumber}`,
+      line_order: 1,
+    });
+
+    // Debit: Tax Payable (Reverse)
+    if (returnData.taxAmount > 0 && taxAcc) {
+      lines.push({
+        account_id: taxAcc.id,
+        debit: returnData.taxAmount,
+        credit: 0,
+        description: `عكس ضريبة المردودات`,
+        line_order: 2,
+      });
+    }
+
+    // Credit: Cash or AR
+    if (returnData.customerId && arAcc) {
+      lines.push({
+        account_id: arAcc.id,
+        debit: 0,
+        credit: returnData.amount,
+        description: `تخفيض مديونية عميل - مردودات ${returnData.orderNumber}`,
+        line_order: 3,
+      });
+      
+      // Update Customer Balance
+      await supabase.rpc('update_customer_balance', {
+        p_customer_id: returnData.customerId,
+        p_amount: -returnData.amount
+      });
+    } else if (cashAcc) {
+      lines.push({
+        account_id: cashAcc.id,
+        debit: 0,
+        credit: returnData.amount,
+        description: `رد نقدية - مردودات ${returnData.orderNumber}`,
+        line_order: 3,
+      });
+    }
+
+    const entry = await this.createJournalEntry(restaurantId, {
+      entry_date: new Date(),
+      reference_type: 'return',
+      reference_id: returnData.orderId,
+      description: `مردودات مبيعات #${returnData.orderNumber} - ${returnData.reason}`,
+      source: 'pos',
+      is_posted: true,
+      lines,
+    });
+
+    // Reverse COGS
+    if (returnData.cogs && returnData.cogs > 0 && entry) {
+      const cogsAcc = await this.getAccountByCode(restaurantId, mapping.cogsAccount);
+      const invAcc = await this.getAccountByCode(restaurantId, mapping.inventoryAccount);
+      if (cogsAcc && invAcc) {
+        await this.createJournalEntry(restaurantId, {
+          entry_date: new Date(),
+          reference_type: 'return',
+          reference_id: returnData.orderId,
+          description: `عكس تكلفة مردودات - ${returnData.orderNumber}`,
+          source: 'auto',
+          is_posted: true,
+          lines: [
+            { account_id: invAcc.id, debit: returnData.cogs, credit: 0, description: 'إعادة للمخزون', line_order: 1 },
+            { account_id: cogsAcc.id, debit: 0, credit: returnData.cogs, description: 'تخفيض تكلفة', line_order: 2 }
+          ]
+        });
+      }
+    }
+
+    return entry;
+  }
+
+  async createPurchaseJournalEntry(
+    restaurantId: string,
+    purchase: {
+      id: string;
+      supplierId: string;
+      supplierName: string;
+      amount: number;
+      isCredit: boolean;
+      description: string;
+    },
+    businessType: string
+  ): Promise<JournalEntry | null> {
+    const mapping = this.getBusinessMapping(businessType);
+    const lines: Omit<JournalEntryLine, 'id' | 'entry_id'>[] = [];
+
+    const invAcc = await this.getAccountByCode(restaurantId, mapping.inventoryAccount);
+    const cashAcc = await this.getAccountByCode(restaurantId, mapping.cashAccount);
+    const apAcc = await this.getAccountByCode(restaurantId, mapping.accountsPayable);
+
+    if (!invAcc) return null;
+
+    // Debit: Inventory
+    lines.push({
+      account_id: invAcc.id,
+      debit: purchase.amount,
+      credit: 0,
+      description: `شراء مخزون - ${purchase.description}`,
+      line_order: 1,
+    });
+
+    // Credit: Cash or Accounts Payable
+    if (purchase.isCredit && apAcc) {
+      lines.push({
+        account_id: apAcc.id,
+        debit: 0,
+        credit: purchase.amount,
+        description: `ذمم موردين - ${purchase.supplierName}`,
+        line_order: 2,
+      });
+
+      // Update Supplier Balance
+      await supabase.rpc('update_supplier_balance', {
+        p_supplier_id: purchase.supplierId,
+        p_amount: purchase.amount
+      });
+    } else if (cashAcc) {
+      lines.push({
+        account_id: cashAcc.id,
+        debit: 0,
+        credit: purchase.amount,
+        description: `دفع نقدي للمورد - ${purchase.supplierName}`,
+        line_order: 2,
+      });
+    }
+
+    return this.createJournalEntry(restaurantId, {
+      entry_date: new Date(),
+      reference_type: 'purchase',
+      reference_id: purchase.id,
+      description: `فاتورة مشتريات من ${purchase.supplierName}`,
+      source: 'pos',
+      is_posted: true,
+      lines,
+    });
   }
 
   async createCOGSJournalEntry(
