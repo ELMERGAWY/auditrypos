@@ -68,11 +68,11 @@ interface ProfessionalSidebarProps {
 
 const SECTIONS = {
   main: 'الرئيسية',
-  sales: 'المبيعات',
-  inventory: 'المخزون',
-  people: 'العملاء والموظفين',
-  analytics: 'التقارير والتحليلات',
-  system: 'النظام'
+  sales: 'إدارة المبيعات',
+  inventory: 'المخزون والتكاليف',
+  accounting: 'المحاسبة والمالية',
+  analytics: 'التقارير والذكاء الاصطناعي',
+  system: 'إدارة النظام'
 };
 
 export function ProfessionalSidebar({
@@ -102,40 +102,36 @@ export function ProfessionalSidebar({
   const lockedTabs: SidebarTab[] = isTrial ? ['orders', 'delivery', 'shifts', 'stats'] : [];
 
   const navItems: NavItem[] = [
-    // Main Section
+    // 1. الرئيسية
     { id: 'pos', label: 'نقطة البيع', icon: LayoutGrid, section: 'main', shortcut: 'F1' },
     
-    // Sales Section
+    // 2. المبيعات
     { id: 'orders', label: config.labels.orders, icon: Receipt, badge: stats.pendingOrders, section: 'sales', locked: lockedTabs.includes('orders') },
     { id: 'menu', label: config.labels.menu, icon: ShoppingCart, section: 'sales' },
     { id: 'sales_returns', label: 'مردودات المبيعات', icon: RotateCcw, section: 'sales' },
     { id: 'delivery', label: 'المناديب', icon: Truck, badge: stats.deliveryOrders, section: 'sales', locked: lockedTabs.includes('delivery') },
     
-    // Inventory Section (conditional)
+    // 3. المخزون والتكاليف
     ...(config.features.includes('inventory') ? [
       { id: 'inventory', label: config.labels.inventory, icon: Package, section: 'inventory' },
-      { id: 'inventory_receipts', label: 'إيصالات المخزون', icon: Receipt, section: 'inventory' },
-      { id: 'suppliers', label: 'الموردين', icon: Store, section: 'inventory' },
-      { id: 'supplier_accounts', label: 'حسابات الموردين', icon: Wallet, section: 'inventory' }
+      { id: 'inventory_receipts', label: 'إيصالات المخزون', icon: Receipt, section: 'inventory' }
     ] : []),
     
-    // People Section
-    { id: 'customers', label: config.labels.customers, icon: Users, section: 'people' },
-    { id: 'customer_accounts', label: 'حسابات العملاء', icon: FileText, section: 'people' },
-    { id: 'staff', label: 'الموظفين', icon: UsersRound, section: 'people' },
+    // 4. المحاسبة والمالية (التابة المدمجة الكبرى)
+    { id: 'customers', label: 'العملاء وحساباتهم', icon: Users, section: 'accounting' },
+    { id: 'suppliers', label: 'الموردين وحساباتهم', icon: Store, section: 'accounting' },
+    { id: 'expenses', label: 'المصروفات والمرافق', icon: Wallet, section: 'accounting' },
+    { id: 'financials', label: 'القوائم المالية', icon: DollarSign, section: 'accounting' },
+    { id: 'overheads', label: 'النفقات العامة', icon: TrendingUp, section: 'accounting' },
     
-    // Analytics Section
-    { id: 'stats', label: 'الإحصائيات', icon: BarChart3, section: 'analytics', locked: lockedTabs.includes('stats') },
-    { id: 'financials', label: 'القوائم المالية', icon: DollarSign, section: 'analytics' },
-    { id: 'expenses', label: 'المصروفات', icon: Wallet, section: 'analytics' },
-    { id: 'overheads', label: 'النفقات العامة', icon: TrendingUp, section: 'analytics' },
-    { id: 'shifts', label: 'الشفتات', icon: CalendarClock, section: 'analytics', locked: lockedTabs.includes('shifts') },
+    // 5. التقارير والذكاء الاصطناعي
+    { id: 'analytics', label: 'مركز التقارير والتحليلات', icon: BarChart3, section: 'analytics' },
+    { id: 'stats', label: 'إحصائيات الأداء', icon: Activity, section: 'analytics', locked: lockedTabs.includes('stats') },
+    { id: 'shifts', label: 'إدارة الشفتات', icon: CalendarClock, section: 'analytics', locked: lockedTabs.includes('shifts') },
     
-    // System Section
+    // 6. النظام
     { id: 'qr', label: 'قائمة QR', icon: QrCode, section: 'system' },
-    ...(config.features.includes('waiter_calls') ? [
-      { id: 'waiter', label: 'استدعاء ويتر', icon: Bell, badge: stats.unackCalls, section: 'system' }
-    ] : []),
+    { id: 'staff', label: 'الموظفين', icon: UsersRound, section: 'system' },
     { id: 'notifications', label: 'الإشعارات', icon: Bell, section: 'system' },
     { id: 'settings', label: 'الإعدادات', icon: Settings, section: 'system' }
   ].filter(Boolean) as NavItem[];
