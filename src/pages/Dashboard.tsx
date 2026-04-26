@@ -39,6 +39,7 @@ import { BarcodeScanner } from './dashboard/BarcodeScanner';
 import { POSGrid } from './dashboard/pos/POSGrid';
 import { POSCart } from './dashboard/pos/POSCart';
 import { InvoiceTabs } from './dashboard/pos/InvoiceTabs';
+import { VentroCRM } from './dashboard/VentroCRM';
 import { TradingAccount } from './dashboard/TradingAccount';
 import { BOMManager } from './dashboard/BOMManager';
 import { AccountingMegaTab } from './dashboard/AccountingMegaTab';
@@ -622,12 +623,14 @@ export default function Dashboard() {
       setOrderType(getDefaultOrderType(bt) as OrderType);
     }
   }, [restaurant?.id]);
-  const allTabs: { id: DashboardTab; label: string; icon: typeof LayoutGrid; badge?: number; locked?: boolean }[] = [
+  
+  const allTabs: { id: DashboardTab; label: string; icon: any; badge?: number; locked?: boolean }[] = [
     { id: 'pos', label: 'نقطة البيع', icon: LayoutGrid },
     { id: 'orders', label: 'الطلبات', icon: Receipt, badge: pendingOrders.length, locked: lockedTabs.includes('orders') },
     { id: 'inventory', label: 'المخزون والتكاليف', icon: Package },
-    { id: 'accounting', label: 'المحاسبة والمالية', icon: Wallet } as any,
-    { id: 'analytics', label: 'التقارير المخصصة', icon: BarChart3 } as any,
+    { id: 'crm', label: 'إدارة العملاء CRM', icon: Heart },
+    { id: 'accounting', label: 'المحاسبة والمالية', icon: Landmark },
+    { id: 'analytics', label: 'التقارير المخصصة', icon: BarChart3 },
     { id: 'settings', label: 'الإعدادات', icon: Settings },
   ];
 
@@ -899,205 +902,6 @@ export default function Dashboard() {
             </div>
           )}
 
-          {/* ===================== DELIVERY TAB ===================== */}
-          {activeTab === 'delivery' && (
-            <DeliveryTab
-              restaurantId={restaurant.id}
-              agents={agents}
-              setAgents={setAgents}
-              deliveryOrders={deliveryOrders}
-              onAssignAgent={handleAssignAgent}
-            />
-          )}
-
-          {/* ===================== SHIFTS TAB ===================== */}
-          {activeTab === 'shifts' && (
-            <ShiftsTab
-              restaurant={restaurant}
-              currentShift={currentShift}
-              setCurrentShift={setCurrentShift}
-              profileName={profileName}
-              userId={user!.id}
-              todayRevenue={todayRevenue}
-              todayOrdersCount={todayOrders.length}
-            />
-          )}
-
-          {/* ===================== STATS TAB ===================== */}
-          {activeTab === 'stats' && (
-            <div className="p-4 space-y-6">
-              <h2 className="font-display text-xl font-bold">الإحصائيات</h2>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                {[
-                  { label: 'إجمالي الإيرادات', value: `${totalRevenue} ${currency}`, color: 'text-primary' },
-                  { label: 'إجمالي الطلبات', value: String(orders.length), color: 'text-foreground' },
-                  { label: 'إيرادات اليوم', value: `${todayRevenue} ${currency}`, color: 'text-success' },
-                  { label: 'متوسط قيمة الطلب', value: `${avgOrderValue} ${currency}`, color: 'text-accent' },
-                ].map(s => (
-                  <div key={s.label} className="glass-card p-4">
-                    <p className="text-xs text-muted-foreground">{s.label}</p>
-                    <p className={`font-display text-2xl font-bold ${s.color}`}>{s.value}</p>
-                  </div>
-                ))}
-              </div>
-
-              {topItems.length > 0 && (
-                <div className="glass-card p-6">
-                  <h3 className="font-display font-bold mb-4">🏆 الأكثر مبيعاً</h3>
-                  <div className="space-y-3">
-                    {topItems.map(([name, qty], idx) => {
-                      const menuItem = menuItems.find(m => m.name === name);
-                      const maxQty = topItems[0][1];
-                      return (
-                        <div key={name} className="flex items-center gap-3">
-                          <span className="w-6 text-center font-bold text-muted-foreground">{idx + 1}</span>
-                          <span className="text-xl">{menuItem?.image || '🍽️'}</span>
-                          <div className="flex-1">
-                            <div className="flex justify-between mb-1">
-                              <span className="text-sm font-medium">{name}</span>
-                              <span className="text-sm text-primary font-bold">{qty} مبيعات</span>
-                            </div>
-                            <div className="h-2 bg-secondary rounded-full overflow-hidden">
-                              <motion.div initial={{ width: 0 }} animate={{ width: `${(qty / maxQty) * 100}%` }}
-                                transition={{ duration: 0.8, delay: idx * 0.1 }} className="h-full rounded-full gradient-bg" />
-                            </div>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              )}
-
-              <div className="glass-card p-6">
-                <h3 className="font-display font-bold mb-4">الإيرادات - آخر 7 أيام</h3>
-                <div className="h-64">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={last7Days}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="hsl(224, 18%, 18%)" />
-                      <XAxis dataKey="day" stroke="hsl(215, 15%, 55%)" fontSize={12} />
-                      <YAxis stroke="hsl(215, 15%, 55%)" fontSize={12} />
-                      <Tooltip contentStyle={{ backgroundColor: 'hsl(224, 24%, 12%)', border: '1px solid hsl(224, 18%, 18%)', borderRadius: '8px' }} formatter={(v: number) => [`${v} ${currency}`, 'الإيرادات']} />
-                      <Bar dataKey="revenue" fill="hsl(25, 95%, 53%)" radius={[6, 6, 0, 0]} />
-                    </BarChart>
-                  </ResponsiveContainer>
-                </div>
-              </div>
-
-              <div className="grid md:grid-cols-2 gap-6">
-                {categoryData.length > 0 && (
-                  <div className="glass-card p-6">
-                    <h3 className="font-display font-bold mb-4">التوزيع حسب الفئة</h3>
-                    <div className="flex flex-col items-center gap-4">
-                      <div className="h-48 w-full">
-                        <ResponsiveContainer width="100%" height="100%">
-                          <RePieChart><Pie data={categoryData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={80} label={({ name }) => name}>{categoryData.map((_, idx) => <Cell key={idx} fill={CHART_COLORS[idx % CHART_COLORS.length]} />)}</Pie><Tooltip /></RePieChart>
-                        </ResponsiveContainer>
-                      </div>
-                      <div className="space-y-2 w-full">{categoryData.map((d, idx) => <div key={d.name} className="flex items-center gap-3"><div className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: CHART_COLORS[idx % CHART_COLORS.length] }} /><span className="text-sm flex-1">{d.name}</span><span className="text-sm font-bold text-primary">{d.value} {currency}</span></div>)}</div>
-                    </div>
-                  </div>
-                )}
-                <div className="glass-card p-6">
-                  <h3 className="font-display font-bold mb-4">عدد الطلبات - آخر 7 أيام</h3>
-                  <div className="h-52">
-                    <ResponsiveContainer width="100%" height="100%">
-                      <LineChart data={last7Days}>
-                        <CartesianGrid strokeDasharray="3 3" stroke="hsl(224, 18%, 18%)" />
-                        <XAxis dataKey="day" stroke="hsl(215, 15%, 55%)" fontSize={12} />
-                        <YAxis stroke="hsl(215, 15%, 55%)" fontSize={12} />
-                        <Tooltip contentStyle={{ backgroundColor: 'hsl(224, 24%, 12%)', border: '1px solid hsl(224, 18%, 18%)', borderRadius: '8px' }} />
-                        <Line type="monotone" dataKey="orders" stroke="hsl(25, 95%, 53%)" strokeWidth={2} dot={{ fill: 'hsl(25, 95%, 53%)' }} name="الطلبات" />
-                      </LineChart>
-                    </ResponsiveContainer>
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* ===================== ACCOUNTING MEGA TAB ===================== */}
-          {activeTab === 'accounting' && (
-            <AccountingMegaTab restaurantId={restaurant.id} currency={restaurant.currency || 'ج.م'} />
-          )}
-
-          {/* ===================== CUSTOM REPORTS TAB ===================== */}
-          {activeTab === 'analytics' && (
-            <CustomReportBuilder restaurantId={restaurant.id} currency={restaurant.currency || 'ج.م'} />
-          )}
-
-          {/* ===================== MENU TAB ===================== */}
-          {activeTab === 'menu' && (
-            <MenuTab
-              restaurant={restaurant}
-              menuItems={menuItems}
-              setMenuItems={setMenuItems}
-              menuForm={menuForm}
-              setMenuForm={setMenuForm}
-              showAddItem={showAddItem}
-              setShowAddItem={setShowAddItem}
-              editingItem={editingItem}
-              setEditingItem={setEditingItem}
-              loadData={loadData}
-            />
-          )}
-
-          {/* ===================== QR TAB ===================== */}
-          {activeTab === 'qr' && (
-            <div className="p-4 flex flex-col items-center">
-              <h2 className="font-display text-xl font-bold mb-6">رابط المتجر الإلكتروني</h2>
-              {restaurant.logo_url && (
-                <img src={restaurant.logo_url} alt="logo" className="w-24 h-24 object-contain rounded-2xl mb-4 border border-border" />
-              )}
-              <div className="glass-card p-8 text-center">
-                <QRCodeSVG value={`${window.location.origin}/store/${restaurant.id}`} size={220} bgColor="transparent" fgColor="hsl(25, 95%, 53%)" level="H" />
-                <p className="text-muted-foreground text-sm mt-4">{restaurant.name}</p>
-                <p className="text-xs text-muted-foreground mt-2">رابط المتجر — شاركه مع عملائك للطلب مباشرة</p>
-                <p className="text-xs text-primary mt-1 break-all font-mono">{window.location.origin}/store/{restaurant.id}</p>
-                <div className="flex gap-2 mt-4 justify-center">
-                  <Button onClick={() => navigator.clipboard.writeText(`${window.location.origin}/store/${restaurant.id}`).then(() => toast.success('تم نسخ الرابط'))} variant="outline">
-                    نسخ الرابط
-                  </Button>
-                  <Button onClick={() => window.open(`${window.location.origin}/store/${restaurant.id}`, '_blank')} className="gradient-bg text-primary-foreground border-0">
-                    معاينة المتجر
-                  </Button>
-                </div>
-              </div>
-              {/* QR Menu link (legacy) */}
-              <div className="glass-card p-4 mt-4 text-center">
-                <p className="text-xs text-muted-foreground mb-2">رابط قائمة QR (للعرض فقط)</p>
-                <QRCodeSVG value={`${window.location.origin}/qr-menu/${restaurant.id}`} size={120} bgColor="transparent" fgColor="hsl(var(--muted-foreground))" level="H" />
-                <p className="text-[10px] text-muted-foreground mt-2 break-all">{window.location.origin}/qr-menu/${restaurant.id}</p>
-              </div>
-            </div>
-          )}
-
-          {/* ===================== WAITER TAB ===================== */}
-          {activeTab === 'waiter' && (
-            <div className="p-4">
-              <h2 className="font-display text-xl font-bold mb-4 flex items-center gap-2">
-                <Bell className="w-5 h-5 text-primary" /> استدعاءات الويتر
-              </h2>
-              {waiterCalls.length === 0 && <p className="text-muted-foreground text-center py-12">لا توجد استدعاءات</p>}
-              {waiterCalls.map(call => (
-                <motion.div key={call.id} initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }}
-                  className={`glass-card p-4 mb-3 ${!call.acknowledged ? 'border-primary/50 pulse-notification' : ''}`}>
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="font-bold text-sm">{call.table_info}</p>
-                      <p className="text-xs text-muted-foreground">{new Date(call.created_at).toLocaleTimeString('ar-EG')}</p>
-                    </div>
-                    {!call.acknowledged ? (
-                      <Button size="sm" className="gradient-bg text-primary-foreground border-0" onClick={() => handleAcknowledge(call.id)}>
-                        <Check className="w-4 h-4 ml-1" /> تم
-                      </Button>
-                    ) : <Badge className="status-active">تم الاستجابة</Badge>}
-                  </div>
-                </motion.div>
-              ))}
-            </div>
-          )}
-
           {/* ===================== INVENTORY TAB ===================== */}
             {activeTab === 'inventory' && (
               <div className="space-y-4">
@@ -1109,9 +913,6 @@ export default function Dashboard() {
               </div>
             )}
 
-          {/* ===================== CUSTOMERS TAB ===================== */}
-          {activeTab === 'customers' && (
-            <CustomersTab restaurantId={restaurant.id} currency={currency} />
           )}
 
           {/* ===================== SUPPLIERS TAB ===================== */}
@@ -1152,6 +953,16 @@ export default function Dashboard() {
           {/* ===================== NOTIFICATIONS TAB ===================== */}
           {activeTab === 'notifications' && (
             <NotificationsTab restaurantId={restaurant.id} />
+          )}
+
+          {/* ===================== CRM TAB ===================== */}
+          {activeTab === 'crm' && (
+            <VentroCRM restaurantId={restaurant.id} currency={currency} />
+          )}
+
+          {/* ===================== ACCOUNTING MEGA TAB ===================== */}
+          {activeTab === 'accounting' && (
+            <AccountingMegaTab restaurantId={restaurant.id} currency={restaurant.currency || 'ج.م'} />
           )}
 
           {/* ===================== FINANCIALS TAB ===================== */}
