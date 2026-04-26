@@ -3,7 +3,7 @@
  * Complete double-entry accounting system types
  */
 
-export type AccountType = 'asset' | 'liability' | 'equity' | 'revenue' | 'expense' | 'cogs';
+export type AccountType = 'asset' | 'liability' | 'equity' | 'revenue' | 'expense';
 export type AccountSubtype = 
   | 'current_asset' | 'fixed_asset' | 'inventory' | 'receivable' | 'bank' | 'cash'
   | 'current_liability' | 'long_term_liability' | 'payable'
@@ -92,8 +92,8 @@ export const STANDARD_CHART_OF_ACCOUNTS: AccountTemplate[] = [
   { code: '4.02', name: 'إيرادات أخرى', account_type: 'revenue', subtype: 'other_revenue', level: 2, parent_code: '4' },
   
   // COGS (5)
-  { code: '5', name: 'تكلفة البضاعة المباعة', account_type: 'cogs', subtype: 'cogs', level: 1 },
-  { code: '5.01', name: 'تكلفة المبيعات', account_type: 'cogs', subtype: 'cogs', level: 2, parent_code: '5' },
+  { code: '5', name: 'تكلفة البضاعة المباعة', account_type: 'expense', subtype: 'cogs', level: 1 },
+  { code: '5.01', name: 'تكلفة المبيعات', account_type: 'expense', subtype: 'cogs', level: 2, parent_code: '5' },
   
   // Expenses (6)
   { code: '6', name: 'المصروفات', account_type: 'expense', subtype: 'operating_expense', level: 1 },

@@ -650,8 +650,8 @@ export default function Dashboard() {
     <div className="min-h-screen bg-background flex items-center justify-center p-4">
       <div className="glass-card p-8 max-w-md text-center">
         <ChefHat className="w-12 h-12 text-primary mx-auto mb-4" />
-        <h2 className="font-display text-xl font-bold mb-2">لا يوجد مطعم مسجّل</h2>
-        <p className="text-muted-foreground mb-4">أنشئ مطعمك الأول للبدء</p>
+        <h2 className="font-display text-xl font-bold mb-2">لا يوجد نشاط مسجّل</h2>
+        <p className="text-muted-foreground mb-4">أنشئ مشروعك الأول للبدء</p>
         <CreateRestaurantForm userId={user.id} onCreated={loadData} />
       </div>
     </div>
