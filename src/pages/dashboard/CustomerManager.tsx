@@ -89,7 +89,7 @@ export function CustomerManager({ restaurantId, currency }: Props) {
         .select(`
           id, name, phone, email, address, balance, credit_limit, tax_number, created_at,
           orders(id, total, created_at, status),
-          customer_transactions(id, amount, transaction_type, created_at)
+          customer_transactions(id, amount, type, created_at)
         `)
         .eq('restaurant_id', restaurantId)
         .order('name');
@@ -140,7 +140,7 @@ export function CustomerManager({ restaurantId, currency }: Props) {
       // Get customer transactions (payments)
       const { data: payments } = await supabase
         .from('customer_transactions')
-        .select('id, amount, transaction_type, notes, created_at')
+        .select('id, amount, type, description, created_at')
         .eq('customer_id', customerId)
         .order('created_at', { ascending: true });
 
@@ -173,9 +173,9 @@ export function CustomerManager({ restaurantId, currency }: Props) {
         statement.push({
           id: payment.id,
           date: payment.created_at,
-          type: payment.transaction_type,
+          type: payment.type as any,
           reference: '',
-          description: payment.notes || 'سداد',
+          description: payment.description || 'سداد',
           debit: 0,
           credit: amount,
           balance: runningBalance
