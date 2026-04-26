@@ -41,6 +41,7 @@ import { POSCart } from './dashboard/pos/POSCart';
 import { InvoiceTabs } from './dashboard/pos/InvoiceTabs';
 import { TradingAccount } from './dashboard/TradingAccount';
 import { BOMManager } from './dashboard/BOMManager';
+import { AnalyticsTab } from './dashboard/AnalyticsTab';
 import { SettingsTab } from './dashboard/SettingsTab';
 import { BUSINESS_TYPES, BUSINESS_TABS, getAddressPlaceholder, getCheckoutButtonLabel, getCustomerPlaceholder, getDefaultOrderType, getNotesPlaceholder, getPosSearchPlaceholder, isFoodSector, isInventoryDrivenBusiness, type BusinessType } from '@/lib/businessTypes';
 import { useAuth } from '@/lib/AuthContext';
@@ -635,6 +636,7 @@ export default function Dashboard() {
     { id: 'delivery', label: 'المناديب', icon: Truck, badge: deliveryOrders.length, locked: lockedTabs.includes('delivery') },
     { id: 'shifts', label: 'الشفتات', icon: CalendarClock, locked: lockedTabs.includes('shifts') },
     { id: 'stats', label: 'الإحصائيات', icon: BarChart3, locked: lockedTabs.includes('stats') },
+    { id: 'analytics', label: 'التحليلات', icon: PieChart },
     { id: 'menu', label: btConfig?.labels?.menu || 'القائمة', icon: ShoppingCart },
     { id: 'qr', label: 'رابط المتجر', icon: QrCode },
     { id: 'waiter', label: 'ويتر', icon: Bell, badge: unackCalls.length },
@@ -1004,7 +1006,7 @@ export default function Dashboard() {
                     <div className="flex flex-col items-center gap-4">
                       <div className="h-48 w-full">
                         <ResponsiveContainer width="100%" height="100%">
-                          <PieChart><Pie data={categoryData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={80} label={({ name }) => name}>{categoryData.map((_, idx) => <Cell key={idx} fill={CHART_COLORS[idx % CHART_COLORS.length]} />)}</Pie><Tooltip /></PieChart>
+                          <RePieChart><Pie data={categoryData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={80} label={({ name }) => name}>{categoryData.map((_, idx) => <Cell key={idx} fill={CHART_COLORS[idx % CHART_COLORS.length]} />)}</Pie><Tooltip /></RePieChart>
                         </ResponsiveContainer>
                       </div>
                       <div className="space-y-2 w-full">{categoryData.map((d, idx) => <div key={d.name} className="flex items-center gap-3"><div className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: CHART_COLORS[idx % CHART_COLORS.length] }} /><span className="text-sm flex-1">{d.name}</span><span className="text-sm font-bold text-primary">{d.value} {currency}</span></div>)}</div>
@@ -1027,6 +1029,11 @@ export default function Dashboard() {
                 </div>
               </div>
             </div>
+          )}
+
+          {/* ===================== ANALYTICS TAB ===================== */}
+          {activeTab === 'analytics' && (
+            <AnalyticsTab restaurantId={restaurant.id} currency={restaurant.currency || 'ج.م'} />
           )}
 
           {/* ===================== MENU TAB ===================== */}
@@ -1159,7 +1166,7 @@ export default function Dashboard() {
 
           {/* ===================== FINANCIALS TAB ===================== */}
           {activeTab === 'financials' && (
-            <FinancialsTab restaurantId={restaurant.id} currency={currency} />
+            <FinancialsTab restaurantId={restaurant.id} currency={restaurant.currency || 'ج.م'} />
           )}
 
           {/* ===================== OVERHEADS TAB ===================== */}
