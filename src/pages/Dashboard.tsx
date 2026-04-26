@@ -632,11 +632,6 @@ export default function Dashboard() {
     { id: 'supplier_accounts', label: 'حسابات الموردين', icon: FileText },
     { id: 'inventory_receipts', label: 'فواتير الاستلام', icon: Truck },
     { id: 'expenses', label: 'المصروفات', icon: Wallet },
-    { id: 'overheads', label: 'النفقات العامة', icon: TrendingUp },
-    { id: 'delivery', label: 'المناديب', icon: Truck, badge: deliveryOrders.length, locked: lockedTabs.includes('delivery') },
-    { id: 'shifts', label: 'الشفتات', icon: CalendarClock, locked: lockedTabs.includes('shifts') },
-    { id: 'stats', label: 'الإحصائيات', icon: BarChart3, locked: lockedTabs.includes('stats') },
-    { id: 'analytics', label: 'التحليلات', icon: PieChart },
     { id: 'analytics', label: 'التقارير والتحليلات', icon: PieChart },
     { id: 'menu', label: btConfig?.labels?.menu || 'القائمة', icon: ShoppingCart },
     { id: 'qr', label: 'رابط المتجر', icon: QrCode },
@@ -1030,11 +1025,6 @@ export default function Dashboard() {
                 </div>
               </div>
             </div>
-          )}
-
-          {/* ===================== ANALYTICS TAB ===================== */}
-          {activeTab === 'analytics' && (
-            <AnalyticsTab restaurantId={restaurant.id} currency={restaurant.currency || 'ج.م'} />
           )}
 
           {/* ===================== ANALYTICS TAB ===================== */}
