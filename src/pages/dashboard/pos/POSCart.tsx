@@ -51,6 +51,7 @@ interface POSCartProps {
   setPaidAmount: (val: string) => void;
   remaining: number;
   checkout: (sendToPrep: boolean) => void;
+  updateValue: (id: string, value: number) => void;
 }
 
 export function POSCart({
@@ -61,7 +62,7 @@ export function POSCart({
   orderNotes, setOrderNotes, discount, setDiscount, discountType, setDiscountType,
   currency, getUnitOptions, setCartItemUnit, updateQty, setCartItemQty,
   discountAmount, taxAmount, cartSubtotal, cartTotal, paymentMethod, setPaymentMethod,
-  paidAmount, setPaidAmount, remaining, checkout
+  paidAmount, setPaidAmount, remaining, checkout, updateValue
 }: POSCartProps) {
   const { hasPermission } = usePermissions(restaurant?.id);
   return (
@@ -174,9 +175,23 @@ export function POSCart({
             <span className="text-xl">{c.item.image}</span>
             <div className="flex-1 min-w-0">
               <p className="text-sm font-medium truncate">{c.item.name}</p>
-              <p className="text-xs text-primary">{(c.item.price * c.qty).toFixed(2)} {currency}</p>
+              <div className="flex items-center gap-1">
+                <span className="text-[10px] text-muted-foreground">السعر:</span>
+                <span className="text-[10px] font-bold text-primary">{c.item.price} {currency}</span>
+              </div>
             </div>
-            <div className="flex items-center gap-1 flex-wrap">
+            <div className="flex flex-col gap-1 items-end">
+              <div className="flex items-center gap-1">
+                <div className="relative w-20">
+                  <Input 
+                    type="number" 
+                    value={(c.item.price * c.qty).toFixed(2)} 
+                    onChange={e => updateValue(c.item.id, Number(e.target.value))}
+                    className="h-7 text-[10px] pr-5 text-center bg-blue-50/50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800"
+                  />
+                  <span className="absolute right-1 top-1/2 -translate-y-1/2 text-[8px] text-blue-600 dark:text-blue-400 font-bold">{currency}</span>
+                </div>
+                <div className="flex items-center gap-1 bg-secondary rounded-md p-0.5">
               {getUnitOptions(c.item).length > 1 && (
                 <select value={c.unitMode} onChange={e => setCartItemUnit(c.item.id, e.target.value)}
                   className="h-7 text-[10px] bg-secondary border border-border rounded-md px-1">

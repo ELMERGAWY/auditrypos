@@ -298,6 +298,17 @@ export default function Dashboard() {
   };
 
   const setCartItemUnit = (id: string, unitLabel: string) => {
+    setCart(prev => prev.map(c => c.item.id === id ? { ...c, unitMode: unitLabel } : c));
+  };
+
+  const updateValue = (id: string, value: number) => {
+    setCart(prev => prev.map(c => {
+      if (c.item.id !== id) return c;
+      const newQty = value / c.item.price;
+      const roundedQty = Math.round(newQty * 1000) / 1000;
+      return { ...c, qty: roundedQty, qtyText: String(roundedQty) };
+    }));
+  };
     setCart(prev => prev.map(c => {
       if (c.item.id !== id) return c;
       const units = getUnitOptions(c.item);
@@ -813,6 +824,7 @@ export default function Dashboard() {
                 setPaidAmount={setPaidAmount}
                 remaining={remaining}
                 checkout={checkout}
+                updateValue={updateValue}
               />
             </div>
           )}
