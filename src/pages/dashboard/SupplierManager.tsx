@@ -93,7 +93,7 @@ export function SupplierManager({ restaurantId, currency }: Props) {
           id, name, phone, email, address, balance, credit_limit, tax_number, 
           contact_person, payment_terms, created_at,
           inventory_receipts(id, total_amount, receipt_date),
-          supplier_transactions(id, amount, transaction_type, created_at)
+          supplier_transactions(id, amount, type, created_at)
         `)
         .eq('restaurant_id', restaurantId)
         .order('name');
@@ -144,7 +144,7 @@ export function SupplierManager({ restaurantId, currency }: Props) {
       // Get supplier transactions (payments)
       const { data: payments } = await supabase
         .from('supplier_transactions')
-        .select('id, amount, transaction_type, notes, created_at')
+        .select('id, amount, type, description, created_at')
         .eq('supplier_id', supplierId)
         .order('created_at', { ascending: true });
 
@@ -199,9 +199,9 @@ export function SupplierManager({ restaurantId, currency }: Props) {
         statement.push({
           id: payment.id,
           date: payment.created_at,
-          type: 'payment',
+          type: payment.type as any,
           reference: '',
-          description: payment.notes || 'سداد',
+          description: payment.description || 'سداد',
           debit: 0,
           credit: amount,
           balance: runningBalance
