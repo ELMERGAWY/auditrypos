@@ -184,6 +184,26 @@ export default function Dashboard() {
     product_id: ''
   });
 
+  if (authLoading || !dataLoaded) return <div className="min-h-screen bg-background flex flex-col items-center justify-center p-4"><div className="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin mb-4"></div><p className="text-sm font-bold text-muted-foreground animate-pulse">جاري تحميل البيانات الحية...</p></div>;
+  if (!user) { navigate('/auth'); return null; }
+
+  if (!restaurant) {
+    return (
+      <div className="min-h-screen bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-primary/5 via-transparent to-transparent flex items-center justify-center p-6">
+        <div className="max-w-md w-full glass-card p-10 text-center space-y-6 shadow-2xl scale-in">
+          <div className="w-20 h-20 rounded-3xl gradient-bg flex items-center justify-center mx-auto shadow-lg shadow-primary/20">
+            <ChefHat className="w-10 h-10 text-primary-foreground" />
+          </div>
+          <h1 className="text-3xl font-extrabold tracking-tight">إنشاء مؤسستك</h1>
+          <p className="text-muted-foreground">أهلاً بك في Auditry. ابدأ بإنشاء أول مؤسسة لك للتحكم في كافة العمليات المحاسبية والمالية.</p>
+          <CreateRestaurantForm userId={user.id} onCreated={loadData} />
+        </div>
+      </div>
+    );
+  }
+
+  const businessType = (restaurant.business_type || 'restaurant') as BusinessType;
+
   const isSuspended = restaurant
     ? restaurant.status === 'suspended' || (restaurant.subscription_end && new Date(restaurant.subscription_end) < new Date())
     : false;
@@ -612,7 +632,6 @@ export default function Dashboard() {
     setWaiterCalls(prev => prev.map(c => c.id === id ? { ...c, acknowledged: true } : c));
   };
 
-  const businessType = (restaurant?.business_type || 'restaurant') as BusinessType;
   const allowedTabs = BUSINESS_TABS[businessType] || BUSINESS_TABS.restaurant;
   const btConfig = BUSINESS_TYPES[businessType];
 
