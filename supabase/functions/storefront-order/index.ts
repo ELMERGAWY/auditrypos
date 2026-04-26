@@ -38,8 +38,33 @@ Deno.serve(async (req) => {
       });
     }
 
+    // 1. Fetch official prices from DB to prevent price manipulation
+    const menuItemIds = items.map((i: any) => i.menu_item_id).filter(Boolean);
+    const { data: dbItems } = await supabase
+      .from("menu_items")
+      .select("id, price, name")
+      .in("id", menuItemIds);
+
+    if (!dbItems || dbItems.length === 0) {
+      return new Response(JSON.stringify({ error: "No valid items found" }), {
+        status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" }
+      });
+    }
+
+    // 2. Map real prices to ordered items and calculate secure total
+    const secureItems = items.map((i: any) => {
+      const dbItem = dbItems.find(db => db.id === i.menu_item_id);
+      if (!dbItem) return null;
+      return {
+        ...i,
+        name: dbItem.name,
+        price: dbItem.price, // Use DB price, ignore client price
+        quantity: Math.max(1, i.quantity || 1)
+      };
+    }).filter(Boolean);
+
     const orderNum = `SF-${Date.now().toString().slice(-6)}`;
-    const total = items.reduce((s: number, i: any) => s + (i.price || 0) * (i.quantity || 1), 0);
+    const total = secureItems.reduce((s: number, i: any) => s + (i.price * i.quantity), 0);
 
     const { data: order, error } = await supabase.from("orders").insert({
       restaurant_id,
@@ -59,13 +84,15 @@ Deno.serve(async (req) => {
       });
     }
 
+    // 3. Insert items with official prices
     await supabase.from("order_items").insert(
-      items.map((i: any) => ({
+      secureItems.map((i: any) => ({
         order_id: order.id,
+        menu_item_id: i.menu_item_id,
         menu_item_name: i.name,
         menu_item_image: i.image || "📦",
-        quantity: i.quantity || 1,
-        price: i.price || 0,
+        quantity: i.quantity,
+        price: i.price, // Save official price
       }))
     );
 
