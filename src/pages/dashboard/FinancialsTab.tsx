@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { BarChart3, TrendingUp, TrendingDown, DollarSign, FileText, Wallet, BookOpen, Scale, PieChart } from 'lucide-react';
+import { BarChart3, TrendingUp, TrendingDown, DollarSign, FileText, Wallet, BookOpen, Scale, PieChart, ShoppingBag } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { supabase } from '@/integrations/supabase/client';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
