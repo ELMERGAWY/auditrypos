@@ -5,9 +5,13 @@ import {
   ArrowUpRight, ArrowDownLeft, RefreshCcw, ShoppingBag, 
   Truck, Package, ClipboardList, Briefcase, UsersRound,
   Calculator, History, Settings, BarChart3, HardDrive,
-  Banknote, Receipt, Layers, Boxes, Ban, LayoutDashboard
+  Banknote, Receipt, Layers, Boxes, Ban, LayoutDashboard,
+  Plus, Search, Download, Printer, Filter
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Badge } from '@/components/ui/badge';
+import { supabase } from '@/integrations/supabase/client';
 import { CustomersTab } from './CustomersTab';
 import { SuppliersTab } from './SuppliersTab';
 import { ExpensesTab } from './ExpensesTab';
@@ -26,52 +30,84 @@ type SubModule = 'overview' | 'bank_cash' | 'customers' | 'suppliers' | 'expense
 
 export function AccountingMegaTab({ restaurantId, currency }: Props) {
   const [activeModule, setActiveModule] = useState<SubModule>('overview');
-  const [bizName, setBizName] = useState('نظام الإدارة المتكامل');
+  const [journalEntries, setJournalEntries] = useState<any[]>([]);
+  const [accounts, setAccounts] = useState<any[]>([]);
+  const [loading, setLoading] = useState(false);
+
+  // Load GL Data
+  useEffect(() => {
+    const loadAccountingData = async () => {
+      setLoading(true);
+      const { data: entries } = await supabase
+        .from('journal_entries')
+        .select(`
+          *,
+          journal_entry_lines (
+            *,
+            chart_of_accounts (name, code)
+          )
+        `)
+        .eq('restaurant_id', restaurantId)
+        .order('created_at', { ascending: false })
+        .limit(20);
+      
+      const { data: accs } = await supabase
+        .from('chart_of_accounts')
+        .select('*')
+        .eq('restaurant_id', restaurantId);
+
+      if (entries) setJournalEntries(entries);
+      if (accs) setAccounts(accs);
+      setLoading(false);
+    };
+    loadAccountingData();
+  }, [restaurantId]);
 
   const sections = [
     {
       title: 'النقدية والبنوك',
       icon: Banknote,
       items: [
-        { id: 'expenses', label: 'المقبوضات والمدفوعات', icon: Banknote, count: 3223 },
-        { id: 'bank_cash', label: 'حسابات البنك والخزينة', icon: Building2, count: 2 },
+        { id: 'bank_cash', label: 'حسابات البنك والخزينة', icon: Building2 },
+        { id: 'expenses', label: 'المقبوضات والمدفوعات', icon: Banknote },
       ]
     },
     {
       title: 'المبيعات والمشتريات',
       icon: ShoppingBag,
       items: [
-        { id: 'customers', label: 'حسابات العملاء', icon: Users, count: 29 },
-        { id: 'suppliers', label: 'حسابات الموردين', icon: Store, count: 53 },
+        { id: 'customers', label: 'حسابات العملاء', icon: Users },
+        { id: 'suppliers', label: 'حسابات الموردين', icon: Store },
       ]
     },
     {
       title: 'المخزون والإنتاج',
       icon: Layers,
       items: [
-        { id: 'inventory', label: 'أصناف المخزون', icon: Boxes, count: 117 },
-        { id: 'production', label: 'أوامر الإنتاج والتكاليف', icon: HardDrive, count: 235 },
+        { id: 'inventory', label: 'أصناف المخزون', icon: Boxes },
+        { id: 'production', label: 'أوامر الإنتاج والتكاليف', icon: HardDrive },
       ]
     },
     {
       title: 'الإدارة والمالية',
       icon: Calculator,
       items: [
-        { id: 'financials', label: 'القوائم المالية', icon: Landmark, count: 0 },
-        { id: 'assets', label: 'الأصول الثابتة', icon: Truck, count: 82 },
-        { id: 'hr', label: 'الموظفون والرواتب', icon: UsersRound, count: 0 },
+        { id: 'financials', label: 'القوائم المالية', icon: Landmark },
+        { id: 'assets', label: 'الأصول الثابتة', icon: Truck },
+        { id: 'hr', label: 'الموظفون والرواتب', icon: UsersRound },
       ]
     },
     {
-      title: 'التقارير المتقدمة',
+      title: 'التقارير والدفاتر',
       icon: BarChart3,
       items: [
-        { id: 'reports', label: 'مولد التقارير المخصص', icon: FileText, count: 0 },
-        { id: 'ledger', label: 'القيود والدفاتر', icon: ClipboardList, count: 90 },
+        { id: 'ledger', label: 'دفتر الأستاذ العام', icon: ClipboardList },
+        { id: 'reports', label: 'مولد التقارير المخصص', icon: FileText },
       ]
     }
   ];
 
+  // Render Sub-Modules
   if (activeModule !== 'overview') {
     return (
       <div className="flex flex-col h-full bg-background" dir="rtl">
@@ -95,13 +131,105 @@ export function AccountingMegaTab({ restaurantId, currency }: Props) {
           {activeModule === 'hr' && <StaffTab restaurantId={restaurantId} currency={currency} />}
           {activeModule === 'reports' && <CustomReportBuilder restaurantId={restaurantId} currency={currency} />}
           
-          {/* Fallback for other modules */}
-          {!['customers', 'suppliers', 'expenses', 'financials', 'inventory', 'production', 'hr', 'reports'].includes(activeModule) && (
-            <div className="glass-card p-12 text-center space-y-4 border-dashed border-2 border-primary/20 max-w-2xl mx-auto mt-20">
-              <Landmark className="w-16 h-16 text-primary/10 mx-auto" />
-              <h3 className="text-2xl font-bold">تكامل البيانات المالية</h3>
-              <p className="text-muted-foreground">يتم الآن مزامنة كافة القيود المحاسبية والارتباطات لهذا القسم لضمان دقة التقارير المالية والختامية.</p>
-              <Button variant="outline" onClick={() => setActiveModule('overview')}>رجوع للرئيسية</Button>
+          {/* REAL LEDGER VIEW */}
+          {activeModule === 'ledger' && (
+            <div className="space-y-6 fade-in">
+              <div className="flex items-center justify-between">
+                <h3 className="text-xl font-bold">دفتر الأستاذ العام (Journal Entries)</h3>
+                <div className="flex gap-2">
+                  <Button size="sm" variant="outline" className="gap-2"><Plus className="w-4 h-4" /> قيد يدوي</Button>
+                  <Button size="sm" variant="outline" className="gap-2"><Download className="w-4 h-4" /> تصدير</Button>
+                </div>
+              </div>
+              
+              <div className="glass-card overflow-hidden">
+                <table className="w-full text-right text-sm">
+                  <thead className="bg-muted/50 border-b">
+                    <tr>
+                      <th className="p-4">رقم القيد</th>
+                      <th className="p-4">التاريخ</th>
+                      <th className="p-4">البيان</th>
+                      <th className="p-4">المدين</th>
+                      <th className="p-4">الدائن</th>
+                      <th className="p-4">الحالة</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-border/50">
+                    {journalEntries.map((entry) => (
+                      <tr key={entry.id} className="hover:bg-muted/30 transition-colors">
+                        <td className="p-4 font-mono font-bold text-primary">{entry.entry_number}</td>
+                        <td className="p-4 text-xs">{new Date(entry.entry_date).toLocaleDateString('ar-EG')}</td>
+                        <td className="p-4 max-w-xs truncate">{entry.description}</td>
+                        <td className="p-4 font-bold text-emerald-500">{entry.total_debit.toLocaleString()}</td>
+                        <td className="p-4 font-bold text-destructive">{entry.total_credit.toLocaleString()}</td>
+                        <td className="p-4">
+                          <Badge className="bg-emerald-500/10 text-emerald-500 border-0">مرحّل</Badge>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
+          {/* REAL ASSETS VIEW */}
+          {activeModule === 'assets' && (
+            <div className="space-y-6 fade-in">
+              <div className="flex items-center justify-between">
+                <h3 className="text-xl font-bold">سجل الأصول الثابتة</h3>
+                <Button size="sm" className="gradient-bg text-primary-foreground border-0 gap-2"><Plus className="w-4 h-4" /> إضافة أصل</Button>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                {['آلات ومعدات', 'أثاث ومفروشات', 'وسائل نقل'].map(cat => (
+                  <div key={cat} className="glass-card p-6 text-center">
+                    <p className="text-xs text-muted-foreground mb-1">{cat}</p>
+                    <p className="text-2xl font-bold">0.00 <span className="text-xs font-normal text-muted-foreground">{currency}</span></p>
+                  </div>
+                ))}
+              </div>
+              <div className="p-20 text-center border-2 border-dashed rounded-3xl text-muted-foreground">
+                <Truck className="w-16 h-16 mb-4 opacity-10 mx-auto" />
+                <p>لا توجد أصول مسجلة حالياً. ابدأ بإضافة أصل جديد لحساب الإهلاكات آلياً.</p>
+              </div>
+            </div>
+          )}
+
+          {/* REAL BANK & CASH VIEW */}
+          {activeModule === 'bank_cash' && (
+            <div className="space-y-6 fade-in">
+              <div className="flex items-center justify-between">
+                <h3 className="text-xl font-bold">حسابات النقدية والبنوك</h3>
+                <Button size="sm" variant="outline" className="gap-2"><Plus className="w-4 h-4" /> إضافة حساب</Button>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {accounts.filter(a => a.is_cash_account || a.is_bank_account).map(acc => (
+                  <div key={acc.id} className="glass-card p-6 relative overflow-hidden group">
+                    <div className="absolute top-0 left-0 w-1 h-full bg-primary" />
+                    <div className="flex justify-between items-start">
+                      <div>
+                        <p className="text-xs font-bold text-muted-foreground uppercase">{acc.code}</p>
+                        <h4 className="text-lg font-bold">{acc.name}</h4>
+                      </div>
+                      <Building2 className="w-8 h-8 text-primary/10 group-hover:scale-110 transition-transform" />
+                    </div>
+                    <div className="mt-6">
+                      <p className="text-xs text-muted-foreground">الرصيد الحالي</p>
+                      <p className="text-3xl font-black text-primary">{acc.current_balance.toLocaleString()} <span className="text-sm font-normal">{currency}</span></p>
+                    </div>
+                    <div className="mt-4 flex gap-2">
+                       <Button size="sm" variant="secondary" className="text-[10px] flex-1">كشف حساب</Button>
+                       <Button size="sm" variant="secondary" className="text-[10px] flex-1">تحويل</Button>
+                    </div>
+                  </div>
+                ))}
+                {accounts.filter(a => a.is_cash_account || a.is_bank_account).length === 0 && (
+                  <div className="col-span-2 p-12 text-center border-2 border-dashed rounded-3xl text-muted-foreground">
+                    <Banknote className="w-12 h-12 mb-4 opacity-10 mx-auto" />
+                    <p>لم يتم تعريف حسابات نقدية أو بنكية في شجرة الحسابات.</p>
+                  </div>
+                )}
+              </div>
             </div>
           )}
         </div>
@@ -112,10 +240,10 @@ export function AccountingMegaTab({ restaurantId, currency }: Props) {
   return (
     <div className="flex h-full bg-background overflow-hidden" dir="rtl">
       {/* Sidebar Navigation */}
-      <div className="w-64 border-l bg-card/40 backdrop-blur-xl p-4 flex flex-col shrink-0 overflow-y-auto custom-scrollbar">
+      <div className="w-64 border-l bg-card/40 backdrop-blur-xl p-4 flex flex-col shrink-0 overflow-y-auto custom-scrollbar shadow-2xl">
         <div className="flex items-center gap-3 mb-10 px-2">
           <div className="w-10 h-10 rounded-xl gradient-bg flex items-center justify-center shadow-lg shadow-primary/20">
-            <LayoutDashboard className="w-5 h-5 text-primary-foreground" />
+            <Landmark className="w-5 h-5 text-primary-foreground" />
           </div>
           <span className="font-display font-bold text-md tracking-tight">Auditry ERP</span>
         </div>
@@ -134,11 +262,6 @@ export function AccountingMegaTab({ restaurantId, currency }: Props) {
                     <item.icon className="w-4 h-4 text-muted-foreground/70 group-hover:text-primary transition-colors" />
                     <span className="font-medium">{item.label}</span>
                   </div>
-                  {item.count > 0 && (
-                    <span className="text-[9px] font-bold bg-muted/50 px-1.5 py-0.5 rounded text-muted-foreground group-hover:bg-primary/20 group-hover:text-primary">
-                      {item.count}
-                    </span>
-                  )}
                 </button>
               ))}
             </div>
@@ -156,24 +279,23 @@ export function AccountingMegaTab({ restaurantId, currency }: Props) {
             </div>
             <div className="flex gap-3">
                <Button variant="outline" className="gap-2"><Settings className="w-4 h-4" /> الإعدادات</Button>
-               <Button className="gradient-bg text-primary-foreground border-0 gap-2 shadow-lg shadow-primary/20"><FileText className="w-4 h-4" /> تصدير ميزان المراجعة</Button>
+               <Button className="gradient-bg text-primary-foreground border-0 gap-2 shadow-lg shadow-primary/20"><Plus className="w-4 h-4" /> قيد جديد</Button>
             </div>
           </header>
 
           {/* KPI Dashboard */}
           <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
             {[
-              { label: 'إجمالي السيولة', val: '128,450.00', icon: Banknote, color: 'primary', trend: '+8%' },
-              { label: 'صافي الربح', val: '42,900.00', icon: TrendingUp, color: 'emerald', trend: '+12%' },
-              { label: 'مديونية العملاء', val: '15,200.00', icon: Users, color: 'destructive', trend: '-2%' },
-              { label: 'التزامات الموردين', val: '9,150.00', icon: Store, color: 'amber', trend: '0%' }
+              { label: 'إجمالي السيولة', val: accounts.filter(a => a.is_cash_account || a.is_bank_account).reduce((s, a) => s + (a.current_balance || 0), 0).toLocaleString(), icon: Banknote, color: 'primary' },
+              { label: 'مديونية العملاء', val: accounts.find(a => a.code === '1200')?.current_balance?.toLocaleString() || '0', icon: Users, color: 'destructive' },
+              { label: 'التزامات الموردين', val: accounts.find(a => a.code === '2100')?.current_balance?.toLocaleString() || '0', icon: Store, color: 'amber' },
+              { label: 'إجمالي الأصول', val: accounts.filter(a => a.account_type === 'asset').reduce((s, a) => s + (a.current_balance || 0), 0).toLocaleString(), icon: Landmark, color: 'emerald' }
             ].map((stat) => (
               <div key={stat.label} className="glass-card p-6 group hover:translate-y-[-4px] transition-all duration-300">
                 <div className="flex justify-between items-start mb-4">
                   <div className={`p-2 rounded-xl bg-${stat.color}-500/10 text-${stat.color}-500 group-hover:scale-110 transition-transform`}>
                     <stat.icon className="w-5 h-5" />
                   </div>
-                  <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full bg-${stat.color}-500/10 text-${stat.color}-500`}>{stat.trend}</span>
                 </div>
                 <p className="text-xs text-muted-foreground font-medium mb-1">{stat.label}</p>
                 <h3 className="text-xl font-bold tracking-tight">{stat.val} <span className="text-[10px] font-normal text-muted-foreground opacity-60">{currency}</span></h3>
@@ -182,58 +304,67 @@ export function AccountingMegaTab({ restaurantId, currency }: Props) {
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-            {/* Real-time Activity */}
+            {/* Real GL Activity Feed */}
             <div className="lg:col-span-2 space-y-5">
               <div className="flex items-center justify-between px-1">
                 <h3 className="font-bold text-xl flex items-center gap-2 tracking-tight">
-                  <History className="w-5 h-5 text-primary" /> سجل العمليات المالية اللحظي
+                  <History className="w-5 h-5 text-primary" /> سجل العمليات المالية الحية
                 </h3>
-                <Button variant="link" className="text-xs">عرض الكل</Button>
+                <Button variant="link" className="text-xs" onClick={() => setActiveModule('ledger')}>عرض كافة القيود</Button>
               </div>
               <div className="glass-card divide-y divide-border/30 overflow-hidden shadow-xl shadow-black/5">
-                {[1, 2, 3, 4, 5, 6].map((i) => (
-                  <div key={i} className="p-5 flex items-center justify-between hover:bg-muted/40 transition-all cursor-pointer">
+                {journalEntries.map((entry) => (
+                  <div key={entry.id} className="p-5 flex items-center justify-between hover:bg-muted/40 transition-all cursor-pointer group">
                     <div className="flex items-center gap-5">
-                      <div className={`w-12 h-12 rounded-2xl flex items-center justify-center ${i % 2 === 0 ? "bg-emerald-500/10 text-emerald-500 shadow-inner" : "bg-destructive/10 text-destructive shadow-inner"}`}>
-                        {i % 2 === 0 ? <ArrowDownLeft className="w-6 h-6" /> : <ArrowUpRight className="w-6 h-6" />}
+                      <div className="w-12 h-12 rounded-2xl bg-primary/5 flex items-center justify-center group-hover:bg-primary/10 transition-colors shadow-inner">
+                        <Scale className="w-6 h-6 text-primary" />
                       </div>
                       <div>
-                        <p className="text-sm font-extrabold">{i % 2 === 0 ? 'مقبوضات من عميل' : 'سداد فاتورة مورد'}</p>
-                        <p className="text-[10px] text-muted-foreground font-medium uppercase mt-1">الرقم المرجعي: JV-240426-00{i} • بواسطة: المدير</p>
+                        <p className="text-sm font-extrabold">{entry.description}</p>
+                        <p className="text-[10px] text-muted-foreground font-medium uppercase mt-1">الرقم: {entry.entry_number} • المصدر: {entry.source}</p>
                       </div>
                     </div>
                     <div className="text-right">
-                       <p className={`font-black text-sm ${i % 2 === 0 ? "text-emerald-500" : "text-destructive"}`}>
-                        {i % 2 === 0 ? '+' : '-'}{(i * 850).toLocaleString()} {currency}
+                       <p className="font-black text-sm text-primary">
+                        {entry.total_debit.toLocaleString()} {currency}
                       </p>
-                      <p className="text-[9px] text-muted-foreground mt-1">منذ {i*2} دقيقة</p>
+                      <p className="text-[9px] text-muted-foreground mt-1">{new Date(entry.entry_date).toLocaleDateString('ar-EG')}</p>
                     </div>
                   </div>
                 ))}
+                {journalEntries.length === 0 && (
+                  <div className="p-10 text-center text-muted-foreground italic">لا توجد عمليات مالية مسجلة بعد.</div>
+                )}
               </div>
             </div>
 
-            {/* Quick Actions & Metrics */}
+            {/* Accounting Metrics */}
             <div className="space-y-8">
                <div className="glass-card p-6 bg-gradient-to-br from-primary/10 to-transparent">
-                  <h4 className="font-bold mb-4 text-sm flex items-center gap-2"><Zap className="w-4 h-4 text-amber-500" /> إجراءات محاسبية سريعة</h4>
-                  <div className="grid grid-cols-2 gap-3">
-                     <Button variant="secondary" className="text-[10px] h-16 flex-col gap-1 py-2 rounded-2xl bg-background/50 hover:bg-background shadow-sm border-0"><Calculator className="w-4 h-4" /> إهلاك أصول</Button>
-                     <Button variant="secondary" className="text-[10px] h-16 flex-col gap-1 py-2 rounded-2xl bg-background/50 hover:bg-background shadow-sm border-0"><UsersRound className="w-4 h-4" /> صرف رواتب</Button>
-                     <Button variant="secondary" className="text-[10px] h-16 flex-col gap-1 py-2 rounded-2xl bg-background/50 hover:bg-background shadow-sm border-0"><RotateCcw className="w-4 h-4" /> جرد مخزني</Button>
-                     <Button variant="secondary" className="text-[10px] h-16 flex-col gap-1 py-2 rounded-2xl bg-background/50 hover:bg-background shadow-sm border-0"><FileText className="w-4 h-4" /> تسوية بنكية</Button>
+                  <h4 className="font-bold mb-4 text-sm flex items-center gap-2"><ArrowRight className="w-4 h-4 text-primary" /> مجمعات الحسابات</h4>
+                  <div className="space-y-4">
+                     {[
+                       { label: 'الأصول المتداولة', val: 74, color: 'primary' },
+                       { label: 'الالتزامات', val: 12, color: 'destructive' },
+                       { label: 'حقوق الملكية', val: 14, color: 'emerald' }
+                     ].map(m => (
+                       <div key={m.label} className="space-y-1">
+                          <div className="flex justify-between text-[10px] font-bold uppercase">
+                             <span>{m.label}</span>
+                             <span>{m.val}%</span>
+                          </div>
+                          <div className="h-1.5 w-full bg-muted rounded-full overflow-hidden">
+                             <div className={`h-full bg-${m.color}-500`} style={{ width: `${m.val}%` }} />
+                          </div>
+                       </div>
+                     ))}
                   </div>
                </div>
-
-               <div className="glass-card p-8 text-center space-y-4">
-                  <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest">توزيع المصروفات</p>
-                  <div className="w-32 h-32 rounded-full border-[10px] border-primary/10 border-t-primary border-r-emerald-500 mx-auto flex items-center justify-center">
-                     <span className="text-2xl font-black">74%</span>
-                  </div>
-                  <div className="flex justify-center gap-4 text-[10px] font-bold">
-                     <span className="flex items-center gap-1"><div className="w-2 h-2 rounded-full bg-primary" /> ثابتة</span>
-                     <span className="flex items-center gap-1"><div className="w-2 h-2 rounded-full bg-emerald-500" /> متغيرة</span>
-                  </div>
+               
+               <div className="glass-card p-6 text-center space-y-2">
+                  <Calculator className="w-12 h-12 text-primary/20 mx-auto" />
+                  <p className="text-xs font-bold">مركز التكلفة (Cost Center)</p>
+                  <p className="text-xs text-muted-foreground">تم تفعيل الربط التلقائي بين المبيعات والمخزون لحساب تكلفة البضاعة المباعة (COGS) لحظياً.</p>
                </div>
             </div>
           </div>
@@ -243,10 +374,10 @@ export function AccountingMegaTab({ restaurantId, currency }: Props) {
   );
 }
 
-function Zap({ className }: { className?: string }) {
+function Scale({ className }: { className?: string }) {
   return (
     <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
-      <path d="M4 14a1 1 0 0 1-.78-1.63l9.9-10.2a.5.5 0 0 1 .86.46l-1.92 6.02A1 1 0 0 0 13 10h7a1 1 0 0 1 .78 1.63l-9.9 10.2a.5.5 0 0 1-.86-.46l1.92-6.02A1 1 0 0 0 11 14H4Z"/>
+      <path d="m16 16 3-8 3 8c-.87.65-1.92 1-3 1s-2.13-.35-3-1Z"/><path d="m2 16 3-8 3 8c-.87.65-1.92 1-3 1s-2.13-.35-3-1Z"/><path d="M7 21h10"/><path d="M12 3v18"/><path d="M3 7h2c2 0 5-1 7-2 2 1 5 2 7 2h2"/>
     </svg>
   );
 }
