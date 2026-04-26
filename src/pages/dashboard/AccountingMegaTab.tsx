@@ -6,7 +6,8 @@ import {
   Truck, Package, ClipboardList, Briefcase, UsersRound,
   Calculator, History, Settings, BarChart3, HardDrive,
   Banknote, Receipt, Layers, Boxes, Ban, LayoutDashboard,
-  Plus, Search, Download, Printer, Filter, X, Scale as ScaleIcon
+  Plus, Search, Download, Printer, Filter, X, Scale as ScaleIcon,
+  ShoppingBag, ClipboardList
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -242,13 +243,13 @@ export function AccountingMegaTab({ restaurantId, currency }: Props) {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-border/50">
-                    {journalEntries.map((entry) => (
+                    {journalEntries?.map((entry) => (
                       <tr key={entry.id} className="hover:bg-muted/30 transition-colors">
                         <td className="p-4 font-mono font-bold text-primary">{entry.entry_number}</td>
-                        <td className="p-4 text-xs">{new Date(entry.entry_date).toLocaleDateString('ar-EG')}</td>
-                        <td className="p-4 max-w-xs truncate">{entry.description}</td>
-                        <td className="p-4 font-bold text-emerald-500">{entry.total_debit.toLocaleString()}</td>
-                        <td className="p-4 font-bold text-destructive">{entry.total_credit.toLocaleString()}</td>
+                        <td className="p-4 text-xs">{entry.entry_date ? new Date(entry.entry_date).toLocaleDateString('ar-EG') : '-'}</td>
+                        <td className="p-4 max-w-xs truncate">{entry.description || '-'}</td>
+                        <td className="p-4 font-bold text-emerald-500">{(entry.total_debit || 0).toLocaleString()}</td>
+                        <td className="p-4 font-bold text-destructive">{(entry.total_credit || 0).toLocaleString()}</td>
                         <td className="p-4">
                           <Badge className="bg-emerald-500/10 text-emerald-500 border-0">مرحّل</Badge>
                         </td>
@@ -267,7 +268,7 @@ export function AccountingMegaTab({ restaurantId, currency }: Props) {
                 <Button size="sm" onClick={() => setShowAddAsset(true)} className="gradient-bg text-primary-foreground border-0 gap-2"><Plus className="w-4 h-4" /> إضافة أصل</Button>
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {assets.map(asset => (
+                {assets?.map(asset => (
                    <div key={asset.id} className="glass-card p-6 relative overflow-hidden group">
                       <div className="absolute top-0 left-0 w-1 h-full bg-primary" />
                       <div className="flex justify-between items-start">
@@ -282,7 +283,7 @@ export function AccountingMegaTab({ restaurantId, currency }: Props) {
                           <p className="text-xs text-muted-foreground">القيمة الحالية</p>
                           <p className="text-2xl font-black text-primary">{asset.current_value?.toLocaleString()} <span className="text-xs font-normal">{currency}</span></p>
                         </div>
-                        <p className="text-[10px] text-muted-foreground">تم الشراء: {new Date(asset.purchase_date).toLocaleDateString('ar-EG')}</p>
+                        <p className="text-[10px] text-muted-foreground">تم الشراء: {asset.purchase_date ? new Date(asset.purchase_date).toLocaleDateString('ar-EG') : '-'}</p>
                       </div>
                    </div>
                 ))}
@@ -456,22 +457,22 @@ export function AccountingMegaTab({ restaurantId, currency }: Props) {
                 <Button variant="link" className="text-xs" onClick={() => setActiveModule('ledger')}>عرض كافة القيود</Button>
               </div>
               <div className="glass-card divide-y divide-border/30 overflow-hidden shadow-xl shadow-black/5">
-                {journalEntries.slice(0, 6).map((entry) => (
+                {journalEntries?.slice(0, 6).map((entry) => (
                   <div key={entry.id} className="p-5 flex items-center justify-between hover:bg-muted/40 transition-all cursor-pointer group">
                     <div className="flex items-center gap-5">
                       <div className="w-12 h-12 rounded-2xl bg-primary/5 flex items-center justify-center group-hover:bg-primary/10 transition-colors shadow-inner">
                         <ScaleIcon className="w-6 h-6 text-primary" />
                       </div>
                       <div>
-                        <p className="text-sm font-extrabold">{entry.description}</p>
+                        <p className="text-sm font-extrabold">{entry.description || 'عملية مالية'}</p>
                         <p className="text-[10px] text-muted-foreground font-medium uppercase mt-1">الرقم: {entry.entry_number} • المصدر: {entry.source}</p>
                       </div>
                     </div>
                     <div className="text-right">
                        <p className="font-black text-sm text-primary">
-                        {entry.total_debit.toLocaleString()} {currency}
+                        {(entry.total_debit || 0).toLocaleString()} {currency}
                       </p>
-                      <p className="text-[9px] text-muted-foreground mt-1">{new Date(entry.entry_date).toLocaleDateString('ar-EG')}</p>
+                      <p className="text-[9px] text-muted-foreground mt-1">{entry.entry_date ? new Date(entry.entry_date).toLocaleDateString('ar-EG') : '-'}</p>
                     </div>
                   </div>
                 ))}
