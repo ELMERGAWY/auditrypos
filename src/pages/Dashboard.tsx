@@ -35,6 +35,7 @@ const StaffTab = lazy(() => import('./dashboard/StaffTab').then(m => ({ default:
 const NotificationsTab = lazy(() => import('./dashboard/NotificationsTab').then(m => ({ default: m.NotificationsTab })));
 const FinancialsTab = lazy(() => import('./dashboard/FinancialsTab').then(m => ({ default: m.FinancialsTab })));
 const OverheadManager = lazy(() => import('./dashboard/OverheadManager').then(m => ({ default: m.OverheadManager })));
+const AdvancedReportsHub = lazy(() => import('./dashboard/AdvancedReportsHub').then(m => ({ default: m.AdvancedReportsHub })));
 import { BarcodeScanner } from './dashboard/BarcodeScanner';
 import { POSGrid } from './dashboard/pos/POSGrid';
 import { POSCart } from './dashboard/pos/POSCart';
@@ -956,6 +957,7 @@ export default function Dashboard() {
 
             {activeTab === 'crm' && <VentroCRM restaurantId={restaurant.id} currency={currency} />}
             {activeTab === 'accounting' && <AccountingMegaTab restaurantId={restaurant.id} currency={currency} />}
+            {activeTab === 'analytics' && <AdvancedReportsHub restaurantId={restaurant.id} currency={currency} />}
             {activeTab === 'settings' && <SettingsTab restaurant={restaurant} businessType={businessType} profileName={profileName} user={user} agents={agents} isSuspended={isSuspended} isSuperAdmin={isSuperAdmin} loadData={loadData} />}
           </Suspense>
         </main>
