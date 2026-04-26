@@ -91,14 +91,23 @@ export function AccountingMegaTab({ restaurantId, currency }: Props) {
         <Button variant="ghost" size="sm" onClick={() => setActiveModule('overview')} className="gap-2 text-muted-foreground hover:text-primary">
           <ArrowRight className="w-4 h-4" /> العودة للوحة ERP الرئيسية
         </Button>
-        <div className="glass-card p-6 min-h-[600px] flex items-center justify-center border-dashed border-2">
-          <div className="text-center space-y-3">
-            <Landmark className="w-12 h-12 text-primary/20 mx-auto" />
-            <h3 className="text-xl font-bold">هذا المودول قيد التفعيل</h3>
-            <p className="text-muted-foreground max-w-xs mx-auto">جاري ربط كافة الحسابات والبيانات التاريخية لهذا القسم المحاسبي بشكل آلي</p>
-            <Button variant="outline" onClick={() => setActiveModule('overview')}>رجوع</Button>
+        {activeModule === 'customers' && <CustomersTab restaurantId={restaurantId} currency={currency} />}
+        {activeModule === 'suppliers' && <SuppliersTab restaurantId={restaurantId} currency={currency} />}
+        {activeModule === 'payments' && <ExpensesTab restaurantId={restaurantId} currency={currency} />}
+        {activeModule === 'receipts' && <ExpensesTab restaurantId={restaurantId} currency={currency} />}
+        {activeModule === 'financials' && <FinancialsTab restaurantId={restaurantId} currency={currency} />}
+        
+        {/* Placeholder for others */}
+        {!['customers', 'suppliers', 'payments', 'receipts', 'financials'].includes(activeModule) && (
+          <div className="glass-card p-6 min-h-[600px] flex items-center justify-center border-dashed border-2">
+            <div className="text-center space-y-3">
+              <Landmark className="w-12 h-12 text-primary/20 mx-auto" />
+              <h3 className="text-xl font-bold">هذا المودول قيد التفعيل</h3>
+              <p className="text-muted-foreground max-w-xs mx-auto">جاري ربط كافة الحسابات والبيانات التاريخية لهذا القسم المحاسبي بشكل آلي</p>
+              <Button variant="outline" onClick={() => setActiveModule('overview')}>رجوع</Button>
+            </div>
           </div>
-        </div>
+        )}
       </div>
     );
   }
