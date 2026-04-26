@@ -755,11 +755,10 @@ export default function Dashboard() {
           ))}
         </header>
 
-        <main className="flex-1 overflow-auto">
-          <Suspense fallback={<div className="flex h-full items-center justify-center"><div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin"></div></div>}>
-
-          {/* ===================== POS TAB ===================== */}
-          {activeTab === 'pos' && (
+        <main className="flex-1 overflow-auto bg-background/30 custom-scrollbar p-0">
+          <Suspense fallback={<div className="h-full flex items-center justify-center p-12"><RefreshCcw className="w-10 h-10 animate-spin text-primary" /></div>}>
+            {/* ===================== POS TAB ===================== */}
+            {activeTab === 'pos' && (
             <div className="flex flex-col lg:flex-row h-full">
               <POSGrid
                 currency={currency}
@@ -900,11 +899,9 @@ export default function Dashboard() {
                 );
               })}
             </div>
-            </div>
           )}
 
           {/* ===================== OTHER ERP MODULES ===================== */}
-          <Suspense fallback={<div className="h-full w-full flex items-center justify-center p-12"><RefreshCcw className="w-10 h-10 animate-spin text-primary" /></div>}>
             {/* ===================== ORDERS TAB ===================== */}
             {activeTab === 'orders' && (
               <div className="p-4 space-y-4">
