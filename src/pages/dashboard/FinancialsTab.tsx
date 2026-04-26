@@ -6,8 +6,10 @@ import { supabase } from '@/integrations/supabase/client';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { GeneralLedger } from './GeneralLedger';
 import { TrialBalance } from './TrialBalance';
+import { CashFlowStatement } from './CashFlowStatement';
+import { EquityStatement } from './EquityStatement';
 
-type FinancialTab = 'overview' | 'ledger' | 'trial_balance';
+type FinancialTab = 'overview' | 'ledger' | 'trial_balance' | 'cash_flow' | 'equity';
 
 interface Props {
   restaurantId: string;
@@ -125,6 +127,8 @@ export function FinancialsTab({ restaurantId, currency }: Props) {
     { id: 'overview' as FinancialTab, label: 'نظرة عامة', icon: PieChart },
     { id: 'ledger' as FinancialTab, label: 'حساب الاستاذ', icon: BookOpen },
     { id: 'trial_balance' as FinancialTab, label: 'ميزان المراجعة', icon: Scale },
+    { id: 'cash_flow' as FinancialTab, label: 'التدفقات النقدية', icon: Wallet },
+    { id: 'equity' as FinancialTab, label: 'حقوق الملكية', icon: DollarSign },
   ];
 
   if (activeTab === 'ledger') {
@@ -165,6 +169,48 @@ export function FinancialsTab({ restaurantId, currency }: Props) {
           ))}
         </div>
         <TrialBalance restaurantId={restaurantId} currency={currency} />
+      </div>
+    );
+  }
+
+  if (activeTab === 'cash_flow') {
+    return (
+      <div className="space-y-4">
+        <div className="flex gap-2 mb-4 overflow-x-auto pb-2">
+          {tabs.map(tab => (
+            <Button
+              key={tab.id}
+              variant={activeTab === tab.id ? 'default' : 'outline'}
+              onClick={() => setActiveTab(tab.id)}
+              className="flex items-center gap-2 whitespace-nowrap"
+            >
+              <tab.icon className="w-4 h-4" />
+              {tab.label}
+            </Button>
+          ))}
+        </div>
+        <CashFlowStatement restaurantId={restaurantId} currency={currency} />
+      </div>
+    );
+  }
+
+  if (activeTab === 'equity') {
+    return (
+      <div className="space-y-4">
+        <div className="flex gap-2 mb-4 overflow-x-auto pb-2">
+          {tabs.map(tab => (
+            <Button
+              key={tab.id}
+              variant={activeTab === tab.id ? 'default' : 'outline'}
+              onClick={() => setActiveTab(tab.id)}
+              className="flex items-center gap-2 whitespace-nowrap"
+            >
+              <tab.icon className="w-4 h-4" />
+              {tab.label}
+            </Button>
+          ))}
+        </div>
+        <EquityStatement restaurantId={restaurantId} currency={currency} />
       </div>
     );
   }
