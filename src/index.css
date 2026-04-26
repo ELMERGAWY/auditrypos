@@ -6,72 +6,39 @@
 
 @layer base {
   :root {
-    --background: 210 20% 98%;
-    --foreground: 224 71% 4%;
+    --background: 210 40% 98%;
+    --foreground: 222 47% 11%;
     --card: 0 0% 100%;
-    --card-foreground: 224 71% 4%;
+    --card-foreground: 222 47% 11%;
     --popover: 0 0% 100%;
-    --popover-foreground: 224 71% 4%;
-    --primary: 222 47% 11%; /* Professional Deep Blue/Black */
-    --primary-foreground: 210 20% 98%;
-    --secondary: 210 20% 96%;
+    --popover-foreground: 222 47% 11%;
+    --primary: 222 47% 11%;
+    --primary-foreground: 210 40% 98%;
+    --secondary: 210 40% 96%;
     --secondary-foreground: 222 47% 11%;
-    --muted: 210 20% 96%;
+    --muted: 210 40% 96%;
     --muted-foreground: 215 16% 47%;
-    --accent: 222 47% 11%;
-    --accent-foreground: 210 20% 98%;
+    --accent: 210 40% 96%;
+    --accent-foreground: 222 47% 11%;
     --destructive: 0 84% 60%;
-    --destructive-foreground: 210 20% 98%;
+    --destructive-foreground: 210 40% 98%;
     --border: 214 32% 91%;
     --input: 214 32% 91%;
     --ring: 222 47% 11%;
-    --radius: 0.75rem;
+    --radius: 0.5rem;
 
-    /* Premium Soft Glass Palette */
-    --glass-bg: rgba(255, 255, 255, 0.85);
-    --glass-border: rgba(226, 232, 240, 0.8);
-    --surface-blur: 8px;
-    --hero-gradient: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
-    --card-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.05);
+    --glass-bg: rgba(255, 255, 255, 1);
+    --glass-border: #e2e8f0;
+    --surface-blur: 0px;
+    --hero-gradient: none;
+    --card-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06);
   }
 
   .dark {
-    --background: 224 28% 8%;
-    --foreground: 210 20% 95%;
-    --card: 224 24% 12%;
-    --card-foreground: 210 20% 95%;
-    --popover: 224 24% 12%;
-    --popover-foreground: 210 20% 95%;
-    --primary: 25 95% 53%;
-    --primary-foreground: 0 0% 100%;
-    --secondary: 224 20% 16%;
-    --secondary-foreground: 210 20% 95%;
-    --muted: 224 20% 16%;
-    --muted-foreground: 215 15% 55%;
-    --accent: 38 92% 50%;
-    --accent-foreground: 0 0% 100%;
-    --destructive: 0 62% 30%;
-    --destructive-foreground: 210 20% 95%;
-    --border: 224 18% 18%;
-    --input: 224 18% 18%;
-    --ring: 25 95% 53%;
-    --sidebar-background: 224 28% 6%;
-    --sidebar-foreground: 210 20% 90%;
-    --sidebar-primary: 25 95% 53%;
-    --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 224 20% 14%;
-    --sidebar-accent-foreground: 210 20% 90%;
-    --sidebar-border: 224 18% 18%;
-    --sidebar-ring: 25 95% 53%;
-
-    --surface: 224 20% 14%;
-    --surface-foreground: 210 20% 95%;
-    --success: 142 71% 45%;
-    --success-foreground: 0 0% 100%;
-    --warning: 38 92% 50%;
-    --warning-foreground: 0 0% 100%;
-    --hero-gradient: linear-gradient(135deg, hsl(25, 95%, 53%), hsl(38, 92%, 50%));
-    --glass: 224 24% 12% / 0.8;
+    --background: 210 40% 98%;
+    --foreground: 222 47% 11%;
+    --card: 0 0% 100%;
+    --border: 214 32% 91%;
   }
 }
 
@@ -93,22 +60,15 @@
 @layer components {
   /* Ventro Pro: Enhanced Glass Card */
   .glass-card {
-    background: var(--glass-bg);
-    backdrop-filter: blur(var(--surface-blur));
-    -webkit-backdrop-filter: blur(var(--surface-blur));
-    border: 1px solid var(--glass-border);
-    box-shadow: var(--card-shadow);
-    @apply rounded-3xl transition-all duration-500 ease-in-out;
+    @apply bg-card border border-border shadow-sm rounded-xl transition-all duration-200;
   }
 
   .glass-card:hover {
-    @apply -translate-y-1 shadow-2xl;
-    border: 1px solid rgba(255, 255, 255, 0.6);
+    @apply shadow-md border-border/80;
   }
 
   .premium-sidebar {
-    @apply fixed right-4 top-4 bottom-4 w-72 glass-card z-50 p-6 flex flex-col gap-8;
-    background: rgba(255, 255, 255, 0.85);
+    @apply fixed right-0 top-0 bottom-0 w-64 bg-slate-900 z-50 p-4 flex flex-col gap-6 text-white;
   }
 
   /* Ventro Pro: Gradient Text */
@@ -333,30 +293,9 @@
   }
 
   /* Ventro Pro: Business Type Themes - Enhanced */
-  /* Business Themes - Enhanced Pro */
   .theme-restaurant { 
-    --primary: 25 95% 53%; 
-    --hero-gradient: linear-gradient(135deg, #f97316 0%, #ea580c 100%); 
-    --glass-bg: rgba(255, 247, 237, 0.7);
-  }
-  .theme-retail { 
-    --primary: 217 91% 60%; 
-    --hero-gradient: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%); 
-    --glass-bg: rgba(239, 246, 255, 0.7);
-  }
-  .theme-pharmacy { 
-    --primary: 160 84% 39%; 
-    --hero-gradient: linear-gradient(135deg, #10b981 0%, #047857 100%); 
-    --glass-bg: rgba(236, 253, 245, 0.7);
-  }
-  .theme-wholesale { 
-    --primary: 262 83% 58%; 
-    --hero-gradient: linear-gradient(135deg, #8b5cf6 0%, #6d28d9 100%); 
-    --glass-bg: rgba(245, 243, 255, 0.7);
-  }
-  .theme-services { 
-    --primary: 199 89% 48%; 
-    --hero-gradient: linear-gradient(135deg, #0ea5e9 0%, #0369a1 100%); 
-    --glass-bg: rgba(240, 249, 255, 0.7);
+    --primary: 222 47% 11%; 
+    --hero-gradient: none; 
+    --glass-bg: #ffffff;
   }
 }
