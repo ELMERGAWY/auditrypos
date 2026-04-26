@@ -52,6 +52,7 @@ interface POSCartProps {
   remaining: number;
   checkout: (sendToPrep: boolean) => void;
   updateValue: (id: string, value: number) => void;
+  removeFromCart: (id: string) => void;
 }
 
 export function POSCart({
@@ -62,7 +63,7 @@ export function POSCart({
   orderNotes, setOrderNotes, discount, setDiscount, discountType, setDiscountType,
   currency, getUnitOptions, setCartItemUnit, updateQty, setCartItemQty,
   discountAmount, taxAmount, cartSubtotal, cartTotal, paymentMethod, setPaymentMethod,
-  paidAmount, setPaidAmount, remaining, checkout, updateValue
+  paidAmount, setPaidAmount, remaining, checkout, updateValue, removeFromCart
 }: POSCartProps) {
   const { hasPermission } = usePermissions(restaurant?.id);
   return (
@@ -171,8 +172,14 @@ export function POSCart({
         {cart.length === 0 && <p className="text-muted-foreground text-sm text-center py-8">السلة فارغة</p>}
         {cart.map(c => (
           <motion.div key={c.item.id} initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }}
-            className="flex items-center gap-3 bg-secondary/50 rounded-lg p-3">
-            <span className="text-xl">{c.item.image}</span>
+            className="flex items-center gap-2 bg-secondary/50 rounded-lg p-3 relative group">
+            <button 
+              onClick={() => removeFromCart(c.item.id)}
+              className="absolute -top-2 -left-2 w-5 h-5 rounded-full bg-destructive text-white items-center justify-center hidden group-hover:flex shadow-lg z-10"
+            >
+              <X className="w-3 h-3" />
+            </button>
+            <span className="text-xl shrink-0">{c.item.image}</span>
             <div className="flex-1 min-w-0">
               <p className="text-sm font-medium truncate">{c.item.name}</p>
               <div className="flex items-center gap-1">

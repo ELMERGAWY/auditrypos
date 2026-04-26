@@ -298,28 +298,34 @@ export default function Dashboard() {
   };
 
   const setCartItemUnit = (id: string, unitLabel: string) => {
-    setCart(prev => prev.map(c => c.item.id === id ? { ...c, unitMode: unitLabel } : c));
-  };
-
-  const updateValue = (id: string, value: number) => {
-    setCart(prev => prev.map(c => {
-      if (c.item.id !== id) return c;
-      const newQty = value / c.item.price;
-      const roundedQty = Math.round(newQty * 1000) / 1000;
-      return { ...c, qty: roundedQty, qtyText: String(roundedQty) };
-    }));
-  };
     setCart(prev => prev.map(c => {
       if (c.item.id !== id) return c;
       const units = getUnitOptions(c.item);
       const oldUnit = units.find(u => u.label === c.unitMode);
       const newUnit = units.find(u => u.label === unitLabel);
       if (!oldUnit || !newUnit) return { ...c, unitMode: unitLabel };
-      // Convert qty: e.g. 1 kg → 1000 grams
       const baseQty = c.qty * oldUnit.factor;
       const newQty = Math.round((baseQty / newUnit.factor) * 100) / 100;
       return { ...c, unitMode: unitLabel, qty: newQty, qtyText: String(newQty) };
     }));
+  };
+
+  const updateValue = (id: string, value: number) => {
+    if (isNaN(value)) return;
+    setCart(prev => prev.map(c => {
+      if (c.item.id !== id) return c;
+      const units = getUnitOptions(c.item);
+      const currentUnit = units.find(u => u.label === c.unitMode);
+      const unitFactor = currentUnit?.factor || 1;
+      const newQty = value / (c.item.price * unitFactor);
+      const roundedQty = Math.round(newQty * 1000) / 1000;
+      return { ...c, qty: roundedQty, qtyText: String(roundedQty) };
+    }));
+  };
+
+  const removeFromCart = (id: string) => {
+    setCart(prev => prev.filter(c => c.item.id !== id));
+    toast.success('تم حذف الصنف من السلة');
   };
 
   const clearCart = () => {
@@ -825,6 +831,7 @@ export default function Dashboard() {
                 remaining={remaining}
                 checkout={checkout}
                 updateValue={updateValue}
+                removeFromCart={removeFromCart}
               />
             </div>
           )}
