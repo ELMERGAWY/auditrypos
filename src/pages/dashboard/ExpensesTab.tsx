@@ -7,6 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { Card } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { supabase } from '@/integrations/supabase/client';
+import { journalService } from '@/lib/accounting/journalService';
 import { toast } from 'sonner';
 
 interface Expense {
@@ -175,6 +176,18 @@ export function ExpensesTab({ restaurantId, currency }: Props) {
       toast.error('فشل تسجيل المصروف');
       return;
     }
+
+    // 1.1 Create Journal Entry for Accounting Link
+    await journalService.createExpenseJournalEntry(restaurantId, {
+      amount: amount,
+      description: form.description || `مصروف ${form.category}`,
+      category: form.category === 'إيجار' ? 'rent' : 
+                form.category === 'رواتب' ? 'salaries' :
+                form.category === 'كهرباء ومياه' ? 'utilities' :
+                form.category === 'إعلانات' ? 'marketing' : 'general',
+      payment_method: 'cash', // Defaulting to cash for now
+      date: new Date(form.date)
+    });
 
     // 2. Create daily overheads distributed over working days
     const now = new Date();
