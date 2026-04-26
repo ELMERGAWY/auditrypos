@@ -179,36 +179,65 @@ export function ReceiptModalWrapper({ order, restaurant, onClose }: ReceiptProps
   const printReceipt = () => {
     if (!ref.current) return;
     
-    // Clone the content to avoid modifying the original
     const content = ref.current.innerHTML;
-    
-    // Create print window with specific dimensions for 80mm thermal paper
+    const isFood = restaurant.business_type === 'restaurant' || restaurant.business_type === 'cafe';
+    const isWholesale = restaurant.business_type === 'wholesale';
+    const kitchenTitle = isFood ? 'طلب تحضير (مطبخ)' : (isWholesale ? 'طلب تجهيز (مخزن)' : 'نسخة تحضير');
+
     const printWindow = window.open('', '_blank', 'width=400,height=800,scrollbars=yes');
     if (!printWindow) { 
       alert('يرجى السماح بالنوافذ المنبثقة للطباعة'); 
       return; 
     }
 
+    // Kitchen/Warehouse Copy (Items only)
+    const kitchenCopy = `
+      <div class="receipt">
+        <div class="center">
+          <div class="logo-name">${kitchenTitle}</div>
+          <div class="subtitle">رقم الطلب: ${order.order_number.slice(-4)}</div>
+          <div class="subtitle">التاريخ: ${new Date(order.created_at).toLocaleString('ar-EG')}</div>
+        </div>
+        <hr class="divider" />
+        <div class="items-section">
+          ${order.items.map(item => `
+            <div class="item-row">
+              <span class="item-name" style="font-size: 16px; font-weight: bold;">${item.menu_item_name}</span>
+              <span class="item-qty" style="font-size: 16px; font-weight: bold;">x ${item.quantity}</span>
+            </div>
+          `).join('')}
+        </div>
+        ${order.notes ? `<div style="font-size: 14px; font-weight: bold; border: 1px solid #000; padding: 4px; margin-top: 8px;">ملاحظات: ${order.notes}</div>` : ''}
+        <div class="center footer" style="margin-top: 20px;">
+          <p>----------------------------</p>
+        </div>
+      </div>
+    `;
+
     printWindow.document.open();
     printWindow.document.write(`<!DOCTYPE html>
 <html dir="rtl" lang="ar">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>فاتورة #${order.order_number.slice(-4)}</title>
-  <style>${THERMAL_STYLES}</style>
+  <title>طباعة الفاتورة</title>
+  <style>${THERMAL_STYLES} @media print { .page-break { page-break-after: always; } }</style>
 </head>
 <body>
-  <div class="receipt">
+  <!-- Customer Copy -->
+  <div class="receipt page-break">
+    <div class="center bold" style="margin-bottom: 5px;">نسخة العميل</div>
     ${content}
   </div>
+
+  <!-- Kitchen/Warehouse Copy -->
+  ${(isFood || isWholesale) ? kitchenCopy : ''}
+
   <script>
     window.onload = function() {
       setTimeout(function() {
         window.focus();
         window.print();
-        // Close after print (optional)
-        // setTimeout(function() { window.close(); }, 1000);
+        setTimeout(function() { window.close(); }, 500);
       }, 250);
     };
   </script>
