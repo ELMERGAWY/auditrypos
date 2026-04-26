@@ -20,6 +20,7 @@ import { BOMManager } from './BOMManager';
 import { InventoryTab } from './InventoryTab';
 import { StaffTab } from './StaffTab';
 import { CustomReportBuilder } from './CustomReportBuilder';
+import { BankCashModule } from './BankCashModule';
 
 interface Props {
   restaurantId: string;
@@ -124,6 +125,7 @@ export function AccountingMegaTab({ restaurantId, currency }: Props) {
         <div className="flex-1 overflow-auto p-4 custom-scrollbar">
           {activeModule === 'customers' && <CustomersTab restaurantId={restaurantId} currency={currency} />}
           {activeModule === 'suppliers' && <SuppliersTab restaurantId={restaurantId} currency={currency} />}
+          {activeModule === 'bank_cash' && <BankCashModule restaurantId={restaurantId} currency={currency} />}
           {activeModule === 'expenses' && <ExpensesTab restaurantId={restaurantId} currency={currency} />}
           {activeModule === 'financials' && <FinancialsTab restaurantId={restaurantId} currency={currency} />}
           {activeModule === 'inventory' && <InventoryTab restaurantId={restaurantId} currency={currency} />}
