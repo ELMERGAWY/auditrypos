@@ -913,8 +913,6 @@ export default function Dashboard() {
               </div>
             )}
 
-          )}
-
           {/* ===================== SUPPLIERS TAB ===================== */}
           {activeTab === 'suppliers' && (
             <SuppliersTab restaurantId={restaurant.id} currency={currency} />
