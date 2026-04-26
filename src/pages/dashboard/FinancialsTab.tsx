@@ -8,8 +8,10 @@ import { GeneralLedger } from './GeneralLedger';
 import { TrialBalance } from './TrialBalance';
 import { CashFlowStatement } from './CashFlowStatement';
 import { EquityStatement } from './EquityStatement';
+import { BalanceSheet } from './BalanceSheet';
+import { TradingAccount } from './TradingAccount';
 
-type FinancialTab = 'overview' | 'ledger' | 'trial_balance' | 'cash_flow' | 'equity';
+type FinancialTab = 'overview' | 'ledger' | 'trial_balance' | 'cash_flow' | 'equity' | 'balance_sheet' | 'trading';
 
 interface Props {
   restaurantId: string;
@@ -125,11 +127,43 @@ export function FinancialsTab({ restaurantId, currency }: Props) {
   // Sub-tabs for financial reports
   const tabs = [
     { id: 'overview' as FinancialTab, label: 'نظرة عامة', icon: PieChart },
+    { id: 'trading' as FinancialTab, label: 'المتاجرة والتكلفة', icon: ShoppingBag },
+    { id: 'balance_sheet' as FinancialTab, label: 'المركز المالي', icon: Scale },
     { id: 'ledger' as FinancialTab, label: 'حساب الاستاذ', icon: BookOpen },
     { id: 'trial_balance' as FinancialTab, label: 'ميزان المراجعة', icon: Scale },
     { id: 'cash_flow' as FinancialTab, label: 'التدفقات النقدية', icon: Wallet },
     { id: 'equity' as FinancialTab, label: 'حقوق الملكية', icon: DollarSign },
   ];
+
+  if (activeTab === 'balance_sheet') {
+    return (
+      <div className="space-y-4">
+        <div className="flex gap-2 mb-4 overflow-x-auto pb-2">
+          {tabs.map(tab => (
+            <Button key={tab.id} variant={activeTab === tab.id ? 'default' : 'outline'} onClick={() => setActiveTab(tab.id)} className="flex items-center gap-2 whitespace-nowrap">
+              <tab.icon className="w-4 h-4" /> {tab.label}
+            </Button>
+          ))}
+        </div>
+        <BalanceSheet restaurantId={restaurantId} currency={currency} />
+      </div>
+    );
+  }
+
+  if (activeTab === 'trading') {
+    return (
+      <div className="space-y-4">
+        <div className="flex gap-2 mb-4 overflow-x-auto pb-2">
+          {tabs.map(tab => (
+            <Button key={tab.id} variant={activeTab === tab.id ? 'default' : 'outline'} onClick={() => setActiveTab(tab.id)} className="flex items-center gap-2 whitespace-nowrap">
+              <tab.icon className="w-4 h-4" /> {tab.label}
+            </Button>
+          ))}
+        </div>
+        <TradingAccount restaurantId={restaurantId} currency={currency} />
+      </div>
+    );
+  }
 
   if (activeTab === 'ledger') {
     return (
@@ -217,13 +251,13 @@ export function FinancialsTab({ restaurantId, currency }: Props) {
 
   return (
     <div className="space-y-4">
-      <div className="flex gap-2 mb-4">
+      <div className="flex gap-2 mb-4 overflow-x-auto pb-2">
         {tabs.map(tab => (
           <Button
             key={tab.id}
             variant={activeTab === tab.id ? 'default' : 'outline'}
             onClick={() => setActiveTab(tab.id)}
-            className="flex items-center gap-2"
+            className="flex items-center gap-2 whitespace-nowrap"
           >
             <tab.icon className="w-4 h-4" />
             {tab.label}
