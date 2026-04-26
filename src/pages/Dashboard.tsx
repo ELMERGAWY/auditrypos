@@ -900,92 +900,63 @@ export default function Dashboard() {
                 );
               })}
             </div>
+            </div>
           )}
 
-          {/* ===================== INVENTORY TAB ===================== */}
-            {activeTab === 'inventory' && (
-              <div className="space-y-4">
-                <div className="flex gap-2 p-1 bg-secondary/50 rounded-xl w-fit mx-auto sm:mx-0">
-                  <Button variant={activeSubView === 'stock' ? 'default' : 'ghost'} size="sm" onClick={() => setActiveSubView('stock')} className={activeSubView === 'stock' ? 'gradient-bg' : ''}>المخزون</Button>
-                  <Button variant={activeSubView === 'bom' ? 'default' : 'ghost'} size="sm" onClick={() => setActiveSubView('bom')} className={activeSubView === 'bom' ? 'gradient-bg' : ''}>هندسة التكاليف (BOM)</Button>
+          {/* ===================== OTHER ERP MODULES ===================== */}
+          <Suspense fallback={<div className="h-full w-full flex items-center justify-center p-12"><RefreshCcw className="w-10 h-10 animate-spin text-primary" /></div>}>
+            {/* ===================== ORDERS TAB ===================== */}
+            {activeTab === 'orders' && (
+              <div className="p-4 space-y-4">
+                <div className="flex items-center justify-between mb-2">
+                  <h2 className="font-display text-xl font-bold">الطلبات ({filteredOrders.length})</h2>
                 </div>
-                {activeSubView === 'stock' ? <InventoryTab restaurantId={restaurant.id} currency={restaurant.currency || 'ج.م'} /> : <BOMManager restaurantId={restaurant.id} currency={restaurant.currency || 'ج.م'} />}
+                <div className="flex gap-2 overflow-x-auto pb-2">
+                  {(['all', 'pending', 'preparing', 'ready', 'completed', 'cancelled'] as const).map(status => (
+                    <button key={status} onClick={() => setOrderFilter(status)}
+                      className={`px-3 py-1.5 rounded-lg text-xs whitespace-nowrap transition-colors ${orderFilter === status ? 'gradient-bg text-primary-foreground' : 'bg-secondary text-secondary-foreground'}`}>
+                      {status === 'all' ? `الكل (${orders.length})` : `${STATUS_CONFIG[status].label} (${orders.filter(o => o.status === status).length})`}
+                    </button>
+                  ))}
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {filteredOrders.map(order => {
+                    const statusCfg = STATUS_CONFIG[order.status as OrderStatus] || STATUS_CONFIG.pending;
+                    return (
+                      <motion.div key={order.id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="glass-card p-4">
+                        <div className="flex justify-between mb-3 items-center">
+                           <span className="font-bold text-xs">#{order.order_number.slice(-4)}</span>
+                           <Badge className={statusCfg.className}>{statusCfg.label}</Badge>
+                        </div>
+                        <div className="space-y-1 text-xs">
+                          {order.items.map((item, idx) => <p key={idx}>{item.menu_item_name} x {item.quantity}</p>)}
+                        </div>
+                        <div className="mt-4 pt-3 border-t font-bold text-primary flex justify-between">
+                           <span>الإجمالي:</span>
+                           <span>{order.total} {currency}</span>
+                        </div>
+                      </motion.div>
+                    );
+                  })}
+                </div>
               </div>
             )}
 
-          {/* ===================== SUPPLIERS TAB ===================== */}
-          {activeTab === 'suppliers' && (
-            <SuppliersTab restaurantId={restaurant.id} currency={currency} />
-          )}
+            {/* ===================== INVENTORY TAB ===================== */}
+            {activeTab === 'inventory' && (
+              <div className="p-4 space-y-4">
+                <div className="flex gap-2 p-1 bg-secondary/50 rounded-xl w-fit">
+                  <Button variant={activeSubView === 'stock' ? 'default' : 'ghost'} size="sm" onClick={() => setActiveSubView('stock')} className={activeSubView === 'stock' ? 'gradient-bg' : ''}>المخزون</Button>
+                  <Button variant={activeSubView === 'bom' ? 'default' : 'ghost'} size="sm" onClick={() => setActiveSubView('bom')} className={activeSubView === 'bom' ? 'gradient-bg' : ''}>هندسة التكاليف (BOM)</Button>
+                </div>
+                {activeSubView === 'stock' ? <InventoryTab restaurantId={restaurant.id} currency={currency} /> : <BOMManager restaurantId={restaurant.id} currency={currency} />}
+              </div>
+            )}
 
-          {/* ===================== CUSTOMER ACCOUNTS TAB (Professional) ===================== */}
-          {activeTab === 'customer_accounts' && (
-            <CustomerManager restaurantId={restaurant.id} currency={currency} />
-          )}
-
-          {/* ===================== SALES RETURNS TAB ===================== */}
-          {activeTab === 'sales_returns' && (
-            <SalesReturnsManager restaurantId={restaurant.id} currency={currency} />
-          )}
-
-          {/* ===================== SUPPLIER ACCOUNTS TAB (Professional) ===================== */}
-          {activeTab === 'supplier_accounts' && (
-            <SupplierManager restaurantId={restaurant.id} currency={currency} />
-          )}
-
-          {/* ===================== INVENTORY RECEIPTS TAB ===================== */}
-          {activeTab === 'inventory_receipts' && (
-            <InventoryReceiptsManager restaurantId={restaurant.id} currency={currency} />
-          )}
-
-          {/* ===================== EXPENSES TAB ===================== */}
-          {activeTab === 'expenses' && (
-            <ExpensesTab restaurantId={restaurant.id} currency={currency} />
-          )}
-
-          {/* ===================== STAFF TAB ===================== */}
-          {activeTab === 'staff' && (
-            <StaffTab restaurantId={restaurant.id} />
-          )}
-
-          {/* ===================== NOTIFICATIONS TAB ===================== */}
-          {activeTab === 'notifications' && (
-            <NotificationsTab restaurantId={restaurant.id} />
-          )}
-
-          {/* ===================== CRM TAB ===================== */}
-          {activeTab === 'crm' && (
-            <VentroCRM restaurantId={restaurant.id} currency={currency} />
-          )}
-
-          {/* ===================== ACCOUNTING MEGA TAB ===================== */}
-          {activeTab === 'accounting' && (
-            <AccountingMegaTab restaurantId={restaurant.id} currency={restaurant.currency || 'ج.م'} />
-          )}
-
-          {/* ===================== FINANCIALS TAB ===================== */}
-          {activeTab === 'financials' && (
-            <FinancialsTab restaurantId={restaurant.id} currency={restaurant.currency || 'ج.م'} />
-          )}
-
-          {/* ===================== OVERHEADS TAB ===================== */}
-          {activeTab === 'overheads' && (
-            <OverheadManager restaurantId={restaurant.id} currency={currency} />
-          )}
-
-          {/* ===================== SETTINGS TAB ===================== */}
-          {activeTab === 'settings' && (
-            <SettingsTab 
-              restaurant={restaurant}
-              businessType={businessType}
-              profileName={profileName}
-              user={user}
-              agents={agents}
-              isSuspended={isSuspended}
-              isSuperAdmin={isSuperAdmin}
-              loadData={loadData}
-            />
-          )}          </Suspense>
+            {activeTab === 'crm' && <VentroCRM restaurantId={restaurant.id} currency={currency} />}
+            {activeTab === 'accounting' && <AccountingMegaTab restaurantId={restaurant.id} currency={currency} />}
+            {activeTab === 'settings' && <SettingsTab restaurant={restaurant} businessType={businessType} profileName={profileName} user={user} agents={agents} isSuspended={isSuspended} isSuperAdmin={isSuperAdmin} loadData={loadData} />}
+          </Suspense>
         </main>
       </div>
     </div>
