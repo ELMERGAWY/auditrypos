@@ -35,11 +35,13 @@ const StaffTab = lazy(() => import('./dashboard/StaffTab').then(m => ({ default:
 const NotificationsTab = lazy(() => import('./dashboard/NotificationsTab').then(m => ({ default: m.NotificationsTab })));
 const FinancialsTab = lazy(() => import('./dashboard/FinancialsTab').then(m => ({ default: m.FinancialsTab })));
 const OverheadManager = lazy(() => import('./dashboard/OverheadManager').then(m => ({ default: m.OverheadManager })));
-const SettingsTab = lazy(() => import('./dashboard/SettingsTab').then(m => ({ default: m.SettingsTab })));
 import { BarcodeScanner } from './dashboard/BarcodeScanner';
 import { POSGrid } from './dashboard/pos/POSGrid';
 import { POSCart } from './dashboard/pos/POSCart';
 import { InvoiceTabs } from './dashboard/pos/InvoiceTabs';
+import { TradingAccount } from './dashboard/TradingAccount';
+import { BOMManager } from './dashboard/BOMManager';
+import { SettingsTab } from './dashboard/SettingsTab';
 import { BUSINESS_TYPES, BUSINESS_TABS, getAddressPlaceholder, getCheckoutButtonLabel, getCustomerPlaceholder, getDefaultOrderType, getNotesPlaceholder, getPosSearchPlaceholder, isFoodSector, isInventoryDrivenBusiness, type BusinessType } from '@/lib/businessTypes';
 import { useAuth } from '@/lib/AuthContext';
 import { useDarkMode } from '@/lib/useDarkMode';
@@ -134,6 +136,7 @@ export default function Dashboard() {
   } = useDashboardData();
 
   const [activeTab, setActiveTab] = useState<SidebarTab>('pos');
+  const [activeSubView, setActiveSubView] = useState<'stock' | 'bom'>('stock');
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
   // POS State
@@ -1067,7 +1070,7 @@ export default function Dashboard() {
               <div className="glass-card p-4 mt-4 text-center">
                 <p className="text-xs text-muted-foreground mb-2">رابط قائمة QR (للعرض فقط)</p>
                 <QRCodeSVG value={`${window.location.origin}/qr-menu/${restaurant.id}`} size={120} bgColor="transparent" fgColor="hsl(var(--muted-foreground))" level="H" />
-                <p className="text-[10px] text-muted-foreground mt-2 break-all">{window.location.origin}/qr-menu/{restaurant.id}</p>
+                <p className="text-[10px] text-muted-foreground mt-2 break-all">{window.location.origin}/qr-menu/${restaurant.id}</p>
               </div>
             </div>
           )}
@@ -1099,9 +1102,15 @@ export default function Dashboard() {
           )}
 
           {/* ===================== INVENTORY TAB ===================== */}
-          {activeTab === 'inventory' && (
-            <InventoryTab restaurantId={restaurant.id} currency={currency} />
-          )}
+            {activeTab === 'inventory' && (
+              <div className="space-y-4">
+                <div className="flex gap-2 p-1 bg-secondary/50 rounded-xl w-fit mx-auto sm:mx-0">
+                  <Button variant={activeSubView === 'stock' ? 'default' : 'ghost'} size="sm" onClick={() => setActiveSubView('stock')} className={activeSubView === 'stock' ? 'gradient-bg' : ''}>المخزون</Button>
+                  <Button variant={activeSubView === 'bom' ? 'default' : 'ghost'} size="sm" onClick={() => setActiveSubView('bom')} className={activeSubView === 'bom' ? 'gradient-bg' : ''}>هندسة التكاليف (BOM)</Button>
+                </div>
+                {activeSubView === 'stock' ? <InventoryTab restaurantId={restaurant.id} currency={restaurant.currency || 'ج.م'} /> : <BOMManager restaurantId={restaurant.id} currency={restaurant.currency || 'ج.م'} />}
+              </div>
+            )}
 
           {/* ===================== CUSTOMERS TAB ===================== */}
           {activeTab === 'customers' && (
