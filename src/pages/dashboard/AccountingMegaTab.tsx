@@ -2,12 +2,11 @@ import { useState, useEffect } from 'react';
 import { 
   Users, Store, Wallet, DollarSign, TrendingUp, RotateCcw, 
   ChevronRight, ArrowRight, FileText, Landmark, Building2,
-  ArrowUpRight, ArrowDownLeft, RefreshCcw, ShoppingBag, 
+  ArrowUpRight, ArrowDownLeft, RefreshCcw, ShoppingBag,
   Truck, Package, ClipboardList, Briefcase, UsersRound,
   Calculator, History, Settings, BarChart3, HardDrive,
   Banknote, Receipt, Layers, Boxes, Ban, LayoutDashboard,
-  Plus, Search, Download, Printer, Filter, X, Scale as ScaleIcon,
-  ShoppingBag, ClipboardList
+  Plus, Search, Download, Printer, Filter, X, Scale as ScaleIcon
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
