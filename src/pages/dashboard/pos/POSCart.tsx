@@ -170,10 +170,18 @@ export function POSCart({
               <div className="flex items-center gap-1">
                 <div className="relative w-20">
                   <Input 
-                    type="number" 
-                    value={(c.item.price * c.qty).toFixed(2)} 
-                    onChange={e => updateValue(c.item.id, parseFloat(e.target.value))}
+                    type="text" 
+                    inputMode="decimal"
+                    defaultValue={(c.item.price * c.qty).toFixed(2)} 
+                    onBlur={e => updateValue(c.item.id, parseFloat(e.target.value))}
+                    onKeyDown={e => {
+                      if (e.key === 'Enter') {
+                        updateValue(c.item.id, parseFloat((e.target as HTMLInputElement).value));
+                        (e.target as HTMLInputElement).blur();
+                      }
+                    }}
                     className="h-7 text-[10px] pr-5 text-center bg-blue-50/50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800"
+                    placeholder="المبلغ"
                   />
                   <span className="absolute right-1 top-1/2 -translate-y-1/2 text-[8px] text-blue-600 dark:text-blue-400 font-bold">{currency}</span>
                 </div>
