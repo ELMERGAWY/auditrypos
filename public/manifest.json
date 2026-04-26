@@ -1,0 +1,25 @@
+{
+  "short_name": "AuditryPOS",
+  "name": "Auditry POS - نظام إدارة الأنشطة",
+  "icons": [
+    {
+      "src": "favicon.ico",
+      "sizes": "64x64 32x32 24x24 16x16",
+      "type": "image/x-icon"
+    },
+    {
+      "src": "placeholder.svg",
+      "type": "image/svg+xml",
+      "sizes": "512x512",
+      "purpose": "any maskable"
+    }
+  ],
+  "start_url": ".",
+  "display": "standalone",
+  "theme_color": "#f97316",
+  "background_color": "#ffffff",
+  "lang": "ar-EG",
+  "dir": "rtl",
+  "orientation": "portrait",
+  "description": "النظام المتكامل لإدارة المطاعم، الكافيهات، والمتاجر مع الربط المحاسبي الكامل."
+}
