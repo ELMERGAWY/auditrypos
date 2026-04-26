@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ChefHat } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -9,10 +9,16 @@ import { toast } from 'sonner';
 
 const Login = () => {
   const navigate = useNavigate();
-  const { signIn } = useAuth();
+  const { signIn, user } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (user) {
+      navigate('/dashboard');
+    }
+  }, [user, navigate]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -27,7 +33,7 @@ const Login = () => {
       toast.error(error.message);
     } else {
       toast.success('مرحباً بك!');
-      navigate('/dashboard');
+      // Navigation is handled by useEffect when user state updates
     }
   };
 

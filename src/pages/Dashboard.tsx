@@ -53,7 +53,7 @@ function CreateRestaurantForm({ userId, onCreated }: { userId: string; onCreated
   const [loading, setLoading] = useState(false);
 
   // Check localStorage for pending business from registration
-  useState(() => {
+  useEffect(() => {
     const pending = localStorage.getItem('pending_business');
     if (pending) {
       try {
@@ -63,7 +63,7 @@ function CreateRestaurantForm({ userId, onCreated }: { userId: string; onCreated
         localStorage.removeItem('pending_business');
       } catch {}
     }
-  });
+  }, []);
 
   const handleCreate = async () => {
     if (!name.trim()) return;
