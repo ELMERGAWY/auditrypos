@@ -21,6 +21,7 @@ import { InventoryTab } from './InventoryTab';
 import { StaffTab } from './StaffTab';
 import { CustomReportBuilder } from './CustomReportBuilder';
 import { BankCashModule } from './BankCashModule';
+import { AdvancedReportsHub } from './AdvancedReportsHub';
 
 interface Props {
   restaurantId: string;
@@ -131,7 +132,7 @@ export function AccountingMegaTab({ restaurantId, currency }: Props) {
           {activeModule === 'inventory' && <InventoryTab restaurantId={restaurantId} currency={currency} />}
           {activeModule === 'production' && <BOMManager restaurantId={restaurantId} currency={currency} />}
           {activeModule === 'hr' && <StaffTab restaurantId={restaurantId} currency={currency} />}
-          {activeModule === 'reports' && <CustomReportBuilder restaurantId={restaurantId} currency={currency} />}
+          {activeModule === 'reports' && <AdvancedReportsHub restaurantId={restaurantId} currency={currency} />}
           
           {/* REAL LEDGER VIEW */}
           {activeModule === 'ledger' && (
