@@ -127,11 +127,11 @@ export const BUSINESS_TYPES: Record<BusinessType, BusinessTypeConfig> = {
     description: 'مطاعم، كافيهات، مطابخ سحابية',
     category: 'food',
     
-    color: 'hsl(25, 95%, 53%)',
+    color: 'hsl(222, 47%, 11%)',
     theme: { 
-      primary: '25 95% 53%', 
-      accent: '38 92% 50%', 
-      gradient: 'linear-gradient(135deg, hsl(25, 95%, 53%), hsl(38, 92%, 50%))',
+      primary: '222 47% 11%', 
+      accent: '215 25% 27%', 
+      gradient: 'linear-gradient(135deg, #1e293b 0%, #0f172a 100%)',
       sidebarBg: 'hsl(25 95% 53% / 0.05)',
       sidebarText: 'hsl(25 95% 53%)'
     },
@@ -192,7 +192,7 @@ export const BUSINESS_TYPES: Record<BusinessType, BusinessTypeConfig> = {
       requireCustomer: false
     },
     
-    tabs: ['pos', 'orders', 'menu', 'delivery', 'shifts', 'stats', 'financials', 'qr', 'waiter', 'inventory', 'customers', 'customer_accounts', 'sales_returns', 'expenses', 'staff', 'notifications', 'settings'],
+    tabs: ['pos', 'orders', 'menu', 'inventory', 'inventory_receipts', 'delivery', 'customers', 'customer_accounts', 'sales_returns', 'suppliers', 'supplier_accounts', 'shifts', 'stats', 'financials', 'expenses', 'staff', 'notifications', 'settings'],
     
     specialFields: [
       { name: 'guest_count', type: 'number', label: 'عدد الضيوف', required: false },

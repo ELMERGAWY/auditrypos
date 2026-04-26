@@ -12,27 +12,27 @@
     --card-foreground: 224 71% 4%;
     --popover: 0 0% 100%;
     --popover-foreground: 224 71% 4%;
-    --primary: 224 76% 48%;
+    --primary: 222 47% 11%; /* Professional Deep Blue/Black */
     --primary-foreground: 210 20% 98%;
-    --secondary: 220 14% 96%;
-    --secondary-foreground: 224 71% 4%;
-    --muted: 220 14% 96%;
-    --muted-foreground: 220 10% 46%;
-    --accent: 224 76% 48%;
+    --secondary: 210 20% 96%;
+    --secondary-foreground: 222 47% 11%;
+    --muted: 210 20% 96%;
+    --muted-foreground: 215 16% 47%;
+    --accent: 222 47% 11%;
     --accent-foreground: 210 20% 98%;
     --destructive: 0 84% 60%;
     --destructive-foreground: 210 20% 98%;
-    --border: 220 13% 91%;
-    --input: 220 13% 91%;
-    --ring: 224 76% 48%;
-    --radius: 1rem;
+    --border: 214 32% 91%;
+    --input: 214 32% 91%;
+    --ring: 222 47% 11%;
+    --radius: 0.75rem;
 
-    /* Ventro Global Design System */
-    --glass-bg: rgba(255, 255, 255, 0.7);
-    --glass-border: rgba(255, 255, 255, 0.4);
-    --surface-blur: 12px;
-    --hero-gradient: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
-    --card-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.07);
+    /* Premium Soft Glass Palette */
+    --glass-bg: rgba(255, 255, 255, 0.85);
+    --glass-border: rgba(226, 232, 240, 0.8);
+    --surface-blur: 8px;
+    --hero-gradient: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+    --card-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.05);
   }
 
   .dark {
