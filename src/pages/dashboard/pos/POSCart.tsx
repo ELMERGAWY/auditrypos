@@ -68,7 +68,7 @@ export function POSCart({
   const { hasPermission } = usePermissions(restaurant?.id);
   return (
     <div className="w-full lg:w-96 bg-card border-r border-border flex flex-col h-full">
-      {/* Cart Header with tabs indicator */}
+      {/* Cart Header */}
       <div className="p-4 border-b border-border">
         <div className="flex items-center justify-between mb-2">
           <h3 className="font-display font-bold flex items-center gap-2">
@@ -94,7 +94,7 @@ export function POSCart({
           </div>
         </div>
 
-        {/* Order Type selector - sector specific */}
+        {/* Order Type selector */}
         <div className="flex gap-1 rounded-lg bg-secondary p-1">
           {(BUSINESS_TYPES[businessType as keyof typeof BUSINESS_TYPES]?.orderTypes || ['pickup', 'delivery']).map(t => {
             const label = t === 'dine_in' ? 'داخلي' : t === 'takeaway' ? 'تيك أواي' : t === 'delivery' ? 'توصيل' : 'استلام';
@@ -199,24 +199,22 @@ export function POSCart({
                   <span className="absolute right-1 top-1/2 -translate-y-1/2 text-[8px] text-blue-600 dark:text-blue-400 font-bold">{currency}</span>
                 </div>
                 <div className="flex items-center gap-1 bg-secondary rounded-md p-0.5">
+                  <button onClick={() => updateQty(c.item.id, -1)} className="w-6 h-6 flex items-center justify-center hover:bg-destructive/20 rounded"><Minus className="w-3 h-3" /></button>
+                  <input
+                    type="text"
+                    value={c.qtyText}
+                    onChange={e => setCartItemQty(c.item.id, e.target.value)}
+                    className="w-10 text-center text-xs bg-transparent border-0"
+                  />
+                  <button onClick={() => updateQty(c.item.id, 1)} className="w-6 h-6 flex items-center justify-center hover:bg-primary/20 rounded"><Plus className="w-3 h-3" /></button>
+                </div>
+              </div>
               {getUnitOptions(c.item).length > 1 && (
                 <select value={c.unitMode} onChange={e => setCartItemUnit(c.item.id, e.target.value)}
-                  className="h-7 text-[10px] bg-secondary border border-border rounded-md px-1">
+                  className="h-6 text-[10px] bg-secondary border-0 rounded px-1 w-full">
                   {getUnitOptions(c.item).map(u => <option key={u.label} value={u.label}>{u.label}</option>)}
                 </select>
               )}
-              <button onClick={() => updateQty(c.item.id, -0.5)} disabled={!hasPermission('pos.delete_item') && c.qty <= 0.5} className="w-7 h-7 rounded-md bg-secondary flex items-center justify-center hover:bg-destructive/20 transition-colors text-[10px] font-bold disabled:opacity-50">-½</button>
-              <button onClick={() => updateQty(c.item.id, -1)} disabled={!hasPermission('pos.delete_item') && c.qty <= 1} className="w-7 h-7 rounded-md bg-secondary flex items-center justify-center hover:bg-destructive/20 transition-colors disabled:opacity-50"><Minus className="w-3 h-3" /></button>
-              <input
-                type="text"
-                inputMode="decimal"
-                value={c.qtyText}
-                onChange={e => setCartItemQty(c.item.id, e.target.value)}
-                onBlur={() => { if (!c.qty || c.qty <= 0) { if (hasPermission('pos.delete_item')) updateQty(c.item.id, 0); else setCartItemQty(c.item.id, '1'); } }}
-                className="w-12 text-center text-sm font-medium bg-transparent border border-border rounded-md h-7"
-              />
-              <button onClick={() => updateQty(c.item.id, 1)} className="w-7 h-7 rounded-md bg-secondary flex items-center justify-center hover:bg-primary/20 transition-colors"><Plus className="w-3 h-3" /></button>
-              <button onClick={() => updateQty(c.item.id, 0.5)} className="w-7 h-7 rounded-md bg-secondary flex items-center justify-center hover:bg-primary/20 transition-colors text-[10px] font-bold">+½</button>
             </div>
           </motion.div>
         ))}
@@ -224,59 +222,27 @@ export function POSCart({
 
       {/* Totals & Checkout */}
       <div className="p-4 border-t border-border space-y-2">
-        {discountAmount > 0 && (
-          <>
-            <div className="flex justify-between text-sm text-muted-foreground"><span>المجموع الفرعي</span><span>{cartSubtotal.toFixed(2)} {currency}</span></div>
-            <div className="flex justify-between text-sm text-success"><span>الخصم</span><span>-{discountAmount.toFixed(2)} {currency}</span></div>
-          </>
-        )}
-        {taxAmount > 0 && (
-          <div className="flex justify-between text-sm text-muted-foreground">
-            <span>الضريبة المضافة</span>
-            <span>+{taxAmount.toFixed(2)} {currency}</span>
-          </div>
-        )}
         <div className="flex justify-between font-display font-bold text-lg">
           <span>الإجمالي</span><span className="text-primary">{cartTotal.toFixed(2)} {currency}</span>
         </div>
-
-        {/* Payment Method */}
         <div className="flex gap-1 rounded-lg bg-secondary p-1">
-          {[
-            { key: 'cash', label: '💵 نقدي' },
-            { key: 'instapay', label: '📱 إنستاباي' },
-            { key: 'vodafone_cash', label: '📲 فودافون كاش' },
-            { key: 'bank', label: '🏦 تحويل بنكي' },
-          ].map(m => (
-            <button key={m.key} onClick={() => setPaymentMethod(m.key)}
-              className={`flex-1 py-1.5 rounded-md text-[10px] transition-all ${paymentMethod === m.key ? 'gradient-bg text-primary-foreground' : 'text-muted-foreground'}`}>
-              {m.label}
+          {['cash', 'instapay', 'vodafone_cash', 'bank'].map(m => (
+            <button key={m} onClick={() => setPaymentMethod(m)}
+              className={`flex-1 py-1.5 rounded-md text-[10px] transition-all ${paymentMethod === m ? 'gradient-bg text-primary-foreground' : 'text-muted-foreground'}`}>
+              {m === 'cash' ? '💵 نقدي' : m === 'instapay' ? '📱 إنستاباي' : m === 'vodafone_cash' ? '📲 فودافون' : '🏦 بنك'}
             </button>
           ))}
         </div>
-
-        {/* Paid & Remaining */}
         <div className="grid grid-cols-2 gap-2">
-          <div className="relative">
-            <DollarSign className="w-3.5 h-3.5 absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground" />
-            <Input value={paidAmount} onChange={e => setPaidAmount(e.target.value)} placeholder="المبلغ المدفوع" className="pr-7 h-8 text-xs" type="number" />
-          </div>
+          <Input value={paidAmount} onChange={e => setPaidAmount(e.target.value)} placeholder="المدفوع" className="h-8 text-xs" type="number" />
           <div className="flex items-center justify-between px-3 py-1.5 rounded-lg bg-secondary/50 text-xs">
             <span className="text-muted-foreground">الباقي:</span>
-            <span className={`font-bold ${remaining > 0 ? 'text-destructive' : 'text-success'}`}>{remaining.toFixed(2)} {currency}</span>
+            <span className="font-bold text-success">{remaining.toFixed(2)}</span>
           </div>
         </div>
-
         <div className="grid grid-cols-3 gap-2">
-          <Button onClick={() => checkout(true)} className="gradient-bg text-primary-foreground border-0 h-10 text-xs" disabled={cart.length === 0}>
-            <Send className="w-4 h-4 ml-1" /> إرسال للتحضير
-          </Button>
-          <Button onClick={() => checkout(false)} className="bg-success text-success-foreground hover:bg-success/90 border-0 h-10 text-xs" disabled={cart.length === 0}>
-            <Receipt className="w-4 h-4 ml-1" /> بيع مباشر
-          </Button>
-          <Button onClick={holdCurrentInvoice} variant="outline" className="h-10 text-xs" disabled={cart.length === 0}>
-            <Pause className="w-4 h-4 ml-1" /> تعليق
-          </Button>
+          <Button onClick={() => checkout(true)} className="gradient-bg text-primary-foreground border-0 h-10 text-xs col-span-1" disabled={cart.length === 0}>إرسال</Button>
+          <Button onClick={() => checkout(false)} className="bg-success text-success-foreground border-0 h-10 text-xs col-span-2" disabled={cart.length === 0}>بيع مباشر</Button>
         </div>
       </div>
     </div>
