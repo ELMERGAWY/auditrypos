@@ -6,44 +6,33 @@
 
 @layer base {
   :root {
-    --background: 0 0% 100%;
-    --foreground: 220 20% 10%;
+    --background: 210 20% 98%;
+    --foreground: 224 71% 4%;
     --card: 0 0% 100%;
-    --card-foreground: 220 20% 10%;
+    --card-foreground: 224 71% 4%;
     --popover: 0 0% 100%;
-    --popover-foreground: 220 20% 10%;
-    --primary: 25 95% 53%;
-    --primary-foreground: 0 0% 100%;
+    --popover-foreground: 224 71% 4%;
+    --primary: 224 76% 48%;
+    --primary-foreground: 210 20% 98%;
     --secondary: 220 14% 96%;
-    --secondary-foreground: 220 20% 10%;
+    --secondary-foreground: 224 71% 4%;
     --muted: 220 14% 96%;
     --muted-foreground: 220 10% 46%;
-    --accent: 38 92% 50%;
-    --accent-foreground: 0 0% 100%;
+    --accent: 224 76% 48%;
+    --accent-foreground: 210 20% 98%;
     --destructive: 0 84% 60%;
-    --destructive-foreground: 0 0% 100%;
+    --destructive-foreground: 210 20% 98%;
     --border: 220 13% 91%;
     --input: 220 13% 91%;
-    --ring: 25 95% 53%;
-    --radius: 0.75rem;
-    --sidebar-background: 0 0% 98%;
-    --sidebar-foreground: 240 5.3% 26.1%;
-    --sidebar-primary: 240 5.9% 10%;
-    --sidebar-primary-foreground: 0 0% 98%;
-    --sidebar-accent: 240 4.8% 95.9%;
-    --sidebar-accent-foreground: 240 5.9% 10%;
-    --sidebar-border: 220 13% 91%;
-    --sidebar-ring: 25 95% 53%;
+    --ring: 224 76% 48%;
+    --radius: 1rem;
 
-    /* Custom tokens */
-    --surface: 220 20% 97%;
-    --surface-foreground: 220 20% 10%;
-    --success: 142 71% 45%;
-    --success-foreground: 0 0% 100%;
-    --warning: 38 92% 50%;
-    --warning-foreground: 0 0% 100%;
-    --hero-gradient: linear-gradient(135deg, hsl(25, 95%, 53%), hsl(38, 92%, 50%));
-    --glass: 0 0% 100% / 0.7;
+    /* Ventro Global Design System */
+    --glass-bg: rgba(255, 255, 255, 0.7);
+    --glass-border: rgba(255, 255, 255, 0.4);
+    --surface-blur: 12px;
+    --hero-gradient: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+    --card-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.07);
   }
 
   .dark {
@@ -104,12 +93,22 @@
 @layer components {
   /* Ventro Pro: Enhanced Glass Card */
   .glass-card {
-    @apply bg-card/85 backdrop-blur-2xl border border-border/40 rounded-2xl shadow-xl;
-    @apply transition-all duration-300 ease-out;
+    background: var(--glass-bg);
+    backdrop-filter: blur(var(--surface-blur));
+    -webkit-backdrop-filter: blur(var(--surface-blur));
+    border: 1px solid var(--glass-border);
+    box-shadow: var(--card-shadow);
+    @apply rounded-3xl transition-all duration-500 ease-in-out;
   }
 
   .glass-card:hover {
-    @apply border-border/60 shadow-2xl;
+    @apply -translate-y-1 shadow-2xl;
+    border: 1px solid rgba(255, 255, 255, 0.6);
+  }
+
+  .premium-sidebar {
+    @apply fixed right-4 top-4 bottom-4 w-72 glass-card z-50 p-6 flex flex-col gap-8;
+    background: rgba(255, 255, 255, 0.85);
   }
 
   /* Ventro Pro: Gradient Text */
@@ -334,58 +333,30 @@
   }
 
   /* Ventro Pro: Business Type Themes - Enhanced */
+  /* Business Themes - Enhanced Pro */
   .theme-restaurant { 
-    --primary: 25 95% 53%; --accent: 38 92% 50%; 
-    --hero-gradient: linear-gradient(135deg, hsl(25,95%,53%), hsl(38,92%,50%)); 
-    --ring: 25 95% 53%; 
-    --sidebar-accent: 25 95% 53% / 0.1;
-  }
-  .theme-cafe { 
-    --primary: 30 70% 40%; --accent: 25 60% 50%; 
-    --hero-gradient: linear-gradient(135deg, hsl(30,70%,40%), hsl(25,60%,50%)); 
-    --ring: 30 70% 40%; 
-    --sidebar-accent: 30 70% 40% / 0.1;
+    --primary: 25 95% 53%; 
+    --hero-gradient: linear-gradient(135deg, #f97316 0%, #ea580c 100%); 
+    --glass-bg: rgba(255, 247, 237, 0.7);
   }
   .theme-retail { 
-    --primary: 210 80% 50%; --accent: 200 70% 55%; 
-    --hero-gradient: linear-gradient(135deg, hsl(210,80%,50%), hsl(200,70%,55%)); 
-    --ring: 210 80% 50%; 
-    --sidebar-accent: 210 80% 50% / 0.1;
-  }
-  .theme-wholesale { 
-    --primary: 142 71% 40%; --accent: 160 60% 45%; 
-    --hero-gradient: linear-gradient(135deg, hsl(142,71%,40%), hsl(160,60%,45%)); 
-    --ring: 142 71% 40%; 
-    --sidebar-accent: 142 71% 40% / 0.1;
-  }
-  .theme-grocery { 
-    --primary: 280 65% 50%; --accent: 300 60% 55%; 
-    --hero-gradient: linear-gradient(135deg, hsl(280,65%,50%), hsl(300,60%,55%)); 
-    --ring: 280 65% 50%; 
-    --sidebar-accent: 280 65% 50% / 0.1;
-  }
-  .theme-warehouse { 
-    --primary: 0 70% 50%; --accent: 15 80% 55%; 
-    --hero-gradient: linear-gradient(135deg, hsl(0,70%,50%), hsl(15,80%,55%)); 
-    --ring: 0 70% 50%; 
-    --sidebar-accent: 0 70% 50% / 0.1;
+    --primary: 217 91% 60%; 
+    --hero-gradient: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%); 
+    --glass-bg: rgba(239, 246, 255, 0.7);
   }
   .theme-pharmacy { 
-    --primary: 170 70% 40%; --accent: 180 65% 45%; 
-    --hero-gradient: linear-gradient(135deg, hsl(170,70%,40%), hsl(180,65%,45%)); 
-    --ring: 170 70% 40%; 
-    --sidebar-accent: 170 70% 40% / 0.1;
+    --primary: 160 84% 39%; 
+    --hero-gradient: linear-gradient(135deg, #10b981 0%, #047857 100%); 
+    --glass-bg: rgba(236, 253, 245, 0.7);
   }
-  .theme-other { 
-    --primary: 220 60% 50%; --accent: 230 55% 55%; 
-    --hero-gradient: linear-gradient(135deg, hsl(220,60%,50%), hsl(230,55%,55%)); 
-    --ring: 220 60% 50%; 
-    --sidebar-accent: 220 60% 50% / 0.1;
+  .theme-wholesale { 
+    --primary: 262 83% 58%; 
+    --hero-gradient: linear-gradient(135deg, #8b5cf6 0%, #6d28d9 100%); 
+    --glass-bg: rgba(245, 243, 255, 0.7);
   }
   .theme-services { 
-    --primary: 45 85% 50%; --accent: 55 80% 55%; 
-    --hero-gradient: linear-gradient(135deg, hsl(45,85%,50%), hsl(55,80%,55%)); 
-    --ring: 45 85% 50%; 
-    --sidebar-accent: 45 85% 50% / 0.1;
+    --primary: 199 89% 48%; 
+    --hero-gradient: linear-gradient(135deg, #0ea5e9 0%, #0369a1 100%); 
+    --glass-bg: rgba(240, 249, 255, 0.7);
   }
 }
