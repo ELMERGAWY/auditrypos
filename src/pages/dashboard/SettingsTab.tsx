@@ -8,6 +8,7 @@ import { useNavigate } from 'react-router-dom';
 import { BUSINESS_TYPES, type BusinessType } from '@/lib/businessTypes';
 import { RoleManager } from './settings/RoleManager';
 import { TaxManager } from './settings/TaxManager';
+import { AccountingSettings } from './settings/AccountingSettings';
 
 interface SettingsTabProps {
   restaurant: any;
@@ -31,7 +32,7 @@ export function SettingsTab({
   loadData
 }: SettingsTabProps) {
   const navigate = useNavigate();
-  const [activeSubTab, setActiveSubTab] = useState<'profile' | 'roles' | 'taxes'>('profile');
+  const [activeSubTab, setActiveSubTab] = useState<'profile' | 'roles' | 'taxes' | 'accounting'>('profile');
 
   const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -66,6 +67,12 @@ export function SettingsTab({
           className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm transition-colors whitespace-nowrap ${activeSubTab === 'taxes' ? 'gradient-bg text-primary-foreground' : 'bg-secondary hover:bg-secondary/80'}`}
         >
           <Percent className="w-4 h-4" /> الضرائب والرسوم
+        </button>
+        <button
+          onClick={() => setActiveSubTab('accounting')}
+          className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm transition-colors whitespace-nowrap ${activeSubTab === 'accounting' ? 'gradient-bg text-primary-foreground' : 'bg-secondary hover:bg-secondary/80'}`}
+        >
+          <BookOpen className="w-4 h-4" /> المعايير المحاسبية
         </button>
       </div>
 
@@ -165,6 +172,11 @@ export function SettingsTab({
         {activeSubTab === 'taxes' && (
           <div className="max-w-3xl">
             <TaxManager companyId={restaurant.id} />
+          </div>
+        )}
+        {activeSubTab === 'accounting' && (
+          <div className="max-w-4xl">
+            <AccountingSettings restaurant={restaurant} loadData={loadData} />
           </div>
         )}
       </div>
