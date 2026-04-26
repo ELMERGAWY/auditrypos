@@ -1,8 +1,8 @@
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { motion } from 'framer-motion';
-import { Shield, ShieldAlert, ShieldCheck, Check, X, AlertCircle } from 'lucide-react';
+import { Shield, ShieldAlert, ShieldCheck, Check, X, AlertCircle, UserCheck, Eye, Warehouse, Building } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 
@@ -19,16 +19,32 @@ interface RolePermission {
   is_allowed: boolean;
 }
 
+const getPermissionStatus = (role: string, permissionCode: string, rolePermissions: RolePermission[]) => {
+  const rp = rolePermissions.find(p => p.role === role && p.permission_code === permissionCode);
+  if (rp) return rp.is_allowed;
+  
+  // Default Fallbacks
+  if (role === 'manager' || role === 'branch_manager') return true;
+  if (role === 'auditor' && (permissionCode.startsWith('finance.') || permissionCode.startsWith('inventory.'))) return true;
+  if (role === 'store_manager' && permissionCode.startsWith('inventory.')) return true;
+  if (role === 'cashier' && ['pos.access', 'pos.checkout', 'pos.delete_item'].includes(permissionCode)) return true;
+  if (role === 'accountant' && (permissionCode.startsWith('finance.') || permissionCode.startsWith('inventory.'))) return true;
+  
+  return false;
+};
+
 export function RoleManager({ companyId }: { companyId: string }) {
   const [permissions, setPermissions] = useState<Permission[]>([]);
   const [rolePermissions, setRolePermissions] = useState<RolePermission[]>([]);
   const [loading, setLoading] = useState(true);
   
   const roles = [
-    { id: 'manager', name: 'مدير (Manager)' },
-    { id: 'accountant', name: 'محاسب (Accountant)' },
-    { id: 'cashier', name: 'كاشير (Cashier)' },
-    { id: 'waiter', name: 'ويتر (Waiter)' }
+    { id: 'manager', name: 'مدير عام', icon: ShieldCheck },
+    { id: 'branch_manager', name: 'مدير فرع', icon: Building },
+    { id: 'accountant', name: 'محاسب', icon: UserCheck },
+    { id: 'auditor', name: 'مراجع مالي', icon: Eye },
+    { id: 'store_manager', name: 'مدير مخزن', icon: Warehouse },
+    { id: 'cashier', name: 'كاشير', icon: Shield },
   ];
 
   useEffect(() => {
@@ -93,18 +109,6 @@ export function RoleManager({ companyId }: { companyId: string }) {
     }
   };
 
-  const getPermissionStatus = (role: string, permissionCode: string) => {
-    const rp = rolePermissions.find(p => p.role === role && p.permission_code === permissionCode);
-    if (rp) return rp.is_allowed;
-    
-    // Default Fallbacks
-    if (role === 'manager') return true;
-    if (role === 'cashier' && ['pos.access', 'pos.checkout', 'pos.delete_item'].includes(permissionCode)) return true;
-    if (role === 'accountant' && (permissionCode.startsWith('finance.') || permissionCode.startsWith('inventory.'))) return true;
-    
-    return false;
-  };
-
   if (loading) return <div className="p-8 text-center"><div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto"></div></div>;
 
   const modules = Array.from(new Set(permissions.map(p => p.module)));
@@ -117,12 +121,17 @@ export function RoleManager({ companyId }: { companyId: string }) {
       </div>
 
       <div className="glass-card p-4 overflow-x-auto">
-        <table className="w-full text-sm text-right">
+        <table className="w-full text-sm text-right border-collapse">
           <thead className="border-b border-border bg-secondary/50">
             <tr>
-              <th className="p-3 font-bold">الصلاحية</th>
+              <th className="p-3 font-bold text-right">الصلاحية</th>
               {roles.map(r => (
-                <th key={r.id} className="p-3 font-bold text-center">{r.name}</th>
+                <th key={r.id} className="p-3 font-bold text-center">
+                  <div className="flex flex-col items-center gap-1">
+                    <r.icon className="w-4 h-4 text-primary" />
+                    <span className="whitespace-nowrap">{r.name}</span>
+                  </div>
+                </th>
               ))}
             </tr>
           </thead>
@@ -130,18 +139,18 @@ export function RoleManager({ companyId }: { companyId: string }) {
             {modules.map(mod => (
               <React.Fragment key={mod}>
                 <tr className="bg-secondary/20">
-                  <td colSpan={roles.length + 1} className="p-2 font-bold text-xs uppercase tracking-wider text-muted-foreground">
+                  <td colSpan={roles.length + 1} className="p-2 font-bold text-xs uppercase tracking-wider text-muted-foreground text-right pr-4">
                     {mod}
                   </td>
                 </tr>
                 {permissions.filter(p => p.module === mod).map(perm => (
                   <tr key={perm.code} className="border-b border-border/50 hover:bg-secondary/30 transition-colors">
-                    <td className="p-3">
+                    <td className="p-3 text-right">
                       <div className="font-medium">{perm.name_ar}</div>
                       <div className="text-[10px] text-muted-foreground font-mono">{perm.code}</div>
                     </td>
                     {roles.map(role => {
-                      const isAllowed = getPermissionStatus(role.id, perm.code);
+                      const isAllowed = getPermissionStatus(role.id, perm.code, rolePermissions);
                       return (
                         <td key={`${role.id}-${perm.code}`} className="p-3 text-center">
                           <button
