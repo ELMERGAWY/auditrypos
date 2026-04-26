@@ -307,6 +307,33 @@
     );
   }
 
+  /* Responsive Table Wrapper */
+  .table-responsive {
+    @apply w-full overflow-x-auto scrollbar-thin;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* Mobile Grid System */
+  .responsive-grid {
+    @apply grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4;
+  }
+
+  /* Compact Mode for POS on Mobile */
+  @media (max-width: 768px) {
+    .pos-layout {
+      @apply flex-col;
+    }
+    .pos-cart-panel {
+      @apply fixed inset-0 z-50 bg-background translate-y-full transition-transform duration-300;
+    }
+    .pos-cart-panel.open {
+      @apply translate-y-0;
+    }
+    .glass-card {
+      @apply rounded-lg p-3;
+    }
+  }
+
   /* Ventro Pro: Business Type Themes - Enhanced */
   .theme-restaurant { 
     --primary: 222 47% 11%; 
