@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { CustomerSearch } from '../CustomerSearch';
-import { BUSINESS_TYPES, getCustomerPlaceholder, getAddressPlaceholder, getNotesPlaceholder } from '@/lib/businessTypes';
+import { BUSINESS_TYPES, getCustomerPlaceholder, getAddressPlaceholder, getNotesPlaceholder, isFoodSector } from '@/lib/businessTypes';
 import type { OrderType, MenuItem, HeldInvoice, DeliveryAgent, Restaurant } from '../types';
 import { usePermissions } from '@/hooks/usePermissions';
 
