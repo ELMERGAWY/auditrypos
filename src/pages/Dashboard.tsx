@@ -35,6 +35,7 @@ const StaffTab = lazy(() => import('./dashboard/StaffTab').then(m => ({ default:
 const NotificationsTab = lazy(() => import('./dashboard/NotificationsTab').then(m => ({ default: m.NotificationsTab })));
 const FinancialsTab = lazy(() => import('./dashboard/FinancialsTab').then(m => ({ default: m.FinancialsTab })));
 const OverheadManager = lazy(() => import('./dashboard/OverheadManager').then(m => ({ default: m.OverheadManager })));
+const SettingsTab = lazy(() => import('./SettingsTab').then(m => ({ default: m.SettingsTab })));
 import { BarcodeScanner } from './dashboard/BarcodeScanner';
 import { POSGrid } from './dashboard/pos/POSGrid';
 import { POSCart } from './dashboard/pos/POSCart';
@@ -70,17 +71,30 @@ function CreateRestaurantForm({ userId, onCreated }: { userId: string; onCreated
   const handleCreate = async () => {
     if (!name.trim()) return;
     setLoading(true);
-    const trialEnd = new Date();
-    trialEnd.setDate(trialEnd.getDate() + 14);
-    await supabase.from('restaurants').insert({
-      owner_id: userId,
-      name,
-      status: 'active',
-      subscription_end: trialEnd.toISOString(),
-      business_type: bizType,
-    });
-    setLoading(false);
-    onCreated();
+    try {
+      const trialEnd = new Date();
+      trialEnd.setDate(trialEnd.getDate() + 14);
+      const { error } = await supabase.from('restaurants').insert({
+        owner_id: userId,
+        name,
+        status: 'active',
+        subscription_end: trialEnd.toISOString(),
+        business_type: bizType,
+      });
+      
+      if (error) {
+        toast.error('حدث خطأ أثناء الإنشاء: ' + error.message);
+        console.error('Create restaurant error:', error);
+        return;
+      }
+      
+      onCreated();
+    } catch (err: any) {
+      toast.error('خطأ غير متوقع: ' + err.message);
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
   };
   return (
     <div className="space-y-3">
@@ -116,7 +130,7 @@ export default function Dashboard() {
     user, authLoading, isOnline, restaurant, menuItems, setMenuItems,
     orders, setOrders, waiterCalls, setWaiterCalls, agents, setAgents,
     currentShift, setCurrentShift, profileName, dataLoaded, loadData, handleLogout,
-    soundEnabled, setSoundEnabled,
+    soundEnabled, setSoundEnabled, taxes
   } = useDashboardData();
 
   const [activeTab, setActiveTab] = useState<SidebarTab>('pos');
@@ -203,7 +217,18 @@ export default function Dashboard() {
   const discountAmount = discountType === 'percent'
     ? cartSubtotal * (Number(discount) || 0) / 100
     : Number(discount) || 0;
-  const cartTotal = Math.max(0, cartSubtotal - discountAmount);
+
+  const taxableAmount = Math.max(0, cartSubtotal - discountAmount);
+  let totalTax = 0;
+  if (taxes) {
+    taxes.forEach(tax => {
+      if (!tax.is_included_in_price) {
+        totalTax += taxableAmount * (tax.rate / 100);
+      }
+    });
+  }
+
+  const cartTotal = taxableAmount + totalTax;
   const paidNum = Number(paidAmount) || 0;
   const remaining = Math.max(0, cartTotal - paidNum);
 
@@ -779,6 +804,7 @@ export default function Dashboard() {
                 updateQty={updateQty}
                 setCartItemQty={setCartItemQty}
                 discountAmount={discountAmount}
+                taxAmount={totalTax}
                 cartSubtotal={cartSubtotal}
                 cartTotal={cartTotal}
                 paymentMethod={paymentMethod}
@@ -1115,79 +1141,17 @@ export default function Dashboard() {
 
           {/* ===================== SETTINGS TAB ===================== */}
           {activeTab === 'settings' && (
-            <div className="p-4 max-w-lg space-y-4">
-              <h2 className="font-display text-xl font-bold">الإعدادات</h2>
-              <div className="glass-card p-4 space-y-3">
-                {/* Logo Upload */}
-                <div className="flex items-center gap-4 pb-3 border-b border-border">
-                  {restaurant.logo_url ? (
-                    <img src={restaurant.logo_url} alt="logo" className="w-20 h-20 object-contain rounded-xl border border-border" />
-                  ) : (
-                    <div className="w-20 h-20 rounded-xl bg-secondary flex items-center justify-center text-3xl">
-                      {BUSINESS_TYPES[businessType]?.icon || '🏢'}
-                    </div>
-                  )}
-                  <div className="flex-1">
-                    <p className="font-bold mb-1">{restaurant.name}</p>
-                    <label className="cursor-pointer">
-                      <input type="file" accept="image/*" className="hidden" onChange={async (e) => {
-                        const file = e.target.files?.[0];
-                        if (!file) return;
-                        const ext = file.name.split('.').pop();
-                        const path = `logos/${restaurant.id}.${ext}`;
-                        const { error: upErr } = await supabase.storage.from('restaurant-assets').upload(path, file, { upsert: true });
-                        if (upErr) { toast.error('خطأ في رفع الشعار'); return; }
-                        const { data: urlData } = supabase.storage.from('restaurant-assets').getPublicUrl(path);
-                        await supabase.from('restaurants').update({ logo_url: urlData.publicUrl }).eq('id', restaurant.id);
-                        toast.success('تم تحديث الشعار');
-                        loadData();
-                      }} />
-                      <span className="text-sm text-primary hover:underline cursor-pointer">
-                        {restaurant.logo_url ? 'تغيير الشعار' : 'رفع شعار'}
-                      </span>
-                    </label>
-                  </div>
-                </div>
-                <div><p className="text-sm text-muted-foreground">نوع النشاط</p>
-                  <p className="font-medium">{BUSINESS_TYPES[businessType]?.icon} {BUSINESS_TYPES[businessType]?.label}</p>
-                </div>
-                <div><p className="text-sm text-muted-foreground">اسم النشاط</p><p className="font-medium">{restaurant.name}</p></div>
-                <div><p className="text-sm text-muted-foreground">المالك</p><p className="font-medium">{profileName}</p></div>
-                <div><p className="text-sm text-muted-foreground">البريد</p><p className="font-medium">{user?.email}</p></div>
-                <div><p className="text-sm text-muted-foreground">العملة</p><p className="font-medium">{restaurant.currency || 'ج.م'}</p></div>
-                <div><p className="text-sm text-muted-foreground">حالة الاشتراك</p>
-                  <Badge className={isSuspended ? 'status-suspended' : 'status-active'}>{isSuspended ? 'موقوف' : 'نشط'}</Badge>
-                </div>
-                {restaurant.subscription_end && (
-                  <div><p className="text-sm text-muted-foreground">ينتهي في</p><p className="font-medium">{new Date(restaurant.subscription_end).toLocaleDateString('ar-EG')}</p></div>
-                )}
-                <div><p className="text-sm text-muted-foreground">المناديب المسجلون</p><p className="font-medium">{agents.length} مندوب</p></div>
-                {/* Store Link */}
-                <div className="pt-3 border-t border-border">
-                  <p className="text-sm text-muted-foreground mb-1">رابط المتجر الإلكتروني</p>
-                  <div className="flex gap-2">
-                    <code className="text-xs bg-secondary px-2 py-1 rounded flex-1 truncate">{window.location.origin}/store/{restaurant.id}</code>
-                    <Button size="sm" variant="outline" onClick={() => navigator.clipboard.writeText(`${window.location.origin}/store/${restaurant.id}`).then(() => toast.success('تم نسخ الرابط'))}>
-                      نسخ
-                    </Button>
-                  </div>
-                </div>
-
-                {/* Super Admin Portal Link */}
-                {isSuperAdmin && (
-                  <div className="pt-3 border-t border-border">
-                    <Button onClick={() => navigate('/super-admin-portal')} className="w-full gradient-bg text-primary-foreground border-0 gap-2">
-                      <Lock className="w-4 h-4" />
-                      لوحة تحكم السوبر أدمن
-                    </Button>
-                    <p className="text-xs text-muted-foreground mt-1 text-center">إدارة جميع الأنشطة والاشتراكات</p>
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
-
-          </Suspense>
+            <SettingsTab 
+              restaurant={restaurant}
+              businessType={businessType}
+              profileName={profileName}
+              user={user}
+              agents={agents}
+              isSuspended={isSuspended}
+              isSuperAdmin={isSuperAdmin}
+              loadData={loadData}
+            />
+          )}          </Suspense>
         </main>
       </div>
     </div>

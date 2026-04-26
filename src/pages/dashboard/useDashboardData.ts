@@ -10,6 +10,15 @@ import type { MenuItem, Order, OrderItem, WaiterCall, Restaurant, DeliveryAgent,
 import { useOrderNotificationSound, useWaiterCallSound } from './SoundNotifications';
 import { getDefaultItemIcon, isInventoryDrivenBusiness, type BusinessType } from '@/lib/businessTypes';
 
+export interface TaxRate {
+  id: string;
+  name: string;
+  rate: number;
+  type: string;
+  is_included_in_price: boolean;
+  is_active: boolean;
+}
+
 const CACHE_KEY_PREFIX = 'dashboard_';
 
 export function useDashboardData() {
@@ -25,6 +34,7 @@ export function useDashboardData() {
   const [orders, setOrders] = useState<Order[]>([]);
   const [waiterCalls, setWaiterCalls] = useState<WaiterCall[]>([]);
   const [agents, setAgents] = useState<DeliveryAgent[]>([]);
+  const [taxes, setTaxes] = useState<TaxRate[]>([]);
   const [currentShift, setCurrentShift] = useState<Shift | null>(null);
   const [profileName, setProfileName] = useState('');
   const [dataLoaded, setDataLoaded] = useState(false);
@@ -48,6 +58,7 @@ export function useDashboardData() {
       if (cached.orders?.length) setOrders(cached.orders);
       if (cached.waiterCalls?.length) setWaiterCalls(cached.waiterCalls);
       if (cached.agents?.length) setAgents(cached.agents);
+      if ((cached as any).taxes?.length) setTaxes((cached as any).taxes);
       if (cached.currentShift) setCurrentShift(cached.currentShift);
       if (cached.profileName) setProfileName(cached.profileName);
       setDataLoaded(true);
@@ -88,7 +99,7 @@ export function useDashboardData() {
     const businessType = (rest.business_type || 'restaurant') as BusinessType;
     const usesProductsCatalog = isInventoryDrivenBusiness(businessType);
 
-    const [itemsRes, ordersRes, callsRes, agentsRes, shiftRes] = await Promise.all([
+    const [itemsRes, ordersRes, callsRes, agentsRes, shiftRes, taxesRes] = await Promise.all([
       usesProductsCatalog
         ? supabase.from('products').select('*').eq('restaurant_id', rest.id).order('sort_order')
         : supabase.from('menu_items').select('*').eq('restaurant_id', rest.id).order('sort_order'),
@@ -96,6 +107,7 @@ export function useDashboardData() {
       supabase.from('waiter_calls').select('*').eq('restaurant_id', rest.id).order('created_at', { ascending: false }),
       supabase.from('delivery_agents').select('*').eq('restaurant_id', rest.id),
       supabase.from('shifts').select('*').eq('restaurant_id', rest.id).eq('status', 'open').maybeSingle(),
+      supabase.from('tax_rates').select('*').eq('restaurant_id', rest.id).eq('is_active', true)
     ]);
 
     const loadedMenuItems = usesProductsCatalog
@@ -116,11 +128,13 @@ export function useDashboardData() {
         })) as MenuItem[])
       : ((itemsRes.data || []) as MenuItem[]);
     const loadedAgents = (agentsRes.data || []) as DeliveryAgent[];
+    const loadedTaxes = (taxesRes.data || []) as TaxRate[];
     const loadedShift = shiftRes.data as unknown as Shift | null;
     const loadedCalls = (callsRes.data || []) as WaiterCall[];
 
     setMenuItems(loadedMenuItems);
     setAgents(loadedAgents);
+    setTaxes(loadedTaxes);
     setCurrentShift(loadedShift);
     setWaiterCalls(loadedCalls);
 
@@ -145,6 +159,7 @@ export function useDashboardData() {
       orders: ordersWithItems,
       waiterCalls: loadedCalls,
       agents: loadedAgents,
+      taxes: loadedTaxes,
       currentShift: loadedShift,
       profileName: pName,
     });
@@ -223,7 +238,7 @@ export function useDashboardData() {
 
   return {
     user, authLoading, isOnline, restaurant, menuItems, setMenuItems,
-    orders, setOrders, waiterCalls, setWaiterCalls, agents, setAgents,
+    orders, setOrders, waiterCalls, setWaiterCalls, agents, setAgents, taxes,
     currentShift, setCurrentShift, profileName, dataLoaded, loadData, handleLogout,
     soundEnabled, setSoundEnabled,
   };

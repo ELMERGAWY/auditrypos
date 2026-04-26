@@ -6,6 +6,7 @@ import { Badge } from '@/components/ui/badge';
 import { CustomerSearch } from '../CustomerSearch';
 import { BUSINESS_TYPES, getCustomerPlaceholder, getAddressPlaceholder, getNotesPlaceholder } from '@/lib/businessTypes';
 import type { OrderType, MenuItem, HeldInvoice, DeliveryAgent, Restaurant } from '../types';
+import { usePermissions } from '@/hooks/usePermissions';
 
 interface POSCartProps {
   activeInvoiceId: string | null;
@@ -41,6 +42,7 @@ interface POSCartProps {
   updateQty: (id: string, d: number) => void;
   setCartItemQty: (id: string, text: string) => void;
   discountAmount: number;
+  taxAmount: number;
   cartSubtotal: number;
   cartTotal: number;
   paymentMethod: string;
@@ -58,9 +60,10 @@ export function POSCart({
   deliveryAddress, setDeliveryAddress, agents, selectedDeliveryAgent, setSelectedDeliveryAgent,
   orderNotes, setOrderNotes, discount, setDiscount, discountType, setDiscountType,
   currency, getUnitOptions, setCartItemUnit, updateQty, setCartItemQty,
-  discountAmount, cartSubtotal, cartTotal, paymentMethod, setPaymentMethod,
+  discountAmount, taxAmount, cartSubtotal, cartTotal, paymentMethod, setPaymentMethod,
   paidAmount, setPaidAmount, remaining, checkout
 }: POSCartProps) {
+  const { hasPermission } = usePermissions(restaurant?.id);
   return (
     <div className="w-full lg:w-96 bg-card border-r border-border flex flex-col h-full">
       {/* Cart Header with tabs indicator */}
@@ -81,7 +84,7 @@ export function POSCart({
                 <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full gradient-bg text-primary-foreground text-[10px] flex items-center justify-center">{invoiceTabs.length}</span>
               )}
             </Button>
-            {cart.length > 0 && (
+            {cart.length > 0 && hasPermission('pos.void_order') && (
               <Button size="sm" variant="ghost" onClick={clearCart} className="text-destructive" title="مسح السلة">
                 <Trash2 className="w-4 h-4" />
               </Button>
@@ -148,16 +151,18 @@ export function POSCart({
           <StickyNote className="w-3.5 h-3.5 absolute right-2.5 top-2.5 text-muted-foreground" />
           <Input value={orderNotes} onChange={e => setOrderNotes(e.target.value)} placeholder={getNotesPlaceholder(businessType)} className="pr-8 h-9 text-xs" />
         </div>
-        <div className="flex gap-2">
-          <div className="flex-1 relative">
-            <Percent className="w-3.5 h-3.5 absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
-            <Input value={discount} onChange={e => setDiscount(e.target.value)} placeholder="خصم" className="pr-8 h-9 text-xs" type="number" />
+        {hasPermission('pos.apply_discount') && (
+          <div className="flex gap-2">
+            <div className="flex-1 relative">
+              <Percent className="w-3.5 h-3.5 absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
+              <Input value={discount} onChange={e => setDiscount(e.target.value)} placeholder="خصم" className="pr-8 h-9 text-xs" type="number" />
+            </div>
+            <div className="flex rounded-lg border border-border overflow-hidden">
+              <button onClick={() => setDiscountType('percent')} className={`px-2 text-xs transition-colors ${discountType === 'percent' ? 'gradient-bg text-primary-foreground' : 'bg-secondary'}`}>%</button>
+              <button onClick={() => setDiscountType('fixed')} className={`px-2 text-xs transition-colors ${discountType === 'fixed' ? 'gradient-bg text-primary-foreground' : 'bg-secondary'}`}>{currency}</button>
+            </div>
           </div>
-          <div className="flex rounded-lg border border-border overflow-hidden">
-            <button onClick={() => setDiscountType('percent')} className={`px-2 text-xs transition-colors ${discountType === 'percent' ? 'gradient-bg text-primary-foreground' : 'bg-secondary'}`}>%</button>
-            <button onClick={() => setDiscountType('fixed')} className={`px-2 text-xs transition-colors ${discountType === 'fixed' ? 'gradient-bg text-primary-foreground' : 'bg-secondary'}`}>{currency}</button>
-          </div>
-        </div>
+        )}
       </div>
 
       {/* Cart Items */}
@@ -178,14 +183,14 @@ export function POSCart({
                   {getUnitOptions(c.item).map(u => <option key={u.label} value={u.label}>{u.label}</option>)}
                 </select>
               )}
-              <button onClick={() => updateQty(c.item.id, -0.5)} className="w-7 h-7 rounded-md bg-secondary flex items-center justify-center hover:bg-destructive/20 transition-colors text-[10px] font-bold">-½</button>
-              <button onClick={() => updateQty(c.item.id, -1)} className="w-7 h-7 rounded-md bg-secondary flex items-center justify-center hover:bg-destructive/20 transition-colors"><Minus className="w-3 h-3" /></button>
+              <button onClick={() => updateQty(c.item.id, -0.5)} disabled={!hasPermission('pos.delete_item') && c.qty <= 0.5} className="w-7 h-7 rounded-md bg-secondary flex items-center justify-center hover:bg-destructive/20 transition-colors text-[10px] font-bold disabled:opacity-50">-½</button>
+              <button onClick={() => updateQty(c.item.id, -1)} disabled={!hasPermission('pos.delete_item') && c.qty <= 1} className="w-7 h-7 rounded-md bg-secondary flex items-center justify-center hover:bg-destructive/20 transition-colors disabled:opacity-50"><Minus className="w-3 h-3" /></button>
               <input
                 type="text"
                 inputMode="decimal"
                 value={c.qtyText}
                 onChange={e => setCartItemQty(c.item.id, e.target.value)}
-                onBlur={() => { if (!c.qty || c.qty <= 0) updateQty(c.item.id, 0); }}
+                onBlur={() => { if (!c.qty || c.qty <= 0) { if (hasPermission('pos.delete_item')) updateQty(c.item.id, 0); else setCartItemQty(c.item.id, '1'); } }}
                 className="w-12 text-center text-sm font-medium bg-transparent border border-border rounded-md h-7"
               />
               <button onClick={() => updateQty(c.item.id, 1)} className="w-7 h-7 rounded-md bg-secondary flex items-center justify-center hover:bg-primary/20 transition-colors"><Plus className="w-3 h-3" /></button>
@@ -202,6 +207,12 @@ export function POSCart({
             <div className="flex justify-between text-sm text-muted-foreground"><span>المجموع الفرعي</span><span>{cartSubtotal.toFixed(2)} {currency}</span></div>
             <div className="flex justify-between text-sm text-success"><span>الخصم</span><span>-{discountAmount.toFixed(2)} {currency}</span></div>
           </>
+        )}
+        {taxAmount > 0 && (
+          <div className="flex justify-between text-sm text-muted-foreground">
+            <span>الضريبة المضافة</span>
+            <span>+{taxAmount.toFixed(2)} {currency}</span>
+          </div>
         )}
         <div className="flex justify-between font-display font-bold text-lg">
           <span>الإجمالي</span><span className="text-primary">{cartTotal.toFixed(2)} {currency}</span>
