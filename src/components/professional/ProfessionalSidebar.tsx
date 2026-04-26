@@ -108,16 +108,20 @@ export function ProfessionalSidebar({
     // Sales Section
     { id: 'orders', label: config.labels.orders, icon: Receipt, badge: stats.pendingOrders, section: 'sales', locked: lockedTabs.includes('orders') },
     { id: 'menu', label: config.labels.menu, icon: ShoppingCart, section: 'sales' },
+    { id: 'sales_returns', label: 'مردودات المبيعات', icon: RotateCcw, section: 'sales' },
     { id: 'delivery', label: 'المناديب', icon: Truck, badge: stats.deliveryOrders, section: 'sales', locked: lockedTabs.includes('delivery') },
     
     // Inventory Section (conditional)
     ...(config.features.includes('inventory') ? [
       { id: 'inventory', label: config.labels.inventory, icon: Package, section: 'inventory' },
-      { id: 'suppliers', label: 'الموردين', icon: Store, section: 'inventory' }
+      { id: 'inventory_receipts', label: 'إيصالات المخزون', icon: Receipt, section: 'inventory' },
+      { id: 'suppliers', label: 'الموردين', icon: Store, section: 'inventory' },
+      { id: 'supplier_accounts', label: 'حسابات الموردين', icon: Wallet, section: 'inventory' }
     ] : []),
     
     // People Section
     { id: 'customers', label: config.labels.customers, icon: Users, section: 'people' },
+    { id: 'customer_accounts', label: 'حسابات العملاء', icon: FileText, section: 'people' },
     { id: 'staff', label: 'الموظفين', icon: UsersRound, section: 'people' },
     
     // Analytics Section
