@@ -41,7 +41,8 @@ import { POSCart } from './dashboard/pos/POSCart';
 import { InvoiceTabs } from './dashboard/pos/InvoiceTabs';
 import { TradingAccount } from './dashboard/TradingAccount';
 import { BOMManager } from './dashboard/BOMManager';
-import { AnalyticsTab } from './dashboard/AnalyticsTab';
+import { AccountingMegaTab } from './dashboard/AccountingMegaTab';
+import { CustomReportBuilder } from './dashboard/CustomReportBuilder';
 import { SettingsTab } from './dashboard/SettingsTab';
 import { BUSINESS_TYPES, BUSINESS_TABS, getAddressPlaceholder, getCheckoutButtonLabel, getCustomerPlaceholder, getDefaultOrderType, getNotesPlaceholder, getPosSearchPlaceholder, isFoodSector, isInventoryDrivenBusiness, type BusinessType } from '@/lib/businessTypes';
 import { useAuth } from '@/lib/AuthContext';
@@ -624,21 +625,9 @@ export default function Dashboard() {
   const allTabs: { id: DashboardTab; label: string; icon: typeof LayoutGrid; badge?: number; locked?: boolean }[] = [
     { id: 'pos', label: 'نقطة البيع', icon: LayoutGrid },
     { id: 'orders', label: 'الطلبات', icon: Receipt, badge: pendingOrders.length, locked: lockedTabs.includes('orders') },
-    { id: 'inventory', label: 'المخزون', icon: Package },
-    { id: 'customers', label: 'العملاء', icon: Users },
-    { id: 'customer_accounts', label: 'حسابات العملاء', icon: FileText },
-    { id: 'sales_returns', label: 'مردودات المبيعات', icon: RotateCcw },
-    { id: 'suppliers', label: 'الموردين', icon: Store },
-    { id: 'supplier_accounts', label: 'حسابات الموردين', icon: FileText },
-    { id: 'inventory_receipts', label: 'فواتير الاستلام', icon: Truck },
-    { id: 'expenses', label: 'المصروفات', icon: Wallet },
-    { id: 'analytics', label: 'التقارير والتحليلات', icon: PieChart },
-    { id: 'menu', label: btConfig?.labels?.menu || 'القائمة', icon: ShoppingCart },
-    { id: 'qr', label: 'رابط المتجر', icon: QrCode },
-    { id: 'waiter', label: 'ويتر', icon: Bell, badge: unackCalls.length },
-    { id: 'staff', label: 'الموظفين', icon: UsersRound },
-    { id: 'financials', label: 'القوائم المالية', icon: DollarSign },
-    { id: 'notifications', label: 'الإشعارات', icon: Bell },
+    { id: 'inventory', label: 'المخزون والتكاليف', icon: Package },
+    { id: 'accounting', label: 'المحاسبة والمالية', icon: Wallet } as any,
+    { id: 'analytics', label: 'التقارير المخصصة', icon: BarChart3 } as any,
     { id: 'settings', label: 'الإعدادات', icon: Settings },
   ];
 
@@ -1027,9 +1016,14 @@ export default function Dashboard() {
             </div>
           )}
 
-          {/* ===================== ANALYTICS TAB ===================== */}
+          {/* ===================== ACCOUNTING MEGA TAB ===================== */}
+          {activeTab === 'accounting' && (
+            <AccountingMegaTab restaurantId={restaurant.id} currency={restaurant.currency || 'ج.م'} />
+          )}
+
+          {/* ===================== CUSTOM REPORTS TAB ===================== */}
           {activeTab === 'analytics' && (
-            <AnalyticsTab restaurantId={restaurant.id} currency={restaurant.currency || 'ج.م'} />
+            <CustomReportBuilder restaurantId={restaurant.id} currency={restaurant.currency || 'ج.م'} />
           )}
 
           {/* ===================== MENU TAB ===================== */}

@@ -102,37 +102,11 @@ export function ProfessionalSidebar({
   const lockedTabs: SidebarTab[] = isTrial ? ['orders', 'delivery', 'shifts', 'stats'] : [];
 
   const navItems: NavItem[] = [
-    // 1. الرئيسية
     { id: 'pos', label: 'نقطة البيع', icon: LayoutGrid, section: 'main', shortcut: 'F1' },
-    
-    // 2. المبيعات
-    { id: 'orders', label: config.labels.orders, icon: Receipt, badge: stats.pendingOrders, section: 'sales', locked: lockedTabs.includes('orders') },
-    { id: 'menu', label: config.labels.menu, icon: ShoppingCart, section: 'sales' },
-    { id: 'sales_returns', label: 'مردودات المبيعات', icon: RotateCcw, section: 'sales' },
-    { id: 'delivery', label: 'المناديب', icon: Truck, badge: stats.deliveryOrders, section: 'sales', locked: lockedTabs.includes('delivery') },
-    
-    // 3. المخزون والتكاليف
-    ...(config.features.includes('inventory') ? [
-      { id: 'inventory', label: config.labels.inventory, icon: Package, section: 'inventory' },
-      { id: 'inventory_receipts', label: 'إيصالات المخزون', icon: Receipt, section: 'inventory' }
-    ] : []),
-    
-    // 4. المحاسبة والمالية (التابة المدمجة الكبرى)
-    { id: 'customers', label: 'العملاء وحساباتهم', icon: Users, section: 'accounting' },
-    { id: 'suppliers', label: 'الموردين وحساباتهم', icon: Store, section: 'accounting' },
-    { id: 'expenses', label: 'المصروفات والمرافق', icon: Wallet, section: 'accounting' },
-    { id: 'financials', label: 'القوائم المالية', icon: DollarSign, section: 'accounting' },
-    { id: 'overheads', label: 'النفقات العامة', icon: TrendingUp, section: 'accounting' },
-    
-    // 5. التقارير والذكاء الاصطناعي
-    { id: 'analytics', label: 'مركز التقارير والتحليلات', icon: BarChart3, section: 'analytics' },
-    { id: 'stats', label: 'إحصائيات الأداء', icon: Activity, section: 'analytics', locked: lockedTabs.includes('stats') },
-    { id: 'shifts', label: 'إدارة الشفتات', icon: CalendarClock, section: 'analytics', locked: lockedTabs.includes('shifts') },
-    
-    // 6. النظام
-    { id: 'qr', label: 'قائمة QR', icon: QrCode, section: 'system' },
-    { id: 'staff', label: 'الموظفين', icon: UsersRound, section: 'system' },
-    { id: 'notifications', label: 'الإشعارات', icon: Bell, section: 'system' },
+    { id: 'orders', label: config.labels.orders, icon: Receipt, badge: stats.pendingOrders, section: 'sales' },
+    { id: 'inventory', label: 'المخزون والتكاليف', icon: Package, section: 'inventory' },
+    { id: 'accounting', label: 'المحاسبة والمالية', icon: Wallet, section: 'main' },
+    { id: 'analytics', label: 'التقارير المخصصة', icon: BarChart3, section: 'main' },
     { id: 'settings', label: 'الإعدادات', icon: Settings, section: 'system' }
   ].filter(Boolean) as NavItem[];
 
