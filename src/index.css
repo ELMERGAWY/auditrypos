@@ -12,8 +12,8 @@
     --card-foreground: 222 47% 11%;
     --popover: 0 0% 100%;
     --popover-foreground: 222 47% 11%;
-    --primary: 222 47% 11%;
-    --primary-foreground: 210 40% 98%;
+    --primary: 25 95% 53%; /* Vivid Orange for better visibility */
+    --primary-foreground: 0 0% 100%;
     --secondary: 210 40% 96%;
     --secondary-foreground: 222 47% 11%;
     --muted: 210 40% 96%;
@@ -24,14 +24,14 @@
     --destructive-foreground: 210 40% 98%;
     --border: 214 32% 91%;
     --input: 214 32% 91%;
-    --ring: 222 47% 11%;
-    --radius: 0.5rem;
+    --ring: 25 95% 53%;
+    --radius: 0.75rem;
 
-    --glass-bg: rgba(255, 255, 255, 1);
-    --glass-border: #e2e8f0;
-    --surface-blur: 0px;
-    --hero-gradient: none;
-    --card-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06);
+    --glass-bg: rgba(255, 255, 255, 0.9);
+    --glass-border: rgba(0, 0, 0, 0.1);
+    --surface-blur: 8px;
+    --hero-gradient: linear-gradient(135deg, #f97316 0%, #ea580c 100%);
+    --card-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
   }
 
   .dark {
@@ -158,11 +158,11 @@
   }
 
   .sidebar-nav-item.active {
-    @apply text-primary bg-primary/5 font-medium;
+    @apply text-white bg-primary shadow-lg shadow-primary/20 font-bold;
   }
 
   .sidebar-nav-item.active::before {
-    @apply h-6;
+    @apply h-6 bg-white;
   }
 
   /* Ventro Pro: Animations */
