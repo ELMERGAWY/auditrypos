@@ -35,7 +35,7 @@ const StaffTab = lazy(() => import('./dashboard/StaffTab').then(m => ({ default:
 const NotificationsTab = lazy(() => import('./dashboard/NotificationsTab').then(m => ({ default: m.NotificationsTab })));
 const FinancialsTab = lazy(() => import('./dashboard/FinancialsTab').then(m => ({ default: m.FinancialsTab })));
 const OverheadManager = lazy(() => import('./dashboard/OverheadManager').then(m => ({ default: m.OverheadManager })));
-const SettingsTab = lazy(() => import('./SettingsTab').then(m => ({ default: m.SettingsTab })));
+const SettingsTab = lazy(() => import('./dashboard/SettingsTab').then(m => ({ default: m.SettingsTab })));
 import { BarcodeScanner } from './dashboard/BarcodeScanner';
 import { POSGrid } from './dashboard/pos/POSGrid';
 import { POSCart } from './dashboard/pos/POSCart';
