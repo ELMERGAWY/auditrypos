@@ -138,33 +138,12 @@ export function POSCart({
               <MapPin className="w-3.5 h-3.5 absolute right-2.5 top-2.5 text-muted-foreground" />
               <Input value={deliveryAddress} onChange={e => setDeliveryAddress(e.target.value)} placeholder={getAddressPlaceholder(businessType)} className="pr-8 h-9 text-xs" />
             </div>
-            {agents.filter(a => a.status === 'available').length > 0 && (
-              <select value={selectedDeliveryAgent} onChange={e => setSelectedDeliveryAgent(e.target.value)}
-                className="w-full h-9 text-xs bg-background border border-input rounded-md px-2">
-                <option value="">اختر مندوب التوصيل...</option>
-                {agents.filter(a => a.status === 'available').map(a => (
-                  <option key={a.id} value={a.id}>🛵 {a.name}</option>
-                ))}
-              </select>
-            )}
           </>
         )}
         <div className="relative">
           <StickyNote className="w-3.5 h-3.5 absolute right-2.5 top-2.5 text-muted-foreground" />
           <Input value={orderNotes} onChange={e => setOrderNotes(e.target.value)} placeholder={getNotesPlaceholder(businessType)} className="pr-8 h-9 text-xs" />
         </div>
-        {hasPermission('pos.apply_discount') && (
-          <div className="flex gap-2">
-            <div className="flex-1 relative">
-              <Percent className="w-3.5 h-3.5 absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
-              <Input value={discount} onChange={e => setDiscount(e.target.value)} placeholder="خصم" className="pr-8 h-9 text-xs" type="number" />
-            </div>
-            <div className="flex rounded-lg border border-border overflow-hidden">
-              <button onClick={() => setDiscountType('percent')} className={`px-2 text-xs transition-colors ${discountType === 'percent' ? 'gradient-bg text-primary-foreground' : 'bg-secondary'}`}>%</button>
-              <button onClick={() => setDiscountType('fixed')} className={`px-2 text-xs transition-colors ${discountType === 'fixed' ? 'gradient-bg text-primary-foreground' : 'bg-secondary'}`}>{currency}</button>
-            </div>
-          </div>
-        )}
       </div>
 
       {/* Cart Items */}
@@ -193,7 +172,7 @@ export function POSCart({
                   <Input 
                     type="number" 
                     value={(c.item.price * c.qty).toFixed(2)} 
-                    onChange={e => updateValue(c.item.id, Number(e.target.value))}
+                    onChange={e => updateValue(c.item.id, parseFloat(e.target.value))}
                     className="h-7 text-[10px] pr-5 text-center bg-blue-50/50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800"
                   />
                   <span className="absolute right-1 top-1/2 -translate-y-1/2 text-[8px] text-blue-600 dark:text-blue-400 font-bold">{currency}</span>
