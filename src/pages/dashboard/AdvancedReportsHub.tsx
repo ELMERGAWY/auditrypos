@@ -1,13 +1,14 @@
 import { useState, useEffect } from 'react';
 import { 
   TrendingUp, Users, Store, Boxes, 
-  Wallet, Landmark, Clock, RefreshCcw, ArrowRight, Download, Printer
+  Wallet, Landmark, Clock, RefreshCcw, ArrowRight, Download, Printer,
+  FileText, Briefcase, Calculator, Building2, Truck, ClipboardList, Scale, Percent
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { supabase } from '@/integrations/supabase/client';
-import { createFinancialReporting, ProfitLossReport, BalanceSheetReport, CashFlowReport, FinancialIndicators } from '@/erp/reporting_engine/financialReports';
+import { createFinancialReporting, ProfitLossReport, BalanceSheetReport, CashFlowReport, FinancialIndicators, TrialBalanceReport } from '@/erp/reporting_engine/financialReports';
 import { toast } from 'sonner';
 
 interface Props {
@@ -26,40 +27,142 @@ export function AdvancedReportsHub({ restaurantId, currency }: Props) {
   const [bsReport, setBsReport] = useState<BalanceSheetReport | null>(null);
   const [cfReport, setCfReport] = useState<CashFlowReport | null>(null);
   const [indicators, setIndicators] = useState<FinancialIndicators | null>(null);
+  const [tbReport, setTbReport] = useState<TrialBalanceReport | null>(null);
   
   // Basic List Reports
   const [listData, setListData] = useState<any[]>([]);
 
   const reportGroups = [
     {
-      title: 'القوائم المالية الأساسية',
+      title: 'القوائم المالية',
       icon: Landmark,
       reports: [
-        { id: 'pnl', label: 'قائمة الدخل (الأرباح والخسائر)', trend: 'استراتيجي' },
-        { id: 'balance_sheet', label: 'قائمة المركز المالي (الميزانية)', trend: 'أساسي' },
-        { id: 'cash_flow', label: 'قائمة التدفقات النقدية', trend: 'نقدي' },
+        { id: 'pnl', label: 'قائمة الدخل', trend: 'أساسي' },
+        { id: 'pnl_budget', label: 'قائمة الدخل (الفعلي مقابل المستهدف)', trend: 'مقارنة' },
+        { id: 'balance_sheet', label: 'قائمة المركز المالي', trend: 'أساسي' },
+        { id: 'cash_flow', label: 'قائمة التدفقات النقدية', trend: 'أساسي' },
+        { id: 'equity_changes', label: 'قائمة التغيرات في حقوق الملكية', trend: 'أساسي' },
+      ]
+    },
+    {
+      title: 'النقد وما في حكمه',
+      icon: Wallet,
+      reports: [
+        { id: 'receipts_payments', label: 'ملخص المدفوعات والمقبوضات', trend: 'نقدي' },
+        { id: 'bank_accounts', label: 'ملخص الحسابات البنكية', trend: 'أرصدة' },
+      ]
+    },
+    {
+      title: 'دفتر الأستاذ العام',
+      icon: ClipboardList,
+      reports: [
+        { id: 'trial_balance', label: 'ميزان المراجعة', trend: 'ميزان' },
+        { id: 'gl_summary', label: 'ملخص دفتر الأستاذ العام', trend: 'ملخص' },
+        { id: 'gl_transactions', label: 'عمليات دفتر الأستاذ العام', trend: 'تفصيلي' },
+      ]
+    },
+    {
+      title: 'الرموز الضريبية',
+      icon: Percent,
+      reports: [
+        { id: 'tax_review', label: 'المراجعة الضريبية', trend: 'ضريبة' },
+        { id: 'tax_summary', label: 'ملخص الضريبة', trend: 'ضريبة' },
+        { id: 'tax_recon', label: 'مطابقة حساب الضريبة', trend: 'ضريبة' },
+        { id: 'tax_transactions', label: 'عمليات الضريبة', trend: 'ضريبة' },
+        { id: 'taxable_sales', label: 'المبيعات الخاضعة للضريبة حسب العميل', trend: 'مبيعات' },
+        { id: 'taxable_purchases', label: 'المشتريات الخاضعة للضريبة حسب المورد', trend: 'مشتريات' },
+      ]
+    },
+    {
+      title: 'الإمارات العربية المتحدة',
+      icon: Building2,
+      reports: [
+        { id: 'vat201_en', label: 'VAT201- VAT Return (En)', trend: 'رسمي' },
+        { id: 'vat201_ar', label: 'VAT201- إقرار ضريبة القيمة المضافة', trend: 'رسمي' },
+      ]
+    },
+    {
+      title: 'التقارير المخصصة',
+      icon: FileText,
+      reports: [
+        { id: 'custom_reports', label: 'التقارير المخصصة', trend: 'مخصص' },
         { id: 'indicators', label: 'مؤشرات الأداء المالي (KPIs)', trend: 'تحليلي' },
       ]
     },
     {
-      title: 'العملاء والذمم المدينة',
+      title: 'الموظفون',
       icon: Users,
       reports: [
-        { id: 'ar_aging', label: 'جدول الذمم المدينة (العملاء)', trend: 'حرج' },
+        { id: 'employees_summary', label: 'ملخص الموظفين', trend: 'HR' },
       ]
     },
     {
-      title: 'الموردون والذمم الدائنة',
+      title: 'قسائم الرواتب',
+      icon: FileText,
+      reports: [
+        { id: 'payslips_summary', label: 'ملخص قسيمة الرواتب', trend: 'HR' },
+        { id: 'payroll_by_item', label: 'إجمالي مسير الراتب حسب البند والموظف', trend: 'HR' },
+      ]
+    },
+    {
+      title: 'حسابات رأس المال',
+      icon: Briefcase,
+      reports: [
+        { id: 'capital_accounts_summary', label: 'ملخص حسابات رأس المال', trend: 'ملكية' },
+      ]
+    },
+    {
+      title: 'عهدة المصروفات النقدية',
+      icon: Wallet,
+      reports: [
+        { id: 'petty_cash_summary', label: 'ملخص عهدة المصروفات النقدية', trend: 'نقدي' },
+      ]
+    },
+    {
+      title: 'الأصول الثابتة',
+      icon: Truck,
+      reports: [
+        { id: 'fixed_assets_summary', label: 'ملخص الأصول الثابتة', trend: 'أصول' },
+        { id: 'depreciation_calc', label: 'نافذة احتساب إهلاك الأصول الثابتة', trend: 'إهلاك' },
+      ]
+    },
+    {
+      title: 'الموردون',
       icon: Store,
       reports: [
-        { id: 'ap_aging', label: 'جدول الذمم الدائنة (الموردين)', trend: 'هام' },
+        { id: 'ap_aging', label: 'جدول أعمار الذمم الدائنة', trend: 'حرج' },
+        { id: 'suppliers_summary', label: 'ملخص الموردين', trend: 'أرصدة' },
+        { id: 'supplier_unpaid', label: 'كشف حساب المورد (فواتير غير مسددة)', trend: 'ديون' },
+        { id: 'supplier_statement', label: 'كشف حساب المورد (العمليات)', trend: 'تفصيلي' },
       ]
     },
     {
-      title: 'المخزون والتكاليف',
+      title: 'فواتير البيع',
+      icon: FileText,
+      reports: [
+        { id: 'sales_by_customer', label: 'مجموع فواتير المبيعات حسب العميل', trend: 'مبيعات' },
+        { id: 'sales_by_item', label: 'مجموع فواتير المبيعات حسب الصنف', trend: 'مبيعات' },
+        { id: 'sales_by_custom_field', label: 'مجموع فواتير المبيعات حسب الحقل المخصص', trend: 'مبيعات' },
+      ]
+    },
+    {
+      title: 'أصناف المخزون',
       icon: Boxes,
       reports: [
-        { id: 'inventory_value', label: 'تقييم المخزون الحالي', trend: 'أصول' },
+        { id: 'inventory_value', label: 'ملخص قيمة المخزون', trend: 'تكلفة' },
+        { id: 'inventory_qty', label: 'ملخص كميات المخزون', trend: 'كميات' },
+        { id: 'inventory_margin', label: 'هامش ربح المخزون', trend: 'أرباح' },
+        { id: 'inventory_costing', label: 'ورقة عمل حساب تكلفة المخزون', trend: 'تكاليف' },
+      ]
+    },
+    {
+      title: 'العملاء',
+      icon: Users,
+      reports: [
+        { id: 'ar_aging', label: 'جدول أعمار الذمم المدينة', trend: 'حرج' },
+        { id: 'customers_summary', label: 'ملخص العملاء', trend: 'أرصدة' },
+        { id: 'customer_unpaid', label: 'كشف حساب العميل (فواتير غير مدفوعة)', trend: 'ديون' },
+        { id: 'customer_statement', label: 'كشف حساب العميل (العمليات)', trend: 'تفصيلي' },
       ]
     }
   ];
@@ -72,6 +175,7 @@ export function AdvancedReportsHub({ restaurantId, currency }: Props) {
 
   const loadReportData = async () => {
     setLoading(true);
+    setListData([]);
     try {
       const engine = createFinancialReporting(restaurantId);
       
@@ -84,23 +188,29 @@ export function AdvancedReportsHub({ restaurantId, currency }: Props) {
       } else if (activeReport === 'cash_flow') {
         const data = await engine.generateCashFlow(startDate, endDate);
         setCfReport(data);
+      } else if (activeReport === 'trial_balance') {
+        const data = await engine.generateTrialBalance(endDate);
+        setTbReport(data);
       } else if (activeReport === 'indicators') {
         const data = await engine.generateFinancialIndicators(endDate);
         setIndicators(data);
-      } else if (activeReport === 'ar_aging') {
+      } else if (activeReport === 'ar_aging' || activeReport === 'customers_summary') {
         const { data } = await supabase.from('customers').select('*').eq('restaurant_id', restaurantId).gt('balance', 0).order('balance', { ascending: false });
         setListData(data || []);
-      } else if (activeReport === 'ap_aging') {
+      } else if (activeReport === 'ap_aging' || activeReport === 'suppliers_summary') {
         const { data, error } = await supabase.from('suppliers').select('*').eq('restaurant_id', restaurantId).gt('balance', 0).order('balance', { ascending: false });
-        if (error) {
-           setListData([]);
-        } else {
-           setListData(data || []);
-        }
-      } else if (activeReport === 'inventory_value') {
-        const { data } = await supabase.from('products').select('*').eq('restaurant_id', restaurantId).gt('quantity', 0).order('category');
+        if (!error) setListData(data || []);
+      } else if (activeReport === 'inventory_value' || activeReport === 'inventory_qty') {
+        const { data } = await supabase.from('products').select('*').eq('restaurant_id', restaurantId).order('category');
+        setListData(data || []);
+      } else if (activeReport === 'fixed_assets_summary') {
+        const { data } = await supabase.from('fixed_assets').select('*').eq('restaurant_id', restaurantId);
+        setListData(data || []);
+      } else if (activeReport === 'employees_summary') {
+        const { data } = await supabase.from('staff').select('*').eq('restaurant_id', restaurantId);
         setListData(data || []);
       }
+      // For other reports, they will show the placeholder automatically
     } catch (err: any) {
       console.error(err);
       toast.error('حدث خطأ أثناء تحميل التقرير');
@@ -232,6 +342,48 @@ export function AdvancedReportsHub({ restaurantId, currency }: Props) {
     );
   };
 
+  const renderTrialBalance = () => {
+    if (!tbReport) return null;
+    return (
+      <div className="max-w-4xl mx-auto">
+        <div className="flex justify-between items-center mb-6">
+          <Badge className={tbReport.is_balanced ? "bg-emerald-500" : "bg-destructive"}>
+            {tbReport.is_balanced ? "الميزان متطابق" : "يوجد فرق غير متطابق"}
+          </Badge>
+        </div>
+        <table className="w-full text-right text-sm border-collapse">
+          <thead>
+            <tr className="bg-muted font-black uppercase text-muted-foreground">
+              <th className="p-3 border">كود الحساب</th>
+              <th className="p-3 border">اسم الحساب</th>
+              <th className="p-3 border text-center">نوع الحساب</th>
+              <th className="p-3 border text-left">أرصدة مدينة ({currency})</th>
+              <th className="p-3 border text-left">أرصدة دائنة ({currency})</th>
+            </tr>
+          </thead>
+          <tbody>
+            {tbReport.accounts.map((acc, i) => (
+               <tr key={i} className="hover:bg-primary/5 transition-colors border-b">
+                 <td className="p-2 border font-mono">{acc.code}</td>
+                 <td className="p-2 border font-bold">{acc.name}</td>
+                 <td className="p-2 border text-center">{acc.account_type}</td>
+                 <td className="p-2 border text-left">{acc.closing_balance > 0 ? acc.closing_balance.toLocaleString() : '-'}</td>
+                 <td className="p-2 border text-left">{acc.closing_balance < 0 ? Math.abs(acc.closing_balance).toLocaleString() : '-'}</td>
+               </tr>
+            ))}
+          </tbody>
+          <tfoot>
+             <tr className="bg-primary/10 font-black text-lg text-primary">
+                <td colSpan={3} className="p-4 border text-left">إجمالي الأرصدة</td>
+                <td className="p-4 border text-left">{tbReport.totals.closing_debits.toLocaleString()}</td>
+                <td className="p-4 border text-left">{tbReport.totals.closing_credits.toLocaleString()}</td>
+             </tr>
+          </tfoot>
+        </table>
+      </div>
+    );
+  };
+
   const renderCashFlow = () => {
     if (!cfReport) return null;
     return (
@@ -316,14 +468,14 @@ export function AdvancedReportsHub({ restaurantId, currency }: Props) {
   const renderListReport = () => {
     let total = 0;
     
-    if (activeReport === 'ar_aging' || activeReport === 'ap_aging') {
+    if (activeReport === 'ar_aging' || activeReport === 'ap_aging' || activeReport === 'customers_summary' || activeReport === 'suppliers_summary') {
       total = listData.reduce((s, r) => s + (r.balance || 0), 0);
       return (
         <div>
           <table className="w-full text-right text-sm border-collapse">
              <thead><tr className="bg-muted font-black uppercase text-muted-foreground"><th className="p-4 border">الاسم</th><th className="p-4 border">الهاتف</th><th className="p-4 border text-left">الرصيد المستحق ({currency})</th></tr></thead>
              <tbody>
-               {listData.length === 0 ? <tr><td colSpan={3} className="p-8 text-center text-muted-foreground">لا توجد أرصدة مستحقة.</td></tr> : listData.map((row, i) => (
+               {listData.length === 0 ? <tr><td colSpan={3} className="p-8 text-center text-muted-foreground">لا توجد سجلات مطابقة.</td></tr> : listData.map((row, i) => (
                  <tr key={i} className="hover:bg-primary/5 transition-colors border-b">
                    <td className="p-4 border font-bold">{row.name}</td>
                    <td className="p-4 border">{row.phone || '-'}</td>
@@ -339,35 +491,97 @@ export function AdvancedReportsHub({ restaurantId, currency }: Props) {
       );
     }
 
-    if (activeReport === 'inventory_value') {
+    if (activeReport === 'inventory_value' || activeReport === 'inventory_qty') {
       total = listData.reduce((s, r) => s + ((r.quantity || 0) * (r.cost_price || 0)), 0);
+      const isQtyOnly = activeReport === 'inventory_qty';
       return (
         <div>
           <table className="w-full text-right text-sm border-collapse">
-             <thead><tr className="bg-muted font-black uppercase text-muted-foreground"><th className="p-4 border">الصنف</th><th className="p-4 border">التصنيف</th><th className="p-4 border text-center">الكمية</th><th className="p-4 border text-center">التكلفة</th><th className="p-4 border text-left">إجمالي القيمة ({currency})</th></tr></thead>
+             <thead><tr className="bg-muted font-black uppercase text-muted-foreground"><th className="p-4 border">الصنف</th><th className="p-4 border">التصنيف</th><th className="p-4 border text-center">الكمية</th>{!isQtyOnly && <th className="p-4 border text-center">التكلفة</th>}{!isQtyOnly && <th className="p-4 border text-left">إجمالي القيمة ({currency})</th>}</tr></thead>
              <tbody>
                {listData.length === 0 ? <tr><td colSpan={5} className="p-8 text-center text-muted-foreground">لا يوجد مخزون.</td></tr> : listData.map((row, i) => (
                  <tr key={i} className="hover:bg-primary/5 transition-colors border-b">
                    <td className="p-3 border font-bold">{row.name}</td>
                    <td className="p-3 border">{row.category}</td>
-                   <td className="p-3 border text-center">{row.quantity}</td>
-                   <td className="p-3 border text-center">{row.cost_price?.toLocaleString()}</td>
-                   <td className="p-3 border text-left font-black text-primary">{((row.quantity || 0) * (row.cost_price || 0)).toLocaleString()}</td>
+                   <td className="p-3 border text-center font-bold text-lg">{row.quantity}</td>
+                   {!isQtyOnly && <td className="p-3 border text-center">{row.cost_price?.toLocaleString()}</td>}
+                   {!isQtyOnly && <td className="p-3 border text-left font-black text-primary">{((row.quantity || 0) * (row.cost_price || 0)).toLocaleString()}</td>}
+                 </tr>
+               ))}
+             </tbody>
+             {!isQtyOnly && (
+               <tfoot>
+                 <tr className="bg-primary/10 font-black text-lg text-primary"><td colSpan={4} className="p-4 border text-left">إجمالي قيمة المخزون الحالية</td><td className="p-4 border text-left">{total.toLocaleString()}</td></tr>
+               </tfoot>
+             )}
+          </table>
+        </div>
+      );
+    }
+
+    if (activeReport === 'fixed_assets_summary') {
+      total = listData.reduce((s, r) => s + (r.current_value || 0), 0);
+      return (
+        <div>
+          <table className="w-full text-right text-sm border-collapse">
+             <thead><tr className="bg-muted font-black uppercase text-muted-foreground"><th className="p-4 border">الأصل</th><th className="p-4 border">التصنيف</th><th className="p-4 border text-center">تاريخ الشراء</th><th className="p-4 border text-center">القيمة الدفترية</th><th className="p-4 border text-left">القيمة الحالية ({currency})</th></tr></thead>
+             <tbody>
+               {listData.length === 0 ? <tr><td colSpan={5} className="p-8 text-center text-muted-foreground">لا توجد أصول مسجلة.</td></tr> : listData.map((row, i) => (
+                 <tr key={i} className="hover:bg-primary/5 transition-colors border-b">
+                   <td className="p-3 border font-bold">{row.name}</td>
+                   <td className="p-3 border">{row.category}</td>
+                   <td className="p-3 border text-center">{row.purchase_date ? new Date(row.purchase_date).toLocaleDateString() : '-'}</td>
+                   <td className="p-3 border text-center">{row.purchase_value?.toLocaleString()}</td>
+                   <td className="p-3 border text-left font-black text-emerald-600">{row.current_value?.toLocaleString()}</td>
                  </tr>
                ))}
              </tbody>
              <tfoot>
-               <tr className="bg-primary/10 font-black text-lg text-primary"><td colSpan={4} className="p-4 border text-left">إجمالي قيمة المخزون الحالية</td><td className="p-4 border text-left">{total.toLocaleString()}</td></tr>
+               <tr className="bg-emerald-500/10 font-black text-lg text-emerald-700"><td colSpan={4} className="p-4 border text-left">إجمالي قيمة الأصول الثابتة</td><td className="p-4 border text-left">{total.toLocaleString()}</td></tr>
              </tfoot>
           </table>
         </div>
       );
     }
 
-    return null;
+    if (activeReport === 'employees_summary') {
+      return (
+        <div>
+          <table className="w-full text-right text-sm border-collapse">
+             <thead><tr className="bg-muted font-black uppercase text-muted-foreground"><th className="p-4 border">الموظف</th><th className="p-4 border">المنصب</th><th className="p-4 border text-center">الهاتف</th><th className="p-4 border text-left">الراتب الأساسي ({currency})</th></tr></thead>
+             <tbody>
+               {listData.length === 0 ? <tr><td colSpan={4} className="p-8 text-center text-muted-foreground">لا يوجد موظفين مسجلين.</td></tr> : listData.map((row, i) => (
+                 <tr key={i} className="hover:bg-primary/5 transition-colors border-b">
+                   <td className="p-3 border font-bold">{row.name}</td>
+                   <td className="p-3 border">{row.role}</td>
+                   <td className="p-3 border text-center" dir="ltr">{row.phone || '-'}</td>
+                   <td className="p-3 border text-left font-bold">{row.salary?.toLocaleString()}</td>
+                 </tr>
+               ))}
+             </tbody>
+          </table>
+        </div>
+      );
+    }
+
+    // Placeholder UI for reports not fully implemented yet
+    return (
+      <div className="flex flex-col items-center justify-center p-20 text-center border-2 border-dashed border-primary/20 rounded-2xl bg-primary/5">
+        <Scale className="w-16 h-16 text-primary/30 mb-6" />
+        <h2 className="text-2xl font-black mb-2 text-primary">التقرير قيد التجهيز</h2>
+        <p className="text-muted-foreground max-w-md">هذا التقرير المتخصص يتم الآن ربطه بوحدة المعالجة المحاسبية الأساسية، وسيكون متاحاً بشكل كامل وشامل في التحديث القادم للسيستم لضمان دقة العمليات وحساب التكاليف المتشابكة.</p>
+        <Button variant="outline" className="mt-6" onClick={() => setActiveReport(null)}>العودة للقائمة الرئيسية</Button>
+      </div>
+    );
   };
 
   if (activeReport) {
+    const isPlaceholder = ![
+      'pnl', 'balance_sheet', 'cash_flow', 'indicators', 'trial_balance',
+      'ar_aging', 'ap_aging', 'customers_summary', 'suppliers_summary',
+      'inventory_value', 'inventory_qty', 'fixed_assets_summary', 'employees_summary'
+    ].includes(activeReport);
+
     return (
       <div className="flex flex-col h-full bg-background fade-in" dir="rtl">
         <header className="border-b bg-card/50 backdrop-blur-md p-4 flex items-center justify-between shrink-0">
@@ -386,10 +600,10 @@ export function AdvancedReportsHub({ restaurantId, currency }: Props) {
                  <Input type="date" value={endDate} onChange={e => setEndDate(e.target.value)} className="h-8 text-xs border-0 bg-transparent w-36" />
               </div>
               <div className="h-4 w-px bg-border mx-2" />
-              <Button variant="outline" size="sm" className="gap-2 h-9 px-4 rounded-xl border-primary/20 hover:bg-primary/5 transition-all">
+              <Button variant="outline" size="sm" className="gap-2 h-9 px-4 rounded-xl border-primary/20 hover:bg-primary/5 transition-all" disabled={isPlaceholder}>
                 <Download className="w-4 h-4" /> Excel
               </Button>
-              <Button variant="primary" size="sm" className="gap-2 h-9 px-4 rounded-xl gradient-bg text-white border-0 shadow-lg shadow-primary/20" onClick={handlePrint}>
+              <Button variant="primary" size="sm" className="gap-2 h-9 px-4 rounded-xl gradient-bg text-white border-0 shadow-lg shadow-primary/20" onClick={handlePrint} disabled={isPlaceholder}>
                 <Printer className="w-4 h-4" /> طباعة
               </Button>
            </div>
@@ -420,20 +634,25 @@ export function AdvancedReportsHub({ restaurantId, currency }: Props) {
                 {activeReport === 'pnl' && renderPLReport()}
                 {activeReport === 'balance_sheet' && renderBalanceSheet()}
                 {activeReport === 'cash_flow' && renderCashFlow()}
+                {activeReport === 'trial_balance' && renderTrialBalance()}
                 {activeReport === 'indicators' && renderIndicators()}
-                {['ar_aging', 'ap_aging', 'inventory_value'].includes(activeReport) && renderListReport()}
+                {![
+                  'pnl', 'balance_sheet', 'cash_flow', 'trial_balance', 'indicators'
+                ].includes(activeReport) && renderListReport()}
               </div>
 
               {/* Report Footer */}
-              <div className="mt-16 pt-8 border-t flex justify-between items-end italic text-[10px] text-muted-foreground">
-                 <div className="space-y-1">
-                    <p>هذا التقرير تم استخراجه آلياً من النظام المحاسبي المتكامل.</p>
-                    <p className="mt-4">المدير المالي / المحاسب: ________________________</p>
-                 </div>
-                 <div className="text-left">
-                    <p>Auditry ERP - Advanced Financial Reports</p>
-                 </div>
-              </div>
+              {!isPlaceholder && (
+                <div className="mt-16 pt-8 border-t flex justify-between items-end italic text-[10px] text-muted-foreground">
+                   <div className="space-y-1">
+                      <p>هذا التقرير تم استخراجه آلياً من النظام المحاسبي المتكامل.</p>
+                      <p className="mt-4">المدير المالي / المحاسب: ________________________</p>
+                   </div>
+                   <div className="text-left">
+                      <p>Auditry ERP - Advanced Financial Reports</p>
+                   </div>
+                </div>
+              )}
 
               {/* Loading Overlay */}
               {loading && (
@@ -453,11 +672,11 @@ export function AdvancedReportsHub({ restaurantId, currency }: Props) {
   return (
     <div className="space-y-10 p-8 fade-in bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-primary/5 via-transparent to-transparent" dir="rtl">
       <header className="space-y-2 text-center max-w-2xl mx-auto mb-16">
-        <h2 className="text-4xl font-black font-display tracking-tight text-primary">التقارير المالية والمحاسبية</h2>
-        <p className="text-muted-foreground text-lg">قوائم وتقارير مالية احترافية مبنية على العمليات والقيود الفعلية لضمان الدقة والرقابة.</p>
+        <h2 className="text-4xl font-black font-display tracking-tight text-primary">التقارير المالية والمحاسبية الشاملة</h2>
+        <p className="text-muted-foreground text-lg">قوائم وتقارير مالية وإدارية وضريبية احترافية مبنية على العمليات والقيود الفعلية لضمان الدقة والرقابة.</p>
       </header>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-8">
         {reportGroups.map((group) => (
           <div key={group.title} className="space-y-4 group">
             <div className="flex items-center gap-3 px-1">
@@ -467,16 +686,17 @@ export function AdvancedReportsHub({ restaurantId, currency }: Props) {
               <h3 className="font-black text-lg tracking-tight">{group.title}</h3>
             </div>
             
-            <div className="glass-card overflow-hidden shadow-xl shadow-black/5 hover:border-primary/30 transition-all">
+            <div className="glass-card overflow-hidden shadow-xl shadow-black/5 hover:border-primary/30 transition-all bg-card/60">
               <div className="divide-y divide-border/30">
                 {group.reports.map((report) => (
                   <button
                     key={report.id}
                     onClick={() => setActiveReport(report.id)}
-                    className="w-full p-4 text-right flex items-center justify-between hover:bg-primary/5 transition-colors group/item"
+                    className="w-full p-4 text-right flex items-center justify-between hover:bg-primary/10 transition-colors group/item relative overflow-hidden"
                   >
-                    <span className="text-sm font-bold text-foreground/80 group-hover/item:text-primary transition-colors">{report.label}</span>
-                    <Badge className="bg-primary/5 text-primary border-0 text-[10px] px-2 font-bold">{report.trend}</Badge>
+                    <div className="absolute inset-0 bg-gradient-to-r from-primary/5 to-transparent translate-x-full group-hover/item:translate-x-0 transition-transform duration-300" />
+                    <span className="text-sm font-bold text-foreground/80 group-hover/item:text-primary transition-colors relative z-10">{report.label}</span>
+                    <Badge className="bg-secondary/80 text-secondary-foreground border-0 text-[10px] px-2 font-bold group-hover/item:bg-primary/20 group-hover/item:text-primary transition-colors relative z-10">{report.trend}</Badge>
                   </button>
                 ))}
               </div>
