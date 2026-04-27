@@ -2,7 +2,7 @@ import { motion } from 'framer-motion';
 import { TrendingUp, Receipt, DollarSign, Timer } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { TableGrid } from '../TableGrid';
-import { getPosSearchPlaceholder, isFoodSector } from '@/lib/businessTypes';
+import { getPosSearchPlaceholder, isFoodSector, isInventoryDrivenBusiness } from '@/lib/businessTypes';
 import type { OrderType, MenuItem, Order } from '../types';
 
 interface POSGridProps {
@@ -76,7 +76,12 @@ export function POSGrid({
 
       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
         {filteredItems.map(item => (
-          <motion.button key={item.id} whileTap={{ scale: 0.95 }} onClick={() => addToCart(item)} className="pos-grid-item text-right">
+          <motion.button key={item.id} whileTap={{ scale: 0.95 }} onClick={() => addToCart(item)} className="pos-grid-item text-right relative">
+            {item.stock_quantity !== undefined && isInventoryDrivenBusiness(businessType) && (
+              <div className={`absolute top-2 left-2 text-[10px] font-bold px-1.5 py-0.5 rounded-md ${item.stock_quantity <= 0 ? 'bg-destructive/10 text-destructive' : 'bg-secondary text-secondary-foreground'}`}>
+                {item.stock_quantity} {item.stock_quantity <= 0 ? 'نفذ' : 'متبقي'}
+              </div>
+            )}
             <div className="text-3xl mb-2">{item.image}</div>
             <p className="font-medium text-sm truncate">{item.name}</p>
             <p className="text-primary font-bold text-sm">{item.price} {currency}</p>

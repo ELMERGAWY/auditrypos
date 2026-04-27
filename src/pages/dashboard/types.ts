@@ -18,6 +18,7 @@ export interface MenuItem {
   pricing_method?: 'fixed' | 'cost_plus';
   profit_margin_percent?: number;
   calculated_cost_price?: number;
+  stock_quantity?: number;
 }
 
 export interface OrderItem {

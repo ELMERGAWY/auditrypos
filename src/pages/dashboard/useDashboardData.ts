@@ -125,6 +125,7 @@ export function useDashboardData() {
           barcode: product.barcode || '',
           sku: product.sku || '',
           unit: product.unit || 'قطعة',
+          stock_quantity: product.quantity || 0,
         })) as MenuItem[])
       : ((itemsRes.data || []) as MenuItem[]);
     const loadedAgents = (agentsRes.data || []) as DeliveryAgent[];
