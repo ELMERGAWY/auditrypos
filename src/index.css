@@ -1,0 +1,351 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Space+Grotesk:wght@400;500;600;700&family=Cairo:wght@400;500;600;700;800&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 210 40% 98%;
+    --foreground: 222 47% 11%;
+    --card: 0 0% 100%;
+    --card-foreground: 222 47% 11%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 222 47% 11%;
+    --primary: 25 95% 53%; /* Vivid Orange for better visibility */
+    --primary-foreground: 0 0% 100%;
+    --secondary: 210 40% 96%;
+    --secondary-foreground: 222 47% 11%;
+    --muted: 210 40% 96%;
+    --muted-foreground: 215 16% 47%;
+    --accent: 210 40% 96%;
+    --accent-foreground: 222 47% 11%;
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 210 40% 98%;
+    --success: 142 76% 36%;
+    --success-foreground: 0 0% 100%;
+    --warning: 38 92% 50%;
+    --warning-foreground: 0 0% 100%;
+    --border: 214 32% 91%;
+    --input: 214 32% 91%;
+    --ring: 25 95% 53%;
+    --radius: 0.75rem;
+
+    --glass-bg: rgba(255, 255, 255, 0.9);
+    --glass-border: rgba(0, 0, 0, 0.1);
+    --surface-blur: 8px;
+    --hero-gradient: linear-gradient(135deg, #f97316 0%, #ea580c 100%);
+    --card-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+  }
+
+  .dark {
+    --background: 222 47% 11%;
+    --foreground: 210 40% 98%;
+    --card: 222 47% 14%;
+    --card-foreground: 210 40% 98%;
+    --popover: 222 47% 14%;
+    --popover-foreground: 210 40% 98%;
+    --primary: 210 40% 98%;
+    --primary-foreground: 222 47% 11%;
+    --secondary: 222 47% 18%;
+    --secondary-foreground: 210 40% 98%;
+    --muted: 222 47% 18%;
+    --muted-foreground: 215 16% 70%;
+    --accent: 222 47% 18%;
+    --accent-foreground: 210 40% 98%;
+    --destructive: 0 62% 30%;
+    --destructive-foreground: 210 40% 98%;
+    --success: 142 71% 45%;
+    --success-foreground: 0 0% 100%;
+    --warning: 38 92% 50%;
+    --warning-foreground: 0 0% 100%;
+    --border: 222 47% 20%;
+    --input: 222 47% 20%;
+    --ring: 210 40% 98%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground font-sans antialiased;
+    font-family: 'Inter', sans-serif;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    font-family: 'Space Grotesk', sans-serif;
+  }
+}
+
+@layer components {
+  /* Ventro Pro: Enhanced Glass Card */
+  .glass-card {
+    @apply bg-card border border-border shadow-sm rounded-xl transition-all duration-200;
+  }
+
+  .glass-card:hover {
+    @apply shadow-md border-border/80;
+  }
+
+  .premium-sidebar {
+    @apply fixed right-0 top-0 bottom-0 w-64 bg-slate-900 z-50 p-4 flex flex-col gap-6 text-white;
+  }
+
+  /* Ventro Pro: Gradient Text */
+  .gradient-text {
+    @apply bg-clip-text text-transparent;
+    background-image: var(--hero-gradient);
+  }
+
+  /* Ventro Pro: Gradient Background */
+  .gradient-bg {
+    background-image: var(--hero-gradient);
+    @apply transition-all duration-300;
+  }
+
+  .gradient-bg:hover {
+    filter: brightness(1.05);
+  }
+
+  /* Ventro Pro: Glow Effects */
+  .glow-primary {
+    box-shadow: 0 0 40px hsl(var(--primary) / 0.25), 0 0 80px hsl(var(--primary) / 0.1);
+  }
+
+  .glow-soft {
+    box-shadow: 0 4px 30px -10px hsl(var(--primary) / 0.15);
+  }
+
+  /* Ventro Pro: POS Grid Item */
+  .pos-grid-item {
+    @apply glass-card p-4 cursor-pointer;
+    @apply transition-all duration-200 ease-out;
+    @apply hover:scale-[1.02] hover:border-primary/40 hover:shadow-lg;
+    @apply active:scale-[0.98];
+  }
+
+  /* Ventro Pro: Status Badges */
+  .status-active {
+    @apply border rounded-lg px-3 py-1 text-xs font-medium;
+    color: hsl(var(--success));
+    background: linear-gradient(135deg, hsl(var(--success) / 0.15), hsl(var(--success) / 0.05));
+    border-color: hsl(var(--success) / 0.3);
+  }
+
+  .status-suspended {
+    @apply border rounded-lg px-3 py-1 text-xs font-medium;
+    color: hsl(var(--destructive));
+    background: linear-gradient(135deg, hsl(var(--destructive) / 0.15), hsl(var(--destructive) / 0.05));
+    border-color: hsl(var(--destructive) / 0.3);
+  }
+
+  .status-pending {
+    @apply border rounded-lg px-3 py-1 text-xs font-medium;
+    color: hsl(var(--warning));
+    background: linear-gradient(135deg, hsl(var(--warning) / 0.15), hsl(var(--warning) / 0.05));
+    border-color: hsl(var(--warning) / 0.3);
+  }
+
+  /* Ventro Pro: Professional Sidebar */
+  .sidebar-nav-item {
+    @apply flex items-center gap-3 px-4 py-3 rounded-xl;
+    @apply text-muted-foreground hover:text-foreground;
+    @apply transition-all duration-200 ease-out;
+    @apply hover:bg-secondary/80;
+    @apply relative overflow-hidden;
+  }
+
+  .sidebar-nav-item::before {
+    content: '';
+    @apply absolute right-0 top-1/2 -translate-y-1/2 w-1 h-0 rounded-l-full;
+    background: hsl(var(--primary));
+    transition: height 0.2s ease-out;
+  }
+
+  .sidebar-nav-item.active {
+    @apply text-white bg-primary shadow-lg shadow-primary/20 font-bold;
+  }
+
+  .sidebar-nav-item.active::before {
+    @apply h-6 bg-white;
+  }
+
+  /* Ventro Pro: Animations */
+  .pulse-notification {
+    animation: pulse-glow 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  }
+
+  @keyframes pulse-glow {
+    0%, 100% { box-shadow: 0 0 0 0 hsl(var(--primary) / 0.4); }
+    50% { box-shadow: 0 0 0 15px hsl(var(--primary) / 0); }
+  }
+
+  .fade-in-up {
+    animation: fadeInUp 0.4s ease-out;
+  }
+
+  @keyframes fadeInUp {
+    from {
+      opacity: 0;
+      transform: translateY(20px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  .scale-in {
+    animation: scaleIn 0.3s ease-out;
+  }
+
+  @keyframes scaleIn {
+    from {
+      opacity: 0;
+      transform: scale(0.9);
+    }
+    to {
+      opacity: 1;
+      transform: scale(1);
+    }
+  }
+
+  /* Ventro Pro: Floating Button */
+  .floating-btn {
+    @apply fixed bottom-6 right-6 z-50 gradient-bg text-primary-foreground;
+    @apply rounded-full p-4 shadow-2xl glow-primary;
+    @apply transition-transform duration-200;
+  }
+
+  .floating-btn:hover {
+    @apply scale-105;
+  }
+
+  /* Ventro Pro: Card Hover Effects */
+  .hover-lift {
+    @apply transition-all duration-300 ease-out;
+  }
+
+  .hover-lift:hover {
+    @apply -translate-y-1 shadow-xl;
+  }
+
+  /* Ventro Pro: Button Variants */
+  .btn-primary {
+    @apply gradient-bg text-primary-foreground font-medium;
+    @apply px-6 py-2.5 rounded-xl;
+    @apply transition-all duration-200;
+    @apply hover:opacity-90 hover:shadow-lg;
+    @apply active:scale-[0.98];
+  }
+
+  .btn-secondary {
+    @apply bg-secondary text-secondary-foreground font-medium;
+    @apply px-6 py-2.5 rounded-xl;
+    @apply transition-all duration-200;
+    @apply hover:bg-secondary/80;
+    @apply active:scale-[0.98];
+  }
+
+  /* Ventro Pro: Input Styles */
+  .input-ventro {
+    @apply bg-background border rounded-xl px-4 py-3;
+    @apply transition-all duration-200;
+    @apply focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary;
+    @apply hover:border-border/80;
+  }
+
+  /* Ventro Pro: Scrollbar */
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
+
+  .scrollbar-thin {
+    scrollbar-width: thin;
+    scrollbar-color: hsl(var(--muted)) transparent;
+  }
+
+  .scrollbar-thin::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+
+  .scrollbar-thin::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  .scrollbar-thin::-webkit-scrollbar-thumb {
+    background: hsl(var(--muted));
+    border-radius: 3px;
+  }
+
+  /* Ventro Pro: Shimmer Loading */
+  .shimmer {
+    background: linear-gradient(
+      90deg,
+      hsl(var(--muted)) 25%,
+      hsl(var(--muted) / 0.5) 50%,
+      hsl(var(--muted)) 75%
+    );
+    background-size: 200% 100%;
+    animation: shimmer 1.5s infinite;
+  }
+
+  @keyframes shimmer {
+    0% { background-position: 200% 0; }
+    100% { background-position: -200% 0; }
+  }
+
+  /* Ventro Pro: Divider */
+  .divider-gradient {
+    height: 1px;
+    background: linear-gradient(
+      90deg,
+      transparent,
+      hsl(var(--border)),
+      transparent
+    );
+  }
+
+  /* Responsive Table Wrapper */
+  .table-responsive {
+    @apply w-full overflow-x-auto scrollbar-thin;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* Mobile Grid System */
+  .responsive-grid {
+    @apply grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4;
+  }
+
+  /* Compact Mode for POS on Mobile */
+  @media (max-width: 768px) {
+    .pos-layout {
+      @apply flex-col;
+    }
+    .pos-cart-panel {
+      @apply fixed inset-0 z-50 bg-background translate-y-full transition-transform duration-300;
+    }
+    .pos-cart-panel.open {
+      @apply translate-y-0;
+    }
+    .glass-card {
+      @apply rounded-lg p-3;
+    }
+  }
+
+  /* Ventro Pro: Business Type Themes - Enhanced */
+  .theme-restaurant { 
+    --primary: 222 47% 11%; 
+    --hero-gradient: none; 
+    --glass-bg: #ffffff;
+  }
+}
