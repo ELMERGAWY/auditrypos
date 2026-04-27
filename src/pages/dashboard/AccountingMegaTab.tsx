@@ -6,7 +6,7 @@ import {
   Truck, Package, ClipboardList, Briefcase, UsersRound,
   Calculator, History, Settings, BarChart3, HardDrive,
   Banknote, Receipt, Layers, Boxes, Ban, LayoutDashboard,
-  Plus, Search, Download, Printer, Filter, X, Scale as ScaleIcon
+  Plus, Search, Download, Printer, Filter, X, Scale as ScaleIcon, Network
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -23,13 +23,14 @@ import { StaffTab } from './StaffTab';
 import { CustomReportBuilder } from './CustomReportBuilder';
 import { BankCashModule } from './BankCashModule';
 import { AdvancedReportsHub } from './AdvancedReportsHub';
+import { ChartOfAccountsTab } from './ChartOfAccountsTab';
 
 interface Props {
   restaurantId: string;
   currency: string;
 }
 
-type SubModule = 'overview' | 'bank_cash' | 'customers' | 'suppliers' | 'expenses' | 'inventory' | 'production' | 'hr' | 'assets' | 'ledger' | 'reports' | 'financials';
+type SubModule = 'overview' | 'bank_cash' | 'customers' | 'suppliers' | 'expenses' | 'inventory' | 'production' | 'hr' | 'assets' | 'ledger' | 'reports' | 'financials' | 'coa';
 
 export function AccountingMegaTab({ restaurantId, currency }: Props) {
   const [activeModule, setActiveModule] = useState<SubModule>('overview');
@@ -190,6 +191,7 @@ export function AccountingMegaTab({ restaurantId, currency }: Props) {
       icon: BarChart3,
       items: [
         { id: 'ledger', label: 'دفتر الأستاذ العام', icon: ClipboardList },
+        { id: 'coa', label: 'شجرة الحسابات (دليل الحسابات)', icon: Network },
         { id: 'reports', label: 'مولد التقارير المخصص', icon: FileText },
       ]
     }
@@ -217,7 +219,8 @@ export function AccountingMegaTab({ restaurantId, currency }: Props) {
           {activeModule === 'production' && <BOMManager restaurantId={restaurantId} currency={currency} />}
           {activeModule === 'hr' && <StaffTab restaurantId={restaurantId} currency={currency} />}
           {activeModule === 'reports' && <AdvancedReportsHub restaurantId={restaurantId} currency={currency} />}
-          {activeModule === 'bank_cash' && <BankCashModule restaurantId={restaurantId} currency={currency} />}
+          { activeModule === 'bank_cash' && <BankCashModule restaurantId={restaurantId} currency={currency} />}
+          { activeModule === 'coa' && <ChartOfAccountsTab restaurantId={restaurantId} currency={currency} />}
           
           {activeModule === 'ledger' && (
             <div className="space-y-6 fade-in">
