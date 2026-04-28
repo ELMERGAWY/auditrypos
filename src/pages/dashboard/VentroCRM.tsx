@@ -4,7 +4,7 @@ import {
   TrendingUp, Star, Phone, Mail, MapPin, 
   Search, Filter, MoreVertical,
   Award, Zap, History,
-  Columns, Plus, Clock
+  Columns, Plus, Clock, CheckCircle, List
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -26,6 +26,7 @@ export function VentroCRM({ restaurantId, currency }: Props) {
   const [leads, setLeads] = useState<any[]>([]);
   const [logs, setLogs] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [viewMode, setViewMode] = useState<'kanban' | 'table'>('kanban');
 
   // New lead form state
   const [showAddLead, setShowAddLead] = useState(false);
@@ -212,7 +213,27 @@ export function VentroCRM({ restaurantId, currency }: Props) {
                   <h2 className="text-2xl font-black flex items-center gap-2"><Columns className="w-6 h-6 text-primary" /> إدارة مسار المبيعات (Pipeline)</h2>
                   <p className="text-sm text-muted-foreground">تتبع العملاء المحتملين من أول اتصال حتى إغلاق الصفقة.</p>
                </div>
-               <Button onClick={() => setShowAddLead(true)} className="gradient-bg text-primary-foreground border-0 gap-2"><Plus className="w-4 h-4" /> فرصة جديدة</Button>
+               <div className="flex gap-2">
+                  <div className="flex bg-secondary/50 p-1 rounded-lg border border-border/50">
+                    <Button 
+                      variant={viewMode === 'kanban' ? 'secondary' : 'ghost'} 
+                      size="sm" 
+                      onClick={() => setViewMode('kanban')}
+                      className="gap-2 h-8"
+                    >
+                      <Columns className="w-4 h-4" /> كانبان
+                    </Button>
+                    <Button 
+                      variant={viewMode === 'table' ? 'secondary' : 'ghost'} 
+                      size="sm" 
+                      onClick={() => setViewMode('table')}
+                      className="gap-2 h-8"
+                    >
+                      <List className="w-4 h-4" /> جدول
+                    </Button>
+                  </div>
+                  <Button onClick={() => setShowAddLead(true)} className="gradient-bg text-primary-foreground border-0 gap-2"><Plus className="w-4 h-4" /> فرصة جديدة</Button>
+               </div>
             </div>
 
             {showAddLead && (
@@ -231,7 +252,41 @@ export function VentroCRM({ restaurantId, currency }: Props) {
             )}
 
             <div className="flex-1 min-h-[400px]">
-               {renderKanbanBoard()}
+               {viewMode === 'kanban' ? renderKanbanBoard() : (
+                 <div className="glass-card overflow-hidden">
+                   <table className="w-full text-right text-sm">
+                     <thead className="bg-muted/50 border-b">
+                       <tr>
+                         <th className="p-4">العميل المحتمل</th>
+                         <th className="p-4">المرحلة</th>
+                         <th className="p-4">القيمة المتوقعة</th>
+                         <th className="p-4">تاريخ الإضافة</th>
+                         <th className="p-4">إجراءات</th>
+                       </tr>
+                     </thead>
+                     <tbody className="divide-y divide-border/30">
+                       {leads.map(lead => (
+                         <tr key={lead.id} className="hover:bg-muted/40 transition-colors">
+                           <td className="p-4">
+                             <div className="font-bold">{lead.name}</div>
+                             <div className="text-[10px] text-muted-foreground">{lead.phone || 'بدون هاتف'}</div>
+                           </td>
+                           <td className="p-4">
+                             <Badge variant="outline" className="text-[10px]">
+                               {lead.stage === 'new' ? 'جديد' : lead.stage === 'contacted' ? 'تم التواصل' : lead.stage === 'negotiation' ? 'تفاوض' : 'مكتمل'}
+                             </Badge>
+                           </td>
+                           <td className="p-4 font-bold text-primary">{(lead.estimated_value || 0).toLocaleString()} {currency}</td>
+                           <td className="p-4 text-xs text-muted-foreground">{new Date(lead.created_at).toLocaleDateString('ar-EG')}</td>
+                           <td className="p-4">
+                             <Button variant="ghost" size="sm" className="h-8">تعديل</Button>
+                           </td>
+                         </tr>
+                       ))}
+                     </tbody>
+                   </table>
+                 </div>
+               )}
             </div>
           </div>
         )}

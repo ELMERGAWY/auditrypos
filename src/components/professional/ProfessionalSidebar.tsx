@@ -6,7 +6,7 @@ import {
   LayoutGrid, ShoppingCart, QrCode, Bell, Settings, LogOut,
   Receipt, Wifi, WifiOff, X, Check, BarChart3, ChefHat,
   CalendarClock, Package, Users, Truck, Wallet, Store,
-  UsersRound, DollarSign, Lock, ChevronLeft, ChevronRight,
+  UsersRound, DollarSign, Lock, ChevronLeft, ChevronRight, ChevronDown,
   Sparkles, Crown, Zap, Moon, Sun, Volume2, VolumeX,
   CreditCard, TrendingUp, Shield, HelpCircle, RotateCcw, FileText, Activity
 } from 'lucide-react';
@@ -67,10 +67,11 @@ interface ProfessionalSidebarProps {
 }
 
 const SECTIONS = {
-  main: 'الرئيسية',
-  sales: 'إدارة المبيعات',
-  inventory: 'المخزون والتكاليف',
-  accounting: 'المحاسبة والمالية',
+  main: 'العمليات الأساسية',
+  sales: 'المبيعات والعملاء',
+  purchases: 'المشتريات والموردين',
+  inventory: 'المخزون والتصنيع',
+  accounting: 'الحسابات والمالية',
   analytics: 'التقارير والذكاء الاصطناعي',
   system: 'إدارة النظام'
 };
@@ -95,6 +96,13 @@ export function ProfessionalSidebar({
 }: ProfessionalSidebarProps) {
   const config = getBusinessConfig(businessType);
   const [hoveredItem, setHoveredItem] = useState<string | null>(null);
+  const [expandedSections, setExpandedSections] = useState<string[]>(['main', 'sales', 'inventory', 'accounting']);
+  
+  const toggleSection = (section: string) => {
+    setExpandedSections(prev => 
+      prev.includes(section) ? prev.filter(s => s !== section) : [...prev, section]
+    );
+  };
   
   const isSuspended = restaurant.status === 'suspended' || 
     (restaurant.subscription_end && new Date(restaurant.subscription_end) < new Date());
@@ -103,34 +111,40 @@ export function ProfessionalSidebar({
 
   const ALL_NAV_ITEMS: Record<string, Partial<NavItem>> = {
     pos: { label: 'نقطة البيع', icon: LayoutGrid, section: 'main', shortcut: 'F1' },
+    shifts: { label: 'الورديات', icon: CalendarClock, section: 'main' },
+    delivery: { label: 'التوصيل', icon: Truck, section: 'main', badge: stats.deliveryOrders },
+    qr: { label: 'QR Menu', icon: QrCode, section: 'main' },
+    waiter: { label: 'طلبات الجرسون', icon: Bell, badge: stats.unackCalls, section: 'main' },
+
     orders: { label: config.labels.orders, icon: Receipt, badge: stats.pendingOrders, section: 'sales' },
+    sales_orders: { label: 'أوامر البيع', icon: FileText, section: 'sales' },
+    sales_returns: { label: 'مرتجع المبيعات', icon: RotateCcw, section: 'sales' },
+    customers: { label: config.labels.customers, icon: Users, section: 'sales' },
+    crm: { label: 'Ventro CRM', icon: Sparkles, section: 'sales' },
+
+    purchase_orders: { label: 'أوامر الشراء', icon: ShoppingCart, section: 'purchases' },
+    purchase_invoices: { label: 'فواتير المشتريات', icon: DollarSign, section: 'purchases' },
+    suppliers: { label: 'الموردين', icon: UsersRound, section: 'purchases' },
+
     menu: { 
       label: config.labels.menu, 
       icon: config.category === 'food' ? ChefHat : Package, 
       section: 'inventory' 
     },
-    inventory: { label: 'المخزون والتكاليف', icon: Package, section: 'inventory' },
+    inventory: { label: 'جرد المخزون', icon: Package, section: 'inventory' },
     inventory_receipts: { label: 'استلام المخزون', icon: FileText, section: 'inventory' },
-    purchase_invoices: { label: 'فواتير المشتريات', icon: DollarSign, section: 'sales' },
-    sales_orders: { label: 'أوامر البيع', icon: FileText, section: 'sales' },
-    purchase_orders: { label: 'أوامر الشراء', icon: ShoppingCart, section: 'sales' },
-    crm: { label: 'Ventro CRM', icon: Sparkles, section: 'main' },
-    delivery: { label: 'التوصيل', icon: Truck, section: 'sales', badge: stats.deliveryOrders },
-    customers: { label: config.labels.customers, icon: Users, section: 'main' },
+    overheads: { label: 'التكاليف الثابتة', icon: Activity, section: 'inventory' },
+
+    financials: { label: 'التقارير المالية', icon: Wallet, section: 'accounting' },
+    expenses: { label: 'المصروفات', icon: DollarSign, section: 'accounting' },
     customer_accounts: { label: 'حسابات العملاء', icon: CreditCard, section: 'accounting' },
-    suppliers: { label: 'الموردين', icon: UsersRound, section: 'main' },
     supplier_accounts: { label: 'حسابات الموردين', icon: Wallet, section: 'accounting' },
-    sales_returns: { label: 'مرتجع المبيعات', icon: RotateCcw, section: 'sales' },
-    shifts: { label: 'الورديات', icon: CalendarClock, section: 'main' },
-    stats: { label: 'الإحصائيات', icon: BarChart3, section: 'analytics' },
-    financials: { label: 'المحاسبة والمالية', icon: Wallet, section: 'accounting' },
-    expenses: { label: 'المصاريف', icon: DollarSign, section: 'accounting' },
-    staff: { label: 'الموظفين', icon: Users, section: 'system' },
+
+    stats: { label: 'الإحصائيات الشاملة', icon: BarChart3, section: 'analytics' },
+
+    staff: { label: 'إدارة الموظفين', icon: Users, section: 'system' },
     notifications: { label: 'التنبيهات', icon: Bell, section: 'system' },
-    settings: { label: 'الإعدادات', icon: Settings, section: 'system' },
-    qr: { label: 'QR Menu', icon: QrCode, section: 'main' },
-    waiter: { label: 'طلبات الجرسون', icon: Bell, badge: stats.unackCalls, section: 'main' },
-    overheads: { label: 'التكاليف الثابتة', icon: Activity, section: 'inventory' }
+    settings: { label: 'إعدادات النظام', icon: Settings, section: 'system' }
   };
 
   const navItems: NavItem[] = config.tabs
@@ -257,16 +271,29 @@ export function ProfessionalSidebar({
 
         {/* Navigation */}
         <ScrollArea className="flex-1 px-3 py-4">
-          {Object.entries(groupedItems).map(([section, items]) => (
-            <div key={section} className="mb-4">
+          {Object.entries(groupedItems).map(([section, items]) => {
+            const isExpanded = isCollapsed || expandedSections.includes(section);
+            return (
+            <div key={section} className="mb-2">
               {!isCollapsed && (
-                <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider mb-2 px-3">
-                  {SECTIONS[section as keyof typeof SECTIONS]}
-                </p>
+                <button 
+                  onClick={() => toggleSection(section)}
+                  className="w-full flex items-center justify-between px-3 py-2 text-[10px] font-bold text-muted-foreground uppercase tracking-wider hover:text-foreground transition-colors group"
+                >
+                  <span>{SECTIONS[section as keyof typeof SECTIONS]}</span>
+                  <ChevronDown className={cn("w-3 h-3 transition-transform duration-200", isExpanded ? "rotate-180" : "rotate-0", "group-hover:text-primary")} />
+                </button>
               )}
               
-              <div className="space-y-1">
-                {items.map((item) => {
+              <AnimatePresence initial={false}>
+                {isExpanded && (
+                  <motion.div
+                    initial={isCollapsed ? false : { height: 0, opacity: 0 }}
+                    animate={{ height: 'auto', opacity: 1 }}
+                    exit={isCollapsed ? false : { height: 0, opacity: 0 }}
+                    className="space-y-1 overflow-hidden"
+                  >
+                    {items.map((item) => {
                   const isActive = activeTab === item.id;
                   const isLocked = item.locked;
                   const Icon = item.icon;
@@ -361,9 +388,11 @@ export function ProfessionalSidebar({
                     </Tooltip>
                   );
                 })}
-              </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
             </div>
-          ))}
+          )})}
         </ScrollArea>
 
         {/* Footer */}

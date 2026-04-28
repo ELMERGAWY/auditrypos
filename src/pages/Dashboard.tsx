@@ -888,7 +888,7 @@ export default function Dashboard() {
             {activeTab === 'sales_returns' && <SalesReturnsManager restaurantId={restaurant!.id} currency={currency} />}
             
             {activeTab === 'delivery' && <DeliveryTab restaurantId={restaurant!.id} currency={currency} agents={agents} />}
-            {activeTab === 'shifts' && <ShiftsTab restaurantId={restaurant!.id} currency={currency} />}
+            {activeTab === 'shifts' && <ShiftsTab restaurant={restaurant!} currentShift={currentShift} setCurrentShift={setCurrentShift} profileName={profileName} userId={user!.id} todayRevenue={todayRevenue} todayOrdersCount={todayOrders.length} />}
             
             {activeTab === 'stats' && (
               <div className="p-4 h-full">
