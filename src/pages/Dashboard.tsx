@@ -962,9 +962,6 @@ export default function Dashboard() {
             )}
 
           </Suspense>
-        </main>
-      </div>
-    </div>
           </Suspense>
         </main>
       </div>
