@@ -12,6 +12,8 @@ import {
   AlertCircle, CheckCircle, XCircle, Clock, Download,
   ArrowRight, Trash2, FileText
 } from 'lucide-react';
+import { journalService } from '@/lib/accounting/journalService';
+import { BUSINESS_TYPES, type BusinessType } from '@/lib/businessTypes';
 
 interface SalesReturn {
   id: string;
@@ -262,14 +264,32 @@ export function SalesReturnsManager({ restaurantId, currency }: Props) {
     }
   };
 
-  const handleUpdateStatus = async (returnId: string, newStatus: string) => {
+  const handleUpdateStatus = async (ret: SalesReturn, newStatus: string) => {
     try {
       const { error } = await supabase
         .from('sales_returns')
         .update({ status: newStatus })
-        .eq('id', returnId);
+        .eq('id', ret.id);
 
       if (error) throw error;
+
+      // Accounting Integration
+      if (newStatus === 'completed') {
+        const bt = (await supabase.from('restaurants').select('business_type').eq('id', restaurantId).single()).data?.business_type || 'restaurant';
+        
+        await journalService.createSalesReturnJournalEntry(
+          restaurantId,
+          {
+            orderId: ret.id, // Using return ID as reference
+            orderNumber: ret.return_number,
+            amount: ret.total_amount,
+            taxAmount: 0, // Should be calculated or pulled from items
+            reason: ret.reason || 'مردود مبيعات',
+            customerId: ret.customer_id || undefined,
+          },
+          bt
+        );
+      }
 
       toast.success('تم تحديث حالة المردود');
       loadReturns();
@@ -494,7 +514,7 @@ export function SalesReturnsManager({ restaurantId, currency }: Props) {
                             <Button 
                               variant="ghost" 
                               size="sm"
-                              onClick={() => handleUpdateStatus(ret.id, 'approved')}
+                              onClick={() => handleUpdateStatus(ret, 'completed')}
                             >
                               <CheckCircle className="w-4 h-4 text-success" />
                             </Button>

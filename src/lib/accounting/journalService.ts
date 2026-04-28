@@ -107,6 +107,74 @@ class JournalService {
     return data || [];
   }
 
+  async ensureAccountingSetup(restaurantId: string, currency: string = 'ج.م'): Promise<boolean> {
+    // Check if any accounts exist
+    const { count, error: countError } = await supabase
+      .from('chart_of_accounts')
+      .select('id', { count: 'exact', head: true })
+      .eq('restaurant_id', restaurantId);
+    
+    if (countError) return false;
+    if (count && count > 0) return true; // Already setup
+
+    console.log('Seeding default accounts for restaurant:', restaurantId);
+    
+    // Seed basic accounts if empty
+    const standardAccounts = [
+      { code: '1000', name: 'الأصول', type: 'asset' },
+      { code: '1100', name: 'الصندوق / النقدية', type: 'asset', is_cash: true, parent: '1000' },
+      { code: '1200', name: 'العملاء / الذمم المدينة', type: 'asset', parent: '1000' },
+      { code: '1300', name: 'المخزون', type: 'asset', parent: '1000' },
+      { code: '2000', name: 'الخصوم', type: 'liability' },
+      { code: '2100', name: 'الموردون / الذمم الدائنة', type: 'liability', parent: '2000' },
+      { code: '2150', name: 'الضرائب المستحقة (VAT)', type: 'liability', parent: '2000' },
+      { code: '4000', name: 'الإيرادات', type: 'revenue' },
+      { code: '4100', name: 'إيرادات المبيعات', type: 'revenue', parent: '4000' },
+      { code: '4120', name: 'خصم مبيعات', type: 'revenue', parent: '4000' },
+      { code: '4200', name: 'إيرادات الخدمات', type: 'revenue', parent: '4000' },
+      { code: '4300', name: 'إيرادات التوصيل', type: 'revenue', parent: '4000' },
+      { code: '5000', name: 'تكلفة المبيعات (COGS)', type: 'cogs' },
+      { code: '5100', name: 'تكلفة البضاعة المباعة', type: 'cogs', parent: '5000' },
+      { code: '6000', name: 'المصروفات', type: 'expense' },
+      { code: '6100', name: 'الرواتب والأجور', type: 'expense', parent: '6000' },
+    ];
+
+    try {
+      // Insert parents first
+      for (const acc of standardAccounts.filter(a => !a.parent)) {
+        await supabase.from('chart_of_accounts').insert({
+          restaurant_id: restaurantId,
+          code: acc.code,
+          name: acc.name,
+          account_type: acc.type,
+          is_active: true,
+          currency
+        });
+      }
+
+      const { data: parents } = await supabase.from('chart_of_accounts').select('id, code').eq('restaurant_id', restaurantId);
+
+      // Insert children
+      for (const acc of standardAccounts.filter(a => a.parent)) {
+        const parentId = parents?.find(p => p.code === acc.parent)?.id;
+        await supabase.from('chart_of_accounts').insert({
+          restaurant_id: restaurantId,
+          code: acc.code,
+          name: acc.name,
+          account_type: acc.type,
+          parent_id: parentId,
+          is_cash_account: (acc as any).is_cash || false,
+          is_active: true,
+          currency
+        });
+      }
+      return true;
+    } catch (e) {
+      console.error('Failed to auto-seed accounts:', e);
+      return false;
+    }
+  }
+
   async getNextEntryNumber(restaurantId: string): Promise<string> {
     const { data, error } = await supabase
       .from('journal_entries')
@@ -241,7 +309,12 @@ class JournalService {
     const taxAcc = await this.getAccountByCode(restaurantId, mapping.taxPayable);
 
     if (!cashAcc || !salesAcc) {
-      toast.error('الحسابات المحاسبية غير موجودة');
+      const missing = [];
+      if (!cashAcc) missing.push(`النقدية (${mapping.cashAccount})`);
+      if (!salesAcc) missing.push(`إيرادات المبيعات (${mapping.salesRevenue})`);
+      
+      console.error('Accounting accounts missing:', { cashAcc, salesAcc, mapping });
+      toast.error(`الحسابات التالية غير موجودة: ${missing.join('، ')}. يرجى توليد الدليل المحاسبي من الإعدادات.`);
       return null;
     }
 

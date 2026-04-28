@@ -9,6 +9,7 @@ import { cacheData, getCachedData, syncPendingData } from '@/lib/offlineEngine';
 import type { MenuItem, Order, OrderItem, WaiterCall, Restaurant, DeliveryAgent, Shift } from './types';
 import { useOrderNotificationSound, useWaiterCallSound } from './SoundNotifications';
 import { getDefaultItemIcon, isInventoryDrivenBusiness, type BusinessType } from '@/lib/businessTypes';
+import { journalService } from '@/lib/accounting/journalService';
 
 export interface TaxRate {
   id: string;
@@ -98,6 +99,9 @@ export function useDashboardData() {
 
     const businessType = (rest.business_type || 'restaurant') as BusinessType;
     const usesProductsCatalog = isInventoryDrivenBusiness(businessType);
+
+    // Ensure accounting is setup
+    journalService.ensureAccountingSetup(rest.id, rest.currency || 'ج.م');
 
     const [itemsRes, ordersRes, callsRes, agentsRes, shiftRes, taxesRes] = await Promise.all([
       usesProductsCatalog
