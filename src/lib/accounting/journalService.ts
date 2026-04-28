@@ -319,21 +319,32 @@ class JournalService {
     const mapping = this.getBusinessMapping(businessType);
     const lines: Omit<JournalEntryLine, 'id' | 'entry_id'>[] = [];
 
-    // Get account IDs
-    const cashAcc = await this.getAccountByCode(restaurantId, mapping.cashAccount);
-    const arAcc = await this.getAccountByCode(restaurantId, mapping.accountsReceivable);
-    const salesAcc = await this.getAccountByCode(restaurantId, mapping.salesRevenue);
-    const taxAcc = await this.getAccountByCode(restaurantId, mapping.taxPayable);
+    // Get account IDs with self-healing
+    let cashAcc = await this.getAccountByCode(restaurantId, mapping.cashAccount);
+    let salesAcc = await this.getAccountByCode(restaurantId, mapping.salesRevenue);
+
+    if (!cashAcc || !salesAcc) {
+      console.warn('Essential accounts missing, attempting self-healing...', { mapping });
+      await this.ensureAccountingSetup(restaurantId);
+      
+      // Retry fetching
+      this.clearCache();
+      cashAcc = await this.getAccountByCode(restaurantId, mapping.cashAccount);
+      salesAcc = await this.getAccountByCode(restaurantId, mapping.salesRevenue);
+    }
 
     if (!cashAcc || !salesAcc) {
       const missing = [];
       if (!cashAcc) missing.push(`النقدية (${mapping.cashAccount})`);
       if (!salesAcc) missing.push(`إيرادات المبيعات (${mapping.salesRevenue})`);
       
-      console.error('Accounting accounts missing:', { cashAcc, salesAcc, mapping });
-      toast.error(`الحسابات التالية غير موجودة: ${missing.join('، ')}. يرجى توليد الدليل المحاسبي من الإعدادات.`);
+      console.error('Accounting accounts STILL missing after healing:', { cashAcc, salesAcc, mapping });
+      toast.error(`الحسابات التالية غير موجودة: ${missing.join('، ')}. يرجى التأكد من وجود هذه الأكواد في شجرة الحسابات.`);
       return null;
     }
+
+    const arAcc = await this.getAccountByCode(restaurantId, mapping.accountsReceivable);
+    const taxAcc = await this.getAccountByCode(restaurantId, mapping.taxPayable);
 
     const paidAmount = order.paid_amount || order.total;
     const remaining = order.total - paidAmount;
