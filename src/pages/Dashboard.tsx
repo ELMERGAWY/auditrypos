@@ -21,6 +21,7 @@ import { useDashboardData } from './dashboard/useDashboardData';
 import { ReceiptModalWrapper } from './dashboard/ReceiptModal';
 import { ProfessionalSidebar, type SidebarTab } from '@/components/professional/ProfessionalSidebar';
 import { ModuleErrorBoundary } from '@/components/professional/ModuleErrorBoundary';
+import { DashboardErrorBoundary } from '@/components/professional/DashboardErrorBoundary';
 const DeliveryTab = lazy(() => import('./dashboard/DeliveryTab').then(m => ({ default: m.DeliveryTab })));
 const ShiftsTab = lazy(() => import('./dashboard/ShiftsTab').then(m => ({ default: m.ShiftsTab })));
 const MenuTab = lazy(() => import('./dashboard/MenuTab').then(m => ({ default: m.MenuTab })));
@@ -556,7 +557,7 @@ export default function Dashboard() {
   };
 
   const allowedTabs = BUSINESS_TABS[businessType] || BUSINESS_TABS.restaurant;
-  const btConfig = BUSINESS_TYPES[businessType];
+  const config = BUSINESS_TYPES[businessType] || BUSINESS_TYPES.other;
 
   // Reset orderType when restaurant loads to match sector
   useEffect(() => {
@@ -619,6 +620,7 @@ export default function Dashboard() {
   );
 
   return (
+    <DashboardErrorBoundary>
     <div className={`min-h-screen bg-background flex theme-${businessType}`} dir="rtl">
       {/* Suspended Overlay */}
       <AnimatePresence>
@@ -1004,5 +1006,6 @@ export default function Dashboard() {
         </main>
       </div>
     </div>
+    </DashboardErrorBoundary>
   );
 }

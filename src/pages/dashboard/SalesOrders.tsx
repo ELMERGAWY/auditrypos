@@ -47,7 +47,8 @@ export function SalesOrders({ restaurantId, currency }: Props) {
         .order('order_date', { ascending: false });
 
       if (error) {
-        if (error.code === 'PGRST116' || error.message.includes('does not exist')) {
+        if (error.code === 'PGRST116' || error.message.includes('does not exist') || error.message.includes('schema cache')) {
+           console.warn('Sales orders table not found, please create it in Supabase.');
            setOrders([]);
            return;
         }
