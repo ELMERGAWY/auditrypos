@@ -638,6 +638,13 @@ export default function Dashboard() {
         <ChefHat className="w-12 h-12 text-primary mx-auto mb-4" />
         <h2 className="font-display text-xl font-bold mb-2">لا يوجد نشاط مسجّل</h2>
         <p className="text-muted-foreground mb-4">أنشئ مشروعك الأول للبدء</p>
+        
+        {isSuperAdmin && (
+          <Button onClick={() => navigate('/super-admin-portal')} className="w-full mb-4 gradient-bg text-white border-0">
+             الدخول للوحة التحكم المركزية <Shield className="w-4 h-4 mr-2" />
+          </Button>
+        )}
+
         <Suspense fallback={<RefreshCcw className="w-6 h-6 animate-spin text-primary mx-auto" />}>
           <CreateRestaurantForm userId={user.id} onCreated={loadData} />
         </Suspense>

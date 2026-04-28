@@ -47,14 +47,7 @@ const SuperAdmin = () => {
   const [bans, setBans] = useState<any[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [extendDays, setExtendDays] = useState<Record<string, number>>({});
-
-  // Ban form
-  const [showBanForm, setShowBanForm] = useState(false);
-  const [banForm, setBanForm] = useState({
-    restaurant_id: '', target_type: 'customer' as 'customer' | 'agent',
-    target_identifier: '', target_name: '', ban_level: 'warning' as 'warning' | 'temporary' | 'permanent',
-    reason: '', expires_days: 7, notes: ''
-  });
+  const [issues, setIssues] = useState<any[]>([]);
 
   useEffect(() => {
     if (!authLoading && (!user || !isSuperAdmin)) {
@@ -64,18 +57,21 @@ const SuperAdmin = () => {
   }, [user, isSuperAdmin, authLoading, navigate]);
 
   const load = async () => {
-    const [restsRes, rcptsRes, ordersRes, agentsRes, bansRes] = await Promise.all([
+    const [restsRes, rcptsRes, ordersRes, agentsRes, bansRes, issuesRes] = await Promise.all([
       supabase.from('restaurants').select('*').order('created_at', { ascending: false }),
       supabase.from('payment_receipts').select('*, restaurants(name)').order('uploaded_at', { ascending: false }),
-      supabase.from('orders').select('*, order_items(*)').order('created_at', { ascending: false }),
+      supabase.from('orders').select('*, order_items(*)').order('created_at', { ascending: false }).limit(500),
       supabase.from('delivery_agents').select('*').order('created_at', { ascending: false }),
       supabase.from('bans').select('*, restaurants(name)').order('created_at', { ascending: false }),
+      // Try to fetch failures if the table exists
+      supabase.from('accounting_post_failures' as any).select('*, restaurants(name)').order('created_at', { ascending: false }).limit(50),
     ]);
     setRestaurants(restsRes.data || []);
     setReceipts(rcptsRes.data || []);
     setOrders(ordersRes.data || []);
     setAgents(agentsRes.data || []);
     setBans(bansRes.data || []);
+    setIssues(issuesRes.data || []);
   };
 
   useEffect(() => { if (isSuperAdmin) load(); }, [isSuperAdmin]);
@@ -83,7 +79,7 @@ const SuperAdmin = () => {
   const stats = useMemo(() => {
     const activeRests = restaurants.filter(r => r.status === 'active').length;
     const suspendedRests = restaurants.filter(r => r.status === 'suspended').length;
-    const pendingRests = restaurants.filter(r => r.status === 'pending').length;
+    const pendingRests = restaurants.filter(r => r.status === 'pending' || r.status === 'trial').length;
     const totalRevenue = orders.filter(o => o.status !== 'cancelled').reduce((s, o) => s + Number(o.total), 0);
     const todayOrders = orders.filter(o => new Date(o.created_at).toDateString() === new Date().toDateString());
     const todayRevenue = todayOrders.filter(o => o.status !== 'cancelled').reduce((s, o) => s + Number(o.total), 0);
@@ -101,18 +97,14 @@ const SuperAdmin = () => {
       return { day: date.toLocaleDateString('ar-EG', { weekday: 'short' }), revenue: dayOrders.reduce((s, o) => s + Number(o.total), 0), orders: dayOrders.length };
     });
 
-    const revenueByRestaurant = restaurants.map(r => {
-      const rOrders = orders.filter(o => o.restaurant_id === r.id && o.status !== 'cancelled');
-      return { name: r.name, revenue: rOrders.reduce((s, o) => s + Number(o.total), 0) };
-    }).sort((a, b) => b.revenue - a.revenue).slice(0, 10);
-
     return {
       activeRests, suspendedRests, pendingRests, totalRevenue, todayRevenue,
       todayOrders: todayOrders.length, activeAgents, activeBans,
-      last7Days, revenueByRestaurant, byBusinessType,
+      last7Days, byBusinessType,
       pendingReceipts: receipts.filter(r => r.status === 'pending').length,
+      unresolvedIssues: issues.length
     };
-  }, [restaurants, orders, agents, bans, receipts]);
+  }, [restaurants, orders, agents, bans, receipts, issues]);
 
   // Actions
   const handleStatusChange = async (id: string, status: string) => {
@@ -164,9 +156,9 @@ const SuperAdmin = () => {
               <Shield className="w-7 h-7 text-destructive animate-pulse" />
             </div>
             <div>
-              <h1 className="text-xl font-bold font-display tracking-tight">النظام المركزي للتحكم</h1>
+              <h1 className="text-xl font-bold font-display tracking-tight">Ventro Pro Portal</h1>
               <p className="text-xs text-muted-foreground flex items-center gap-1">
-                <Activity className="w-3 h-3 text-green-500" /> لوحة السوبر أدمن الخارقة
+                <Activity className="w-3 h-3 text-green-500" /> لوحة السوبر أدمن المركزية
               </p>
             </div>
           </div>
@@ -178,11 +170,12 @@ const SuperAdmin = () => {
         {/* Navigation Tabs */}
         <div className="flex gap-2 overflow-x-auto pb-2 no-scrollbar">
           {[
-            { id: 'overview', label: 'الإحصائيات العامة', icon: BarChart3 },
-            { id: 'restaurants', label: 'إدارة الأنشطة', icon: Store, badge: restaurants.length },
-            { id: 'receipts', label: 'طلبات التفعيل', icon: FileText, badge: stats.pendingReceipts },
-            { id: 'bans', label: 'الرقابة والحظر', icon: Ban },
-            { id: 'backup', label: 'تصدير البيانات', icon: Database },
+            { id: 'overview', label: 'نظرة عامة', icon: BarChart3 },
+            { id: 'restaurants', label: 'إدارة الشركات', icon: Store, badge: restaurants.length },
+            { id: 'receipts', label: 'الاشتراكات', icon: FileText, badge: stats.pendingReceipts },
+            { id: 'issues', label: 'مشاكل العملاء', icon: AlertTriangle, badge: stats.unresolvedIssues },
+            { id: 'bans', label: 'الرقابة', icon: Ban },
+            { id: 'backup', label: 'النظام', icon: Database },
           ].map(t => (
             <button key={t.id} onClick={() => setTab(t.id as Tab)}
               className={`flex items-center gap-2 px-6 py-3 rounded-2xl text-sm font-medium transition-all ${
@@ -199,24 +192,24 @@ const SuperAdmin = () => {
           <div className="space-y-6">
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
               <div className="glass-card p-6 border-b-4 border-b-primary">
-                <Store className="w-8 h-8 text-primary mb-2" />
+                <Users className="w-8 h-8 text-primary mb-2" />
                 <p className="text-3xl font-bold">{stats.activeRests}</p>
-                <p className="text-sm text-muted-foreground">نشاط فعّال حالياً</p>
+                <p className="text-sm text-muted-foreground">شركة نشطة</p>
               </div>
               <div className="glass-card p-6 border-b-4 border-b-success">
                 <DollarSign className="w-8 h-8 text-success mb-2" />
                 <p className="text-3xl font-bold">{stats.todayRevenue.toLocaleString()} ج.م</p>
-                <p className="text-sm text-muted-foreground">إيرادات اليوم للنظام</p>
+                <p className="text-sm text-muted-foreground">إيرادات اليوم</p>
               </div>
               <div className="glass-card p-6 border-b-4 border-b-warning">
-                <FileText className="w-8 h-8 text-warning mb-2" />
-                <p className="text-3xl font-bold">{stats.pendingReceipts}</p>
-                <p className="text-sm text-muted-foreground">إيصالات تنتظر الموافقة</p>
+                <AlertTriangle className="w-8 h-8 text-warning mb-2" />
+                <p className="text-3xl font-bold">{stats.unresolvedIssues}</p>
+                <p className="text-sm text-muted-foreground">مشاكل تقنية مكتشفة</p>
               </div>
               <div className="glass-card p-6 border-b-4 border-b-destructive">
-                <Ban className="w-8 h-8 text-destructive mb-2" />
-                <p className="text-3xl font-bold">{stats.activeBans}</p>
-                <p className="text-sm text-muted-foreground">حظر نشط</p>
+                <Clock className="w-8 h-8 text-destructive mb-2" />
+                <p className="text-3xl font-bold">{stats.pendingRests}</p>
+                <p className="text-sm text-muted-foreground">في فترة التجربة/انتظار</p>
               </div>
             </div>
 
@@ -241,15 +234,14 @@ const SuperAdmin = () => {
               </div>
 
               <div className="glass-card p-6">
-                <h3 className="font-bold mb-4 flex items-center gap-2"><ShoppingCart className="w-5 h-5 text-primary" /> أقوى 10 أنشطة مبيعاً</h3>
+                <h3 className="font-bold mb-4 flex items-center gap-2"><LayoutGrid className="w-5 h-5 text-primary" /> توزيع القطاعات</h3>
                 <ResponsiveContainer width="100%" height={300}>
-                  <BarChart data={stats.revenueByRestaurant} layout="vertical">
-                    <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                    <XAxis type="number" stroke="hsl(var(--muted-foreground))" />
-                    <YAxis dataKey="name" type="category" stroke="hsl(var(--muted-foreground))" width={100} />
-                    <Tooltip contentStyle={{ backgroundColor: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: '12px' }} />
-                    <Bar dataKey="revenue" fill="hsl(var(--primary))" radius={[0, 4, 4, 0]} />
-                  </BarChart>
+                  <PieChart>
+                    <Pie data={stats.byBusinessType} innerRadius={60} outerRadius={100} paddingAngle={5} dataKey="value">
+                      {stats.byBusinessType.map((entry, index) => <Cell key={`cell-${index}`} fill={CHART_COLORS[index % CHART_COLORS.length]} />)}
+                    </Pie>
+                    <Tooltip />
+                  </PieChart>
                 </ResponsiveContainer>
               </div>
             </div>
@@ -259,28 +251,28 @@ const SuperAdmin = () => {
         {tab === 'restaurants' && (
           <div className="space-y-6">
             <div className="flex flex-col md:flex-row gap-4 items-center justify-between">
-              <h2 className="text-2xl font-bold flex items-center gap-2"><Store className="w-6 h-6 text-primary" /> الأنشطة التجارية المسجلة</h2>
+              <h2 className="text-2xl font-bold flex items-center gap-2"><Store className="w-6 h-6 text-primary" /> إدارة الشركات والموديولات</h2>
               <div className="relative w-full md:w-80">
                 <Search className="w-4 h-4 absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
-                <Input placeholder="بحث باسم النشاط أو الإيميل..." className="pr-10 rounded-xl" value={searchQuery} onChange={e => setSearchQuery(e.target.value)} />
+                <Input placeholder="بحث باسم الشركة أو المعرف..." className="pr-10 rounded-xl" value={searchQuery} onChange={e => setSearchQuery(e.target.value)} />
               </div>
             </div>
 
             <div className="grid grid-cols-1 gap-4">
               {restaurants.filter(r => r.name.toLowerCase().includes(searchQuery.toLowerCase())).map(r => (
-                <div key={r.id} className="glass-card p-6 flex flex-col md:flex-row items-start md:items-center justify-between gap-6 hover:border-primary/50 transition-colors">
+                <div key={r.id} className="glass-card p-6 flex flex-col lg:flex-row items-start lg:items-center justify-between gap-6 hover:border-primary/50 transition-colors">
                   <div className="flex items-center gap-4 flex-1">
                     <div className="w-16 h-16 rounded-2xl bg-secondary flex items-center justify-center text-3xl shadow-inner">
                       {BUSINESS_TYPES[r.business_type as BusinessType]?.icon || '🏢'}
                     </div>
-                    <div>
+                    <div className="flex-1">
                       <div className="flex items-center gap-2 mb-1">
                         <h4 className="text-lg font-bold">{r.name}</h4>
                         <Badge className={r.status === 'active' ? 'bg-success/10 text-success' : 'bg-destructive/10 text-destructive'}>
                           {r.status === 'active' ? 'نشط' : 'موقوف'}
                         </Badge>
                       </div>
-                      <p className="text-xs text-muted-foreground mb-2">{r.id}</p>
+                      <p className="text-[10px] text-muted-foreground font-mono mb-2 uppercase tracking-widest">{r.id}</p>
                       
                       {/* Modules Display */}
                       <div className="flex flex-wrap gap-1 mb-3">
@@ -296,13 +288,13 @@ const SuperAdmin = () => {
                       </div>
 
                       <div className="flex items-center gap-4 text-xs font-medium">
-                        <span className="flex items-center gap-1"><Calendar className="w-3 h-3" /> انتهاء الاشتراك: {r.subscription_end ? new Date(r.subscription_end).toLocaleDateString('ar-EG') : 'غير محدد'}</span>
-                        <span className="flex items-center gap-1"><Activity className="w-3 h-3" /> الحالة: {r.status}</span>
+                        <span className="flex items-center gap-1"><CalendarPlus className="w-3 h-3 text-primary" /> انتهاء الاشتراك: {r.subscription_end ? new Date(r.subscription_end).toLocaleDateString('ar-EG') : 'غير محدد'}</span>
+                        <span className="flex items-center gap-1"><Clock className="w-3 h-3 text-primary" /> تاريخ التسجيل: {new Date(r.created_at).toLocaleDateString('ar-EG')}</span>
                       </div>
                     </div>
                   </div>
 
-                  <div className="flex flex-col sm:flex-row items-center gap-3 w-full md:w-auto">
+                  <div className="flex flex-col sm:flex-row items-center gap-3 w-full lg:w-auto">
                     <div className="flex bg-secondary/50 p-1 rounded-xl w-full sm:w-auto">
                       {[30, 90, 365].map(d => (
                         <button key={d} onClick={() => setExtendDays(prev => ({ ...prev, [r.id]: d }))}
@@ -311,18 +303,44 @@ const SuperAdmin = () => {
                         </button>
                       ))}
                     </div>
-                    <Button size="sm" onClick={() => handleExtendSubscription(r.id)} className="w-full sm:w-auto gradient-bg text-white">تفعيل/تمديد</Button>
+                    <Button size="sm" onClick={() => handleExtendSubscription(r.id)} className="w-full sm:w-auto gradient-bg text-white shadow-lg shadow-primary/20">تجديد</Button>
                     <div className="h-8 w-[1px] bg-border hidden sm:block mx-2" />
                     <Button size="sm" variant="outline" onClick={() => handleStatusChange(r.id, r.status === 'active' ? 'suspended' : 'active')} className="w-full sm:w-auto">
                       {r.status === 'active' ? <Pause className="w-4 h-4 ml-1" /> : <Play className="w-4 h-4 ml-1" />}
                       {r.status === 'active' ? 'إيقاف' : 'تفعيل'}
                     </Button>
-                    <Button size="sm" variant="destructive" onClick={() => handleDelete(r.id)} className="w-full sm:w-auto">
+                    <Button size="sm" variant="ghost" onClick={() => handleDelete(r.id)} className="w-full sm:w-auto text-destructive hover:bg-destructive/10">
                       <Trash2 className="w-4 h-4" />
                     </Button>
                   </div>
                 </div>
               ))}
+            </div>
+          </div>
+        )}
+
+        {tab === 'issues' && (
+          <div className="space-y-6">
+            <h2 className="text-2xl font-bold flex items-center gap-2 text-warning"><AlertTriangle className="w-6 h-6" /> تتبع مشاكل وأعطال العملاء</h2>
+            <div className="grid gap-4">
+              {issues.length === 0 ? (
+                <div className="glass-card p-12 text-center text-muted-foreground">لا توجد بلاغات أعطال حالياً. نظامك مستقر ✅</div>
+              ) : (
+                issues.map(issue => (
+                  <div key={issue.id} className="glass-card p-6 border-r-4 border-r-destructive">
+                    <div className="flex justify-between items-start mb-4">
+                      <div>
+                        <h4 className="font-bold text-lg mb-1">{issue.restaurants?.name || 'غير معروف'}</h4>
+                        <p className="text-xs text-muted-foreground">{new Date(issue.created_at).toLocaleString('ar-EG')}</p>
+                      </div>
+                      <Badge variant="destructive">فشل محاسبي</Badge>
+                    </div>
+                    <div className="bg-destructive/5 p-4 rounded-xl font-mono text-sm text-destructive border border-destructive/10 overflow-x-auto">
+                      {issue.error_message}
+                    </div>
+                  </div>
+                ))
+              )}
             </div>
           </div>
         )}
