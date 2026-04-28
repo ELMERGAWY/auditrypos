@@ -158,7 +158,7 @@ export function DeliveryTab({ restaurantId, agents, setAgents, deliveryOrders, o
                 </div>
               </div>
               <Badge className={agent.status === 'available' ? 'status-active' : agent.status === 'busy' ? 'status-pending' : 'bg-secondary text-muted-foreground'}>
-                {STATUS_CONF[agent.status].label}
+                {STATUS_CONF[agent.status]?.label || agent.status}
               </Badge>
             </div>
             {agent.current_lat && (
@@ -172,7 +172,7 @@ export function DeliveryTab({ restaurantId, agents, setAgents, deliveryOrders, o
                 <Button key={s} size="sm" variant={agent.status === s ? 'default' : 'outline'}
                   className={agent.status === s ? 'gradient-bg text-primary-foreground border-0' : ''}
                   onClick={() => handleUpdateStatus(agent, s)}>
-                  {STATUS_CONF[s].label}
+                  {STATUS_CONF[s]?.label || s}
                 </Button>
               ))}
               <Button size="sm" variant="outline" onClick={() => setPickingLocationFor(agent.id)} className="text-primary border-primary/30">

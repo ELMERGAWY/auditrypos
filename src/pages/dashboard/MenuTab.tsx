@@ -44,7 +44,7 @@ export function MenuTab({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const logoInputRef = useRef<HTMLInputElement>(null);
   const businessType = (restaurant.business_type || 'restaurant') as BusinessType;
-  const btConfig = BUSINESS_TYPES[businessType];
+  const btConfig = BUSINESS_TYPES[businessType] || BUSINESS_TYPES.other;
   const EMOJI_OPTIONS = getItemIconOptions(businessType);
   const defaultIcon = getDefaultItemIcon(businessType);
 

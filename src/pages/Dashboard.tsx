@@ -20,6 +20,7 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContaine
 import { useDashboardData } from './dashboard/useDashboardData';
 import { ReceiptModalWrapper } from './dashboard/ReceiptModal';
 import { ProfessionalSidebar, type SidebarTab } from '@/components/professional/ProfessionalSidebar';
+import { ModuleErrorBoundary } from '@/components/professional/ModuleErrorBoundary';
 const DeliveryTab = lazy(() => import('./dashboard/DeliveryTab').then(m => ({ default: m.DeliveryTab })));
 const ShiftsTab = lazy(() => import('./dashboard/ShiftsTab').then(m => ({ default: m.ShiftsTab })));
 const MenuTab = lazy(() => import('./dashboard/MenuTab').then(m => ({ default: m.MenuTab })));
@@ -787,7 +788,8 @@ export default function Dashboard() {
 
             {/* ORDERS TAB */}
             {activeTab === 'orders' && (
-              <div className="p-4 space-y-4">
+              <ModuleErrorBoundary moduleName="الطلبات">
+                <div className="p-4 space-y-4">
                 <div className="flex items-center justify-between mb-4">
                   <h2 className="text-3xl font-black">{config.labels.orders} ({filteredOrders.length})</h2>
                   <div className="flex gap-2 overflow-x-auto pb-2">
@@ -840,11 +842,13 @@ export default function Dashboard() {
                   </div>
                 )}
               </div>
+              </ModuleErrorBoundary>
             )}
 
             {/* PRODUCTS / MENU TAB */}
             {activeTab === 'menu' && (
-              <MenuTab
+              <ModuleErrorBoundary moduleName="الخدمات والمنتجات">
+                <MenuTab
                 restaurant={restaurant!}
                 menuItems={menuItems}
                 setMenuItems={setMenuItems}
@@ -856,11 +860,13 @@ export default function Dashboard() {
                 setEditingItem={setEditingItem}
                 loadData={loadData}
               />
+              </ModuleErrorBoundary>
             )}
 
             {/* INVENTORY TAB */}
             {activeTab === 'inventory' && (
-              <div className="p-4 space-y-6">
+              <ModuleErrorBoundary moduleName="المخزون">
+                <div className="p-4 space-y-6">
                 <header className="flex justify-between items-center">
                   <div>
                     <h2 className="text-3xl font-black">إدارة المخزون</h2>
@@ -873,6 +879,7 @@ export default function Dashboard() {
                 </header>
                 {activeSubView === 'stock' ? <InventoryTab restaurantId={restaurant!.id} currency={currency} /> : <BOMManager restaurantId={restaurant!.id} currency={currency} />}
               </div>
+              </ModuleErrorBoundary>
             )}
 
             {activeTab === 'inventory_receipts' && <InventoryReceiptsManager restaurantId={restaurant!.id} currency={currency} />}
@@ -888,27 +895,43 @@ export default function Dashboard() {
             {activeTab === 'customer_accounts' && <CustomersTab restaurantId={restaurant!.id} currency={currency} />}
             {activeTab === 'supplier_accounts' && <SuppliersTab restaurantId={restaurant!.id} currency={currency} />}
             
-            {activeTab === 'expenses' && <ExpensesTab restaurantId={restaurant!.id} currency={currency} />}
-            {activeTab === 'financials' && <FinancialsTab restaurantId={restaurant!.id} currency={currency} />}
+            {activeTab === 'expenses' && (
+              <ModuleErrorBoundary moduleName="المصروفات">
+                <ExpensesTab restaurantId={restaurant!.id} currency={currency} />
+              </ModuleErrorBoundary>
+            )}
+            {activeTab === 'financials' && (
+              <ModuleErrorBoundary moduleName="التقارير المالية">
+                <FinancialsTab restaurantId={restaurant!.id} currency={currency} />
+              </ModuleErrorBoundary>
+            )}
             {activeTab === 'overheads' && <OverheadManager restaurantId={restaurant!.id} currency={currency} />}
             
-            {activeTab === 'sales_returns' && <SalesReturnsManager restaurantId={restaurant!.id} currency={currency} />}
+            {activeTab === 'sales_returns' && (
+              <ModuleErrorBoundary moduleName="مرتجعات المبيعات">
+                <SalesReturnsManager restaurantId={restaurant!.id} currency={currency} />
+              </ModuleErrorBoundary>
+            )}
             
             {activeTab === 'delivery' && (
-              <DeliveryTab 
+              <ModuleErrorBoundary moduleName="التوصيل">
+                <DeliveryTab 
                 restaurantId={restaurant!.id} 
                 agents={agents} 
                 setAgents={setAgents} 
                 deliveryOrders={deliveryOrders} 
                 onAssignAgent={onAssignAgent} 
               />
+              </ModuleErrorBoundary>
             )}
             {activeTab === 'shifts' && <ShiftsTab restaurant={restaurant!} currentShift={currentShift} setCurrentShift={setCurrentShift} profileName={profileName} userId={user!.id} todayRevenue={todayRevenue} todayOrdersCount={todayOrders.length} />}
             
             {activeTab === 'stats' && (
-              <div className="p-4 h-full">
-                <AdvancedReportsHub restaurantId={restaurant!.id} currency={currency} />
-              </div>
+              <ModuleErrorBoundary moduleName="الإحصائيات">
+                <div className="p-4 h-full">
+                  <AdvancedReportsHub restaurantId={restaurant!.id} currency={currency} />
+                </div>
+              </ModuleErrorBoundary>
             )}
             
             {activeTab === 'analytics' && <AdvancedReportsHub restaurantId={restaurant!.id} currency={currency} />}

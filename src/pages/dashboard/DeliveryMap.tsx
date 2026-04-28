@@ -78,7 +78,7 @@ export default function DeliveryMap({
             <Marker key={agent.id} position={[agent.current_lat!, agent.current_lng!]} icon={agentIcon(agent.status)}>
               <Popup>
                 <div className="text-sm font-bold">{agent.name}</div>
-                <div className="text-xs">{STATUS_CONF[agent.status].label}</div>
+                <div className="text-xs">{STATUS_CONF[agent.status]?.label || agent.status}</div>
               </Popup>
             </Marker>
           ))}
