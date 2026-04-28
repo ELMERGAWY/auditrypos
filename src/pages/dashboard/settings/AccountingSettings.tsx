@@ -1,8 +1,9 @@
 import { useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { Book, CheckCircle2, AlertCircle, Info } from 'lucide-react';
+import { Book, CheckCircle2, AlertCircle, Info, Building2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { BUSINESS_TYPES } from '@/lib/businessTypes';
 
 interface Props {
   restaurant: any;
@@ -31,7 +32,8 @@ export function AccountingSettings({ restaurant, loadData }: Props) {
   const [form, setForm] = useState({
     accounting_standard: restaurant.accounting_standard || 'IFRS',
     inventory_method: restaurant.inventory_method || 'FIFO',
-    inventory_system: restaurant.inventory_system || 'PERPETUAL'
+    inventory_system: restaurant.inventory_system || 'PERPETUAL',
+    business_type: restaurant.business_type || 'restaurant'
   });
 
   const handleSave = async () => {
@@ -46,7 +48,8 @@ export function AccountingSettings({ restaurant, loadData }: Props) {
     const { error } = await supabase.from('restaurants').update({
       accounting_standard: form.accounting_standard,
       inventory_method: form.inventory_method,
-      inventory_system: form.inventory_system
+      inventory_system: form.inventory_system,
+      business_type: form.business_type
     }).eq('id', restaurant.id);
 
     if (error) toast.error('فشل حفظ الإعدادات');
@@ -118,15 +121,46 @@ export function AccountingSettings({ restaurant, loadData }: Props) {
         </div>
       </div>
 
-      <div className="p-4 bg-primary/5 border border-primary/20 rounded-xl flex gap-3">
-        <Info className="w-5 h-5 text-primary shrink-0" />
-        <p className="text-xs leading-relaxed">
-          <strong>تنبيه هامي:</strong> تغيير المعيار المحاسبي أو طريقة تقييم المخزون أثناء العمل سيؤثر على احتساب تكلفة البضاعة المباعة (COGS) في التقارير اللاحقة. يوصى باختيار الطريقة المناسبة قبل البدء في تسجيل العمليات.
+      {/* Business Module Selection */}
+      <div className="glass-card p-4 space-y-4 lg:col-span-2 border-primary/20">
+        <label className="block text-sm font-bold text-primary flex items-center gap-2">
+          <Building2 className="w-4 h-4" /> موديول النظام المخصص (Business Modules)
+        </label>
+        <p className="text-xs text-muted-foreground mb-4">
+          اختر طبيعة نشاطك التجاري. هذا الاختيار سيقوم بتخصيص الواجهات، القوائم، التقارير، والربط المحاسبي (Chart of Accounts) آلياً بما يتوافق مع ممارسات هذا النشاط.
         </p>
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
+          {Object.values(BUSINESS_TYPES).map(bt => (
+            <button 
+              key={bt.id} 
+              type="button"
+              onClick={() => setForm({ ...form, business_type: bt.id })}
+              className={`p-4 rounded-xl border-2 text-center transition-all flex flex-col items-center gap-2 relative group ${form.business_type === bt.id ? 'border-primary bg-primary/5 ring-1 ring-primary/20' : 'border-border hover:border-primary/30 bg-card/50'}`}
+            >
+              <span className="text-3xl group-hover:scale-110 transition-transform">{bt.icon}</span>
+              <span className="font-bold text-[11px] leading-tight">{bt.label}</span>
+              {form.business_type === bt.id && (
+                <div className="absolute top-1 left-1">
+                  <CheckCircle2 className="w-4 h-4 text-primary" />
+                </div>
+              )}
+            </button>
+          ))}
+        </div>
       </div>
 
-      <Button onClick={handleSave} disabled={loading} className="w-full h-12 gradient-bg text-primary-foreground text-lg border-0">
-        {loading ? 'جاري الحفظ...' : 'حفظ الإعدادات المحاسبية'}
+      <div className="p-4 bg-primary/5 border border-primary/20 rounded-xl flex gap-3">
+        <Info className="w-5 h-5 text-primary shrink-0" />
+        <div className="space-y-1">
+          <p className="text-xs font-bold text-primary">تأثير التغيير:</p>
+          <p className="text-[10px] leading-relaxed text-muted-foreground">
+            تغيير موديول النظام سيؤدي إلى ظهور/اختفاء بعض التبويبات في القائمة الجانبية (مثل الطاولات للمطاعم أو العقود للعقارات). كما سيتم توجيه القيود المحاسبية للحسابات الخاصة بالنشاط الجديد.
+          </p>
+        </div>
+      </div>
+
+      <Button onClick={handleSave} disabled={loading} className="w-full h-12 gradient-bg text-primary-foreground text-lg border-0 shadow-lg shadow-primary/20">
+        {loading ? 'جاري حفظ التكوينات...' : 'تحديث إعدادات الموديول والمحاسبة'}
       </Button>
     </div>
   );

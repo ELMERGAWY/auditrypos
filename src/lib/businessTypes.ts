@@ -1,4 +1,4 @@
-export type BusinessType = 'restaurant' | 'retail' | 'wholesale' | 'warehouse' | 'cafe' | 'grocery' | 'pharmacy' | 'services' | 'other';
+export type BusinessType = 'restaurant' | 'retail' | 'wholesale' | 'warehouse' | 'cafe' | 'grocery' | 'pharmacy' | 'services' | 'shipping' | 'distribution' | 'hospital' | 'factory' | 'real_estate' | 'contracting' | 'finishing' | 'rental' | 'education' | 'law_firm' | 'marketing_agency' | 'gym' | 'beauty_salon' | 'auto_repair' | 'other';
 export type BusinessCategory = 'food' | 'retail' | 'health' | 'services' | 'logistics' | 'other';
 export type PosLayout = 'classic' | 'grid' | 'list' | 'compact' | 'restaurant' | 'retail' | 'grocery' | 'services' | 'pharmacy';
 export type FeatureFlag = 
@@ -20,6 +20,20 @@ const BUSINESS_ITEM_ICONS: Record<BusinessType, string[]> = {
   warehouse: ['📦', '🏭', '🧱', '🪵', '🧰', '🚚', '🏷️', '🗂️', '🪜', '📋', '🔩', '⚙️'],
   pharmacy: ['💊', '🩹', '🧴', '🩺', '🧪', '🌡️', '🧼', '🦷', '👓', '📦', '🩻', '💉'],
   services: ['🧺', '🧼', '🧽', '🪛', '🔧', '💇', '🚗', '🧹', '🧯', '🪙', '📋', '🛎️'],
+  distribution: ['🚚', '📦', '🚐', '📋', '🛒', '🏭', '🏗️', '⛽', '🛣️', '🏢', '🏷️', '📦'],
+  shipping: ['🚢', '✈️', '🚚', '📦', '🗺️', '⚓', '🏢', '🏗️', '📦', '🏷️', '📦', '📋'],
+  hospital: ['🏥', '💊', '🩺', '🚑', '💉', '🩹', '🌡️', '🦷', '🧪', '🧬', '🩸', '🩻'],
+  factory: ['🏭', '🏗️', '⚙️', '🔩', '🛠️', '👷', '📦', '🏷️', '🧱', '🪵', '🎨', '👔'],
+  real_estate: ['🏠', '🏢', '🔑', '🏠', '🏨', '🏰', '🏘️', '🏙️', '🏡', '🗺️', '📋', '🏗️'],
+  contracting: ['🏗️', '🚧', '🏢', '🏗️', '📐', '🛠️', '🧱', '🪵', '🎨', '🚜', '👷', '📋'],
+  finishing: ['🎨', '🖌️', '🛋️', '🏡', '📐', '🧱', '🪵', '🛠️', '🏠', '✨', '📋', '👔'],
+  rental: ['🚗', '🚙', '🚚', '🚜', '🔑', '📋', '🛡️', '⚙️', '🛠️', '⛽', '🛣️', '🏢'],
+  education: ['📚', '🎓', '🏫', '📝', '✏️', '🖍️', '🎨', '💻', '🧪', '🧬', '📏', '📐'],
+  law_firm: ['⚖️', '📋', '💼', '🏢', '🏛️', '🖋️', '📜', '🛡️', '🗝️', '📅', '👔', '🏛️'],
+  marketing_agency: ['📢', '🎨', '💻', '📸', '🎥', '📊', '📈', '📱', '✨', '🎯', '🤝', '🚀'],
+  gym: ['💪', '🏋️', '🚴', '🧘', '👟', '🥤', '⏱️', '🥇', '🥊', '🥗', '🚿', '📱'],
+  beauty_salon: ['✂️', '💅', '💄', '🧴', '💆', '✨', '💇', '🎨', '🧼', '🌸', '🪞', '🎀'],
+  auto_repair: ['🔧', '🪛', '⚙️', '🚗', '🚙', '🏎️', '⛽', '🔋', '🧼', '🛞', '🛠️', '📋'],
   other: ['🏢', '📦', '🛍️', '🧰', '📋', '🏷️', '🪑', '🧴', '📚', '🪙', '⚙️', '🧺'],
 };
 
@@ -193,7 +207,7 @@ export const BUSINESS_TYPES: Record<BusinessType, BusinessTypeConfig> = {
       requireCustomer: false
     },
     
-    tabs: ['pos', 'orders', 'menu', 'inventory', 'inventory_receipts', 'purchase_invoices', 'purchase_orders', 'sales_orders', 'crm', 'delivery', 'customers', 'customer_accounts', 'sales_returns', 'suppliers', 'supplier_accounts', 'shifts', 'stats', 'financials', 'expenses', 'staff', 'notifications', 'settings'],
+    tabs: ['pos', 'orders', 'menu', 'inventory', 'inventory_receipts', 'purchase_invoices', 'purchase_orders', 'sales_orders', 'crm', 'delivery', 'customers', 'customer_accounts', 'sales_returns', 'suppliers', 'supplier_accounts', 'shifts', 'stats', 'financials', 'accounting', 'expenses', 'staff', 'notifications', 'settings'],
     
     specialFields: [
       { name: 'guest_count', type: 'number', label: 'عدد الضيوف', required: false },
@@ -273,7 +287,7 @@ export const BUSINESS_TYPES: Record<BusinessType, BusinessTypeConfig> = {
       requireCustomer: false
     },
     
-    tabs: ['pos', 'orders', 'menu', 'inventory', 'inventory_receipts', 'purchase_invoices', 'purchase_orders', 'sales_orders', 'crm', 'delivery', 'customers', 'customer_accounts', 'sales_returns', 'shifts', 'stats', 'financials', 'qr', 'waiter', 'expenses', 'staff', 'notifications', 'settings']
+    tabs: ['pos', 'orders', 'menu', 'inventory', 'inventory_receipts', 'purchase_invoices', 'purchase_orders', 'sales_orders', 'crm', 'delivery', 'customers', 'customer_accounts', 'sales_returns', 'shifts', 'stats', 'financials', 'accounting', 'qr', 'waiter', 'expenses', 'staff', 'notifications', 'settings']
   },
   
   retail: {
@@ -347,7 +361,7 @@ export const BUSINESS_TYPES: Record<BusinessType, BusinessTypeConfig> = {
       requireCustomer: false
     },
     
-    tabs: ['pos', 'orders', 'menu', 'inventory', 'inventory_receipts', 'purchase_invoices', 'purchase_orders', 'sales_orders', 'crm', 'delivery', 'customers', 'customer_accounts', 'sales_returns', 'suppliers', 'supplier_accounts', 'shifts', 'stats', 'financials', 'expenses', 'staff', 'notifications', 'settings'],
+    tabs: ['pos', 'orders', 'menu', 'inventory', 'inventory_receipts', 'purchase_invoices', 'purchase_orders', 'sales_orders', 'crm', 'delivery', 'customers', 'customer_accounts', 'sales_returns', 'suppliers', 'supplier_accounts', 'shifts', 'stats', 'financials', 'accounting', 'expenses', 'staff', 'notifications', 'settings'],
     
     specialFields: [
       { name: 'size', type: 'select', label: 'المقاس', required: false },
@@ -425,7 +439,7 @@ export const BUSINESS_TYPES: Record<BusinessType, BusinessTypeConfig> = {
       requireCustomer: false
     },
     
-    tabs: ['pos', 'orders', 'menu', 'inventory', 'inventory_receipts', 'purchase_invoices', 'purchase_orders', 'crm', 'customers', 'customer_accounts', 'sales_returns', 'suppliers', 'supplier_accounts', 'shifts', 'stats', 'financials', 'expenses', 'staff', 'notifications', 'settings'],
+    tabs: ['pos', 'orders', 'menu', 'inventory', 'inventory_receipts', 'purchase_invoices', 'purchase_orders', 'crm', 'customers', 'customer_accounts', 'sales_returns', 'suppliers', 'supplier_accounts', 'shifts', 'stats', 'financials', 'accounting', 'expenses', 'staff', 'notifications', 'settings'],
     
     specialFields: [
       { name: 'expiry_date', type: 'date', label: 'تاريخ الصلاحية', required: false },
@@ -504,7 +518,7 @@ export const BUSINESS_TYPES: Record<BusinessType, BusinessTypeConfig> = {
       requireCustomer: true
     },
     
-    tabs: ['pos', 'orders', 'menu', 'inventory', 'inventory_receipts', 'purchase_invoices', 'purchase_orders', 'sales_orders', 'crm', 'delivery', 'customers', 'customer_accounts', 'sales_returns', 'suppliers', 'supplier_accounts', 'shifts', 'stats', 'financials', 'expenses', 'staff', 'notifications', 'settings'],
+    tabs: ['pos', 'orders', 'menu', 'inventory', 'inventory_receipts', 'purchase_invoices', 'purchase_orders', 'sales_orders', 'crm', 'delivery', 'customers', 'customer_accounts', 'sales_returns', 'suppliers', 'supplier_accounts', 'shifts', 'stats', 'financials', 'accounting', 'expenses', 'staff', 'notifications', 'settings'],
     
     specialFields: [
       { name: 'prescription_number', type: 'text', label: 'رقم الروشتة', required: false },
@@ -584,7 +598,7 @@ export const BUSINESS_TYPES: Record<BusinessType, BusinessTypeConfig> = {
       requireCustomer: true
     },
     
-    tabs: ['pos', 'orders', 'menu', 'inventory', 'inventory_receipts', 'purchase_invoices', 'purchase_orders', 'sales_orders', 'crm', 'delivery', 'customers', 'customer_accounts', 'sales_returns', 'suppliers', 'supplier_accounts', 'shifts', 'stats', 'financials', 'expenses', 'staff', 'notifications', 'settings'],
+    tabs: ['pos', 'orders', 'menu', 'inventory', 'inventory_receipts', 'purchase_invoices', 'purchase_orders', 'sales_orders', 'crm', 'delivery', 'customers', 'customer_accounts', 'sales_returns', 'suppliers', 'supplier_accounts', 'shifts', 'stats', 'financials', 'accounting', 'expenses', 'staff', 'notifications', 'settings'],
     
     specialFields: [
       { name: 'credit_limit', type: 'number', label: 'حد الائتمان', required: false },
@@ -663,7 +677,7 @@ export const BUSINESS_TYPES: Record<BusinessType, BusinessTypeConfig> = {
       requireCustomer: true
     },
     
-    tabs: ['inventory', 'inventory_receipts', 'orders', 'menu', 'purchase_invoices', 'purchase_orders', 'sales_orders', 'crm', 'delivery', 'customers', 'customer_accounts', 'sales_returns', 'suppliers', 'supplier_accounts', 'shifts', 'stats', 'financials', 'expenses', 'staff', 'notifications', 'settings']
+    tabs: ['inventory', 'inventory_receipts', 'orders', 'menu', 'purchase_invoices', 'purchase_orders', 'sales_orders', 'crm', 'delivery', 'customers', 'customer_accounts', 'sales_returns', 'suppliers', 'supplier_accounts', 'shifts', 'stats', 'financials', 'accounting', 'expenses', 'staff', 'notifications', 'settings']
   },
   
   services: {
@@ -737,7 +751,7 @@ export const BUSINESS_TYPES: Record<BusinessType, BusinessTypeConfig> = {
       requireCustomer: true
     },
     
-    tabs: ['pos', 'orders', 'menu', 'inventory', 'inventory_receipts', 'purchase_invoices', 'purchase_orders', 'sales_orders', 'crm', 'customers', 'customer_accounts', 'sales_returns', 'shifts', 'stats', 'financials', 'expenses', 'staff', 'notifications', 'settings'],
+    tabs: ['pos', 'orders', 'menu', 'inventory', 'inventory_receipts', 'purchase_invoices', 'purchase_orders', 'sales_orders', 'crm', 'customers', 'customer_accounts', 'sales_returns', 'shifts', 'stats', 'financials', 'accounting', 'expenses', 'staff', 'notifications', 'settings'],
     
     specialFields: [
       { name: 'pickup_date', type: 'date', label: 'تاريخ الاستلام', required: true },
@@ -817,7 +831,905 @@ export const BUSINESS_TYPES: Record<BusinessType, BusinessTypeConfig> = {
       requireCustomer: false
     },
     
-    tabs: ['pos', 'orders', 'menu', 'inventory', 'inventory_receipts', 'purchase_invoices', 'purchase_orders', 'sales_orders', 'crm', 'delivery', 'customers', 'customer_accounts', 'sales_returns', 'suppliers', 'supplier_accounts', 'shifts', 'stats', 'financials', 'expenses', 'staff', 'notifications', 'settings']
+    tabs: ['pos', 'orders', 'menu', 'inventory', 'inventory_receipts', 'purchase_invoices', 'purchase_orders', 'sales_orders', 'crm', 'delivery', 'customers', 'customer_accounts', 'sales_returns', 'suppliers', 'supplier_accounts', 'shifts', 'stats', 'financials', 'accounting', 'expenses', 'staff', 'notifications', 'settings']
+  },
+  shipping: {
+    id: 'shipping',
+    label: 'شحن ولوجستيات',
+    icon: '🚢',
+    description: 'شركات شحن، نقل طرود، خدمات لوجستية',
+    category: 'logistics',
+    color: 'hsl(200, 70%, 45%)',
+    theme: { 
+      primary: '200 70% 45%', 
+      accent: '190 60% 50%', 
+      gradient: 'linear-gradient(135deg, #0ea5e9 0%, #0369a1 100%)',
+      sidebarBg: 'hsl(200 70% 45% / 0.05)',
+      sidebarText: 'hsl(200 70% 45%)'
+    },
+    posLayout: {
+      type: 'compact',
+      showTableGrid: false,
+      showCategoriesSidebar: true,
+      itemGridCols: 4,
+      showItemImages: false,
+      showPrices: true,
+      cartPosition: 'right',
+      showBarcodeScanner: true,
+      showScale: true,
+      quickActions: ['track', 'scan', 'manifest', 'customer']
+    },
+    orderTypes: [
+      { id: 'pickup', label: 'استلام طرد', icon: '📦', color: '#0ea5e9', requiresTable: false, requiresAddress: true, requiresPhone: true },
+      { id: 'delivery', label: 'تسليم طرد', icon: '🚚', color: '#0284c7', requiresTable: false, requiresAddress: true, requiresPhone: true }
+    ],
+    features: ['barcode', 'inventory', 'customers', 'service_tracking', 'status_board'],
+    labels: {
+      menu: 'الخدمات / الطرود',
+      item: 'طرد',
+      items: 'طرود',
+      order: 'بوليصة',
+      orders: 'بوالص الشحن',
+      customer: 'المرسل / المرسل إليه',
+      customers: 'العملاء',
+      inventory: 'مخزون الطرود',
+      category: 'نوع الشحن',
+      checkout: 'إصدار البوليصة',
+      receipt: 'بوليصة شحن',
+      table: 'منطقة',
+      tables: 'المناطق',
+      section: 'مسار',
+      branch: 'فرع'
+    },
+    placeholders: {
+      search: '🔍 بحث برقم البوليصة أو العميل...',
+      customer: 'اسم المرسل/المستقبل',
+      notes: 'تفاصيل الشحنة...',
+      address: 'عنوان التوصيل'
+    },
+    defaults: {
+      taxRate: 14,
+      serviceCharge: 0,
+      enableTax: true,
+      priceIncludesTax: false,
+      currency: 'ج.م',
+      allowCredit: true,
+      requireCustomer: true
+    },
+    tabs: ['pos', 'orders', 'crm', 'delivery', 'customers', 'customer_accounts', 'financials', 'accounting', 'expenses', 'staff', 'settings']
+  },
+  distribution: {
+    id: 'distribution',
+    label: 'توزيع ومناديب',
+    icon: '🚐',
+    description: 'شركات توزيع، سيارات توزيع، وكلاء مصانع',
+    category: 'logistics',
+    color: 'hsl(35, 90%, 50%)',
+    theme: { 
+      primary: '35 90% 50%', 
+      accent: '45 80% 55%', 
+      gradient: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
+      sidebarBg: 'hsl(35 90% 50% / 0.05)',
+      sidebarText: 'hsl(35 90% 50%)'
+    },
+    posLayout: {
+      type: 'retail',
+      showTableGrid: false,
+      showCategoriesSidebar: true,
+      itemGridCols: 5,
+      showItemImages: true,
+      showPrices: true,
+      cartPosition: 'right',
+      showBarcodeScanner: true,
+      showScale: false,
+      quickActions: ['van_stock', 'route', 'customer_visit', 'collection']
+    },
+    orderTypes: [
+      { id: 'delivery', label: 'توزيع لعميل', icon: '🚚', color: '#f59e0b', requiresTable: false, requiresAddress: true, requiresPhone: true }
+    ],
+    features: ['inventory', 'customers', 'credit', 'invoicing', 'multi_unit'],
+    labels: {
+      menu: 'المنتجات',
+      item: 'منتج',
+      items: 'منتجات',
+      order: 'أمر توزيع',
+      orders: 'أوامر التوزيع',
+      customer: 'التاجر / العميل',
+      customers: 'قائمة التجار',
+      inventory: 'مخزون السيارة',
+      category: 'التصنيف',
+      checkout: 'إتمام البيع',
+      receipt: 'فاتورة توزيع',
+      table: 'خط سير',
+      tables: 'خطوط السير',
+      section: 'منطقة',
+      branch: 'فرع'
+    },
+    placeholders: {
+      search: '🔍 بحث في المنتجات...',
+      customer: 'اسم التاجر',
+      notes: 'ملاحظات الزيارة...',
+      address: 'موقع التاجر'
+    },
+    defaults: {
+      taxRate: 14,
+      serviceCharge: 0,
+      enableTax: true,
+      priceIncludesTax: false,
+      currency: 'ج.م',
+      allowCredit: true,
+      requireCustomer: true
+    },
+    tabs: ['pos', 'orders', 'menu', 'inventory', 'inventory_receipts', 'crm', 'delivery', 'customers', 'customer_accounts', 'suppliers', 'supplier_accounts', 'financials', 'accounting', 'settings']
+  },
+  hospital: {
+    id: 'hospital',
+    label: 'مستشفى / عيادة',
+    icon: '🏥',
+    description: 'مستشفيات، عيادات طبية، مراكز تخصصية',
+    category: 'health',
+    color: 'hsl(190, 80%, 45%)',
+    theme: { 
+      primary: '190 80% 45%', 
+      accent: '200 70% 50%', 
+      gradient: 'linear-gradient(135deg, #0ea5e9 0%, #0369a1 100%)',
+      sidebarBg: 'hsl(190 80% 45% / 0.05)',
+      sidebarText: 'hsl(190 80% 45%)'
+    },
+    posLayout: {
+      type: 'services',
+      showTableGrid: false,
+      showCategoriesSidebar: true,
+      itemGridCols: 4,
+      showItemImages: false,
+      showPrices: true,
+      cartPosition: 'right',
+      showBarcodeScanner: false,
+      showScale: false,
+      quickActions: ['appointment', 'patient_file', 'prescription', 'billing']
+    },
+    orderTypes: [
+      { id: 'pickup', label: 'كشف / استشارة', icon: '🩺', color: '#0ea5e9', requiresTable: false, requiresAddress: false, requiresPhone: true }
+    ],
+    features: ['prescriptions', 'customers', 'service_tracking', 'status_board', 'inventory'],
+    labels: {
+      menu: 'الخدمات الطبية',
+      item: 'خدمة / كشف',
+      items: 'خدمات',
+      order: 'فاتورة مريض',
+      orders: 'فواتير المرضى',
+      customer: 'المريض',
+      customers: 'المرضى',
+      inventory: 'المستلزمات',
+      category: 'التخصص',
+      checkout: 'إصدار الفاتورة',
+      receipt: 'فاتورة طبية',
+      table: 'غرفة',
+      tables: 'الغرف',
+      section: 'عيادة',
+      branch: 'فرع'
+    },
+    placeholders: {
+      search: '🔍 بحث عن خدمة أو مريض...',
+      customer: 'اسم المريض',
+      notes: 'ملاحظات طبية...',
+      address: 'العنوان'
+    },
+    defaults: {
+      taxRate: 0,
+      serviceCharge: 0,
+      enableTax: false,
+      priceIncludesTax: true,
+      currency: 'ج.م',
+      allowCredit: true,
+      requireCustomer: true
+    },
+    tabs: ['pos', 'orders', 'menu', 'crm', 'customers', 'customer_accounts', 'financials', 'accounting', 'staff', 'settings']
+  },
+  factory: {
+    id: 'factory',
+    label: 'مصنع / إنتاج',
+    icon: '🏭',
+    description: 'مصانع، خطوط إنتاج، تصنيع غذائي',
+    category: 'other',
+    color: 'hsl(12, 70%, 50%)',
+    theme: { 
+      primary: '12 70% 50%', 
+      accent: '20 60% 55%', 
+      gradient: 'linear-gradient(135deg, #ef4444 0%, #b91c1c 100%)',
+      sidebarBg: 'hsl(12 70% 50% / 0.05)',
+      sidebarText: 'hsl(12 70% 50%)'
+    },
+    posLayout: {
+      type: 'compact',
+      showTableGrid: false,
+      showCategoriesSidebar: true,
+      itemGridCols: 4,
+      showItemImages: true,
+      showPrices: true,
+      cartPosition: 'right',
+      showBarcodeScanner: true,
+      showScale: true,
+      quickActions: ['production_order', 'raw_materials', 'bom', 'quality_check']
+    },
+    orderTypes: [
+      { id: 'pickup', label: 'أمر إنتاج', icon: '⚙️', color: '#ef4444', requiresTable: false, requiresAddress: false, requiresPhone: false }
+    ],
+    features: ['inventory', 'multi_unit', 'recipes', 'production_order', 'variants'],
+    labels: {
+      menu: 'المنتجات التامة',
+      item: 'منتج',
+      items: 'منتجات',
+      order: 'أمر تشغيل',
+      orders: 'أوامر التشغيل',
+      customer: 'العميل المستلم',
+      customers: 'العملاء',
+      inventory: 'المواد الخام',
+      category: 'خط الإنتاج',
+      checkout: 'تسجيل الإنتاج',
+      receipt: 'إذن إنتاج',
+      table: 'خط',
+      tables: 'الخطوط',
+      section: 'عنبر',
+      branch: 'فرع'
+    },
+    placeholders: {
+      search: '🔍 بحث عن منتج تام...',
+      customer: 'جهة الاستلام',
+      notes: 'ملاحظات الإنتاج...',
+      address: 'العنوان'
+    },
+    defaults: {
+      taxRate: 14,
+      serviceCharge: 0,
+      enableTax: true,
+      priceIncludesTax: false,
+      currency: 'ج.م',
+      allowCredit: true,
+      requireCustomer: false
+    },
+    tabs: ['pos', 'orders', 'menu', 'inventory', 'inventory_receipts', 'purchase_invoices', 'purchase_orders', 'sales_orders', 'crm', 'customers', 'customer_accounts', 'suppliers', 'supplier_accounts', 'financials', 'accounting', 'settings']
+  },
+  real_estate: {
+    id: 'real_estate',
+    label: 'عقارات وتأجير',
+    icon: '🏠',
+    description: 'إدارة الشقق، العقارات، التأجير السكني والتجاري',
+    category: 'services',
+    color: 'hsl(250, 60%, 45%)',
+    theme: { 
+      primary: '250 60% 45%', 
+      accent: '240 50% 50%', 
+      gradient: 'linear-gradient(135deg, #6366f1 0%, #4338ca 100%)',
+      sidebarBg: 'hsl(250 60% 45% / 0.05)',
+      sidebarText: 'hsl(250 60% 45%)'
+    },
+    posLayout: {
+      type: 'services',
+      showTableGrid: true,
+      showCategoriesSidebar: true,
+      itemGridCols: 4,
+      showItemImages: true,
+      showPrices: true,
+      cartPosition: 'right',
+      showBarcodeScanner: false,
+      showScale: false,
+      quickActions: ['lease', 'maintenance', 'rent_collection', 'tenant_history']
+    },
+    orderTypes: [
+      { id: 'pickup', label: 'عقد جديد', icon: '📝', color: '#6366f1', requiresTable: false, requiresAddress: true, requiresPhone: true },
+      { id: 'delivery', label: 'صيانة', icon: '🛠️', color: '#4338ca', requiresTable: false, requiresAddress: true, requiresPhone: true }
+    ],
+    features: ['customers', 'service_tracking', 'status_board', 'inventory'],
+    labels: {
+      menu: 'الوحدات العقارية',
+      item: 'وحدة',
+      items: 'وحدات',
+      order: 'عقد إيجار',
+      orders: 'العقود',
+      customer: 'المستأجر',
+      customers: 'المستأجرين',
+      inventory: 'المستلزمات',
+      category: 'نوع العقار',
+      checkout: 'إبرام العقد',
+      receipt: 'فاتورة إيجار',
+      table: 'عمارة',
+      tables: 'العمارات',
+      section: 'منطقة',
+      branch: 'مكتب'
+    },
+    placeholders: {
+      search: '🔍 بحث عن وحدة أو مستأجر...',
+      customer: 'اسم المستأجر',
+      notes: 'شروط العقد...',
+      address: 'عنوان العقار'
+    },
+    defaults: {
+      taxRate: 0,
+      serviceCharge: 0,
+      enableTax: false,
+      priceIncludesTax: true,
+      currency: 'ج.م',
+      allowCredit: true,
+      requireCustomer: true
+    },
+    tabs: ['pos', 'orders', 'menu', 'crm', 'customers', 'customer_accounts', 'financials', 'accounting', 'expenses', 'staff', 'settings']
+  },
+  contracting: {
+    id: 'contracting',
+    label: 'مقاولات وإنشاءات',
+    icon: '🏗️',
+    description: 'شركات المقاولات، الإنشاءات، الهندسة المدنية',
+    category: 'other',
+    color: 'hsl(20, 80%, 40%)',
+    theme: { 
+      primary: '20 80% 40%', 
+      accent: '25 70% 45%', 
+      gradient: 'linear-gradient(135deg, #c2410c 0%, #9a3412 100%)',
+      sidebarBg: 'hsl(20 80% 40% / 0.05)',
+      sidebarText: 'hsl(20 80% 40%)'
+    },
+    posLayout: {
+      type: 'compact',
+      showTableGrid: false,
+      showCategoriesSidebar: true,
+      itemGridCols: 4,
+      showItemImages: false,
+      showPrices: true,
+      cartPosition: 'right',
+      showBarcodeScanner: false,
+      showScale: true,
+      quickActions: ['project_cost', 'materials', 'labor', 'subcontractor']
+    },
+    orderTypes: [
+      { id: 'pickup', label: 'مشروع جديد', icon: '🏗️', color: '#c2410c', requiresTable: false, requiresAddress: true, requiresPhone: true }
+    ],
+    features: ['inventory', 'multi_unit', 'recipes', 'customers'],
+    labels: {
+      menu: 'بنود الأعمال',
+      item: 'بند',
+      items: 'بنود',
+      order: 'مستخلص',
+      orders: 'المستخلصات',
+      customer: 'العميل',
+      customers: 'العملاء',
+      inventory: 'خامات الإنشاء',
+      category: 'نوع العمل',
+      checkout: 'إصدار مستخلص',
+      receipt: 'مستخلص أعمال',
+      table: 'موقع',
+      tables: 'المواقع',
+      section: 'عنبر',
+      branch: 'شركة'
+    },
+    placeholders: {
+      search: '🔍 بحث عن مشروع أو بند...',
+      customer: 'اسم صاحب المشروع',
+      notes: 'ملاحظات التنفيذ...',
+      address: 'موقع المشروع'
+    },
+    defaults: {
+      taxRate: 14,
+      serviceCharge: 0,
+      enableTax: true,
+      priceIncludesTax: false,
+      currency: 'ج.م',
+      allowCredit: true,
+      requireCustomer: true
+    },
+    tabs: ['pos', 'orders', 'menu', 'inventory', 'inventory_receipts', 'purchase_invoices', 'purchase_orders', 'crm', 'customers', 'customer_accounts', 'suppliers', 'supplier_accounts', 'financials', 'accounting', 'settings']
+  },
+  finishing: {
+    id: 'finishing',
+    label: 'تشطيبات وديكور',
+    icon: '🎨',
+    description: 'شركات التشطيب، الديكور، التصميم الداخلي',
+    category: 'services',
+    color: 'hsl(160, 60%, 40%)',
+    theme: { 
+      primary: '160 60% 40%', 
+      accent: '150 50% 45%', 
+      gradient: 'linear-gradient(135deg, #059669 0%, #047857 100%)',
+      sidebarBg: 'hsl(160 60% 40% / 0.05)',
+      sidebarText: 'hsl(160 60% 40%)'
+    },
+    posLayout: {
+      type: 'classic',
+      showTableGrid: false,
+      showCategoriesSidebar: true,
+      itemGridCols: 4,
+      showItemImages: true,
+      showPrices: true,
+      cartPosition: 'right',
+      showBarcodeScanner: false,
+      showScale: false,
+      quickActions: ['design', 'quote', 'materials', 'progress']
+    },
+    orderTypes: [
+      { id: 'pickup', label: 'طلب تشطيب', icon: '🎨', color: '#059669', requiresTable: false, requiresAddress: true, requiresPhone: true }
+    ],
+    features: ['inventory', 'customers', 'service_tracking'],
+    labels: {
+      menu: 'خدمات الديكور',
+      item: 'خدمة',
+      items: 'خدمات',
+      order: 'مقايسة',
+      orders: 'المقايسات',
+      customer: 'العميل',
+      customers: 'العملاء',
+      inventory: 'خامات التشطيب',
+      category: 'النمط',
+      checkout: 'اعتماد المقايسة',
+      receipt: 'مقايسة تشطيب',
+      table: 'وحدة',
+      tables: 'الوحدات',
+      section: 'منطقة',
+      branch: 'معرض'
+    },
+    placeholders: {
+      search: '🔍 بحث عن عميل أو خدمة...',
+      customer: 'اسم العميل',
+      notes: 'تفاصيل الديكور...',
+      address: 'محل التنفيذ'
+    },
+    defaults: {
+      taxRate: 14,
+      serviceCharge: 0,
+      enableTax: true,
+      priceIncludesTax: false,
+      currency: 'ج.م',
+      allowCredit: true,
+      requireCustomer: true
+    },
+    tabs: ['pos', 'orders', 'menu', 'inventory', 'inventory_receipts', 'crm', 'customers', 'customer_accounts', 'financials', 'accounting', 'expenses', 'staff', 'settings']
+  },
+  rental: {
+    id: 'rental',
+    label: 'تأجير معدات/سيارات',
+    icon: '🚗',
+    description: 'تأجير السيارات، المعدات الثقيلة، الأدوات',
+    category: 'services',
+    color: 'hsl(215, 70%, 45%)',
+    theme: { 
+      primary: '215 70% 45%', 
+      accent: '210 60% 50%', 
+      gradient: 'linear-gradient(135deg, #1d4ed8 0%, #1e40af 100%)',
+      sidebarBg: 'hsl(215 70% 45% / 0.05)',
+      sidebarText: 'hsl(215 70% 45%)'
+    },
+    posLayout: {
+      type: 'compact',
+      showTableGrid: true,
+      showCategoriesSidebar: true,
+      itemGridCols: 5,
+      showItemImages: true,
+      showPrices: true,
+      cartPosition: 'right',
+      showBarcodeScanner: true,
+      showScale: false,
+      quickActions: ['check_out', 'check_in', 'damage_report', 'maintenance']
+    },
+    orderTypes: [
+      { id: 'pickup', label: 'حجز تأجير', icon: '🔑', color: '#1d4ed8', requiresTable: false, requiresAddress: true, requiresPhone: true }
+    ],
+    features: ['inventory', 'customers', 'service_tracking', 'status_board'],
+    labels: {
+      menu: 'قائمة المعدات',
+      item: 'معدة / سيارة',
+      items: 'معدات',
+      order: 'عقد تأجير',
+      orders: 'عقود التأجير',
+      customer: 'المستأجر',
+      customers: 'المستأجرين',
+      inventory: 'قطع الغيار',
+      category: 'الفئة',
+      checkout: 'تسليم المعدة',
+      receipt: 'إيصال تأجير',
+      table: 'جراج',
+      tables: 'الجراجات',
+      section: 'صف',
+      branch: 'فرع'
+    },
+    placeholders: {
+      search: '🔍 بحث عن معدة أو مستأجر...',
+      customer: 'اسم المستأجر',
+      notes: 'شروط التأجير...',
+      address: 'موقع التسليم'
+    },
+    defaults: {
+      taxRate: 0,
+      serviceCharge: 0,
+      enableTax: false,
+      priceIncludesTax: true,
+      currency: 'ج.م',
+      allowCredit: true,
+      requireCustomer: true
+    },
+    tabs: ['pos', 'orders', 'menu', 'inventory', 'crm', 'customers', 'customer_accounts', 'financials', 'accounting', 'expenses', 'staff', 'settings']
+  },
+  education: {
+    id: 'education',
+    label: 'مراكز تعليمية',
+    icon: '📚',
+    description: 'مدارس، مراكز تدريب، أكاديميات',
+    category: 'services',
+    color: 'hsl(330, 70%, 50%)',
+    theme: { 
+      primary: '330 70% 50%', 
+      accent: '340 60% 55%', 
+      gradient: 'linear-gradient(135deg, #ec4899 0%, #db2777 100%)',
+      sidebarBg: 'hsl(330 70% 50% / 0.05)',
+      sidebarText: 'hsl(330 70% 50%)'
+    },
+    posLayout: {
+      type: 'services',
+      showTableGrid: true,
+      showCategoriesSidebar: true,
+      itemGridCols: 4,
+      showItemImages: false,
+      showPrices: true,
+      cartPosition: 'right',
+      showBarcodeScanner: false,
+      showScale: false,
+      quickActions: ['enroll', 'attendance', 'exams', 'results']
+    },
+    orderTypes: [
+      { id: 'pickup', label: 'تسجيل طالب', icon: '📝', color: '#ec4899', requiresTable: false, requiresAddress: false, requiresPhone: true }
+    ],
+    features: ['customers', 'service_tracking', 'status_board', 'inventory'],
+    labels: {
+      menu: 'الدورات / الحصص',
+      item: 'دورة / مادة',
+      items: 'دورات',
+      order: 'فاتورة طالب',
+      orders: 'فواتير الطلاب',
+      customer: 'الطالب',
+      customers: 'الطلاب',
+      inventory: 'الكتب / الأدوات',
+      category: 'المستوى',
+      checkout: 'تسجيل الحضور',
+      receipt: 'إيصال سداد',
+      table: 'قاعة',
+      tables: 'القاعات',
+      section: 'مجموعة',
+      branch: 'مركز'
+    },
+    placeholders: {
+      search: '🔍 بحث عن طالب أو مادة...',
+      customer: 'اسم الطالب',
+      notes: 'ملاحظات الأكاديمية...',
+      address: 'عنوان الطالب'
+    },
+    defaults: {
+      taxRate: 0,
+      serviceCharge: 0,
+      enableTax: false,
+      priceIncludesTax: true,
+      currency: 'ج.م',
+      allowCredit: true,
+      requireCustomer: true
+    },
+    tabs: ['pos', 'orders', 'menu', 'crm', 'customers', 'customer_accounts', 'financials', 'accounting', 'staff', 'settings']
+  },
+  law_firm: {
+    id: 'law_firm',
+    label: 'مكاتب المحاماة',
+    icon: '⚖️',
+    description: 'إدارة القضايا، الموكلين، الاستشارات القانونية',
+    category: 'services',
+    color: 'hsl(210, 30%, 30%)',
+    theme: { 
+      primary: '210 30% 30%', 
+      accent: '200 20% 40%', 
+      gradient: 'linear-gradient(135deg, #1e293b 0%, #334155 100%)',
+      sidebarBg: 'hsl(210 30% 30% / 0.05)',
+      sidebarText: 'hsl(210 30% 30%)'
+    },
+    posLayout: {
+      type: 'services',
+      showTableGrid: false,
+      showCategoriesSidebar: true,
+      itemGridCols: 4,
+      showItemImages: false,
+      showPrices: true,
+      cartPosition: 'right',
+      showBarcodeScanner: false,
+      showScale: false,
+      quickActions: ['case_file', 'consultation', 'legal_fee', 'contract']
+    },
+    orderTypes: [
+      { id: 'pickup', label: 'قضية جديدة', icon: '📜', color: '#1e293b', requiresTable: false, requiresAddress: false, requiresPhone: true }
+    ],
+    features: ['customers', 'service_tracking', 'status_board'],
+    labels: {
+      menu: 'الخدمات القانونية',
+      item: 'خدمة / استشارة',
+      items: 'خدمات',
+      order: 'أتعاب',
+      orders: 'الفواتير',
+      customer: 'الموكل',
+      customers: 'الموكلين',
+      inventory: 'الأوراق الرسمية',
+      category: 'نوع القضايا',
+      checkout: 'إصدار الفاتورة',
+      receipt: 'إيصال أتعاب',
+      table: 'محكمة',
+      tables: 'المحاكم',
+      section: 'مكتب',
+      branch: 'فرع'
+    },
+    placeholders: {
+      search: '🔍 بحث عن موكل أو قضية...',
+      customer: 'اسم الموكل',
+      notes: 'تفاصيل القضية...',
+      address: 'العنوان'
+    },
+    defaults: {
+      taxRate: 0,
+      serviceCharge: 0,
+      enableTax: false,
+      priceIncludesTax: true,
+      currency: 'ج.م',
+      allowCredit: true,
+      requireCustomer: true
+    },
+    tabs: ['pos', 'orders', 'menu', 'crm', 'customers', 'customer_accounts', 'financials', 'accounting', 'staff', 'settings']
+  },
+  marketing_agency: {
+    id: 'marketing_agency',
+    label: 'وكالات التسويق',
+    icon: '📢',
+    description: 'إدارة الحملات، التصميم، التسويق الرقمي',
+    category: 'services',
+    color: 'hsl(280, 70%, 50%)',
+    theme: { 
+      primary: '280 70% 50%', 
+      accent: '290 60% 55%', 
+      gradient: 'linear-gradient(135deg, #a855f7 0%, #7e22ce 100%)',
+      sidebarBg: 'hsl(280 70% 50% / 0.05)',
+      sidebarText: 'hsl(280 70% 50%)'
+    },
+    posLayout: {
+      type: 'services',
+      showTableGrid: false,
+      showCategoriesSidebar: true,
+      itemGridCols: 4,
+      showItemImages: true,
+      showPrices: true,
+      cartPosition: 'right',
+      showBarcodeScanner: false,
+      showScale: false,
+      quickActions: ['campaign', 'design_order', 'social_media', 'report']
+    },
+    orderTypes: [
+      { id: 'pickup', label: 'حملة جديدة', icon: '🎯', color: '#a855f7', requiresTable: false, requiresAddress: false, requiresPhone: true }
+    ],
+    features: ['customers', 'service_tracking', 'status_board'],
+    labels: {
+      menu: 'خدمات التسويق',
+      item: 'خدمة',
+      items: 'خدمات',
+      order: 'مشروع',
+      orders: 'المشاريع',
+      customer: 'العميل',
+      customers: 'العملاء',
+      inventory: 'الأصول الرقمية',
+      category: 'نوع الخدمة',
+      checkout: 'فوترة المشروع',
+      receipt: 'فاتورة خدمات',
+      table: 'حملة',
+      tables: 'الحملات',
+      section: 'فريق',
+      branch: 'وكالة'
+    },
+    placeholders: {
+      search: '🔍 بحث عن عميل أو حملة...',
+      customer: 'اسم العميل',
+      notes: 'تفاصيل المشروع...',
+      address: 'العنوان'
+    },
+    defaults: {
+      taxRate: 14,
+      serviceCharge: 0,
+      enableTax: true,
+      priceIncludesTax: false,
+      currency: 'ج.م',
+      allowCredit: true,
+      requireCustomer: true
+    },
+    tabs: ['pos', 'orders', 'menu', 'crm', 'customers', 'customer_accounts', 'financials', 'accounting', 'expenses', 'staff', 'settings']
+  },
+  gym: {
+    id: 'gym',
+    label: 'نوادي رياضية',
+    icon: '💪',
+    description: 'صالات الجيم، مراكز اللياقة، النوادي',
+    category: 'services',
+    color: 'hsl(10, 80%, 50%)',
+    theme: { 
+      primary: '10 80% 50%', 
+      accent: '15 70% 55%', 
+      gradient: 'linear-gradient(135deg, #ef4444 0%, #b91c1c 100%)',
+      sidebarBg: 'hsl(10 80% 50% / 0.05)',
+      sidebarText: 'hsl(10 80% 50%)'
+    },
+    posLayout: {
+      type: 'services',
+      showTableGrid: true,
+      showCategoriesSidebar: true,
+      itemGridCols: 4,
+      showItemImages: true,
+      showPrices: true,
+      cartPosition: 'right',
+      showBarcodeScanner: true,
+      showScale: false,
+      quickActions: ['membership', 'check_in', 'trainer', 'supplements']
+    },
+    orderTypes: [
+      { id: 'pickup', label: 'اشتراك جديد', icon: '🥇', color: '#ef4444', requiresTable: false, requiresAddress: false, requiresPhone: true }
+    ],
+    features: ['customers', 'service_tracking', 'status_board', 'inventory', 'barcode'],
+    labels: {
+      menu: 'العضويات والخدمات',
+      item: 'باقة / صنف',
+      items: 'أصناف',
+      order: 'عملية سداد',
+      orders: 'سداد الاشتراكات',
+      customer: 'المشترك',
+      customers: 'المشتركين',
+      inventory: 'المكملات والأدوات',
+      category: 'نوع الاشتراك',
+      checkout: 'تفعيل الاشتراك',
+      receipt: 'إيصال سداد',
+      table: 'منطقة تدريب',
+      tables: 'المناطق',
+      section: 'كابتن',
+      branch: 'جيم'
+    },
+    placeholders: {
+      search: '🔍 بحث عن مشترك أو باقة...',
+      customer: 'اسم المشترك',
+      notes: 'ملاحظات صحية...',
+      address: 'العنوان'
+    },
+    defaults: {
+      taxRate: 14,
+      serviceCharge: 0,
+      enableTax: true,
+      priceIncludesTax: false,
+      currency: 'ج.م',
+      allowCredit: true,
+      requireCustomer: true
+    },
+    tabs: ['pos', 'orders', 'menu', 'inventory', 'crm', 'customers', 'customer_accounts', 'financials', 'accounting', 'expenses', 'staff', 'settings']
+  },
+  beauty_salon: {
+    id: 'beauty_salon',
+    label: 'صالونات تجميل',
+    icon: '✂️',
+    description: 'صالونات الحلاقة، مراكز التجميل، السبا',
+    category: 'services',
+    color: 'hsl(330, 80%, 60%)',
+    theme: { 
+      primary: '330 80% 60%', 
+      accent: '320 70% 65%', 
+      gradient: 'linear-gradient(135deg, #f472b6 0%, #db2777 100%)',
+      sidebarBg: 'hsl(330 80% 60% / 0.05)',
+      sidebarText: 'hsl(330 80% 60%)'
+    },
+    posLayout: {
+      type: 'services',
+      showTableGrid: true,
+      showCategoriesSidebar: true,
+      itemGridCols: 4,
+      showItemImages: true,
+      showPrices: true,
+      cartPosition: 'right',
+      showBarcodeScanner: false,
+      showScale: false,
+      quickActions: ['booking', 'stylist', 'product_sale', 'loyalty']
+    },
+    orderTypes: [
+      { id: 'pickup', label: 'حجز جديد', icon: '✨', color: '#f472b6', requiresTable: true, requiresAddress: false, requiresPhone: true }
+    ],
+    features: ['customers', 'service_tracking', 'status_board', 'inventory', 'loyalty'],
+    labels: {
+      menu: 'الخدمات والمنتجات',
+      item: 'خدمة / منتج',
+      items: 'خدمات',
+      order: 'فاتورة صالون',
+      orders: 'فواتير العملاء',
+      customer: 'العميلة',
+      customers: 'العميلات',
+      inventory: 'مستحضرات التجميل',
+      category: 'القسم',
+      checkout: 'إتمام الخدمة',
+      receipt: 'فاتورة تجميل',
+      table: 'كرسي / غرفة',
+      tables: 'الكراسي',
+      section: 'أخصائية',
+      branch: 'فرع'
+    },
+    placeholders: {
+      search: '🔍 بحث عن خدمة أو عميلة...',
+      customer: 'اسم العميلة',
+      notes: 'تفاصيل الخدمة...',
+      address: 'العنوان'
+    },
+    defaults: {
+      taxRate: 14,
+      serviceCharge: 0,
+      enableTax: true,
+      priceIncludesTax: false,
+      currency: 'ج.م',
+      allowCredit: true,
+      requireCustomer: false
+    },
+    tabs: ['pos', 'orders', 'menu', 'inventory', 'crm', 'customers', 'customer_accounts', 'financials', 'accounting', 'expenses', 'staff', 'settings']
+  },
+  auto_repair: {
+    id: 'auto_repair',
+    label: 'صيانة السيارات',
+    icon: '🔧',
+    description: 'مراكز الصيانة، ميكانيكا، كهرباء السيارات',
+    category: 'services',
+    color: 'hsl(200, 10%, 30%)',
+    theme: { 
+      primary: '200 10% 30%', 
+      accent: '210 20% 40%', 
+      gradient: 'linear-gradient(135deg, #475569 0%, #1e293b 100%)',
+      sidebarBg: 'hsl(200 10% 30% / 0.05)',
+      sidebarText: 'hsl(200 10% 30%)'
+    },
+    posLayout: {
+      type: 'services',
+      showTableGrid: true,
+      showCategoriesSidebar: true,
+      itemGridCols: 4,
+      showItemImages: true,
+      showPrices: true,
+      cartPosition: 'right',
+      showBarcodeScanner: true,
+      showScale: false,
+      quickActions: ['work_order', 'spare_parts', 'mechanic', 'status']
+    },
+    orderTypes: [
+      { id: 'pickup', label: 'أمر إصلاح', icon: '🚗', color: '#475569', requiresTable: true, requiresAddress: false, requiresPhone: true }
+    ],
+    features: ['customers', 'service_tracking', 'status_board', 'inventory', 'barcode'],
+    labels: {
+      menu: 'قطع الغيار والخدمات',
+      item: 'قطعة / خدمة',
+      items: 'بنود',
+      order: 'فاتورة إصلاح',
+      orders: 'فواتير الصيانة',
+      customer: 'صاحب السيارة',
+      customers: 'العملاء',
+      inventory: 'المخزن',
+      category: 'النوع',
+      checkout: 'تسليم السيارة',
+      receipt: 'فاتورة صيانة',
+      table: 'باكية / ورشة',
+      tables: 'الباكيات',
+      section: 'فني',
+      branch: 'مركز صيانة'
+    },
+    placeholders: {
+      search: '🔍 بحث عن سيارة أو قطعة...',
+      customer: 'اسم صاحب السيارة',
+      notes: 'تفاصيل العطل...',
+      address: 'رقم اللوحة'
+    },
+    defaults: {
+      taxRate: 14,
+      serviceCharge: 0,
+      enableTax: true,
+      priceIncludesTax: false,
+      currency: 'ج.م',
+      allowCredit: true,
+      requireCustomer: true
+    },
+    tabs: ['pos', 'orders', 'menu', 'inventory', 'inventory_receipts', 'purchase_invoices', 'crm', 'customers', 'customer_accounts', 'suppliers', 'supplier_accounts', 'financials', 'accounting', 'expenses', 'staff', 'settings']
   }
 };
 
@@ -831,6 +1743,20 @@ export const BUSINESS_TABS: Record<BusinessType, string[]> = {
   warehouse: BUSINESS_TYPES.warehouse.tabs,
   pharmacy: BUSINESS_TYPES.pharmacy.tabs,
   services: BUSINESS_TYPES.services.tabs,
+  shipping: BUSINESS_TYPES.shipping.tabs,
+  distribution: BUSINESS_TYPES.distribution.tabs,
+  hospital: BUSINESS_TYPES.hospital.tabs,
+  factory: BUSINESS_TYPES.factory.tabs,
+  real_estate: BUSINESS_TYPES.real_estate.tabs,
+  contracting: BUSINESS_TYPES.contracting.tabs,
+  finishing: BUSINESS_TYPES.finishing.tabs,
+  rental: BUSINESS_TYPES.rental.tabs,
+  education: BUSINESS_TYPES.education.tabs,
+  law_firm: BUSINESS_TYPES.law_firm.tabs,
+  marketing_agency: BUSINESS_TYPES.marketing_agency.tabs,
+  gym: BUSINESS_TYPES.gym.tabs,
+  beauty_salon: BUSINESS_TYPES.beauty_salon.tabs,
+  auto_repair: BUSINESS_TYPES.auto_repair.tabs,
   other: BUSINESS_TYPES.other.tabs
 };
 

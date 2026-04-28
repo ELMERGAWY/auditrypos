@@ -103,6 +103,49 @@ export interface BusinessAccountMapping {
   marketingExpense: string;    // 6400
 }
 
+export type BusinessType = 
+  | 'services' | 'retail' | 'restaurant' | 'pharmacy' | 'grocery' 
+  | 'wholesale' | 'warehouse' | 'shipping' | 'distribution' 
+  | 'hospital' | 'factory' | 'general';
+
+// Business-Specific Account Mappings
+// ============================================================
+
+export interface BusinessAccountMapping {
+  // Asset Accounts
+  cashAccount: string;           // 1100
+  bankAccount: string;         // 1400
+  accountsReceivable: string;  // 1200
+  inventoryAccount: string;    // 1300
+  
+  // Liability Accounts
+  accountsPayable: string;     // 2100
+  taxPayable: string;          // 2150
+  accruedExpenses: string;     // 2200
+  
+  // Revenue Accounts
+  salesRevenue: string;        // 4100
+  serviceRevenue: string;      // 4200
+  deliveryRevenue?: string;    // 4300 (for restaurants)
+  shippingRevenue?: string;    // 4400 (for shipping)
+  
+  // COGS Accounts
+  cogsAccount: string;         // 5100
+  wastageAccount?: string;     // 5200 (restaurants)
+  productionCostAccount?: string; // 5300 (factories)
+  
+  // Expense Accounts
+  salariesExpense: string;   // 6100
+  rentExpense: string;       // 6200
+  utilitiesExpense: string;  // 6300
+  marketingExpense: string;    // 6400
+  realEstateRevenue?: string;  // 4800
+  contractingRevenue?: string; // 4900
+  finishingRevenue?: string;   // 4210
+  rentalRevenue?: string;      // 4220
+  educationRevenue?: string;   // 4230
+}
+
 // Account mappings per business type
 export const BUSINESS_ACCOUNT_MAPPINGS: Record<string, Partial<BusinessAccountMapping>> = {
   restaurant: {
@@ -111,41 +154,81 @@ export const BUSINESS_ACCOUNT_MAPPINGS: Record<string, Partial<BusinessAccountMa
     marketingExpense: '6400',
   },
   retail: {
-    // Retail uses different inventory valuation
     cogsAccount: '5100',
-    // May have shrinkage account
-    wastageAccount: '5250', // Inventory shrinkage
+    wastageAccount: '5250',
   },
   grocery: {
-    // Grocery has high inventory turnover
     cogsAccount: '5100',
-    wastageAccount: '5200', // Spoilage
+    wastageAccount: '5200',
     marketingExpense: '6400',
   },
   pharmacy: {
-    // Pharmacy specific
     cogsAccount: '5100',
-    // May have expired goods account
-    wastageAccount: '5300', // Expired medications
+    wastageAccount: '5300',
   },
   wholesale: {
-    // Wholesale has different pricing structure
     salesRevenue: '4100',
     cogsAccount: '5100',
-    // Bulk discounts
     marketingExpense: '6400',
   },
   services: {
-    // Services have no inventory
     inventoryAccount: undefined,
-    cogsAccount: '5150', // Direct service costs
+    cogsAccount: '5150',
     serviceRevenue: '4200',
   },
   warehouse: {
-    // Warehouse/storage business
     cogsAccount: '5100',
-    rentExpense: '6200', // Major cost for warehouses
+    rentExpense: '6200',
   },
+  shipping: {
+    shippingRevenue: '4400',
+    inventoryAccount: undefined, // Usually no inventory
+    cogsAccount: '5160', // Direct shipping costs
+  },
+  distribution: {
+    salesRevenue: '4100',
+    cogsAccount: '5100',
+    marketingExpense: '6500', // Distribution specific marketing/commissions
+  },
+  hospital: {
+    serviceRevenue: '4200',
+    inventoryAccount: '1350', // Medical supplies
+    cogsAccount: '5170', // Medical costs
+  },
+  factory: {
+    productionCostAccount: '5300',
+    inventoryAccount: '1300', // Raw materials
+    salesRevenue: '4100',
+  },
+  real_estate: {
+    realEstateRevenue: '4800',
+    serviceRevenue: '4200',
+    inventoryAccount: undefined,
+  },
+  contracting: {
+    contractingRevenue: '4900',
+    inventoryAccount: '1300',
+    cogsAccount: '5100',
+  },
+  finishing: {
+    finishingRevenue: '4210',
+    serviceRevenue: '4200',
+    inventoryAccount: '1300',
+  },
+  rental: {
+    rentalRevenue: '4220',
+    serviceRevenue: '4200',
+    inventoryAccount: undefined,
+  },
+  education: {
+    educationRevenue: '4230',
+    serviceRevenue: '4200',
+    inventoryAccount: undefined,
+  },
+  general: {
+    salesRevenue: '4100',
+    cogsAccount: '5100',
+  }
 };
 
 // Journal Entry Templates by Business Type

@@ -73,7 +73,7 @@ export function SettingsTab({
           onClick={() => setActiveSubTab('accounting')}
           className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm transition-colors whitespace-nowrap ${activeSubTab === 'accounting' ? 'gradient-bg text-primary-foreground' : 'bg-secondary hover:bg-secondary/80'}`}
         >
-          <BookOpen className="w-4 h-4" /> المعايير المحاسبية
+          <BookOpen className="w-4 h-4" /> إعدادات الموديولات والمحاسبة
         </button>
         <button
           onClick={() => setActiveSubTab('audit')}
