@@ -597,6 +597,13 @@ export default function Dashboard() {
     </div>
   );
 
+  const onAssignAgent = async (orderId: string, agentId: string) => {
+    const { error } = await supabase.from('orders').update({ delivery_agent_id: agentId }).eq('id', orderId);
+    if (error) { toast.error('خطأ في تعيين المندوب'); return; }
+    setOrders(prev => prev.map(o => o.id === orderId ? { ...o, delivery_agent_id: agentId } : o));
+    toast.success('تم تعيين المندوب للطلب ✅');
+  };
+
   if (!restaurant) return (
     <div className="min-h-screen bg-background flex items-center justify-center p-4">
       <div className="glass-card p-8 max-w-md text-center">
@@ -887,7 +894,15 @@ export default function Dashboard() {
             
             {activeTab === 'sales_returns' && <SalesReturnsManager restaurantId={restaurant!.id} currency={currency} />}
             
-            {activeTab === 'delivery' && <DeliveryTab restaurantId={restaurant!.id} currency={currency} agents={agents} />}
+            {activeTab === 'delivery' && (
+              <DeliveryTab 
+                restaurantId={restaurant!.id} 
+                agents={agents} 
+                setAgents={setAgents} 
+                deliveryOrders={deliveryOrders} 
+                onAssignAgent={onAssignAgent} 
+              />
+            )}
             {activeTab === 'shifts' && <ShiftsTab restaurant={restaurant!} currentShift={currentShift} setCurrentShift={setCurrentShift} profileName={profileName} userId={user!.id} todayRevenue={todayRevenue} todayOrdersCount={todayOrders.length} />}
             
             {activeTab === 'stats' && (
