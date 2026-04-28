@@ -52,6 +52,11 @@ class CheckoutIntegration {
     }
   ): Promise<CheckoutResult> {
     try {
+      // 0. Ensure accounting accounts exist (Self-healing)
+      if (context.isOnline) {
+        await journalService.ensureAccountingSetup(context.restaurantId, context.currency);
+      }
+
       // 1. Calculate taxes
       const cartItemsForTax = orderData.cart.map(item => ({
         product_id: (item as any).product_id || item.menu_item_id,

@@ -163,7 +163,11 @@ export default function Dashboard() {
     return i.available;
   });
 
-  const cartSubtotal = cart.reduce((s, c) => s + c.item.price * c.qty, 0);
+  const cartSubtotal = cart.reduce((s, c) => {
+    const units = getUnitOptions(c.item);
+    const unitFactor = units.find(u => u.label === c.unitMode)?.factor || 1;
+    return s + (c.item.price * unitFactor * c.qty);
+  }, 0);
   const discountAmount = discountType === 'percent'
     ? cartSubtotal * (Number(discount) || 0) / 100
     : Number(discount) || 0;
@@ -216,7 +220,7 @@ export default function Dashboard() {
     if (product.secondary_unit && product.unit_conversion_factor && Number(product.unit_conversion_factor) > 1) {
       options.push({
         label: product.secondary_unit,
-        factor: 1 / Number(product.unit_conversion_factor),
+        factor: Number(product.unit_conversion_factor),
       });
     }
     return options;

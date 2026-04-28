@@ -201,10 +201,10 @@ export function useDashboardData() {
       // If online, add a small grace period for auth to recover (e.g. during a token refresh)
       const timer = setTimeout(() => {
         if (!user && !authLoading && isOnline) {
-          console.log("Auth session missing while online, redirecting...");
+          console.log("Auth session missing while online, redirecting after grace period...");
           navigate('/login');
         }
-      }, 2000); 
+      }, 10000); // 10 seconds grace period
       return () => clearTimeout(timer);
     }
     

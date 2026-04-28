@@ -35,20 +35,36 @@ class TaxService {
       if (cached) return cached;
     }
 
-    const { data, error } = await supabase
-      .from('tax_rates')
-      .select('*')
-      .eq('restaurant_id', restaurantId)
-      .eq('is_active', true);
+    // Try online first
+    if (typeof navigator !== 'undefined' && navigator.onLine) {
+      try {
+        const { data, error } = await supabase
+          .from('tax_rates')
+          .select('*')
+          .eq('restaurant_id', restaurantId)
+          .eq('is_active', true);
 
-    if (error) {
-      console.error('Failed to load tax rates:', error);
-      return [];
+        if (!error && data) {
+          const configs = data as TaxConfig[];
+          this.taxCache.set(restaurantId, configs);
+          // Save to local storage for offline use
+          localStorage.setItem(`tax_rates_${restaurantId}`, JSON.stringify(configs));
+          return configs;
+        }
+      } catch (err) {
+        console.warn("Tax load online failed, trying local fallback", err);
+      }
     }
 
-    const configs = (data || []) as TaxConfig[];
-    this.taxCache.set(restaurantId, configs);
-    return configs;
+    // Offline or online failed: try local storage
+    const saved = localStorage.getItem(`tax_rates_${restaurantId}`);
+    if (saved) {
+      const configs = JSON.parse(saved) as TaxConfig[];
+      this.taxCache.set(restaurantId, configs);
+      return configs;
+    }
+
+    return [];
   }
 
   async createTaxRate(config: Omit<TaxConfig, 'id'>): Promise<TaxConfig | null> {

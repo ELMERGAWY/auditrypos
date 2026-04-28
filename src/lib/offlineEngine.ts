@@ -115,6 +115,9 @@ export async function getCachedData<T>(key: string): Promise<T | null> {
 
 // ─── Sync Engine ───
 import { supabase } from '@/integrations/supabase/client';
+import { journalService } from './accounting/journalService';
+import type { Order, OrderItem } from '@/pages/dashboard/types';
+import type { BusinessType } from './businessTypes';
 
 export async function syncPendingData(): Promise<{ synced: number; errors: number }> {
   let synced = 0, errors = 0;
@@ -155,8 +158,25 @@ export async function syncPendingData(): Promise<{ synced: number; errors: numbe
         unit_factor: item.unit_factor || 1,
         cost_price_snapshot: item.cost_price_snapshot || 0,
       }));
-      await supabase.from('order_items').insert(itemsWithOrderId);
+      const { data: items } = await supabase.from('order_items').insert(itemsWithOrderId).select();
       
+      // CREATE ACCOUNTING JOURNAL ENTRY FOR SYNCED ORDER
+      try {
+        // Fetch restaurant to get business type
+        const { data: rest } = await supabase.from('restaurants').select('business_type').eq('id', order.restaurant_id).single();
+        const businessType = (rest?.business_type || 'restaurant') as BusinessType;
+        
+        await journalService.createSaleJournalEntry(
+          order.restaurant_id,
+          { ...order, items: (items || []) as OrderItem[] } as Order,
+          businessType,
+          0, // COGS can be calculated if needed, using 0 for simple sync
+          0  // Tax can be extracted if needed
+        );
+      } catch (accErr) {
+        console.error("Accounting sync error:", accErr);
+      }
+
       await removePendingOrder(po.id);
       synced++;
     } catch { errors++; }

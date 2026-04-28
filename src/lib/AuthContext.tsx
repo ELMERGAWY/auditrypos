@@ -28,7 +28,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       console.log(`Auth Event: ${event}`);
+      
       if (event === 'SIGNED_OUT') {
+        // If we are offline, don't clear state immediately as it might be a refresh error
+        if (typeof navigator !== 'undefined' && !navigator.onLine) {
+          console.log("Offline SIGNED_OUT event ignored to preserve local session.");
+          return;
+        }
         setSession(null);
         setUser(null);
         setIsSuperAdmin(false);
