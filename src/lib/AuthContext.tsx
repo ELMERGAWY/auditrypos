@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
+import { createContext, useContext, useEffect, useState, useMemo, type ReactNode } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import type { User, Session } from '@supabase/supabase-js';
 
@@ -21,29 +21,47 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [isSuperAdmin, setIsSuperAdmin] = useState(false);
 
   useEffect(() => {
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      setSession(session);
-      setUser(session?.user ?? null);
-      if (session?.user) {
-        // Check admin role - defer to avoid blocking
-        setTimeout(async () => {
-          const { data } = await supabase
-            .from('user_roles')
-            .select('role')
-            .eq('user_id', session.user.id)
-            .eq('role', 'super_admin')
-            .maybeSingle();
-          setIsSuperAdmin(!!data);
-        }, 0);
-      } else {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      console.log(`Auth Event: ${event}`);
+      
+      if (event === 'SIGNED_OUT') {
+        setSession(null);
+        setUser(null);
         setIsSuperAdmin(false);
+        setLoading(false);
+      } else if (session) {
+        setSession(session);
+        setUser(session.user);
+        
+        // Only check admin if we have a user and something changed
+        setTimeout(async () => {
+          try {
+            const { data } = await supabase
+              .from('user_roles')
+              .select('role')
+              .eq('user_id', session.user.id)
+              .eq('role', 'super_admin')
+              .maybeSingle();
+            setIsSuperAdmin(!!data);
+          } catch (err) {
+            console.error("Error checking admin status:", err);
+          }
+        }, 0);
+        setLoading(false);
+      } else {
+        // Fallback for INITIAL_SESSION with no user
+        setLoading(false);
       }
-      setLoading(false);
     });
 
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      setUser(session?.user ?? null);
+    supabase.auth.getSession().then(({ data: { session }, error }) => {
+      if (error) {
+        console.error("Session fetch error:", error);
+      }
+      if (session) {
+        setSession(session);
+        setUser(session.user);
+      }
       setLoading(false);
     });
 
@@ -69,10 +87,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const signOut = async () => {
     await supabase.auth.signOut();
+    setUser(null);
+    setSession(null);
   };
 
+  const value = useMemo(() => ({
+    user,
+    session,
+    loading,
+    isSuperAdmin,
+    signUp,
+    signIn,
+    signOut
+  }), [user, session, loading, isSuperAdmin]);
+
   return (
-    <AuthContext.Provider value={{ user, session, loading, isSuperAdmin, signUp, signIn, signOut }}>
+    <AuthContext.Provider value={value}>
       {children}
     </AuthContext.Provider>
   );

@@ -190,7 +190,17 @@ export function useDashboardData() {
   }, [isOnline, user, dataLoaded]);
 
   useEffect(() => {
-    if (!authLoading && !user) { navigate('/login'); return; }
+    if (!authLoading && !user) { 
+      // Add a small grace period for auth to recover (e.g. during a token refresh or transient network glitch)
+      const timer = setTimeout(() => {
+        if (!user && !authLoading) {
+          console.log("Auth session missing after grace period, redirecting...");
+          navigate('/login');
+        }
+      }, 1500); 
+      return () => clearTimeout(timer);
+    }
+    
     if (user) {
       // Load cached data first for instant display
       loadCachedData(user.id).then(() => {
