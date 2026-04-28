@@ -139,6 +139,19 @@ const SuperAdmin = () => {
     load(); toast.success(`تم تمديد الاشتراك لـ ${days} يوم`);
   };
 
+  const handleToggleModule = async (restaurantId: string, moduleKey: string) => {
+    const rest = restaurants.find(r => r.id === restaurantId);
+    if (!rest) return;
+    const modules = Array.isArray(rest.enabled_modules) ? [...rest.enabled_modules] : [];
+    const index = modules.indexOf(moduleKey);
+    if (index > -1) modules.splice(index, 1);
+    else modules.push(moduleKey);
+    
+    const { error } = await supabase.from('restaurants').update({ enabled_modules: modules }).eq('id', restaurantId);
+    if (error) toast.error('فشل تحديث الموديولات');
+    else { load(); toast.success('تم تحديث موديولات النشاط'); }
+  };
+
   if (authLoading) return <div className="flex items-center justify-center min-h-screen">جاري التحميل...</div>;
 
   return (
@@ -268,6 +281,20 @@ const SuperAdmin = () => {
                         </Badge>
                       </div>
                       <p className="text-xs text-muted-foreground mb-2">{r.id}</p>
+                      
+                      {/* Modules Display */}
+                      <div className="flex flex-wrap gap-1 mb-3">
+                        {Object.entries(BUSINESS_TYPES).map(([key, bt]) => {
+                          const isEnabled = Array.isArray(r.enabled_modules) && r.enabled_modules.includes(key);
+                          return (
+                            <button key={key} onClick={() => handleToggleModule(r.id, key)}
+                              className={`px-2 py-0.5 rounded text-[10px] border transition-all ${isEnabled ? 'bg-primary/20 border-primary text-primary font-bold' : 'bg-secondary/30 border-transparent text-muted-foreground opacity-50 hover:opacity-100'}`}>
+                              {bt.label}
+                            </button>
+                          );
+                        })}
+                      </div>
+
                       <div className="flex items-center gap-4 text-xs font-medium">
                         <span className="flex items-center gap-1"><Calendar className="w-3 h-3" /> انتهاء الاشتراك: {r.subscription_end ? new Date(r.subscription_end).toLocaleDateString('ar-EG') : 'غير محدد'}</span>
                         <span className="flex items-center gap-1"><Activity className="w-3 h-3" /> الحالة: {r.status}</span>
