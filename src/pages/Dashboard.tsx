@@ -36,16 +36,18 @@ const NotificationsTab = lazy(() => import('./dashboard/NotificationsTab').then(
 const FinancialsTab = lazy(() => import('./dashboard/FinancialsTab').then(m => ({ default: m.FinancialsTab })));
 const OverheadManager = lazy(() => import('./dashboard/OverheadManager').then(m => ({ default: m.OverheadManager })));
 const AdvancedReportsHub = lazy(() => import('./dashboard/AdvancedReportsHub').then(m => ({ default: m.AdvancedReportsHub })));
+const CreateRestaurantForm = lazy(() => import('@/components/dashboard/CreateRestaurantForm').then(m => ({ default: m.CreateRestaurantForm })));
 import { BarcodeScanner } from './dashboard/BarcodeScanner';
-import { POSGrid } from './dashboard/pos/POSGrid';
-import { POSCart } from './dashboard/pos/POSCart';
-import { InvoiceTabs } from './dashboard/pos/InvoiceTabs';
-import { VentroCRM } from './dashboard/VentroCRM';
-import { TradingAccount } from './dashboard/TradingAccount';
-import { BOMManager } from './dashboard/BOMManager';
-import { AccountingMegaTab } from './dashboard/AccountingMegaTab';
-import { CustomReportBuilder } from './dashboard/CustomReportBuilder';
-import { SettingsTab } from './dashboard/SettingsTab';
+const POSGrid = lazy(() => import('./dashboard/pos/POSGrid').then(m => ({ default: m.POSGrid })));
+const POSCart = lazy(() => import('./dashboard/pos/POSCart').then(m => ({ default: m.POSCart })));
+const VentroCRM = lazy(() => import('./dashboard/VentroCRM').then(m => ({ default: m.VentroCRM })));
+const TradingAccount = lazy(() => import('./dashboard/TradingAccount').then(m => ({ default: m.TradingAccount })));
+const BOMManager = lazy(() => import('./dashboard/BOMManager').then(m => ({ default: m.BOMManager })));
+const SettingsTab = lazy(() => import('./dashboard/SettingsTab').then(m => ({ default: m.SettingsTab })));
+const InvoiceTabs = lazy(() => import('./dashboard/pos/InvoiceTabs').then(m => ({ default: m.InvoiceTabs })));
+const SalesOrders = lazy(() => import('./dashboard/SalesOrders').then(m => ({ default: m.SalesOrders })));
+const PurchaseOrders = lazy(() => import('./dashboard/PurchaseOrders').then(m => ({ default: m.PurchaseOrders })));
+const PurchaseInvoices = lazy(() => import('./dashboard/PurchaseInvoices').then(m => ({ default: m.PurchaseInvoices })));
 import { BUSINESS_TYPES, BUSINESS_TABS, getAddressPlaceholder, getCheckoutButtonLabel, getCustomerPlaceholder, getDefaultOrderType, getNotesPlaceholder, getPosSearchPlaceholder, isFoodSector, isInventoryDrivenBusiness, type BusinessType } from '@/lib/businessTypes';
 import { useAuth } from '@/lib/AuthContext';
 import { useDarkMode } from '@/lib/useDarkMode';
@@ -56,72 +58,6 @@ import type {
 } from './dashboard/types';
 import { STATUS_CONFIG, ORDER_TYPE_CONFIG } from './dashboard/types';
 
-function CreateRestaurantForm({ userId, onCreated }: { userId: string; onCreated: () => void }) {
-  const [name, setName] = useState('');
-  const [bizType, setBizType] = useState<BusinessType>('restaurant');
-  const [loading, setLoading] = useState(false);
-
-  // Check localStorage for pending business from registration
-  useEffect(() => {
-    const pending = localStorage.getItem('pending_business');
-    if (pending) {
-      try {
-        const { name: bName, type } = JSON.parse(pending);
-        if (bName) setName(bName);
-        if (type) setBizType(type as BusinessType);
-        localStorage.removeItem('pending_business');
-      } catch {}
-    }
-  }, []);
-
-  const handleCreate = async () => {
-    if (!name.trim()) return;
-    setLoading(true);
-    try {
-      const trialEnd = new Date();
-      trialEnd.setDate(trialEnd.getDate() + 14);
-      const { error } = await supabase.from('restaurants').insert({
-        owner_id: userId,
-        name,
-        status: 'active',
-        subscription_end: trialEnd.toISOString(),
-        business_type: bizType,
-      });
-      
-      if (error) {
-        toast.error('حدث خطأ أثناء الإنشاء: ' + error.message);
-        console.error('Create restaurant error:', error);
-        return;
-      }
-      
-      onCreated();
-    } catch (err: any) {
-      toast.error('خطأ غير متوقع: ' + err.message);
-      console.error(err);
-    } finally {
-      setLoading(false);
-    }
-  };
-  return (
-    <div className="space-y-3">
-      <div className="grid grid-cols-4 gap-2">
-        {(Object.entries(BUSINESS_TYPES) as [BusinessType, typeof BUSINESS_TYPES[BusinessType]][]).slice(0, 8).map(([key, bt]) => (
-          <button key={key} onClick={() => setBizType(key)}
-            className={`p-2 rounded-lg text-center transition-all text-xs ${bizType === key ? 'gradient-bg text-primary-foreground' : 'bg-secondary'}`}>
-            <span className="text-lg block">{bt.icon}</span>
-            {bt.label}
-          </button>
-        ))}
-      </div>
-      <div className="flex gap-2">
-        <Input value={name} onChange={e => setName(e.target.value)} placeholder="اسم النشاط" />
-        <Button onClick={handleCreate} disabled={loading} className="gradient-bg text-primary-foreground border-0">
-          {loading ? '...' : 'إنشاء'}
-        </Button>
-      </div>
-    </div>
-  );
-}
 
 const CHART_COLORS = [
   'hsl(25, 95%, 53%)', 'hsl(38, 92%, 50%)', 'hsl(142, 71%, 45%)',
@@ -667,7 +603,9 @@ export default function Dashboard() {
         <ChefHat className="w-12 h-12 text-primary mx-auto mb-4" />
         <h2 className="font-display text-xl font-bold mb-2">لا يوجد نشاط مسجّل</h2>
         <p className="text-muted-foreground mb-4">أنشئ مشروعك الأول للبدء</p>
-        <CreateRestaurantForm userId={user.id} onCreated={loadData} />
+        <Suspense fallback={<RefreshCcw className="w-6 h-6 animate-spin text-primary mx-auto" />}>
+          <CreateRestaurantForm userId={user.id} onCreated={loadData} />
+        </Suspense>
       </div>
     </div>
   );
@@ -709,16 +647,18 @@ export default function Dashboard() {
       </AnimatePresence>
 
       {/* Invoice Tabs Modal */}
-      <InvoiceTabs
-        show={showInvoiceTabs}
-        onClose={() => setShowInvoiceTabs(false)}
-        invoiceTabs={invoiceTabs}
-        activeInvoiceId={activeInvoiceId}
-        recallInvoice={recallInvoice}
-        deleteInvoiceTab={deleteInvoiceTab}
-        clearCart={clearCart}
-        currency={currency}
-      />
+      <Suspense fallback={null}>
+        <InvoiceTabs
+          show={showInvoiceTabs}
+          onClose={() => setShowInvoiceTabs(false)}
+          invoiceTabs={invoiceTabs}
+          activeInvoiceId={activeInvoiceId}
+          recallInvoice={recallInvoice}
+          deleteInvoiceTab={deleteInvoiceTab}
+          clearCart={clearCart}
+          currency={currency}
+        />
+      </Suspense>
 
       {/* Professional Sidebar */}
       <ProfessionalSidebar
@@ -833,132 +773,198 @@ export default function Dashboard() {
             </div>
           )}
 
-          {/* ===================== ORDERS TAB ===================== */}
-          {activeTab === 'orders' && (
-            <div className="p-4 space-y-3">
-              <div className="flex items-center justify-between mb-2">
-                <h2 className="font-display text-xl font-bold">الطلبات ({filteredOrders.length})</h2>
-              </div>
-              <div className="flex gap-2 overflow-x-auto pb-2">
-                {(['all', 'pending', 'preparing', 'ready', 'completed', 'cancelled'] as const).map(status => (
-                  <button key={status} onClick={() => setOrderFilter(status)}
-                    className={`px-3 py-1.5 rounded-lg text-xs whitespace-nowrap transition-colors ${orderFilter === status ? 'gradient-bg text-primary-foreground' : 'bg-secondary text-secondary-foreground'}`}>
-                    {status === 'all' ? `الكل (${orders.length})` : `${STATUS_CONFIG[status].label} (${orders.filter(o => o.status === status).length})`}
-                  </button>
-                ))}
-              </div>
-              {filteredOrders.length === 0 && <p className="text-muted-foreground text-center py-12">لا توجد طلبات</p>}
-              {filteredOrders.map(order => {
-                const statusCfg = STATUS_CONFIG[order.status as OrderStatus] || STATUS_CONFIG.pending;
-                const assignedAgent = agents.find(a => a.id === order.delivery_agent_id);
-                return (
-                  <motion.div key={order.id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="glass-card p-4">
-                    <div className="flex items-center justify-between mb-3">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <span className="font-bold text-sm">#{order.order_number.slice(-4)}</span>
-                        <Badge variant="outline" className="text-xs">{ORDER_TYPE_CONFIG[order.order_type as OrderType]?.icon} {ORDER_TYPE_CONFIG[order.order_type as OrderType]?.label}</Badge>
-                        {order.table_number && <Badge variant="outline" className="text-xs"><Hash className="w-3 h-3 ml-0.5" />{order.table_number}</Badge>}
-                        {order.customer_name && <span className="text-xs text-muted-foreground">{order.customer_name}</span>}
-                        <span className="text-xs text-muted-foreground">{new Date(order.created_at).toLocaleTimeString('ar-EG')}</span>
-                      </div>
-                      <Badge className={statusCfg.className}>{statusCfg.label}</Badge>
-                    </div>
-                    {order.delivery_address && <p className="text-xs text-muted-foreground flex items-center gap-1 mb-2"><MapPin className="w-3 h-3" />{order.delivery_address}</p>}
-                    {assignedAgent && <p className="text-xs text-warning mb-2 flex items-center gap-1">🛵 {assignedAgent.name}</p>}
-                    {order.notes && <p className="text-xs text-muted-foreground bg-secondary/50 rounded-lg px-3 py-1.5 mb-3 flex items-center gap-1"><StickyNote className="w-3 h-3" />{order.notes}</p>}
-                    <div className="space-y-1 text-sm">
-                      {order.items.map((item, idx) => (
-                        <div key={idx} className="flex justify-between text-muted-foreground">
-                          <span>{item.menu_item_image} {item.menu_item_name} × {item.quantity}</span>
-                          <span>{(item.price * item.quantity).toFixed(2)} {currency}</span>
-                        </div>
-                      ))}
-                    </div>
-                    <div className="flex items-center justify-between mt-3 pt-3 border-t border-border">
-                      <div>
-                        {Number(order.discount) > 0 && <span className="text-xs text-success ml-2">خصم: -{order.discount} {currency}</span>}
-                        <span className="font-bold text-primary">{order.total} {currency}</span>
-                      </div>
-                      <div className="flex gap-2 flex-wrap">
-                        {statusCfg.next && order.status !== 'cancelled' && (
-                          <Button size="sm" className="gradient-bg text-primary-foreground border-0" onClick={() => updateOrderStatus(order.id, statusCfg.next!)}>
-                            {statusCfg.next === 'preparing' && <><UtensilsCrossed className="w-3 h-3 ml-1" /> بدء التحضير</>}
-                            {statusCfg.next === 'ready' && <><CheckCircle className="w-3 h-3 ml-1" /> جاهز</>}
-                            {statusCfg.next === 'completed' && <><Check className="w-3 h-3 ml-1" /> مكتمل</>}
-                          </Button>
-                        )}
-                        {(order.status === 'pending' || order.status === 'preparing') && (
-                          <Button size="sm" variant="outline" className="text-destructive hover:bg-destructive/10" onClick={() => updateOrderStatus(order.id, 'cancelled')}>
-                            <X className="w-3 h-3 ml-1" /> إلغاء
-                          </Button>
-                        )}
-                        <Button size="sm" variant="outline" onClick={() => { setLastReceipt(order); setShowReceipt(true); }}>
-                          <Printer className="w-3 h-3" />
-                        </Button>
-                        <Button size="sm" variant="outline" className="text-destructive hover:bg-destructive/10" onClick={() => deleteOrder(order.id)} title="حذف الطلب">
-                          <Trash2 className="w-3 h-3" />
-                        </Button>
-                      </div>
-                    </div>
-                  </motion.div>
-                );
-              })}
-            </div>
-          )}
+          {/* ===================== ERP MODULES ROUTING ===================== */}
+          <Suspense fallback={<div className="h-full flex items-center justify-center p-20"><RefreshCcw className="w-10 h-10 animate-spin text-primary opacity-20" /></div>}>
+            
+            {/* POS Tab handled above as default */}
 
-          {/* ===================== OTHER ERP MODULES ===================== */}
-            {/* ===================== ORDERS TAB ===================== */}
+            {/* ORDERS TAB */}
             {activeTab === 'orders' && (
               <div className="p-4 space-y-4">
-                <div className="flex items-center justify-between mb-2">
-                  <h2 className="font-display text-xl font-bold">الطلبات ({filteredOrders.length})</h2>
+                <div className="flex items-center justify-between mb-4">
+                  <h2 className="text-3xl font-black">{config.labels.orders} ({filteredOrders.length})</h2>
+                  <div className="flex gap-2 overflow-x-auto pb-2">
+                    {(['all', 'pending', 'preparing', 'ready', 'completed', 'cancelled'] as const).map(status => (
+                      <button key={status} onClick={() => setOrderFilter(status)}
+                        className={`px-4 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition-all ${orderFilter === status ? 'gradient-bg text-white shadow-lg shadow-primary/20' : 'bg-secondary text-muted-foreground hover:bg-secondary/80'}`}>
+                        {status === 'all' ? `الكل (${orders.length})` : `${STATUS_CONFIG[status].label} (${orders.filter(o => o.status === status).length})`}
+                      </button>
+                    ))}
+                  </div>
                 </div>
-                <div className="flex gap-2 overflow-x-auto pb-2">
-                  {(['all', 'pending', 'preparing', 'ready', 'completed', 'cancelled'] as const).map(status => (
-                    <button key={status} onClick={() => setOrderFilter(status)}
-                      className={`px-3 py-1.5 rounded-lg text-xs whitespace-nowrap transition-colors ${orderFilter === status ? 'gradient-bg text-primary-foreground' : 'bg-secondary text-secondary-foreground'}`}>
-                      {status === 'all' ? `الكل (${orders.length})` : `${STATUS_CONFIG[status].label} (${orders.filter(o => o.status === status).length})`}
-                    </button>
-                  ))}
-                </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {filteredOrders.map(order => {
-                    const statusCfg = STATUS_CONFIG[order.status as OrderStatus] || STATUS_CONFIG.pending;
-                    return (
-                      <motion.div key={order.id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="glass-card p-4">
-                        <div className="flex justify-between mb-3 items-center">
-                           <span className="font-bold text-xs">#{order.order_number.slice(-4)}</span>
-                           <Badge className={statusCfg.className}>{statusCfg.label}</Badge>
-                        </div>
-                        <div className="space-y-1 text-xs">
-                          {order.items.map((item, idx) => <p key={idx}>{item.menu_item_name} x {item.quantity}</p>)}
-                        </div>
-                        <div className="mt-4 pt-3 border-t font-bold text-primary flex justify-between">
-                           <span>الإجمالي:</span>
-                           <span>{order.total} {currency}</span>
-                        </div>
-                      </motion.div>
-                    );
-                  })}
-                </div>
+                {filteredOrders.length === 0 ? (
+                  <div className="py-20 text-center text-muted-foreground italic">لا توجد طلبات حالياً</div>
+                ) : (
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    {filteredOrders.map(order => {
+                      const statusCfg = STATUS_CONFIG[order.status as OrderStatus] || STATUS_CONFIG.pending;
+                      const assignedAgent = agents.find(a => a.id === order.delivery_agent_id);
+                      return (
+                        <motion.div key={order.id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="glass-card p-5 group hover:border-primary/50 transition-all">
+                          <div className="flex items-center justify-between mb-4">
+                            <div className="flex flex-col">
+                              <span className="font-black text-lg">#{order.order_number.slice(-4)}</span>
+                              <span className="text-[10px] text-muted-foreground font-mono">{new Date(order.created_at).toLocaleString('ar-EG')}</span>
+                            </div>
+                            <Badge className={`${statusCfg.className} px-3 py-1 rounded-lg text-[10px] font-bold`}>{statusCfg.label}</Badge>
+                          </div>
+                          <div className="space-y-2 mb-6 min-h-[60px]">
+                            {order.items.map((item, idx) => (
+                              <div key={idx} className="flex justify-between items-center text-sm">
+                                <span className="text-muted-foreground">{item.menu_item_name} <span className="text-primary font-bold">× {item.quantity}</span></span>
+                                <span className="font-mono">{(item.price * item.quantity).toFixed(2)}</span>
+                              </div>
+                            ))}
+                          </div>
+                          <div className="flex items-center justify-between pt-4 border-t border-border/50">
+                            <span className="font-black text-xl text-primary">{order.total} <span className="text-[10px] text-muted-foreground font-normal">{currency}</span></span>
+                            <div className="flex gap-2">
+                               <Button size="sm" variant="ghost" className="h-8 w-8 p-0" onClick={() => { setLastReceipt(order); setShowReceipt(true); }}><Printer className="w-4 h-4" /></Button>
+                               {statusCfg.next && (
+                                 <Button size="sm" className="gradient-bg border-0 text-white text-[10px] font-bold h-8 px-3" onClick={() => updateOrderStatus(order.id, statusCfg.next!)}>
+                                   تحديث للحالة التالية
+                                 </Button>
+                               )}
+                            </div>
+                          </div>
+                        </motion.div>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
             )}
 
-            {/* ===================== INVENTORY TAB ===================== */}
+            {/* PRODUCTS / MENU TAB */}
+            {activeTab === 'menu' && (
+              <MenuTab
+                restaurant={restaurant!}
+                menuItems={menuItems}
+                setMenuItems={setMenuItems}
+                menuForm={menuForm}
+                setMenuForm={setMenuForm}
+                showAddItem={showAddItem}
+                setShowAddItem={setShowAddItem}
+                editingItem={editingItem}
+                setEditingItem={setEditingItem}
+                loadData={loadData}
+              />
+            )}
+
+            {/* INVENTORY TAB */}
             {activeTab === 'inventory' && (
-              <div className="p-4 space-y-4">
-                <div className="flex gap-2 p-1 bg-secondary/50 rounded-xl w-fit">
-                  <Button variant={activeSubView === 'stock' ? 'default' : 'ghost'} size="sm" onClick={() => setActiveSubView('stock')} className={activeSubView === 'stock' ? 'gradient-bg' : ''}>المخزون</Button>
-                  <Button variant={activeSubView === 'bom' ? 'default' : 'ghost'} size="sm" onClick={() => setActiveSubView('bom')} className={activeSubView === 'bom' ? 'gradient-bg' : ''}>هندسة التكاليف (BOM)</Button>
-                </div>
-                {activeSubView === 'stock' ? <InventoryTab restaurantId={restaurant.id} currency={currency} /> : <BOMManager restaurantId={restaurant.id} currency={currency} />}
+              <div className="p-4 space-y-6">
+                <header className="flex justify-between items-center">
+                  <div>
+                    <h2 className="text-3xl font-black">إدارة المخزون</h2>
+                    <p className="text-muted-foreground text-sm">متابعة الأرصدة، مستويات الطلب، وهندسة تكاليف الأصناف.</p>
+                  </div>
+                  <div className="flex gap-1 p-1 bg-secondary/50 rounded-2xl">
+                    <Button variant={activeSubView === 'stock' ? 'default' : 'ghost'} size="sm" onClick={() => setActiveSubView('stock')} className={activeSubView === 'stock' ? 'gradient-bg text-white shadow-md' : 'text-muted-foreground'}>أرصدة المخزن</Button>
+                    <Button variant={activeSubView === 'bom' ? 'default' : 'ghost'} size="sm" onClick={() => setActiveSubView('bom')} className={activeSubView === 'bom' ? 'gradient-bg text-white shadow-md' : 'text-muted-foreground'}>تكاليف الـ BOM</Button>
+                  </div>
+                </header>
+                {activeSubView === 'stock' ? <InventoryTab restaurantId={restaurant!.id} currency={currency} /> : <BOMManager restaurantId={restaurant!.id} currency={currency} />}
               </div>
             )}
 
-            {activeTab === 'crm' && <VentroCRM restaurantId={restaurant.id} currency={currency} />}
-            {activeTab === 'accounting' && <AccountingMegaTab restaurantId={restaurant.id} currency={currency} />}
-            {activeTab === 'analytics' && <AdvancedReportsHub restaurantId={restaurant.id} currency={currency} />}
-            {activeTab === 'settings' && <SettingsTab restaurant={restaurant} businessType={businessType} profileName={profileName} user={user} agents={agents} isSuspended={isSuspended} isSuperAdmin={isSuperAdmin} loadData={loadData} />}
+            {activeTab === 'inventory_receipts' && <InventoryReceiptsManager restaurantId={restaurant!.id} currency={currency} />}
+            {activeTab === 'purchase_invoices' && <PurchaseInvoices restaurantId={restaurant!.id} currency={currency} />}
+            {activeTab === 'purchase_orders' && <PurchaseOrders restaurantId={restaurant!.id} currency={currency} />}
+            {activeTab === 'sales_orders' && <SalesOrders restaurantId={restaurant!.id} currency={currency} />}
+            
+            {activeTab === 'crm' && <VentroCRM restaurantId={restaurant!.id} currency={currency} />}
+            
+            {activeTab === 'customers' && <CustomerManager restaurantId={restaurant!.id} currency={currency} />}
+            {activeTab === 'suppliers' && <SupplierManager restaurantId={restaurant!.id} currency={currency} />}
+            
+            {activeTab === 'customer_accounts' && <CustomersTab restaurantId={restaurant!.id} currency={currency} />}
+            {activeTab === 'supplier_accounts' && <SuppliersTab restaurantId={restaurant!.id} currency={currency} />}
+            
+            {activeTab === 'expenses' && <ExpensesTab restaurantId={restaurant!.id} currency={currency} />}
+            {activeTab === 'financials' && <FinancialsTab restaurantId={restaurant!.id} currency={currency} />}
+            {activeTab === 'overheads' && <OverheadManager restaurantId={restaurant!.id} currency={currency} />}
+            
+            {activeTab === 'sales_returns' && <SalesReturnsManager restaurantId={restaurant!.id} currency={currency} />}
+            
+            {activeTab === 'delivery' && <DeliveryTab restaurantId={restaurant!.id} currency={currency} agents={agents} />}
+            {activeTab === 'shifts' && <ShiftsTab restaurantId={restaurant!.id} currency={currency} />}
+            
+            {activeTab === 'stats' && (
+              <div className="p-4 h-full">
+                <AdvancedReportsHub restaurantId={restaurant!.id} currency={currency} />
+              </div>
+            )}
+            
+            {activeTab === 'analytics' && <AdvancedReportsHub restaurantId={restaurant!.id} currency={currency} />}
+            
+            {activeTab === 'staff' && <StaffTab restaurantId={restaurant!.id} currency={currency} />}
+            {activeTab === 'notifications' && <NotificationsTab restaurantId={restaurant!.id} />}
+            
+            {activeTab === 'settings' && (
+              <SettingsTab 
+                restaurant={restaurant!} 
+                businessType={businessType} 
+                profileName={profileName} 
+                user={user} 
+                agents={agents} 
+                isSuspended={isSuspended} 
+                isSuperAdmin={isSuperAdmin} 
+                loadData={loadData} 
+              />
+            )}
+            
+            {activeTab === 'qr' && (
+              <div className="p-10 flex flex-col items-center justify-center space-y-8 bg-card/30 rounded-3xl border-2 border-dashed border-primary/20 m-4">
+                 <div className="p-8 bg-white rounded-3xl shadow-2xl scale-110">
+                    <QRCodeSVG value={`${window.location.origin}/menu/${restaurant!.id}`} size={250} level="H" />
+                 </div>
+                 <div className="text-center space-y-4">
+                    <h3 className="text-3xl font-black">كود المنيو الذكي (QR Menu)</h3>
+                    <p className="text-muted-foreground max-w-md">وجه الكاميرا لمسح الكود واستعراض المنيو بشكل تفاعلي سريع.</p>
+                    <div className="flex gap-3 justify-center">
+                       <Button className="gradient-bg border-0 text-white rounded-xl px-8" onClick={() => window.open(`${window.location.origin}/menu/${restaurant!.id}`, '_blank')}>معاينة القائمة</Button>
+                       <Button variant="outline" className="rounded-xl px-8" onClick={() => window.print()}>طباعة الكود</Button>
+                    </div>
+                 </div>
+              </div>
+            )}
+            
+            {activeTab === 'waiter' && (
+              <div className="p-6 space-y-6">
+                 <h2 className="text-3xl font-black">طلبات الجرسون (Waiter Calls)</h2>
+                 {waiterCalls.length === 0 ? (
+                   <div className="py-20 text-center text-muted-foreground italic border-2 border-dashed rounded-3xl">لا توجد نداءات حالياً</div>
+                 ) : (
+                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                      {waiterCalls.map(call => (
+                        <Card key={call.id} className={`p-6 glass-card border-2 transition-all ${call.acknowledged ? 'opacity-50' : 'border-primary shadow-lg shadow-primary/10 animate-pulse'}`}>
+                           <div className="flex justify-between items-center mb-4">
+                              <div className="flex items-center gap-2">
+                                 <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold">#{call.table_number}</div>
+                                 <span className="font-bold">طاولة رقم {call.table_number}</span>
+                              </div>
+                              <Badge variant={call.acknowledged ? 'secondary' : 'default'} className={call.acknowledged ? '' : 'bg-primary'}>{call.acknowledged ? 'تمت الاستجابة' : 'نداء جديد'}</Badge>
+                           </div>
+                           <p className="text-sm text-muted-foreground mb-6">الوقت: {new Date(call.created_at).toLocaleTimeString('ar-EG')}</p>
+                           {!call.acknowledged && (
+                             <Button className="w-full gradient-bg border-0 text-white rounded-xl" onClick={async () => {
+                               await supabase.from('waiter_calls').update({ acknowledged: true }).eq('id', call.id);
+                               loadData();
+                               toast.success('تمت الاستجابة للطلب');
+                             }}>تأكيد الاستجابة</Button>
+                           )}
+                        </Card>
+                      ))}
+                   </div>
+                 )}
+              </div>
+            )}
+
+          </Suspense>
+        </main>
+      </div>
+    </div>
           </Suspense>
         </main>
       </div>

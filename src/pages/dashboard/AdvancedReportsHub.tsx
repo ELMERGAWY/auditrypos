@@ -9,6 +9,7 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { supabase } from '@/integrations/supabase/client';
 import { createFinancialReporting, ProfitLossReport, BalanceSheetReport, CashFlowReport, FinancialIndicators, TrialBalanceReport } from '@/erp/reporting_engine/financialReports';
+import { generateTaxSummary, generateReceiptsPayments, generateSalesByItem } from '@/erp/reporting_engine/extendedReports';
 import { toast } from 'sonner';
 
 interface Props {
@@ -209,6 +210,23 @@ export function AdvancedReportsHub({ restaurantId, currency }: Props) {
       } else if (activeReport === 'employees_summary') {
         const { data } = await supabase.from('staff').select('*').eq('restaurant_id', restaurantId);
         setListData(data || []);
+      } else if (activeReport === 'tax_summary') {
+        const data = await generateTaxSummary(restaurantId, startDate, endDate);
+        setListData([
+          { label: 'ضريبة المخرجات (Sales Tax)', value: data.outputTax, color: 'text-destructive' },
+          { label: 'ضريبة المدخلات (Purchase Tax)', value: data.inputTax, color: 'text-emerald-600' },
+          { label: 'صافي الضريبة المستحقة', value: data.netTax, color: 'text-primary font-black' }
+        ]);
+      } else if (activeReport === 'receipts_payments') {
+        const data = await generateReceiptsPayments(restaurantId, startDate, endDate);
+        setListData([
+          { label: 'إجمالي المقبوضات', value: data.receipts, color: 'text-emerald-600' },
+          { label: 'إجمالي المدفوعات', value: data.payments, color: 'text-destructive' },
+          { label: 'صافي التدفق النقدي', value: data.net, color: 'text-primary font-black' }
+        ]);
+      } else if (activeReport === 'sales_by_item') {
+        const data = await generateSalesByItem(restaurantId, startDate, endDate);
+        setListData(data);
       }
       // For other reports, they will show the placeholder automatically
     } catch (err: any) {
@@ -564,6 +582,41 @@ export function AdvancedReportsHub({ restaurantId, currency }: Props) {
       );
     }
 
+    if (activeReport === 'tax_summary' || activeReport === 'receipts_payments') {
+      return (
+        <div className="max-w-2xl mx-auto space-y-4 py-10">
+          {listData.map((row, i) => (
+            <div key={i} className="flex justify-between items-center p-6 bg-secondary/20 rounded-2xl border border-border/50">
+              <span className="font-bold text-lg">{row.label}</span>
+              <span className={`text-2xl font-black ${row.color}`}>{row.value.toLocaleString()} {currency}</span>
+            </div>
+          ))}
+        </div>
+      );
+    }
+
+    if (activeReport === 'sales_by_item') {
+      return (
+        <div>
+          <table className="w-full text-right text-sm border-collapse">
+             <thead><tr className="bg-muted font-black uppercase text-muted-foreground"><th className="p-4 border">الصنف</th><th className="p-4 border text-center">الكمية المباعة</th><th className="p-4 border text-left">إجمالي القيمة ({currency})</th></tr></thead>
+             <tbody>
+               {listData.length === 0 ? <tr><td colSpan={3} className="p-8 text-center text-muted-foreground">لا توجد مبيعات في هذه الفترة.</td></tr> : listData.map((row, i) => (
+                 <tr key={i} className="hover:bg-primary/5 transition-colors border-b">
+                   <td className="p-4 border font-bold">{row.name}</td>
+                   <td className="p-4 border text-center font-black text-primary">{row.qty}</td>
+                   <td className="p-4 border text-left font-bold">{row.total.toLocaleString()}</td>
+                 </tr>
+               ))}
+             </tbody>
+             <tfoot>
+               <tr className="bg-primary/5 font-black text-xl text-primary"><td colSpan={2} className="p-4 border text-left">الإجمالي الكلي</td><td className="p-4 border text-left">{listData.reduce((s, r) => s + r.total, 0).toLocaleString()}</td></tr>
+             </tfoot>
+          </table>
+        </div>
+      );
+    }
+
     // Placeholder UI for reports not fully implemented yet
     return (
       <div className="flex flex-col items-center justify-center p-20 text-center border-2 border-dashed border-primary/20 rounded-2xl bg-primary/5">
@@ -579,7 +632,8 @@ export function AdvancedReportsHub({ restaurantId, currency }: Props) {
     const isPlaceholder = ![
       'pnl', 'balance_sheet', 'cash_flow', 'indicators', 'trial_balance',
       'ar_aging', 'ap_aging', 'customers_summary', 'suppliers_summary',
-      'inventory_value', 'inventory_qty', 'fixed_assets_summary', 'employees_summary'
+      'inventory_value', 'inventory_qty', 'fixed_assets_summary', 'employees_summary',
+      'tax_summary', 'receipts_payments', 'sales_by_item'
     ].includes(activeReport);
 
     return (

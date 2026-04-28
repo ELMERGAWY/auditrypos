@@ -17,7 +17,7 @@ interface Props {
   currency: string;
 }
 
-type TabType = 'overview' | 'leads' | 'customers' | 'loyalty' | 'communications';
+type TabType = 'overview' | 'leads' | 'customers' | 'loyalty' | 'communications' | 'insights' | 'tasks';
 type LeadStage = 'new' | 'contacted' | 'negotiation' | 'won' | 'lost';
 
 export function VentroCRM({ restaurantId, currency }: Props) {
@@ -126,6 +126,8 @@ export function VentroCRM({ restaurantId, currency }: Props) {
            { id: 'customers', label: 'العملاء (Customer 360)', icon: Users },
            { id: 'communications', label: 'سجلات التواصل', icon: MessageSquare },
            { id: 'loyalty', label: 'برامج الولاء الذكية', icon: Heart },
+           { id: 'insights', label: 'تحليلات العملاء (Insights)', icon: TrendingUp },
+           { id: 'tasks', label: 'مدير المهام والمتابعة', icon: Clock },
          ].map(item => (
            <button
              key={item.id}
@@ -139,7 +141,6 @@ export function VentroCRM({ restaurantId, currency }: Props) {
          ))}
       </div>
 
-      {/* Main CRM Content */}
       <div className="flex-1 overflow-y-auto p-8 custom-scrollbar relative">
         {activeTab === 'overview' && (
           <div className="space-y-8 fade-in">
@@ -171,7 +172,6 @@ export function VentroCRM({ restaurantId, currency }: Props) {
                </div>
             </div>
 
-            {/* Quick Actions & Recent Activity */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
                <div className="glass-card p-6 space-y-4">
                   <h3 className="font-bold text-xl flex items-center gap-2"><Clock className="w-5 h-5 text-primary" /> أحدث التفاعلات</h3>
@@ -296,7 +296,6 @@ export function VentroCRM({ restaurantId, currency }: Props) {
           </div>
         )}
 
-        {/* ... (Other tabs like loyalty and communications can be expanded similarly) */}
         {activeTab === 'loyalty' && (
            <div className="flex flex-col items-center justify-center h-full text-center space-y-4 fade-in">
               <Award className="w-24 h-24 text-amber-500 opacity-50" />
@@ -328,6 +327,122 @@ export function VentroCRM({ restaurantId, currency }: Props) {
            </div>
         )}
 
+         {activeTab === 'insights' && (
+           <div className="space-y-8 fade-in">
+             <header>
+               <h2 className="text-3xl font-black">تحليلات العملاء الذكية</h2>
+               <p className="text-muted-foreground">رؤى معمقة حول سلوك العملاء والولاء لزيادة المبيعات.</p>
+             </header>
+
+             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+               <div className="glass-card p-6">
+                 <h3 className="font-bold text-lg mb-6 flex items-center gap-2 text-primary">
+                   <TrendingUp className="w-5 h-5" /> توزيع مستويات الولاء
+                 </h3>
+                 <div className="h-64">
+                   <ResponsiveContainer width="100%" height="100%">
+                     <PieChart>
+                       <Pie
+                         data={[
+                           { name: 'بلاتيني', value: customers.filter(c => c.loyalty_tier === 'platinum').length },
+                           { name: 'ذهبي', value: customers.filter(c => c.loyalty_tier === 'gold').length },
+                           { name: 'برونزي', value: customers.filter(c => !c.loyalty_tier || c.loyalty_tier === 'bronze').length },
+                         ]}
+                         cx="50%"
+                         cy="50%"
+                         innerRadius={60}
+                         outerRadius={80}
+                         paddingAngle={5}
+                         dataKey="value"
+                       >
+                         <Cell fill="hsl(280, 70%, 55%)" />
+                         <Cell fill="hsl(38, 92%, 50%)" />
+                         <Cell fill="hsl(200, 80%, 50%)" />
+                       </Pie>
+                       <Tooltip />
+                     </PieChart>
+                   </ResponsiveContainer>
+                 </div>
+               </div>
+
+               <div className="glass-card p-6">
+                 <h3 className="font-bold text-lg mb-6 flex items-center gap-2 text-primary">
+                   <Star className="w-5 h-5" /> أعلى 5 عملاء إنفاقاً
+                 </h3>
+                 <div className="space-y-4">
+                   {customers.slice(0, 5).map((c, i) => (
+                     <div key={c.id} className="flex items-center justify-between p-3 rounded-xl bg-secondary/30">
+                       <div className="flex items-center gap-3">
+                         <div className="w-8 h-8 rounded-full bg-primary/10 text-primary flex items-center justify-center font-bold text-xs">{i+1}</div>
+                         <span className="font-bold">{c.name}</span>
+                       </div>
+                       <span className="font-bold text-emerald-500">{(c.total_spent || 0).toLocaleString()} {currency}</span>
+                     </div>
+                   ))}
+                 </div>
+               </div>
+             </div>
+
+             <div className="glass-card p-6 border-destructive/20 bg-destructive/5">
+                <div className="flex items-center gap-3 mb-4">
+                  <div className="p-2 rounded-lg bg-destructive/10 text-destructive"><Zap className="w-5 h-5" /></div>
+                  <h3 className="text-xl font-bold">عملاء في خطر (Churn Risk)</h3>
+                </div>
+                <p className="text-sm text-muted-foreground mb-6">العملاء الذين لم يقوموا بأي عملية شراء منذ أكثر من 30 يوماً.</p>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  {customers.filter(c => (c.total_spent || 0) > 500).slice(0, 3).map(c => (
+                    <div key={c.id} className="p-4 rounded-2xl bg-background border border-destructive/10 flex flex-col gap-2">
+                       <span className="font-bold">{c.name}</span>
+                       <span className="text-xs text-muted-foreground">{c.phone}</span>
+                       <Button variant="outline" size="sm" className="mt-2 text-destructive border-destructive/20 hover:bg-destructive/5">تواصل الآن</Button>
+                    </div>
+                  ))}
+                </div>
+             </div>
+           </div>
+         )}
+
+         {activeTab === 'tasks' && (
+           <div className="space-y-8 fade-in">
+              <header className="flex justify-between items-end">
+                <div>
+                  <h2 className="text-3xl font-black">مدير المهام والمتابعة</h2>
+                  <p className="text-muted-foreground">قم بجدولة المتابعات مع العملاء المحتملين لضمان عدم ضياع أي فرصة.</p>
+                </div>
+                <Button className="gradient-bg border-0 text-white gap-2"><Plus className="w-4 h-4" /> مهمة متابعة جديدة</Button>
+              </header>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div className="glass-card p-6 border-amber-500/20">
+                  <h3 className="font-bold mb-4 text-amber-600">مهام اليوم</h3>
+                  <div className="space-y-3">
+                    <div className="p-4 rounded-xl bg-amber-500/5 border border-amber-500/10 space-y-2">
+                       <div className="flex justify-between items-start">
+                         <span className="font-bold text-sm">اتصال متابعة: أحمد علي</span>
+                         <Badge className="bg-amber-500/10 text-amber-600 border-0 text-[10px]">عاجل</Badge>
+                       </div>
+                       <p className="text-xs text-muted-foreground">مناقشة عرض السعر المرسل بالأمس.</p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="glass-card p-6 border-blue-500/20">
+                  <h3 className="font-bold mb-4 text-blue-600">القادم</h3>
+                  <p className="text-center py-8 text-muted-foreground text-sm italic">لا توجد مهام مجدولة لاحقاً</p>
+                </div>
+
+                <div className="glass-card p-6 border-emerald-500/20">
+                  <h3 className="font-bold mb-4 text-emerald-600">مكتمل</h3>
+                  <div className="space-y-3 opacity-60">
+                    <div className="p-4 rounded-xl bg-emerald-500/5 border border-emerald-500/10 flex items-center gap-3">
+                       <div className="w-5 h-5 rounded-full bg-emerald-500 text-white flex items-center justify-center"><CheckCircle className="w-3 h-3" /></div>
+                       <span className="text-sm line-through">إرسال البروفايل لشركة التقدم</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+           </div>
+         )}
       </div>
     </div>
   );

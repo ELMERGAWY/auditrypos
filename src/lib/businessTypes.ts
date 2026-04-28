@@ -7,7 +7,8 @@ export type FeatureFlag =
   | 'credit' | 'installments' | 'price_tiers' | 'invoicing' | 'statements'
   | 'prescriptions' | 'insurance' | 'expiry_tracking'
   | 'service_tracking' | 'pickup_delivery' | 'status_board'
-  | 'multi_unit' | 'recipes' | 'modifiers' | 'variants' | 'quick_sale' | 'kitchen';
+  | 'multi_unit' | 'recipes' | 'modifiers' | 'variants' | 'quick_sale' | 'kitchen'
+  | 'purchase_invoices' | 'sales_orders' | 'purchase_orders' | 'crm';
 
 // Business icons for items
 const BUSINESS_ITEM_ICONS: Record<BusinessType, string[]> = {
@@ -192,7 +193,7 @@ export const BUSINESS_TYPES: Record<BusinessType, BusinessTypeConfig> = {
       requireCustomer: false
     },
     
-    tabs: ['pos', 'orders', 'menu', 'inventory', 'inventory_receipts', 'delivery', 'customers', 'customer_accounts', 'sales_returns', 'suppliers', 'supplier_accounts', 'shifts', 'stats', 'financials', 'expenses', 'staff', 'notifications', 'settings'],
+    tabs: ['pos', 'orders', 'menu', 'inventory', 'inventory_receipts', 'purchase_invoices', 'purchase_orders', 'sales_orders', 'crm', 'delivery', 'customers', 'customer_accounts', 'sales_returns', 'suppliers', 'supplier_accounts', 'shifts', 'stats', 'financials', 'expenses', 'staff', 'notifications', 'settings'],
     
     specialFields: [
       { name: 'guest_count', type: 'number', label: 'عدد الضيوف', required: false },
@@ -272,7 +273,7 @@ export const BUSINESS_TYPES: Record<BusinessType, BusinessTypeConfig> = {
       requireCustomer: false
     },
     
-    tabs: ['pos', 'orders', 'menu', 'delivery', 'shifts', 'stats', 'financials', 'qr', 'waiter', 'inventory', 'customers', 'customer_accounts', 'sales_returns', 'expenses', 'staff', 'notifications', 'settings']
+    tabs: ['pos', 'orders', 'menu', 'inventory', 'inventory_receipts', 'purchase_invoices', 'purchase_orders', 'sales_orders', 'crm', 'delivery', 'customers', 'customer_accounts', 'sales_returns', 'shifts', 'stats', 'financials', 'qr', 'waiter', 'expenses', 'staff', 'notifications', 'settings']
   },
   
   retail: {
@@ -346,7 +347,7 @@ export const BUSINESS_TYPES: Record<BusinessType, BusinessTypeConfig> = {
       requireCustomer: false
     },
     
-    tabs: ['pos', 'orders', 'menu', 'inventory', 'inventory_receipts', 'delivery', 'customers', 'customer_accounts', 'sales_returns', 'suppliers', 'supplier_accounts', 'shifts', 'stats', 'financials', 'expenses', 'staff', 'notifications', 'settings'],
+    tabs: ['pos', 'orders', 'menu', 'inventory', 'inventory_receipts', 'purchase_invoices', 'purchase_orders', 'sales_orders', 'crm', 'delivery', 'customers', 'customer_accounts', 'sales_returns', 'suppliers', 'supplier_accounts', 'shifts', 'stats', 'financials', 'expenses', 'staff', 'notifications', 'settings'],
     
     specialFields: [
       { name: 'size', type: 'select', label: 'المقاس', required: false },
@@ -424,7 +425,7 @@ export const BUSINESS_TYPES: Record<BusinessType, BusinessTypeConfig> = {
       requireCustomer: false
     },
     
-    tabs: ['pos', 'orders', 'menu', 'inventory', 'inventory_receipts', 'customers', 'customer_accounts', 'sales_returns', 'suppliers', 'supplier_accounts', 'shifts', 'stats', 'financials', 'expenses', 'staff', 'notifications', 'settings'],
+    tabs: ['pos', 'orders', 'menu', 'inventory', 'inventory_receipts', 'purchase_invoices', 'purchase_orders', 'crm', 'customers', 'customer_accounts', 'sales_returns', 'suppliers', 'supplier_accounts', 'shifts', 'stats', 'financials', 'expenses', 'staff', 'notifications', 'settings'],
     
     specialFields: [
       { name: 'expiry_date', type: 'date', label: 'تاريخ الصلاحية', required: false },
@@ -503,7 +504,7 @@ export const BUSINESS_TYPES: Record<BusinessType, BusinessTypeConfig> = {
       requireCustomer: true
     },
     
-    tabs: ['pos', 'orders', 'menu', 'inventory', 'inventory_receipts', 'delivery', 'customers', 'customer_accounts', 'sales_returns', 'suppliers', 'supplier_accounts', 'shifts', 'stats', 'financials', 'expenses', 'staff', 'notifications', 'settings'],
+    tabs: ['pos', 'orders', 'menu', 'inventory', 'inventory_receipts', 'purchase_invoices', 'purchase_orders', 'sales_orders', 'crm', 'delivery', 'customers', 'customer_accounts', 'sales_returns', 'suppliers', 'supplier_accounts', 'shifts', 'stats', 'financials', 'expenses', 'staff', 'notifications', 'settings'],
     
     specialFields: [
       { name: 'prescription_number', type: 'text', label: 'رقم الروشتة', required: false },
@@ -583,7 +584,7 @@ export const BUSINESS_TYPES: Record<BusinessType, BusinessTypeConfig> = {
       requireCustomer: true
     },
     
-    tabs: ['pos', 'orders', 'menu', 'inventory', 'inventory_receipts', 'delivery', 'customers', 'customer_accounts', 'sales_returns', 'suppliers', 'supplier_accounts', 'shifts', 'stats', 'financials', 'expenses', 'staff', 'notifications', 'settings'],
+    tabs: ['pos', 'orders', 'menu', 'inventory', 'inventory_receipts', 'purchase_invoices', 'purchase_orders', 'sales_orders', 'crm', 'delivery', 'customers', 'customer_accounts', 'sales_returns', 'suppliers', 'supplier_accounts', 'shifts', 'stats', 'financials', 'expenses', 'staff', 'notifications', 'settings'],
     
     specialFields: [
       { name: 'credit_limit', type: 'number', label: 'حد الائتمان', required: false },
@@ -662,7 +663,7 @@ export const BUSINESS_TYPES: Record<BusinessType, BusinessTypeConfig> = {
       requireCustomer: true
     },
     
-    tabs: ['inventory', 'orders', 'menu', 'delivery', 'customers', 'customer_accounts', 'sales_returns', 'suppliers', 'supplier_accounts', 'shifts', 'stats', 'financials', 'expenses', 'staff', 'notifications', 'settings']
+    tabs: ['inventory', 'inventory_receipts', 'orders', 'menu', 'purchase_invoices', 'purchase_orders', 'sales_orders', 'crm', 'delivery', 'customers', 'customer_accounts', 'sales_returns', 'suppliers', 'supplier_accounts', 'shifts', 'stats', 'financials', 'expenses', 'staff', 'notifications', 'settings']
   },
   
   services: {
@@ -736,7 +737,7 @@ export const BUSINESS_TYPES: Record<BusinessType, BusinessTypeConfig> = {
       requireCustomer: true
     },
     
-    tabs: ['pos', 'orders', 'menu', 'delivery', 'customers', 'customer_accounts', 'sales_returns', 'shifts', 'stats', 'financials', 'expenses', 'staff', 'notifications', 'settings'],
+    tabs: ['pos', 'orders', 'menu', 'inventory', 'inventory_receipts', 'purchase_invoices', 'purchase_orders', 'sales_orders', 'crm', 'customers', 'customer_accounts', 'sales_returns', 'shifts', 'stats', 'financials', 'expenses', 'staff', 'notifications', 'settings'],
     
     specialFields: [
       { name: 'pickup_date', type: 'date', label: 'تاريخ الاستلام', required: true },
@@ -816,7 +817,7 @@ export const BUSINESS_TYPES: Record<BusinessType, BusinessTypeConfig> = {
       requireCustomer: false
     },
     
-    tabs: ['pos', 'orders', 'menu', 'inventory', 'inventory_receipts', 'delivery', 'customers', 'customer_accounts', 'sales_returns', 'suppliers', 'supplier_accounts', 'shifts', 'stats', 'financials', 'expenses', 'staff', 'notifications', 'settings']
+    tabs: ['pos', 'orders', 'menu', 'inventory', 'inventory_receipts', 'purchase_invoices', 'purchase_orders', 'sales_orders', 'crm', 'delivery', 'customers', 'customer_accounts', 'sales_returns', 'suppliers', 'supplier_accounts', 'shifts', 'stats', 'financials', 'expenses', 'staff', 'notifications', 'settings']
   }
 };
 

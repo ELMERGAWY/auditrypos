@@ -101,14 +101,53 @@ export function ProfessionalSidebar({
 
   const lockedTabs: SidebarTab[] = isTrial ? ['orders', 'delivery', 'shifts', 'stats'] : [];
 
-  const navItems: NavItem[] = [
-    { id: 'pos', label: 'نقطة البيع', icon: LayoutGrid, section: 'main', shortcut: 'F1' },
-    { id: 'orders', label: config.labels.orders, icon: Receipt, badge: stats.pendingOrders, section: 'sales' },
-    { id: 'inventory', label: 'المخزون والتكاليف', icon: Package, section: 'inventory' },
-    { id: 'accounting', label: 'المحاسبة والمالية', icon: Wallet, section: 'main' },
-    { id: 'analytics', label: 'التقارير المخصصة', icon: BarChart3, section: 'main' },
-    { id: 'settings', label: 'الإعدادات', icon: Settings, section: 'system' }
-  ].filter(Boolean) as NavItem[];
+  const ALL_NAV_ITEMS: Record<string, Partial<NavItem>> = {
+    pos: { label: 'نقطة البيع', icon: LayoutGrid, section: 'main', shortcut: 'F1' },
+    orders: { label: config.labels.orders, icon: Receipt, badge: stats.pendingOrders, section: 'sales' },
+    menu: { 
+      label: config.labels.menu, 
+      icon: config.category === 'food' ? ChefHat : Package, 
+      section: 'inventory' 
+    },
+    inventory: { label: 'المخزون والتكاليف', icon: Package, section: 'inventory' },
+    inventory_receipts: { label: 'استلام المخزون', icon: FileText, section: 'inventory' },
+    purchase_invoices: { label: 'فواتير المشتريات', icon: DollarSign, section: 'sales' },
+    sales_orders: { label: 'أوامر البيع', icon: FileText, section: 'sales' },
+    purchase_orders: { label: 'أوامر الشراء', icon: ShoppingCart, section: 'sales' },
+    crm: { label: 'Ventro CRM', icon: Sparkles, section: 'main' },
+    delivery: { label: 'التوصيل', icon: Truck, section: 'sales', badge: stats.deliveryOrders },
+    customers: { label: config.labels.customers, icon: Users, section: 'main' },
+    customer_accounts: { label: 'حسابات العملاء', icon: CreditCard, section: 'accounting' },
+    suppliers: { label: 'الموردين', icon: UsersRound, section: 'main' },
+    supplier_accounts: { label: 'حسابات الموردين', icon: Wallet, section: 'accounting' },
+    sales_returns: { label: 'مرتجع المبيعات', icon: RotateCcw, section: 'sales' },
+    shifts: { label: 'الورديات', icon: CalendarClock, section: 'main' },
+    stats: { label: 'الإحصائيات', icon: BarChart3, section: 'analytics' },
+    financials: { label: 'المحاسبة والمالية', icon: Wallet, section: 'accounting' },
+    expenses: { label: 'المصاريف', icon: DollarSign, section: 'accounting' },
+    staff: { label: 'الموظفين', icon: Users, section: 'system' },
+    notifications: { label: 'التنبيهات', icon: Bell, section: 'system' },
+    settings: { label: 'الإعدادات', icon: Settings, section: 'system' },
+    qr: { label: 'QR Menu', icon: QrCode, section: 'main' },
+    waiter: { label: 'طلبات الجرسون', icon: Bell, badge: stats.unackCalls, section: 'main' },
+    overheads: { label: 'التكاليف الثابتة', icon: Activity, section: 'inventory' }
+  };
+
+  const navItems: NavItem[] = config.tabs
+    .map(tabId => {
+      const item = ALL_NAV_ITEMS[tabId];
+      if (!item) return null;
+      return {
+        id: tabId as SidebarTab,
+        label: item.label!,
+        icon: item.icon!,
+        section: item.section || 'main',
+        badge: item.badge,
+        shortcut: item.shortcut,
+        locked: lockedTabs.includes(tabId as SidebarTab)
+      };
+    })
+    .filter(Boolean) as NavItem[];
 
   const groupedItems = navItems.reduce((acc, item) => {
     const section = item.section || 'main';
