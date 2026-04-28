@@ -866,7 +866,7 @@ export default function Dashboard() {
                                  </Button>
                                )}
 
-                               {isSuperAdmin && (
+                               {(isSuperAdmin || restaurant) && (
                                  <Button size="sm" variant="ghost" className="h-8 w-8 p-0 text-destructive/70 hover:bg-destructive/10" onClick={() => deleteOrder(order.id)} title="حذف نهائي">
                                    <Trash2 className="w-4 h-4" />
                                  </Button>
