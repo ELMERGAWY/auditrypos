@@ -108,69 +108,86 @@ class JournalService {
   }
 
   async ensureAccountingSetup(restaurantId: string, currency: string = 'ج.م'): Promise<boolean> {
-    // Check if any accounts exist
-    const { count, error: countError } = await supabase
+    // Check existing accounts
+    const { data: existingAccounts, error: fetchError } = await supabase
       .from('chart_of_accounts')
-      .select('id', { count: 'exact', head: true })
+      .select('code')
       .eq('restaurant_id', restaurantId);
     
-    if (countError) return false;
-    if (count && count > 0) return true; // Already setup
-
-    console.log('Seeding default accounts for restaurant:', restaurantId);
+    if (fetchError) return false;
     
-    // Seed basic accounts if empty
+    const existingCodes = new Set(existingAccounts?.map(a => a.code) || []);
+    
+    // Seed basic accounts if missing
     const standardAccounts = [
       { code: '1000', name: 'الأصول', type: 'asset' },
       { code: '1100', name: 'الصندوق / النقدية', type: 'asset', is_cash: true, parent: '1000' },
       { code: '1200', name: 'العملاء / الذمم المدينة', type: 'asset', parent: '1000' },
       { code: '1300', name: 'المخزون', type: 'asset', parent: '1000' },
+      { code: '1400', name: 'البنوك', type: 'asset', parent: '1000' },
       { code: '2000', name: 'الخصوم', type: 'liability' },
       { code: '2100', name: 'الموردون / الذمم الدائنة', type: 'liability', parent: '2000' },
       { code: '2150', name: 'الضرائب المستحقة (VAT)', type: 'liability', parent: '2000' },
+      { code: '3000', name: 'حقوق الملكية', type: 'equity' },
+      { code: '3100', name: 'رأس المال', type: 'equity' },
       { code: '4000', name: 'الإيرادات', type: 'revenue' },
       { code: '4100', name: 'إيرادات المبيعات', type: 'revenue', parent: '4000' },
       { code: '4120', name: 'خصم مبيعات', type: 'revenue', parent: '4000' },
       { code: '4200', name: 'إيرادات الخدمات', type: 'revenue', parent: '4000' },
       { code: '4300', name: 'إيرادات التوصيل', type: 'revenue', parent: '4000' },
-      { code: '5000', name: 'تكلفة المبيعات (COGS)', type: 'cogs' },
-      { code: '5100', name: 'تكلفة البضاعة المباعة', type: 'cogs', parent: '5000' },
+      { code: '5000', name: 'تكلفة المبيعات (COGS)', type: 'expense' },
+      { code: '5100', name: 'تكلفة البضاعة المباعة', type: 'expense', parent: '5000' },
       { code: '6000', name: 'المصروفات', type: 'expense' },
       { code: '6100', name: 'الرواتب والأجور', type: 'expense', parent: '6000' },
     ];
 
+    const missingAccounts = standardAccounts.filter(acc => !existingCodes.has(acc.code));
+    
+    if (missingAccounts.length === 0) return true;
+
+    console.log(`Seeding ${missingAccounts.length} missing system accounts for restaurant:`, restaurantId);
+    
     try {
-      // Insert parents first
-      for (const acc of standardAccounts.filter(a => !a.parent)) {
+      // 1. Insert parents that are missing
+      const missingParents = missingAccounts.filter(a => !a.parent);
+      for (const acc of missingParents) {
         await supabase.from('chart_of_accounts').insert({
           restaurant_id: restaurantId,
           code: acc.code,
           name: acc.name,
-          account_type: acc.type,
+          account_type: acc.type === 'cogs' ? 'expense' : acc.type,
           is_active: true,
           currency
         });
       }
 
-      const { data: parents } = await supabase.from('chart_of_accounts').select('id, code').eq('restaurant_id', restaurantId);
+      // 2. Fetch all current accounts (to get IDs for parents)
+      const { data: allAccounts } = await supabase
+        .from('chart_of_accounts')
+        .select('id, code')
+        .eq('restaurant_id', restaurantId);
 
-      // Insert children
-      for (const acc of standardAccounts.filter(a => a.parent)) {
-        const parentId = parents?.find(p => p.code === acc.parent)?.id;
+      // 3. Insert children that are missing
+      const missingChildren = missingAccounts.filter(a => a.parent);
+      for (const acc of missingChildren) {
+        const parentId = allAccounts?.find(p => p.code === acc.parent)?.id;
+        
         await supabase.from('chart_of_accounts').insert({
           restaurant_id: restaurantId,
           code: acc.code,
           name: acc.name,
-          account_type: acc.type,
+          account_type: acc.type === 'cogs' ? 'expense' : acc.type,
           parent_id: parentId,
           is_cash_account: (acc as any).is_cash || false,
           is_active: true,
           currency
         });
       }
+      
+      this.clearCache();
       return true;
     } catch (e) {
-      console.error('Failed to auto-seed accounts:', e);
+      console.error('Failed to seed missing accounts:', e);
       return false;
     }
   }
