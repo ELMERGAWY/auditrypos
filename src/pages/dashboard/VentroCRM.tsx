@@ -11,6 +11,8 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { ResponsiveContainer, PieChart, Pie, Cell, Tooltip } from 'recharts';
+
 
 interface Props {
   restaurantId: string;
@@ -25,6 +27,7 @@ export function VentroCRM({ restaurantId, currency }: Props) {
   const [customers, setCustomers] = useState<any[]>([]);
   const [leads, setLeads] = useState<any[]>([]);
   const [logs, setLogs] = useState<any[]>([]);
+  const [tasks, setTasks] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [viewMode, setViewMode] = useState<'kanban' | 'table'>('kanban');
 
@@ -38,15 +41,17 @@ export function VentroCRM({ restaurantId, currency }: Props) {
 
   const loadCRMData = async () => {
     setLoading(true);
-    const [customersRes, leadsRes, logsRes] = await Promise.all([
+    const [customersRes, leadsRes, logsRes, tasksRes] = await Promise.all([
       supabase.from('customers').select('*').eq('restaurant_id', restaurantId).order('total_spent', { ascending: false }),
       supabase.from('crm_leads').select('*').eq('restaurant_id', restaurantId),
-      supabase.from('crm_communication_logs').select('*').eq('restaurant_id', restaurantId).order('contact_date', { ascending: false }).limit(20)
+      supabase.from('crm_communication_logs').select('*').eq('restaurant_id', restaurantId).order('contact_date', { ascending: false }).limit(20),
+      supabase.from('crm_tasks').select('*').eq('restaurant_id', restaurantId).order('due_date', { ascending: true })
     ]);
     
     if (customersRes.data) setCustomers(customersRes.data);
     if (leadsRes.data) setLeads(leadsRes.data);
     if (logsRes.data) setLogs(logsRes.data);
+    if (tasksRes.data) setTasks(tasksRes.data);
     setLoading(false);
   };
 
@@ -79,7 +84,8 @@ export function VentroCRM({ restaurantId, currency }: Props) {
       { id: 'new', label: 'جديد', color: 'bg-blue-500/10 text-blue-500 border-blue-500/20' },
       { id: 'contacted', label: 'تم التواصل', color: 'bg-amber-500/10 text-amber-500 border-amber-500/20' },
       { id: 'negotiation', label: 'مرحلة التفاوض', color: 'bg-purple-500/10 text-purple-500 border-purple-500/20' },
-      { id: 'won', label: 'تم الإغلاق بنجاح', color: 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20' }
+      { id: 'won', label: 'تم الإغلاق بنجاح', color: 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20' },
+      { id: 'lost', label: 'خسارة الفرصة', color: 'bg-destructive/10 text-destructive border-destructive/20' }
     ];
 
     return (
