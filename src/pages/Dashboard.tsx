@@ -524,8 +524,30 @@ export default function Dashboard() {
       toast.success(`📴 تم تحديث الحالة أوفلاين — سيتم المزامنة لاحقاً`);
       return;
     }
+    
     const { error } = await supabase.from('orders').update({ status: newStatus }).eq('id', orderId);
     if (error) { toast.error('خطأ في تحديث الحالة'); return; }
+
+    // If cancelled, reverse accounting
+    if (newStatus === 'cancelled') {
+      const order = orders.find(o => o.id === orderId);
+      if (order) {
+        const { journalService } = await import('@/lib/accounting/journalService');
+        await journalService.createSalesReturnJournalEntry(
+          restaurant!.id,
+          {
+            orderId: order.id,
+            orderNumber: order.order_number,
+            amount: order.total,
+            taxAmount: 0, // Should ideally calculate actual tax from order
+            reason: 'إلغاء الطلب من لوحة التحكم',
+            customerId: order.customer_id as string || undefined,
+          },
+          businessType
+        );
+      }
+    }
+
     setOrders(prev => prev.map(o => o.id === orderId ? { ...o, status: newStatus } : o));
     toast.success(`تم تحديث الطلب إلى: ${STATUS_CONFIG[newStatus].label}`);
   };
@@ -834,13 +856,28 @@ export default function Dashboard() {
                           <div className="flex items-center justify-between pt-4 border-t border-border/50">
                             <span className="font-black text-xl text-primary">{order.total} <span className="text-[10px] text-muted-foreground font-normal">{currency}</span></span>
                             <div className="flex gap-2">
-                               <Button size="sm" variant="ghost" className="h-8 w-8 p-0" onClick={() => { setLastReceipt(order); setShowReceipt(true); }}><Printer className="w-4 h-4" /></Button>
-                               {statusCfg.next && (
-                                 <Button size="sm" className="gradient-bg border-0 text-white text-[10px] font-bold h-8 px-3" onClick={() => updateOrderStatus(order.id, statusCfg.next!)}>
-                                   تحديث للحالة التالية
+                               <Button size="sm" variant="ghost" className="h-8 w-8 p-0" onClick={() => { setLastReceipt(order); setShowReceipt(true); }} title="طباعة الفاتورة">
+                                 <Printer className="w-4 h-4" />
+                               </Button>
+                               
+                               {order.status !== 'cancelled' && order.status !== 'completed' && (
+                                 <Button size="sm" variant="ghost" className="h-8 w-8 p-0 text-destructive hover:bg-destructive/10" onClick={() => updateOrderStatus(order.id, 'cancelled')} title="إلغاء الطلب">
+                                   <X className="w-4 h-4" />
                                  </Button>
                                )}
-                            </div>
+
+                               {isSuperAdmin && (
+                                 <Button size="sm" variant="ghost" className="h-8 w-8 p-0 text-destructive/70 hover:bg-destructive/10" onClick={() => deleteOrder(order.id)} title="حذف نهائي">
+                                   <Trash2 className="w-4 h-4" />
+                                 </Button>
+                               )}
+
+                               {statusCfg.next && (
+                                 <Button size="sm" className="gradient-bg border-0 text-white text-[10px] font-bold h-8 px-3" onClick={() => updateOrderStatus(order.id, statusCfg.next!)}>
+                                   {statusCfg.next === 'preparing' ? 'تحضير' : statusCfg.next === 'ready' ? 'جاهز' : 'إتمام'}
+                                 </Button>
+                               )}
+                             </div>
                           </div>
                         </motion.div>
                       );

@@ -50,10 +50,12 @@ export function AccountingSettings({ restaurant, loadData }: Props) {
       inventory_method: form.inventory_method,
       inventory_system: form.inventory_system,
       business_type: form.business_type
-    }).eq('id', restaurant.id);
+    } as any).eq('id', restaurant.id);
 
-    if (error) toast.error('فشل حفظ الإعدادات');
-    else {
+    if (error) {
+      console.error('Save settings error:', error);
+      toast.error(`فشل حفظ الإعدادات: ${error.message}`);
+    } else {
       toast.success('تم تحديث المعايير المحاسبية بنجاح');
       loadData();
     }

@@ -225,6 +225,19 @@ export const BUSINESS_ACCOUNT_MAPPINGS: Record<string, Partial<BusinessAccountMa
     serviceRevenue: '4200',
     inventoryAccount: undefined,
   },
+  law_firm: {
+    serviceRevenue: '4240',
+    inventoryAccount: undefined,
+  },
+  marketing_agency: {
+    serviceRevenue: '4250',
+    inventoryAccount: undefined,
+  },
+  auto_repair: {
+    serviceRevenue: '4260',
+    inventoryAccount: '1300',
+    cogsAccount: '5150',
+  },
   general: {
     salesRevenue: '4100',
     cogsAccount: '5100',

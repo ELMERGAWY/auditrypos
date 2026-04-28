@@ -67,6 +67,9 @@ export interface Restaurant {
   currency: string;
   license_key: string | null;
   business_type: string;
+  accounting_standard?: string;
+  inventory_method?: string;
+  inventory_system?: string;
 }
 
 export interface HeldInvoice {

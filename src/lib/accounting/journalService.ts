@@ -144,8 +144,13 @@ class JournalService {
       { code: '4210', name: 'إيرادات تشطيبات وديكور', type: 'revenue', parent: '4200' },
       { code: '4220', name: 'إيرادات تأجير معدات', type: 'revenue', parent: '4200' },
       { code: '4230', name: 'إيرادات خدمات تعليمية', type: 'revenue', parent: '4200' },
+      { code: '4240', name: 'إيرادات استشارات قانونية', type: 'revenue', parent: '4200' },
+      { code: '4250', name: 'إيرادات تسويق ودعاية', type: 'revenue', parent: '4200' },
+      { code: '4260', name: 'إيرادات خدمات صيانة سيارات', type: 'revenue', parent: '4200' },
       { code: '5000', name: 'تكلفة المبيعات (COGS)', type: 'expense' },
       { code: '5100', name: 'تكلفة البضاعة المباعة', type: 'expense', parent: '5000' },
+      { code: '5150', name: 'تكلفة الخدمات المقدمة', type: 'expense', parent: '5000' },
+      { code: '5300', name: 'تكلفة الإنتاج والتشغيل', type: 'expense', parent: '5000' },
       { code: '6000', name: 'المصروفات', type: 'expense' },
       { code: '6100', name: 'الرواتب والأجور', type: 'expense', parent: '6000' },
     ];
@@ -328,27 +333,38 @@ class JournalService {
     const mapping = this.getBusinessMapping(businessType);
     const lines: Omit<JournalEntryLine, 'id' | 'entry_id'>[] = [];
 
+    // Determine target revenue account based on business type mapping
+    let targetRevenueAccount = mapping.salesRevenue;
+    if (businessType === 'services') targetRevenueAccount = mapping.serviceRevenue;
+    if (businessType === 'shipping') targetRevenueAccount = mapping.shippingRevenue || '4400';
+    if (businessType === 'distribution') targetRevenueAccount = mapping.salesRevenue || '4100';
+    if (businessType === 'hospital') targetRevenueAccount = mapping.serviceRevenue || '4600';
+    if (businessType === 'real_estate') targetRevenueAccount = mapping.realEstateRevenue || '4800';
+    if (businessType === 'contracting') targetRevenueAccount = mapping.contractingRevenue || '4900';
+    if (businessType === 'finishing') targetRevenueAccount = mapping.finishingRevenue || '4210';
+    if (businessType === 'education') targetRevenueAccount = mapping.educationRevenue || '4230';
+
     // Get account IDs with self-healing
     let cashAcc = await this.getAccountByCode(restaurantId, mapping.cashAccount);
-    let salesAcc = await this.getAccountByCode(restaurantId, mapping.salesRevenue);
+    let salesAcc = await this.getAccountByCode(restaurantId, targetRevenueAccount);
 
     if (!cashAcc || !salesAcc) {
-      console.warn('Essential accounts missing, attempting self-healing...', { mapping });
+      console.warn('Essential accounts missing, attempting self-healing...', { mapping, targetRevenueAccount });
       await this.ensureAccountingSetup(restaurantId);
       
       // Retry fetching
       this.clearCache();
       cashAcc = await this.getAccountByCode(restaurantId, mapping.cashAccount);
-      salesAcc = await this.getAccountByCode(restaurantId, mapping.salesRevenue);
+      salesAcc = await this.getAccountByCode(restaurantId, targetRevenueAccount);
     }
 
     if (!cashAcc || !salesAcc) {
       const missing = [];
       if (!cashAcc) missing.push(`النقدية (${mapping.cashAccount})`);
-      if (!salesAcc) missing.push(`إيرادات المبيعات (${mapping.salesRevenue})`);
+      if (!salesAcc) missing.push(`إيرادات (${targetRevenueAccount})`);
       
       console.error('Accounting accounts STILL missing after healing:', { cashAcc, salesAcc, mapping });
-      toast.error(`الحسابات التالية غير موجودة: ${missing.join('، ')}. يرجى التأكد من وجود هذه الأكواد في شجرة الحسابات.`);
+      toast.error(`الحسابات التالية غير موجودة: ${missing.join('، ')}. يرجى التأكد من توليد الدليل المحاسبي.`);
       return null;
     }
 
@@ -376,17 +392,17 @@ class JournalService {
         account_id: arAcc.id,
         debit: remaining,
         credit: 0,
-        description: `ذمم دائنة - فاتورة ${order.order_number}`,
+        description: `ذمم مدينة - فاتورة ${order.order_number}`,
         line_order: 2,
       });
     }
 
-    // 3. Credit: Sales Revenue
+    // 3. Credit: Revenue Account
     lines.push({
       account_id: salesAcc.id,
       debit: 0,
       credit: totalWithDiscount - taxAmount,
-      description: `إيرادات مبيعات - ${order.order_number}`,
+      description: `إيرادات ${businessType} - ${order.order_number}`,
       line_order: 3,
     });
 
