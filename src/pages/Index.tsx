@@ -2,7 +2,7 @@ import { motion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import {
   Wifi, WifiOff, QrCode, LayoutGrid, Shield, Zap, ArrowRight, Truck,
-  Check, Star, CreditCard, Smartphone, Globe, BarChart3, Users, Clock, Receipt,
+  Check, X, Star, CreditCard, Smartphone, Globe, BarChart3, Users, Clock, Receipt,
   Package, ShoppingCart, Warehouse, Pill, Store, Coffee
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
