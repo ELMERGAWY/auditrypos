@@ -10,6 +10,7 @@ interface AuthContextType {
   signUp: (email: string, password: string, fullName: string) => Promise<{ error: Error | null }>;
   signIn: (email: string, password: string) => Promise<{ error: Error | null }>;
   signOut: () => Promise<void>;
+  lastKnownUser: User | null;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -19,11 +20,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
   const [isSuperAdmin, setIsSuperAdmin] = useState(false);
+  const [lastKnownUser, setLastKnownUser] = useState<User | null>(() => {
+    const saved = localStorage.getItem('last_known_user');
+    return saved ? JSON.parse(saved) : null;
+  });
 
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       console.log(`Auth Event: ${event}`);
-      
       if (event === 'SIGNED_OUT') {
         setSession(null);
         setUser(null);
@@ -32,6 +36,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       } else if (session) {
         setSession(session);
         setUser(session.user);
+        setLastKnownUser(session.user);
+        localStorage.setItem('last_known_user', JSON.stringify(session.user));
         
         // Only check admin if we have a user and something changed
         setTimeout(async () => {
@@ -61,6 +67,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (session) {
         setSession(session);
         setUser(session.user);
+        setLastKnownUser(session.user);
+        localStorage.setItem('last_known_user', JSON.stringify(session.user));
       }
       setLoading(false);
     });
@@ -89,6 +97,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     await supabase.auth.signOut();
     setUser(null);
     setSession(null);
+    setLastKnownUser(null);
+    localStorage.removeItem('last_known_user');
   };
 
   const value = useMemo(() => ({
@@ -98,8 +108,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     isSuperAdmin,
     signUp,
     signIn,
-    signOut
-  }), [user, session, loading, isSuperAdmin]);
+    signOut,
+    lastKnownUser
+  }), [user, session, loading, isSuperAdmin, lastKnownUser]);
 
   return (
     <AuthContext.Provider value={value}>

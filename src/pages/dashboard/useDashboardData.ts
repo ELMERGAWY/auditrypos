@@ -25,7 +25,8 @@ const CACHE_KEY_PREFIX = 'dashboard_';
 export function useDashboardData() {
   useDarkMode();
   const navigate = useNavigate();
-  const { user, signOut, loading: authLoading } = useAuth();
+  const { user: supabaseUser, lastKnownUser, signOut, loading: authLoading } = useAuth();
+  const user = supabaseUser || lastKnownUser;
   const isOnline = useOnlineStatus();
   const playOrderSound = useOrderNotificationSound();
   const playWaiterSound = useWaiterCallSound();
@@ -191,13 +192,19 @@ export function useDashboardData() {
 
   useEffect(() => {
     if (!authLoading && !user) { 
-      // Add a small grace period for auth to recover (e.g. during a token refresh or transient network glitch)
+      // If we are offline, NEVER redirect to login. Stay in dashboard with cached data.
+      if (!isOnline) {
+        console.log("Offline mode: No active session but staying in dashboard due to offline-first policy.");
+        return;
+      }
+
+      // If online, add a small grace period for auth to recover (e.g. during a token refresh)
       const timer = setTimeout(() => {
-        if (!user && !authLoading) {
-          console.log("Auth session missing after grace period, redirecting...");
+        if (!user && !authLoading && isOnline) {
+          console.log("Auth session missing while online, redirecting...");
           navigate('/login');
         }
-      }, 1500); 
+      }, 2000); 
       return () => clearTimeout(timer);
     }
     
@@ -205,10 +212,12 @@ export function useDashboardData() {
       // Load cached data first for instant display
       loadCachedData(user.id).then(() => {
         // Then load fresh data from server
-        loadData();
+        if (isOnline) {
+          loadData();
+        }
       });
     }
-  }, [user, authLoading, loadData, loadCachedData, navigate]);
+  }, [user, authLoading, loadData, loadCachedData, navigate, isOnline]);
 
   // Realtime: waiter calls + agent locations + new orders + notifications
   useEffect(() => {
