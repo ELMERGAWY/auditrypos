@@ -216,16 +216,36 @@ export class FinancialReportingEngine {
       is_balanced: true
     };
 
-    for (const acc of accounts || []) {
-      // Calculate movements from journal entries in this period
-      const { data: movements } = await supabase
-        .from('journal_entry_lines')
-        .select('debit, credit')
-        .eq('account_id', acc.id)
-        .in('journal_entries.is_posted', [true]);
+    // 1. Get all movements for ALL accounts in this restaurant in ONE query
+    const { data: allMovements, error: mvError } = await supabase
+      .from('journal_entry_lines')
+      .select(`
+        account_id,
+        debit,
+        credit,
+        journal_entries!inner(entry_date, is_posted, restaurant_id)
+      `)
+      .eq('journal_entries.restaurant_id', this.restaurantId)
+      .eq('journal_entries.is_posted', true)
+      .lte('journal_entries.entry_date', date);
 
-      const debitMovement = movements?.reduce((sum, m) => sum + (m.debit || 0), 0) || 0;
-      const creditMovement = movements?.reduce((sum, m) => sum + (m.credit || 0), 0) || 0;
+    if (mvError) throw mvError;
+
+    // 2. Aggregate movements by account_id in memory
+    const movementMap = new Map<string, { debit: number; credit: number }>();
+    allMovements?.forEach(mv => {
+      const existing = movementMap.get(mv.account_id) || { debit: 0, credit: 0 };
+      movementMap.set(mv.account_id, {
+        debit: existing.debit + (mv.debit || 0),
+        credit: existing.credit + (mv.credit || 0)
+      });
+    });
+
+    // 3. Build report
+    for (const acc of accounts || []) {
+      const movements = movementMap.get(acc.id) || { debit: 0, credit: 0 };
+      const debitMovement = movements.debit;
+      const creditMovement = movements.credit;
 
       // Determine normal balance
       const isDebitNormal = ['asset', 'expense'].includes(acc.account_type);
