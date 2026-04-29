@@ -57,6 +57,9 @@ class CheckoutIntegration {
         await journalService.ensureAccountingSetup(context.restaurantId, context.currency);
       }
 
+      const isDelivery = orderData.orderType === 'delivery';
+      const inventoryItems = orderData.cart.filter(item => (item as any).product_id || item.menu_item_id);
+
       // 1, 6, 8. Run independent calculations in parallel for speed
       const [taxCalculation, cogsResult, customerId] = await Promise.all([
         taxService.calculateOrderTaxes(
@@ -68,13 +71,13 @@ class CheckoutIntegration {
             quantity: item.quantity,
           })),
           {
-            isDelivery: orderData.orderType === 'delivery',
-            deliveryFee: orderData.orderType === 'delivery' ? await this.getDeliveryFee(context.restaurantId) : 0,
+            isDelivery,
+            deliveryFee: isDelivery ? await this.getDeliveryFee(context.restaurantId) : 0,
             discount: orderData.discount || 0,
           }
         ),
         inventoryCosting.calculateOrderCOGS(
-          orderData.cart.filter(item => (item as any).product_id || item.menu_item_id),
+          inventoryItems,
           context.restaurantId
         ),
         orderData.customerName?.trim() ? this.findOrCreateCustomer(
@@ -84,7 +87,7 @@ class CheckoutIntegration {
         ) : Promise.resolve(null)
       ]);
 
-      const deliveryFee = orderData.orderType === 'delivery' ? await this.getDeliveryFee(context.restaurantId) : 0;
+      const deliveryFee = isDelivery ? await this.getDeliveryFee(context.restaurantId) : 0;
       const cogs = cogsResult.totalCOGS;
 
       // 2. Calculate subtotal
