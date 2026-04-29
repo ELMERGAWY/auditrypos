@@ -112,108 +112,79 @@ class JournalService {
   async ensureAccountingSetup(restaurantId: string, currency: string = 'ج.م'): Promise<boolean> {
     if (this.verifiedRestaurants.has(restaurantId)) return true;
 
-    // Check existing accounts
-    const { data: existingAccounts, error: fetchError } = await supabase
-      .from('chart_of_accounts')
-      .select('code')
-      .eq('restaurant_id', restaurantId);
-    
-    if (fetchError) return false;
-    
-    const existingCodes = new Set(existingAccounts?.map(a => a.code) || []);
-    
-    // Seed basic accounts if missing
-    const standardAccounts = [
-      { code: '1000', name: 'الأصول', type: 'asset' },
-      { code: '1100', name: 'الصندوق / النقدية', type: 'asset', is_cash: true, parent: '1000' },
-      { code: '1200', name: 'العملاء / الذمم المدينة', type: 'asset', parent: '1000' },
-      { code: '1300', name: 'المخزون', type: 'asset', parent: '1000' },
-      { code: '1400', name: 'البنوك', type: 'asset', parent: '1000' },
-      { code: '2000', name: 'الخصوم', type: 'liability' },
-      { code: '2100', name: 'الموردون / الذمم الدائنة', type: 'liability', parent: '2000' },
-      { code: '2150', name: 'الضرائب المستحقة (VAT)', type: 'liability', parent: '2000' },
-      { code: '3000', name: 'حقوق الملكية', type: 'equity' },
-      { code: '3100', name: 'رأس المال', type: 'equity' },
-      { code: '4000', name: 'الإيرادات', type: 'revenue' },
-      { code: '4100', name: 'إيرادات المبيعات', type: 'revenue', parent: '4000' },
-      { code: '4120', name: 'خصم مبيعات', type: 'revenue', parent: '4000' },
-      { code: '4200', name: 'إيرادات الخدمات', type: 'revenue', parent: '4000' },
-      { code: '4300', name: 'إيرادات التوصيل', type: 'revenue', parent: '4000' },
-      { code: '4400', name: 'إيرادات الشحن', type: 'revenue', parent: '4000' },
-      { code: '4500', name: 'إيرادات التوزيع', type: 'revenue', parent: '4000' },
-      { code: '4600', name: 'إيرادات الخدمات الطبية', type: 'revenue', parent: '4000' },
-      { code: '4700', name: 'إيرادات الإنتاج الصناعي', type: 'revenue', parent: '4000' },
-      { code: '4800', name: 'إيرادات عقارية وتأجير', type: 'revenue', parent: '4000' },
-      { code: '4900', name: 'إيرادات مقاولات وإنشاءات', type: 'revenue', parent: '4000' },
-      { code: '4210', name: 'إيرادات تشطيبات وديكور', type: 'revenue', parent: '4200' },
-      { code: '4220', name: 'إيرادات تأجير معدات', type: 'revenue', parent: '4200' },
-      { code: '4230', name: 'إيرادات خدمات تعليمية', type: 'revenue', parent: '4200' },
-      { code: '4240', name: 'إيرادات استشارات قانونية', type: 'revenue', parent: '4200' },
-      { code: '4250', name: 'إيرادات تسويق ودعاية', type: 'revenue', parent: '4200' },
-      { code: '4260', name: 'إيرادات خدمات صيانة سيارات', type: 'revenue', parent: '4200' },
-      { code: '5000', name: 'تكلفة المبيعات (COGS)', type: 'expense' },
-      { code: '5100', name: 'تكلفة البضاعة المباعة', type: 'expense', parent: '5000' },
-      { code: '5150', name: 'تكلفة الخدمات المقدمة', type: 'expense', parent: '5000' },
-      { code: '5300', name: 'تكلفة الإنتاج والتشغيل', type: 'expense', parent: '5000' },
-      { code: '6000', name: 'المصروفات', type: 'expense' },
-      { code: '6100', name: 'الرواتب والأجور', type: 'expense', parent: '6000' },
-    ];
-
-    const missingAccounts = standardAccounts.filter(acc => !existingCodes.has(acc.code));
-    
-    if (missingAccounts.length === 0) {
-      this.verifiedRestaurants.add(restaurantId);
-      return true;
-    }
-
-    console.log(`Seeding ${missingAccounts.length} missing system accounts for restaurant:`, restaurantId);
-    
     try {
-      // 1. Prepare parents
-      const missingParents = missingAccounts.filter(a => !a.parent);
-      if (missingParents.length > 0) {
-        const parentPayloads = missingParents.map(acc => ({
-          restaurant_id: restaurantId,
-          code: acc.code,
-          name: acc.name,
-          account_type: acc.type === 'cogs' ? 'expense' : acc.type,
-          is_active: true,
-          currency
-        }));
-        
-        const { error: pError } = await supabase.from('chart_of_accounts').insert(parentPayloads);
-        if (pError) throw pError;
-      }
+      // Step 1: Seed all top-level (root) accounts first using upsert
+      const rootAccounts = [
+        { code: '1000', name: 'الأصول',               account_type: 'asset' },
+        { code: '2000', name: 'الخصوم',               account_type: 'liability' },
+        { code: '3000', name: 'حقوق الملكية',          account_type: 'equity' },
+        { code: '4000', name: 'الإيرادات',             account_type: 'revenue' },
+        { code: '5000', name: 'تكلفة المبيعات (COGS)', account_type: 'expense' },
+        { code: '6000', name: 'المصروفات',             account_type: 'expense' },
+      ].map(a => ({ ...a, restaurant_id: restaurantId, is_active: true, currency }));
 
-      // 2. Fetch all current accounts (to get IDs for parents)
-      const { data: allAccounts } = await supabase
+      const { error: rootErr } = await supabase
+        .from('chart_of_accounts')
+        .upsert(rootAccounts, { onConflict: 'restaurant_id,code', ignoreDuplicates: true });
+      if (rootErr) throw rootErr;
+
+      // Step 2: Fetch all current accounts to resolve parent IDs
+      const { data: allAccounts, error: fetchErr } = await supabase
         .from('chart_of_accounts')
         .select('id, code')
         .eq('restaurant_id', restaurantId);
+      if (fetchErr) throw fetchErr;
 
-      // 3. Prepare and insert children
-      const missingChildren = missingAccounts.filter(a => a.parent);
-      if (missingChildren.length > 0) {
-        const childPayloads = missingChildren.map(acc => {
-          const parentId = allAccounts?.find(p => p.code === acc.parent)?.id;
-          return {
-            restaurant_id: restaurantId,
-            code: acc.code,
-            name: acc.name,
-            account_type: acc.type === 'cogs' ? 'expense' : acc.type,
-            parent_id: parentId,
-            is_cash_account: (acc as any).is_cash || false,
-            is_active: true,
-            currency
-          };
-        });
-        
-        const { error: cError } = await supabase.from('chart_of_accounts').insert(childPayloads);
-        if (cError) throw cError;
-      }
-      
+      const codeToId = new Map<string, string>();
+      allAccounts?.forEach(a => codeToId.set(a.code, a.id));
+
+      // Step 3: Seed child accounts using upsert
+      const childAccounts = [
+        { code: '1100', name: 'الصندوق / النقدية',           account_type: 'asset',     parent: '1000', is_cash_account: true },
+        { code: '1200', name: 'العملاء / الذمم المدينة',     account_type: 'asset',     parent: '1000' },
+        { code: '1300', name: 'المخزون',                     account_type: 'asset',     parent: '1000' },
+        { code: '1400', name: 'البنوك',                      account_type: 'asset',     parent: '1000', is_bank_account: true },
+        { code: '2100', name: 'الموردون / الذمم الدائنة',    account_type: 'liability', parent: '2000' },
+        { code: '2150', name: 'الضرائب المستحقة (VAT)',      account_type: 'liability', parent: '2000' },
+        { code: '3100', name: 'رأس المال',                   account_type: 'equity',    parent: '3000' },
+        { code: '3200', name: 'الأرباح المحتجزة',            account_type: 'equity',    parent: '3000' },
+        { code: '4100', name: 'إيرادات المبيعات',            account_type: 'revenue',   parent: '4000' },
+        { code: '4120', name: 'خصم مبيعات',                  account_type: 'revenue',   parent: '4000' },
+        { code: '4200', name: 'إيرادات الخدمات',             account_type: 'revenue',   parent: '4000' },
+        { code: '4300', name: 'إيرادات التوصيل',             account_type: 'revenue',   parent: '4000' },
+        { code: '4400', name: 'إيرادات الشحن',               account_type: 'revenue',   parent: '4000' },
+        { code: '4500', name: 'إيرادات التوزيع',             account_type: 'revenue',   parent: '4000' },
+        { code: '4600', name: 'إيرادات الخدمات الطبية',      account_type: 'revenue',   parent: '4000' },
+        { code: '4700', name: 'إيرادات الإنتاج الصناعي',     account_type: 'revenue',   parent: '4000' },
+        { code: '4800', name: 'إيرادات عقارية وتأجير',       account_type: 'revenue',   parent: '4000' },
+        { code: '4900', name: 'إيرادات مقاولات وإنشاءات',    account_type: 'revenue',   parent: '4000' },
+        { code: '5100', name: 'تكلفة البضاعة المباعة',       account_type: 'expense',   parent: '5000' },
+        { code: '5150', name: 'تكلفة الخدمات المقدمة',       account_type: 'expense',   parent: '5000' },
+        { code: '5300', name: 'تكلفة الإنتاج والتشغيل',      account_type: 'expense',   parent: '5000' },
+        { code: '6100', name: 'الرواتب والأجور',             account_type: 'expense',   parent: '6000' },
+        { code: '6200', name: 'الإيجار',                     account_type: 'expense',   parent: '6000' },
+        { code: '6300', name: 'المرافق',                     account_type: 'expense',   parent: '6000' },
+        { code: '6400', name: 'الإهلاك',                     account_type: 'expense',   parent: '6000' },
+      ].map(a => ({
+        restaurant_id: restaurantId,
+        code: a.code,
+        name: a.name,
+        account_type: a.account_type,
+        parent_id: codeToId.get(a.parent) || null,
+        is_cash_account: (a as any).is_cash_account || false,
+        is_bank_account: (a as any).is_bank_account || false,
+        is_active: true,
+        currency,
+      }));
+
+      const { error: childErr } = await supabase
+        .from('chart_of_accounts')
+        .upsert(childAccounts, { onConflict: 'restaurant_id,code', ignoreDuplicates: true });
+      if (childErr) throw childErr;
+
       this.verifiedRestaurants.add(restaurantId);
       this.clearCache();
+      console.log('✅ Accounting chart seeded successfully for:', restaurantId);
       return true;
     } catch (e: any) {
       console.error('CRITICAL: Accounting setup failed:', e);
