@@ -42,7 +42,7 @@ const THERMAL_STYLES = `
   .footer { font-size: 10px; color: #000; margin-top: 8px; font-weight: 700; }
   .items-section { margin: 8px 0; width: 100%; }
   .item-row { display: flex; justify-content: space-between; padding: 5px 0; border-bottom: 1px dashed #000; font-size: 12px; font-weight: 700; }
-  .item-name { flex: 1; text-align: right; padding-left: 3px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+  .item-name { flex: 1; text-align: right; padding-left: 3px; overflow: hidden; line-height: 1.1; }
   .item-qty { width: 30px; text-align: center; font-weight: 900; }
   .item-price { width: 45px; text-align: left; }
   .item-total { width: 55px; text-align: left; font-weight: 900; }

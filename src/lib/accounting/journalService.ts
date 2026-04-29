@@ -107,7 +107,11 @@ class JournalService {
     return data || [];
   }
 
+  private verifiedRestaurants = new Set<string>();
+
   async ensureAccountingSetup(restaurantId: string, currency: string = 'ج.م'): Promise<boolean> {
+    if (this.verifiedRestaurants.has(restaurantId)) return true;
+
     // Check existing accounts
     const { data: existingAccounts, error: fetchError } = await supabase
       .from('chart_of_accounts')
@@ -205,6 +209,7 @@ class JournalService {
         if (cError) throw cError;
       }
       
+      this.verifiedRestaurants.add(restaurantId);
       this.clearCache();
       return true;
     } catch (e) {
