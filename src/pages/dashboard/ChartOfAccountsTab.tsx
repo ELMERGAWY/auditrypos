@@ -68,14 +68,11 @@ export function ChartOfAccountsTab({ restaurantId, currency }: Props) {
         restaurant_id: restaurantId,
         code: formData.code,
         name: formData.name,
-        account_type: formData.account_type,
-        subtype: formData.subtype || null,
+        account_type: formData.account_type === 'cogs' ? 'expense' : formData.account_type,
         parent_id: formData.parent_id || null,
         is_bank_account: formData.is_bank_account || false,
         is_cash_account: formData.is_cash_account || false,
-        is_active: formData.is_active !== false,
         opening_balance: formData.opening_balance || 0,
-        currency: currency
       };
 
       if (formData.id) {
@@ -132,16 +129,14 @@ export function ChartOfAccountsTab({ restaurantId, currency }: Props) {
         { code: '6500', name: 'مصروفات بنكية', account_type: 'expense', subtype: 'admin_expense', is_active: true, parent_code: '6000' },
       ];
 
-      // First insert parent nodes
+      // First insert parent nodes using upsert
       for (const acc of standardAccounts.filter(a => !a.parent_code)) {
-        await supabase.from('chart_of_accounts').insert({
+        await supabase.from('chart_of_accounts').upsert({
           restaurant_id: restaurantId,
           code: acc.code,
           name: acc.name,
-          account_type: acc.account_type,
-          is_active: true,
-          currency
-        });
+          account_type: acc.account_type === 'cogs' ? 'expense' : acc.account_type,
+        }, { onConflict: 'restaurant_id,code', ignoreDuplicates: true });
       }
 
       // Fetch inserted parents to get their IDs
@@ -150,18 +145,15 @@ export function ChartOfAccountsTab({ restaurantId, currency }: Props) {
       // Insert child nodes with their parent IDs
       for (const acc of standardAccounts.filter(a => a.parent_code)) {
         const parentId = parents?.find(p => p.code === acc.parent_code)?.id;
-        await supabase.from('chart_of_accounts').insert({
+        await supabase.from('chart_of_accounts').upsert({
           restaurant_id: restaurantId,
           code: acc.code,
           name: acc.name,
-          account_type: acc.account_type,
-          subtype: acc.subtype,
+          account_type: acc.account_type === 'cogs' ? 'expense' : acc.account_type,
           parent_id: parentId,
           is_bank_account: acc.is_bank_account || false,
           is_cash_account: acc.is_cash_account || false,
-          is_active: true,
-          currency
-        });
+        }, { onConflict: 'restaurant_id,code', ignoreDuplicates: true });
       }
 
       toast.success(`تم إنشاء الدليل المحاسبي بنجاح بناءً على ${standard.toUpperCase()}`);

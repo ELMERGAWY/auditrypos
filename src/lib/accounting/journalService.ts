@@ -53,7 +53,6 @@ class JournalService {
       .select('*')
       .eq('restaurant_id', restaurantId)
       .eq('code', code)
-      .eq('is_active', true)
       .single();
 
     if (error || !data) {
@@ -75,7 +74,6 @@ class JournalService {
       .from('chart_of_accounts')
       .select('*')
       .eq('restaurant_id', restaurantId)
-      .eq('is_active', true)
       .order('code');
 
     if (error) {
@@ -96,8 +94,7 @@ class JournalService {
       .from('chart_of_accounts')
       .select('*')
       .eq('restaurant_id', restaurantId)
-      .eq('account_type', type)
-      .eq('is_active', true);
+      .eq('account_type', type);
 
     if (error) {
       console.error(`Failed to load ${type} accounts:`, error);
@@ -113,7 +110,7 @@ class JournalService {
     if (this.verifiedRestaurants.has(restaurantId)) return true;
 
     try {
-      // Step 1: Seed all top-level (root) accounts first using upsert
+      // Step 1: Seed root accounts (no parent) using upsert
       const rootAccounts = [
         { code: '1000', name: 'الأصول',               account_type: 'asset' },
         { code: '2000', name: 'الخصوم',               account_type: 'liability' },
@@ -121,7 +118,7 @@ class JournalService {
         { code: '4000', name: 'الإيرادات',             account_type: 'revenue' },
         { code: '5000', name: 'تكلفة المبيعات (COGS)', account_type: 'expense' },
         { code: '6000', name: 'المصروفات',             account_type: 'expense' },
-      ].map(a => ({ ...a, restaurant_id: restaurantId, is_active: true }));
+      ].map(a => ({ restaurant_id: restaurantId, code: a.code, name: a.name, account_type: a.account_type }));
 
       const { error: rootErr } = await supabase
         .from('chart_of_accounts')
@@ -140,40 +137,39 @@ class JournalService {
 
       // Step 3: Seed child accounts using upsert
       const childAccounts = [
-        { code: '1100', name: 'الصندوق / النقدية',           account_type: 'asset',     parent: '1000', is_cash_account: true },
-        { code: '1200', name: 'العملاء / الذمم المدينة',     account_type: 'asset',     parent: '1000' },
-        { code: '1300', name: 'المخزون',                     account_type: 'asset',     parent: '1000' },
-        { code: '1400', name: 'البنوك',                      account_type: 'asset',     parent: '1000', is_bank_account: true },
-        { code: '2100', name: 'الموردون / الذمم الدائنة',    account_type: 'liability', parent: '2000' },
-        { code: '2150', name: 'الضرائب المستحقة (VAT)',      account_type: 'liability', parent: '2000' },
-        { code: '3100', name: 'رأس المال',                   account_type: 'equity',    parent: '3000' },
-        { code: '3200', name: 'الأرباح المحتجزة',            account_type: 'equity',    parent: '3000' },
-        { code: '4100', name: 'إيرادات المبيعات',            account_type: 'revenue',   parent: '4000' },
-        { code: '4120', name: 'خصم مبيعات',                  account_type: 'revenue',   parent: '4000' },
-        { code: '4200', name: 'إيرادات الخدمات',             account_type: 'revenue',   parent: '4000' },
-        { code: '4300', name: 'إيرادات التوصيل',             account_type: 'revenue',   parent: '4000' },
-        { code: '4400', name: 'إيرادات الشحن',               account_type: 'revenue',   parent: '4000' },
-        { code: '4500', name: 'إيرادات التوزيع',             account_type: 'revenue',   parent: '4000' },
-        { code: '4600', name: 'إيرادات الخدمات الطبية',      account_type: 'revenue',   parent: '4000' },
-        { code: '4700', name: 'إيرادات الإنتاج الصناعي',     account_type: 'revenue',   parent: '4000' },
-        { code: '4800', name: 'إيرادات عقارية وتأجير',       account_type: 'revenue',   parent: '4000' },
-        { code: '4900', name: 'إيرادات مقاولات وإنشاءات',    account_type: 'revenue',   parent: '4000' },
-        { code: '5100', name: 'تكلفة البضاعة المباعة',       account_type: 'expense',   parent: '5000' },
-        { code: '5150', name: 'تكلفة الخدمات المقدمة',       account_type: 'expense',   parent: '5000' },
-        { code: '5300', name: 'تكلفة الإنتاج والتشغيل',      account_type: 'expense',   parent: '5000' },
-        { code: '6100', name: 'الرواتب والأجور',             account_type: 'expense',   parent: '6000' },
-        { code: '6200', name: 'الإيجار',                     account_type: 'expense',   parent: '6000' },
-        { code: '6300', name: 'المرافق',                     account_type: 'expense',   parent: '6000' },
-        { code: '6400', name: 'الإهلاك',                     account_type: 'expense',   parent: '6000' },
+        { code: '1100', name: 'الصندوق / النقدية',           account_type: 'asset',     parent: '1000', is_cash_account: true,  is_bank_account: false },
+        { code: '1200', name: 'العملاء / الذمم المدينة',     account_type: 'asset',     parent: '1000', is_cash_account: false, is_bank_account: false },
+        { code: '1300', name: 'المخزون',                     account_type: 'asset',     parent: '1000', is_cash_account: false, is_bank_account: false },
+        { code: '1400', name: 'البنوك',                      account_type: 'asset',     parent: '1000', is_cash_account: false, is_bank_account: true  },
+        { code: '2100', name: 'الموردون / الذمم الدائنة',    account_type: 'liability', parent: '2000', is_cash_account: false, is_bank_account: false },
+        { code: '2150', name: 'الضرائب المستحقة (VAT)',      account_type: 'liability', parent: '2000', is_cash_account: false, is_bank_account: false },
+        { code: '3100', name: 'رأس المال',                   account_type: 'equity',    parent: '3000', is_cash_account: false, is_bank_account: false },
+        { code: '3200', name: 'الأرباح المحتجزة',            account_type: 'equity',    parent: '3000', is_cash_account: false, is_bank_account: false },
+        { code: '4100', name: 'إيرادات المبيعات',            account_type: 'revenue',   parent: '4000', is_cash_account: false, is_bank_account: false },
+        { code: '4120', name: 'خصم مبيعات',                  account_type: 'revenue',   parent: '4000', is_cash_account: false, is_bank_account: false },
+        { code: '4200', name: 'إيرادات الخدمات',             account_type: 'revenue',   parent: '4000', is_cash_account: false, is_bank_account: false },
+        { code: '4300', name: 'إيرادات التوصيل',             account_type: 'revenue',   parent: '4000', is_cash_account: false, is_bank_account: false },
+        { code: '4400', name: 'إيرادات الشحن',               account_type: 'revenue',   parent: '4000', is_cash_account: false, is_bank_account: false },
+        { code: '4500', name: 'إيرادات التوزيع',             account_type: 'revenue',   parent: '4000', is_cash_account: false, is_bank_account: false },
+        { code: '4600', name: 'إيرادات الخدمات الطبية',      account_type: 'revenue',   parent: '4000', is_cash_account: false, is_bank_account: false },
+        { code: '4700', name: 'إيرادات الإنتاج الصناعي',     account_type: 'revenue',   parent: '4000', is_cash_account: false, is_bank_account: false },
+        { code: '4800', name: 'إيرادات عقارية وتأجير',       account_type: 'revenue',   parent: '4000', is_cash_account: false, is_bank_account: false },
+        { code: '4900', name: 'إيرادات مقاولات وإنشاءات',    account_type: 'revenue',   parent: '4000', is_cash_account: false, is_bank_account: false },
+        { code: '5100', name: 'تكلفة البضاعة المباعة',       account_type: 'expense',   parent: '5000', is_cash_account: false, is_bank_account: false },
+        { code: '5150', name: 'تكلفة الخدمات المقدمة',       account_type: 'expense',   parent: '5000', is_cash_account: false, is_bank_account: false },
+        { code: '5300', name: 'تكلفة الإنتاج والتشغيل',      account_type: 'expense',   parent: '5000', is_cash_account: false, is_bank_account: false },
+        { code: '6100', name: 'الرواتب والأجور',             account_type: 'expense',   parent: '6000', is_cash_account: false, is_bank_account: false },
+        { code: '6200', name: 'الإيجار',                     account_type: 'expense',   parent: '6000', is_cash_account: false, is_bank_account: false },
+        { code: '6300', name: 'المرافق',                     account_type: 'expense',   parent: '6000', is_cash_account: false, is_bank_account: false },
+        { code: '6400', name: 'الإهلاك',                     account_type: 'expense',   parent: '6000', is_cash_account: false, is_bank_account: false },
       ].map(a => ({
         restaurant_id: restaurantId,
         code: a.code,
         name: a.name,
         account_type: a.account_type,
         parent_id: codeToId.get(a.parent) || null,
-        is_cash_account: (a as any).is_cash_account || false,
-        is_bank_account: (a as any).is_bank_account || false,
-        is_active: true,
+        is_cash_account: a.is_cash_account,
+        is_bank_account: a.is_bank_account,
       }));
 
       const { error: childErr } = await supabase
