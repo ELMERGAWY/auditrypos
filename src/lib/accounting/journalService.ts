@@ -238,7 +238,6 @@ class JournalService {
           total_debit: totalDebit,
           total_credit: totalCredit,
           is_posted: entry.is_posted ?? false,
-          is_recurring: entry.is_recurring ?? false,
           created_by: entry.created_by,
         })
         .select()
@@ -255,7 +254,6 @@ class JournalService {
         debit: line.debit || 0,
         credit: line.credit || 0,
         description: line.description,
-        cost_center_id: line.cost_center_id,
         line_order: index,
       }));
 

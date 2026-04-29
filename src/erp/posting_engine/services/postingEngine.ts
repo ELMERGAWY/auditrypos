@@ -430,9 +430,7 @@ export class PostingEngine {
     const { data: journalEntry, error: entryError } = await supabase
       .from('journal_entries')
       .insert({
-        id: entry.id,
-        restaurant_id: entry.restaurant_id,
-        fiscal_period_id: entry.fiscal_period_id,
+        restaurant_id: entry.restaurant_id || entry.company_id,
         entry_number: entry.entry_number,
         entry_date: entry.entry_date,
         source: entry.source,
@@ -441,8 +439,7 @@ export class PostingEngine {
         description: entry.description,
         total_debit: entry.total_debit,
         total_credit: entry.total_credit,
-        status: 'draft',
-        is_recurring: false,
+        is_posted: false,
         created_by: entry.created_by
       })
       .select()
@@ -458,14 +455,11 @@ export class PostingEngine {
         .from('journal_entry_lines')
         .insert(
           entry.lines.map(line => ({
-            id: line.id,
-            entry_id: entry.id,
+            entry_id: journalEntry!.id,
             account_id: line.account_id,
             debit: line.debit,
             credit: line.credit,
             description: line.description,
-            cost_center_id: line.cost_center_id,
-            project_id: line.project_id,
             line_order: line.line_order
           }))
         );
@@ -485,8 +479,7 @@ export class PostingEngine {
     await supabase
       .from('journal_entries')
       .update({
-        status: 'posted',
-        posted_by: this.userId,
+        is_posted: true,
         posted_at: new Date().toISOString()
       })
       .eq('id', entryId);
