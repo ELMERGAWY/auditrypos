@@ -121,7 +121,7 @@ class JournalService {
         { code: '4000', name: 'الإيرادات',             account_type: 'revenue' },
         { code: '5000', name: 'تكلفة المبيعات (COGS)', account_type: 'expense' },
         { code: '6000', name: 'المصروفات',             account_type: 'expense' },
-      ].map(a => ({ ...a, restaurant_id: restaurantId, is_active: true, currency }));
+      ].map(a => ({ ...a, restaurant_id: restaurantId, is_active: true }));
 
       const { error: rootErr } = await supabase
         .from('chart_of_accounts')
@@ -174,7 +174,6 @@ class JournalService {
         is_cash_account: (a as any).is_cash_account || false,
         is_bank_account: (a as any).is_bank_account || false,
         is_active: true,
-        currency,
       }));
 
       const { error: childErr } = await supabase
