@@ -161,7 +161,10 @@ class JournalService {
 
     const missingAccounts = standardAccounts.filter(acc => !existingCodes.has(acc.code));
     
-    if (missingAccounts.length === 0) return true;
+    if (missingAccounts.length === 0) {
+      this.verifiedRestaurants.add(restaurantId);
+      return true;
+    }
 
     console.log(`Seeding ${missingAccounts.length} missing system accounts for restaurant:`, restaurantId);
     
@@ -212,8 +215,9 @@ class JournalService {
       this.verifiedRestaurants.add(restaurantId);
       this.clearCache();
       return true;
-    } catch (e) {
-      console.error('Failed to seed missing accounts:', e);
+    } catch (e: any) {
+      console.error('CRITICAL: Accounting setup failed:', e);
+      toast.error(`فشل تهيئة النظام المحاسبي: ${e.message || 'خطأ غير معروف'}`);
       return false;
     }
   }
@@ -376,7 +380,7 @@ class JournalService {
       if (!salesAcc) missing.push(`إيرادات (${targetRevenueAccount})`);
       
       console.error('Accounting accounts STILL missing after healing:', { cashAcc, salesAcc, mapping });
-      toast.error(`الحسابات التالية غير موجودة: ${missing.join('، ')}. يرجى التأكد من توليد الدليل المحاسبي.`);
+      toast.error(`الحسابات التالية غير موجودة: ${missing.join('، ')}. يرجى التوجه للإعدادات > المحاسبة > والضغط على "إصلاح وتوليد الحسابات".`);
       return null;
     }
 

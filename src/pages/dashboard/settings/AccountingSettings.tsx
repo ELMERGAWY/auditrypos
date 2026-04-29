@@ -161,9 +161,31 @@ export function AccountingSettings({ restaurant, loadData }: Props) {
         </div>
       </div>
 
-      <Button onClick={handleSave} disabled={loading} className="w-full h-12 gradient-bg text-primary-foreground text-lg border-0 shadow-lg shadow-primary/20">
-        {loading ? 'جاري حفظ التكوينات...' : 'تحديث إعدادات الموديول والمحاسبة'}
-      </Button>
+      <div className="flex flex-col gap-3">
+        <Button onClick={handleSave} disabled={loading} className="w-full h-12 gradient-bg text-primary-foreground text-lg border-0 shadow-lg shadow-primary/20">
+          {loading ? 'جاري حفظ التكوينات...' : 'تحديث إعدادات الموديول والمحاسبة'}
+        </Button>
+        
+        <Button 
+          variant="outline" 
+          onClick={async () => {
+            setLoading(true);
+            const { journalService } = await import('@/lib/accounting/journalService');
+            const success = await journalService.ensureAccountingSetup(restaurant.id, restaurant.currency || 'ج.م');
+            if (success) {
+              toast.success('تم فحص وإصلاح الدليل المحاسبي بنجاح');
+              loadData();
+            } else {
+              toast.error('حدث خطأ أثناء محاولة إصلاح الحسابات');
+            }
+            setLoading(false);
+          }} 
+          disabled={loading}
+          className="w-full h-11 border-dashed border-primary/40 text-primary hover:bg-primary/5"
+        >
+          إصلاح وتوليد الحسابات المحاسبية المفقودة 🛠️
+        </Button>
+      </div>
     </div>
   );
 }
