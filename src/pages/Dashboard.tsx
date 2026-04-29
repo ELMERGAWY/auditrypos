@@ -163,6 +163,22 @@ export default function Dashboard() {
     return i.available;
   });
 
+  // Unit conversion helpers - uses product's own secondary_unit & conversion_factor
+  const getUnitOptions = (item: MenuItem) => {
+    const product = (item as any);
+    const baseUnit = product.unit || 'قطعة';
+    const options = [{ label: baseUnit, factor: 1 }];
+    
+    // If product has a secondary unit defined, use it
+    if (product.secondary_unit && product.unit_conversion_factor && Number(product.unit_conversion_factor) > 1) {
+      options.push({
+        label: product.secondary_unit,
+        factor: Number(product.unit_conversion_factor),
+      });
+    }
+    return options;
+  };
+
   const cartSubtotal = cart.reduce((s, c) => {
     const units = getUnitOptions(c.item);
     const unitFactor = units.find(u => u.label === c.unitMode)?.factor || 1;
@@ -210,21 +226,6 @@ export default function Dashboard() {
   const topItems = [...itemSales.entries()].sort((a, b) => b[1] - a[1]).slice(0, 5);
   const filteredOrders = orderFilter === 'all' ? orders : orders.filter(o => o.status === orderFilter);
 
-  // Unit conversion helpers - uses product's own secondary_unit & conversion_factor
-  const getUnitOptions = (item: MenuItem) => {
-    const product = (item as any);
-    const baseUnit = product.unit || 'قطعة';
-    const options = [{ label: baseUnit, factor: 1 }];
-    
-    // If product has a secondary unit defined, use it
-    if (product.secondary_unit && product.unit_conversion_factor && Number(product.unit_conversion_factor) > 1) {
-      options.push({
-        label: product.secondary_unit,
-        factor: Number(product.unit_conversion_factor),
-      });
-    }
-    return options;
-  };
 
   // Cart actions
   const addToCart = (item: MenuItem) => {
