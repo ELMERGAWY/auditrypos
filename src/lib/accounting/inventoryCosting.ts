@@ -137,10 +137,10 @@ class InventoryCostingService {
     const actualConsumed = requestedQty - remainingToConsume;
     const avgUnitCost = actualConsumed > 0 ? totalCost / actualConsumed : 0;
 
-    // Update consumed layers in database
-    for (const consumed of consumedLayers) {
-      await this.consumeFromLayer(consumed.layerId, consumed.qty);
-    }
+    // Update consumed layers in database IN PARALLEL for speed
+    await Promise.all(consumedLayers.map(consumed => 
+      this.consumeFromLayer(consumed.layerId, consumed.qty)
+    ));
 
     return {
       totalCost,

@@ -162,17 +162,20 @@ class JournalService {
     console.log(`Seeding ${missingAccounts.length} missing system accounts for restaurant:`, restaurantId);
     
     try {
-      // 1. Insert parents that are missing
+      // 1. Prepare parents
       const missingParents = missingAccounts.filter(a => !a.parent);
-      for (const acc of missingParents) {
-        await supabase.from('chart_of_accounts').insert({
+      if (missingParents.length > 0) {
+        const parentPayloads = missingParents.map(acc => ({
           restaurant_id: restaurantId,
           code: acc.code,
           name: acc.name,
           account_type: acc.type === 'cogs' ? 'expense' : acc.type,
           is_active: true,
           currency
-        });
+        }));
+        
+        const { error: pError } = await supabase.from('chart_of_accounts').insert(parentPayloads);
+        if (pError) throw pError;
       }
 
       // 2. Fetch all current accounts (to get IDs for parents)
@@ -181,21 +184,25 @@ class JournalService {
         .select('id, code')
         .eq('restaurant_id', restaurantId);
 
-      // 3. Insert children that are missing
+      // 3. Prepare and insert children
       const missingChildren = missingAccounts.filter(a => a.parent);
-      for (const acc of missingChildren) {
-        const parentId = allAccounts?.find(p => p.code === acc.parent)?.id;
-        
-        await supabase.from('chart_of_accounts').insert({
-          restaurant_id: restaurantId,
-          code: acc.code,
-          name: acc.name,
-          account_type: acc.type === 'cogs' ? 'expense' : acc.type,
-          parent_id: parentId,
-          is_cash_account: (acc as any).is_cash || false,
-          is_active: true,
-          currency
+      if (missingChildren.length > 0) {
+        const childPayloads = missingChildren.map(acc => {
+          const parentId = allAccounts?.find(p => p.code === acc.parent)?.id;
+          return {
+            restaurant_id: restaurantId,
+            code: acc.code,
+            name: acc.name,
+            account_type: acc.type === 'cogs' ? 'expense' : acc.type,
+            parent_id: parentId,
+            is_cash_account: (acc as any).is_cash || false,
+            is_active: true,
+            currency
+          };
         });
+        
+        const { error: cError } = await supabase.from('chart_of_accounts').insert(childPayloads);
+        if (cError) throw cError;
       }
       
       this.clearCache();
@@ -287,10 +294,10 @@ class JournalService {
         throw new Error(`Failed to create journal lines: ${linesError.message}`);
       }
 
-      // Update account balances
-      for (const line of entry.lines) {
-        await this.updateAccountBalance(line.account_id, line.debit || 0, line.credit || 0);
-      }
+      // Update account balances IN PARALLEL
+      await Promise.all(entry.lines.map(line => 
+        this.updateAccountBalance(line.account_id, line.debit || 0, line.credit || 0)
+      ));
 
       toast.success(`تم إنشاء قيد يومية ${entryNumber}`);
       
