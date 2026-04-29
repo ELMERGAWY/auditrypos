@@ -448,7 +448,11 @@ export default function Dashboard() {
         // Update local state
         const newOrder = {
           ...result.order,
-          items: result.order.items || [],
+          items: cart.map(i => ({
+            menu_item_name: i.item.name,
+            quantity: i.qty,
+            price: i.item.price
+          })),
           paid_amount: paidNum,
           payment_method: paymentMethod,
         } as Order;

@@ -19,34 +19,42 @@ const PAYMENT_LABELS: Record<string, string> = {
 
 const THERMAL_STYLES = `
   * { margin: 0; padding: 0; box-sizing: border-box; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-  body { font-family: 'Arial', 'Tahoma', sans-serif; font-size: 13px; padding: 4px; max-width: 80mm; margin: 0 auto; color: #000; background: #fff; }
-  .receipt { padding: 4px 0; width: 100%; }
+  body { 
+    font-family: 'Segoe UI', 'Arial', 'Tahoma', sans-serif; 
+    font-size: 14px; 
+    line-height: 1.2;
+    padding: 0; 
+    max-width: 72mm; 
+    margin: 0 auto; 
+    color: #000; 
+    background: #fff; 
+  }
+  .receipt { padding: 5px; width: 100%; }
   .center { text-align: center; }
-  .bold { font-weight: bold; }
-  .logo-name { font-size: 18px; font-weight: bold; letter-spacing: 1px; margin-bottom: 2px; }
-  .subtitle { font-size: 11px; color: #000; margin-bottom: 2px; }
-  .divider { border: none; border-top: 2px solid #000; margin: 6px 0; }
-  .divider-thin { border: none; border-top: 1px solid #000; margin: 4px 0; }
-  .row { display: flex; justify-content: space-between; align-items: center; padding: 2px 0; font-size: 12px; }
-  .total-row { font-size: 14px; font-weight: bold; padding: 4px 0; }
-  .info-label { color: #000; font-size: 12px; }
-  .footer { font-size: 10px; color: #000; margin-top: 6px; }
-  .items-section { margin: 8px 0; }
-  .item-row { display: flex; justify-content: space-between; padding: 4px 0; border-bottom: 1px dashed #000; font-size: 12px; }
-  .item-name { flex: 1; text-align: right; padding-left: 4px; }
-  .item-qty { width: 40px; text-align: center; }
-  .item-price { width: 60px; text-align: left; }
-  .item-total { width: 60px; text-align: left; font-weight: bold; }
-  .items-header { display: flex; justify-content: space-between; padding: 4px 0; border-top: 2px solid #000; border-bottom: 2px solid #000; font-size: 11px; font-weight: bold; }
-  .summary-table { width: 100%; border-collapse: collapse; margin: 6px 0; }
-  .summary-table td { padding: 3px 4px; font-size: 12px; border-bottom: 1px solid #000; }
-  .summary-table td:last-child { text-align: left; font-weight: bold; }
-  .summary-table tr:last-child td { border-bottom: 2px solid #000; }
-  .text-green { font-weight: bold; }
-  .text-red { font-weight: bold; }
+  .bold { font-weight: 800; }
+  .logo-name { font-size: 22px; font-weight: 900; letter-spacing: 0.5px; margin-bottom: 4px; }
+  .subtitle { font-size: 12px; font-weight: 700; color: #000; margin-bottom: 3px; }
+  .divider { border: none; border-top: 3px solid #000; margin: 8px 0; }
+  .divider-thin { border: none; border-top: 1.5px solid #000; margin: 6px 0; }
+  .row { display: flex; justify-content: space-between; align-items: center; padding: 3px 0; font-size: 13px; font-weight: 600; }
+  .total-row { font-size: 16px; font-weight: 900; padding: 6px 0; border-top: 2px solid #000; }
+  .info-label { color: #000; font-size: 13px; }
+  .footer { font-size: 11px; color: #000; margin-top: 10px; font-weight: 700; }
+  .items-section { margin: 10px 0; width: 100%; }
+  .item-row { display: flex; justify-content: space-between; padding: 6px 0; border-bottom: 1px dashed #000; font-size: 13px; font-weight: 700; }
+  .item-name { flex: 1; text-align: right; padding-left: 5px; overflow: hidden; text-overflow: ellipsis; }
+  .item-qty { width: 35px; text-align: center; font-weight: 900; }
+  .item-price { width: 55px; text-align: left; }
+  .item-total { width: 65px; text-align: left; font-weight: 900; }
+  .items-header { display: flex; justify-content: space-between; padding: 5px 0; border-top: 2.5px solid #000; border-bottom: 2.5px solid #000; font-size: 12px; font-weight: 900; }
+  .summary-table { width: 100%; border-collapse: collapse; margin: 8px 0; table-layout: fixed; }
+  .summary-table td { padding: 4px 2px; font-size: 13px; border-bottom: 1.5px solid #000; font-weight: 700; }
+  .summary-table td:last-child { text-align: left; font-weight: 900; }
+  .summary-table tr:last-child td { border-bottom: 3px solid #000; }
   @media print { 
-    body { margin: 0; padding: 2px; width: 80mm; } 
-    @page { margin: 0; size: 80mm auto; }
+    body { margin: 0; padding: 0; width: 100%; } 
+    .receipt { width: 100%; }
+    @page { margin: 0; size: auto; }
     * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; color: #000 !important; }
   }
 `;
