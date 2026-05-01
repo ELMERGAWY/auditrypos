@@ -3,11 +3,21 @@
 -- ============================================================
 
 -- 1. FISCAL PERIODS TABLE
+-- Handle existing table without period_type column
+DO $$
+BEGIN
+    IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'fiscal_periods') THEN
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'fiscal_periods' AND column_name = 'period_type') THEN
+            ALTER TABLE fiscal_periods ADD COLUMN period_type VARCHAR(20) DEFAULT 'monthly' CHECK (period_type IN ('monthly', 'quarterly', 'yearly', 'custom'));
+        END IF;
+    END IF;
+END $$;
+
 CREATE TABLE IF NOT EXISTS fiscal_periods (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     restaurant_id UUID NOT NULL REFERENCES restaurants(id) ON DELETE CASCADE,
     period_name VARCHAR(50) NOT NULL,
-    period_type VARCHAR(20) NOT NULL CHECK (period_type IN ('monthly', 'quarterly', 'yearly', 'custom')),
+    period_type VARCHAR(20) NOT NULL DEFAULT 'monthly' CHECK (period_type IN ('monthly', 'quarterly', 'yearly', 'custom')),
     start_date DATE NOT NULL,
     end_date DATE NOT NULL,
     is_closed BOOLEAN DEFAULT FALSE,
