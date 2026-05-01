@@ -20,7 +20,8 @@ export type SidebarTab =
   | 'pos' | 'orders' | 'menu' | 'delivery' | 'shifts' | 'stats' 
   | 'inventory' | 'customers' | 'suppliers' | 'expenses' | 'qr' 
   | 'waiter' | 'staff' | 'financials' | 'notifications' | 'settings' | 'overheads'
-  | 'customer_accounts' | 'sales_returns' | 'supplier_accounts' | 'inventory_receipts';
+  | 'customer_accounts' | 'sales_returns' | 'supplier_accounts' | 'inventory_receipts'
+  | 'ai_assistant';
 
 interface NavItem {
   id: SidebarTab;
@@ -141,6 +142,7 @@ export function ProfessionalSidebar({
     supplier_accounts: { label: 'حسابات الموردين', icon: Wallet, section: 'accounting' },
 
     stats: { label: 'الإحصائيات الشاملة', icon: BarChart3, section: 'analytics' },
+    ai_assistant: { label: 'مساعد المحاسب (AI)', icon: Sparkles, section: 'analytics' },
 
     staff: { label: 'إدارة الموظفين', icon: Users, section: 'system' },
     notifications: { label: 'التنبيهات', icon: Bell, section: 'system' },

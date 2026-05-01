@@ -38,6 +38,7 @@ const NotificationsTab = lazy(() => import('./dashboard/NotificationsTab').then(
 const FinancialsTab = lazy(() => import('./dashboard/FinancialsTab').then(m => ({ default: m.FinancialsTab })));
 const OverheadManager = lazy(() => import('./dashboard/OverheadManager').then(m => ({ default: m.OverheadManager })));
 const AdvancedReportsHub = lazy(() => import('./dashboard/AdvancedReportsHub').then(m => ({ default: m.AdvancedReportsHub })));
+const AccountingAssistant = lazy(() => import('./dashboard/AccountingAssistant').then(m => ({ default: m.AccountingAssistant })));
 const CreateRestaurantForm = lazy(() => import('@/components/dashboard/CreateRestaurantForm').then(m => ({ default: m.CreateRestaurantForm })));
 import { BarcodeScanner } from './dashboard/BarcodeScanner';
 const POSGrid = lazy(() => import('./dashboard/pos/POSGrid').then(m => ({ default: m.POSGrid })));
@@ -990,6 +991,12 @@ export default function Dashboard() {
             )}
             
             {activeTab === 'analytics' && <AdvancedReportsHub restaurantId={restaurant!.id} currency={currency} />}
+            
+            {activeTab === 'ai_assistant' && (
+              <ModuleErrorBoundary moduleName="مساعد المحاسب (AI)">
+                <AccountingAssistant restaurantId={restaurant!.id} currency={currency} />
+              </ModuleErrorBoundary>
+            )}
             
             {activeTab === 'staff' && <StaffTab restaurantId={restaurant!.id} currency={currency} />}
             {activeTab === 'notifications' && <NotificationsTab restaurantId={restaurant!.id} />}
