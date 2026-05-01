@@ -389,7 +389,6 @@ BEGIN
     LEFT JOIN account_balances ab ON ab.account_id = coa.id 
         AND ab.fiscal_period_id = COALESCE(p_fiscal_period_id, get_current_fiscal_period(p_restaurant_id))
     WHERE coa.restaurant_id = p_restaurant_id
-      AND coa.is_active = TRUE
     ORDER BY coa.code;
 END;
 $$ LANGUAGE plpgsql;
@@ -439,7 +438,6 @@ BEGIN
     LEFT JOIN account_balances ab ON ab.account_id = coa.id AND ab.fiscal_period_id = v_period_id
     WHERE coa.restaurant_id = p_restaurant_id
       AND coa.account_type IN ('revenue', 'cogs', 'expense')
-      AND coa.is_active = TRUE
     ORDER BY 
         CASE coa.account_type 
             WHEN 'revenue' THEN 1 
@@ -483,7 +481,6 @@ BEGIN
     LEFT JOIN account_balances ab ON ab.account_id = coa.id AND ab.fiscal_period_id = v_period_id
     WHERE coa.restaurant_id = p_restaurant_id
       AND coa.account_type IN ('asset', 'liability', 'equity')
-      AND coa.is_active = TRUE
     ORDER BY 
         CASE coa.account_type 
             WHEN 'asset' THEN 1 
