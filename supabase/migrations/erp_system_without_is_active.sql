@@ -247,7 +247,7 @@ BEGIN
             start_dt,
             end_dt
         )
-        ON CONFLICT (restaurant_id, start_date, end_date) DO NOTHING;
+        ON CONFLICT DO NOTHING;
     END LOOP;
 END;
 $$ LANGUAGE plpgsql;
