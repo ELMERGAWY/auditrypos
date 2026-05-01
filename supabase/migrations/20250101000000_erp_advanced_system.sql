@@ -2,6 +2,19 @@
 -- ERP ADVANCED SYSTEM - Comprehensive Accounting & AI Integration
 -- ============================================================
 
+-- FIX: Add is_active column to chart_of_accounts if missing (required by report functions)
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM information_schema.columns 
+        WHERE table_name = 'chart_of_accounts' AND column_name = 'is_active'
+    ) THEN
+        ALTER TABLE chart_of_accounts ADD COLUMN is_active BOOLEAN DEFAULT TRUE;
+    END IF;
+END $$;
+
+CREATE INDEX IF NOT EXISTS idx_chart_of_accounts_active ON chart_of_accounts(restaurant_id, is_active);
+
 -- 1. FISCAL PERIODS TABLE
 CREATE TABLE IF NOT EXISTS fiscal_periods (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
