@@ -3,9 +3,7 @@
 -- ============================================================
 
 -- NOTE: Make sure to run fix_is_active_column.sql FIRST before this file!
--- The ALTER TABLE is removed from here since it needs to run separately
-
-CREATE INDEX IF NOT EXISTS idx_chart_of_accounts_active ON chart_of_accounts(restaurant_id, is_active);
+-- The ALTER TABLE and INDEX creation are removed from here since they need to run separately
 
 -- 1. FISCAL PERIODS TABLE
 CREATE TABLE IF NOT EXISTS fiscal_periods (

@@ -1,9 +1,9 @@
 -- ============================================================
 -- FIX: Add missing is_active column to chart_of_accounts
--- Run this directly in SQL Editor if you get "column is_active does not exist" error
+-- Run this FIRST before 20250101000000_erp_advanced_system.sql
 -- ============================================================
 
--- Check if column exists first (safe to run multiple times)
+-- Add the column
 ALTER TABLE chart_of_accounts 
 ADD COLUMN IF NOT EXISTS is_active BOOLEAN DEFAULT TRUE;
 
