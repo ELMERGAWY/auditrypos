@@ -209,6 +209,14 @@ CREATE TABLE IF NOT EXISTS bank_reconciliation_items (
 -- FUNCTIONS (Simplified without is_active references)
 -- ============================================================
 
+-- Drop existing functions first to avoid return type conflicts
+DROP FUNCTION IF EXISTS create_default_fiscal_periods CASCADE;
+DROP FUNCTION IF EXISTS get_current_fiscal_period CASCADE;
+DROP FUNCTION IF EXISTS post_journal_entry CASCADE;
+DROP FUNCTION IF EXISTS get_trial_balance CASCADE;
+DROP FUNCTION IF EXISTS get_profit_and_loss CASCADE;
+DROP FUNCTION IF EXISTS get_balance_sheet CASCADE;
+
 CREATE OR REPLACE FUNCTION create_default_fiscal_periods(p_restaurant_id UUID, p_year INTEGER DEFAULT EXTRACT(YEAR FROM CURRENT_DATE))
 RETURNS void AS $$
 DECLARE
