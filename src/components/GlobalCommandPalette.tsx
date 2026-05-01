@@ -10,6 +10,7 @@ import {
 } from "@/components/ui/command";
 import { useNavigate } from "react-router-dom";
 import { Search, LayoutDashboard, Settings, Users, Package, Heart, Receipt } from "lucide-react";
+import { toast } from "sonner";
 
 export function GlobalCommandPalette() {
   const [open, setOpen] = useState(false);
