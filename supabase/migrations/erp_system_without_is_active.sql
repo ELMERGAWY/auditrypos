@@ -478,37 +478,37 @@ ALTER TABLE bank_reconciliation_items ENABLE ROW LEVEL SECURITY;
 
 CREATE POLICY fiscal_periods_restaurant_isolation ON fiscal_periods
     USING (restaurant_id IN (
-        SELECT id FROM restaurants WHERE user_id = auth.uid()
+        SELECT id FROM restaurants WHERE owner_id = auth.uid()
     ));
 
 CREATE POLICY account_balances_restaurant_isolation ON account_balances
     USING (restaurant_id IN (
-        SELECT id FROM restaurants WHERE user_id = auth.uid()
+        SELECT id FROM restaurants WHERE owner_id = auth.uid()
     ));
 
 CREATE POLICY ai_chat_messages_restaurant_isolation ON ai_chat_messages
     USING (restaurant_id IN (
-        SELECT id FROM restaurants WHERE user_id = auth.uid()
+        SELECT id FROM restaurants WHERE owner_id = auth.uid()
     ));
 
 CREATE POLICY ai_suggestions_restaurant_isolation ON ai_journal_suggestions
     USING (restaurant_id IN (
-        SELECT id FROM restaurants WHERE user_id = auth.uid()
+        SELECT id FROM restaurants WHERE owner_id = auth.uid()
     ));
 
 CREATE POLICY telegram_bots_restaurant_isolation ON telegram_bots
     USING (restaurant_id IN (
-        SELECT id FROM restaurants WHERE user_id = auth.uid()
+        SELECT id FROM restaurants WHERE owner_id = auth.uid()
     ));
 
 CREATE POLICY telegram_messages_restaurant_isolation ON telegram_messages
     USING (restaurant_id IN (
-        SELECT id FROM restaurants WHERE user_id = auth.uid()
+        SELECT id FROM restaurants WHERE owner_id = auth.uid()
     ));
 
 CREATE POLICY accounting_audit_log_restaurant_isolation ON accounting_audit_log
     USING (restaurant_id IN (
-        SELECT id FROM restaurants WHERE user_id = auth.uid()
+        SELECT id FROM restaurants WHERE owner_id = auth.uid()
     ));
 
 -- ============================================================
