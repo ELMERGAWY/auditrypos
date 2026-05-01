@@ -10,6 +10,7 @@ export { default as taxService } from './taxService';
 export { default as checkoutIntegration } from './checkoutIntegration';
 
 export * from './types';
+export * from './aiTypes';
 
 // Re-export types for convenience
 export type {
