@@ -2,9 +2,8 @@
 -- ERP ADVANCED SYSTEM - Comprehensive Accounting & AI Integration
 -- ============================================================
 
--- FIX: Add is_active column to chart_of_accounts if missing (required by report functions)
--- Note: If this fails, run fix_is_active_column.sql separately first
-ALTER TABLE chart_of_accounts ADD COLUMN IF NOT EXISTS is_active BOOLEAN DEFAULT TRUE;
+-- NOTE: Make sure to run fix_is_active_column.sql FIRST before this file!
+-- The ALTER TABLE is removed from here since it needs to run separately
 
 CREATE INDEX IF NOT EXISTS idx_chart_of_accounts_active ON chart_of_accounts(restaurant_id, is_active);
 
