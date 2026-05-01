@@ -3,15 +3,8 @@
 -- ============================================================
 
 -- FIX: Add is_active column to chart_of_accounts if missing (required by report functions)
-DO $$
-BEGIN
-    IF NOT EXISTS (
-        SELECT 1 FROM information_schema.columns 
-        WHERE table_name = 'chart_of_accounts' AND column_name = 'is_active'
-    ) THEN
-        ALTER TABLE chart_of_accounts ADD COLUMN is_active BOOLEAN DEFAULT TRUE;
-    END IF;
-END $$;
+-- Note: If this fails, run fix_is_active_column.sql separately first
+ALTER TABLE chart_of_accounts ADD COLUMN IF NOT EXISTS is_active BOOLEAN DEFAULT TRUE;
 
 CREATE INDEX IF NOT EXISTS idx_chart_of_accounts_active ON chart_of_accounts(restaurant_id, is_active);
 
