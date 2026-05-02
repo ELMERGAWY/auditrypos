@@ -38,7 +38,7 @@ const NotificationsTab = lazy(() => import('./dashboard/NotificationsTab').then(
 const FinancialsTab = lazy(() => import('./dashboard/FinancialsTab').then(m => ({ default: m.FinancialsTab })));
 const OverheadManager = lazy(() => import('./dashboard/OverheadManager').then(m => ({ default: m.OverheadManager })));
 const AdvancedReportsHub = lazy(() => import('./dashboard/AdvancedReportsHub').then(m => ({ default: m.AdvancedReportsHub })));
-const AccountingAssistantV2 = lazy(() => import('./dashboard/AccountingAssistantV2').then(m => ({ default: m.AccountingAssistantV2 })));
+const AccountingAssistantChat = lazy(() => import('./dashboard/AccountingAssistantChat').then(m => ({ default: m.AccountingAssistantChat })));
 const CreateRestaurantForm = lazy(() => import('@/components/dashboard/CreateRestaurantForm').then(m => ({ default: m.CreateRestaurantForm })));
 import { BarcodeScanner } from './dashboard/BarcodeScanner';
 const POSGrid = lazy(() => import('./dashboard/pos/POSGrid').then(m => ({ default: m.POSGrid })));
@@ -994,10 +994,9 @@ export default function Dashboard() {
             
             {activeTab === 'ai_assistant' && (
               <ModuleErrorBoundary moduleName="مساعد المحاسب (AI)">
-                <AccountingAssistantV2 
+                <AccountingAssistantChat 
                   restaurantId={restaurant!.id} 
-                  userId={user?.id || ''}
-                  currency={currency} 
+                  userId={user?.id || ''} 
                 />
               </ModuleErrorBoundary>
             )}
