@@ -1261,6 +1261,98 @@ export type Database = {
           },
         ]
       }
+      bill_of_materials: {
+        Row: {
+          company_id: string
+          created_at: string
+          expected_yield_percentage: number
+          expected_yield_quantity: number
+          id: string
+          is_active: boolean
+          product_id: string
+          standard_labor_cost: number
+          standard_overhead_cost: number
+          standard_total_cost: number
+          updated_at: string
+          version: string
+        }
+        Insert: {
+          company_id: string
+          created_at?: string
+          expected_yield_percentage?: number
+          expected_yield_quantity?: number
+          id?: string
+          is_active?: boolean
+          product_id: string
+          standard_labor_cost?: number
+          standard_overhead_cost?: number
+          standard_total_cost?: number
+          updated_at?: string
+          version?: string
+        }
+        Update: {
+          company_id?: string
+          created_at?: string
+          expected_yield_percentage?: number
+          expected_yield_quantity?: number
+          id?: string
+          is_active?: boolean
+          product_id?: string
+          standard_labor_cost?: number
+          standard_overhead_cost?: number
+          standard_total_cost?: number
+          updated_at?: string
+          version?: string
+        }
+        Relationships: []
+      }
+      bom_components: {
+        Row: {
+          bom_id: string
+          component_product_id: string
+          created_at: string
+          id: string
+          is_optional: boolean
+          notes: string | null
+          product_id: string
+          quantity_required: number
+          scrap_percentage: number
+          unit_of_measure: string
+        }
+        Insert: {
+          bom_id: string
+          component_product_id: string
+          created_at?: string
+          id?: string
+          is_optional?: boolean
+          notes?: string | null
+          product_id: string
+          quantity_required: number
+          scrap_percentage?: number
+          unit_of_measure?: string
+        }
+        Update: {
+          bom_id?: string
+          component_product_id?: string
+          created_at?: string
+          id?: string
+          is_optional?: boolean
+          notes?: string | null
+          product_id?: string
+          quantity_required?: number
+          scrap_percentage?: number
+          unit_of_measure?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "bom_components_bom_id_fkey"
+            columns: ["bom_id"]
+            isOneToOne: false
+            referencedRelation: "bill_of_materials"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       budget_variance_approvals: {
         Row: {
           account_id: string | null
@@ -1765,38 +1857,56 @@ export type Database = {
       }
       cost_layers: {
         Row: {
+          consumed_at: string | null
+          consumed_quantity: number | null
+          created_at: string
           id: string
           is_consumed: boolean | null
           item_id: string | null
           layer_date: string
+          product_id: string | null
           quantity: number
           reference_id: string | null
           reference_type: string | null
           remaining_qty: number
+          remaining_quantity: number | null
+          total_cost: number | null
           unit_cost: number
           warehouse_id: string | null
         }
         Insert: {
+          consumed_at?: string | null
+          consumed_quantity?: number | null
+          created_at?: string
           id?: string
           is_consumed?: boolean | null
           item_id?: string | null
           layer_date: string
+          product_id?: string | null
           quantity: number
           reference_id?: string | null
           reference_type?: string | null
           remaining_qty?: number
+          remaining_quantity?: number | null
+          total_cost?: number | null
           unit_cost: number
           warehouse_id?: string | null
         }
         Update: {
+          consumed_at?: string | null
+          consumed_quantity?: number | null
+          created_at?: string
           id?: string
           is_consumed?: boolean | null
           item_id?: string | null
           layer_date?: string
+          product_id?: string | null
           quantity?: number
           reference_id?: string | null
           reference_type?: string | null
           remaining_qty?: number
+          remaining_quantity?: number | null
+          total_cost?: number | null
           unit_cost?: number
           warehouse_id?: string | null
         }
@@ -3462,6 +3572,205 @@ export type Database = {
             columns: ["restaurant_id"]
             isOneToOne: false
             referencedRelation: "restaurants_public"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      inventory_levels: {
+        Row: {
+          average_cost: number
+          id: string
+          product_id: string
+          quantity_available: number | null
+          quantity_on_hand: number
+          quantity_reserved: number
+          total_value: number
+          updated_at: string
+          warehouse_id: string
+        }
+        Insert: {
+          average_cost?: number
+          id?: string
+          product_id: string
+          quantity_available?: number | null
+          quantity_on_hand?: number
+          quantity_reserved?: number
+          total_value?: number
+          updated_at?: string
+          warehouse_id: string
+        }
+        Update: {
+          average_cost?: number
+          id?: string
+          product_id?: string
+          quantity_available?: number | null
+          quantity_on_hand?: number
+          quantity_reserved?: number
+          total_value?: number
+          updated_at?: string
+          warehouse_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "inventory_levels_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "inventory_products"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      inventory_movements: {
+        Row: {
+          batch_number: string | null
+          company_id: string
+          cost_layer_ids: Json | null
+          created_at: string
+          created_by: string
+          destination_warehouse_id: string | null
+          expiry_date: string | null
+          id: string
+          journal_entry_id: string | null
+          movement_date: string
+          movement_type: string
+          product_id: string
+          quantity: number
+          reference_id: string
+          reference_line_id: string | null
+          reference_type: string
+          source_warehouse_id: string | null
+          total_cost: number
+          unit_cost: number
+          warehouse_id: string
+        }
+        Insert: {
+          batch_number?: string | null
+          company_id: string
+          cost_layer_ids?: Json | null
+          created_at?: string
+          created_by: string
+          destination_warehouse_id?: string | null
+          expiry_date?: string | null
+          id?: string
+          journal_entry_id?: string | null
+          movement_date?: string
+          movement_type: string
+          product_id: string
+          quantity: number
+          reference_id: string
+          reference_line_id?: string | null
+          reference_type: string
+          source_warehouse_id?: string | null
+          total_cost?: number
+          unit_cost?: number
+          warehouse_id: string
+        }
+        Update: {
+          batch_number?: string | null
+          company_id?: string
+          cost_layer_ids?: Json | null
+          created_at?: string
+          created_by?: string
+          destination_warehouse_id?: string | null
+          expiry_date?: string | null
+          id?: string
+          journal_entry_id?: string | null
+          movement_date?: string
+          movement_type?: string
+          product_id?: string
+          quantity?: number
+          reference_id?: string
+          reference_line_id?: string | null
+          reference_type?: string
+          source_warehouse_id?: string | null
+          total_cost?: number
+          unit_cost?: number
+          warehouse_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "inventory_movements_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "inventory_products"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      inventory_products: {
+        Row: {
+          average_cost: number
+          category_id: string | null
+          company_id: string
+          costing_method: string
+          created_at: string
+          id: string
+          is_active: boolean
+          is_inventory_item: boolean
+          last_purchase_price: number
+          name: string
+          sku: string
+          source_product_id: string | null
+          standard_cost: number | null
+          track_batches: boolean
+          track_expiry: boolean
+          unit_of_measure: string
+          updated_at: string
+          weight: number | null
+        }
+        Insert: {
+          average_cost?: number
+          category_id?: string | null
+          company_id: string
+          costing_method?: string
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          is_inventory_item?: boolean
+          last_purchase_price?: number
+          name: string
+          sku: string
+          source_product_id?: string | null
+          standard_cost?: number | null
+          track_batches?: boolean
+          track_expiry?: boolean
+          unit_of_measure?: string
+          updated_at?: string
+          weight?: number | null
+        }
+        Update: {
+          average_cost?: number
+          category_id?: string | null
+          company_id?: string
+          costing_method?: string
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          is_inventory_item?: boolean
+          last_purchase_price?: number
+          name?: string
+          sku?: string
+          source_product_id?: string | null
+          standard_cost?: number | null
+          track_batches?: boolean
+          track_expiry?: boolean
+          unit_of_measure?: string
+          updated_at?: string
+          weight?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "inventory_products_source_product_id_fkey"
+            columns: ["source_product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inventory_products_source_product_id_fkey"
+            columns: ["source_product_id"]
+            isOneToOne: false
+            referencedRelation: "v_inventory_valuation"
             referencedColumns: ["id"]
           },
         ]
@@ -6227,6 +6536,128 @@ export type Database = {
             referencedColumns: ["code"]
           },
         ]
+      }
+      sales_invoice_lines: {
+        Row: {
+          created_at: string
+          description: string | null
+          discount_amount: number
+          id: string
+          invoice_id: string
+          line_total: number
+          product_id: string | null
+          quantity: number
+          tax_amount: number
+          total_cost: number
+          unit_cost: number
+          unit_price: number
+          warehouse_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          discount_amount?: number
+          id?: string
+          invoice_id: string
+          line_total?: number
+          product_id?: string | null
+          quantity?: number
+          tax_amount?: number
+          total_cost?: number
+          unit_cost?: number
+          unit_price?: number
+          warehouse_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          discount_amount?: number
+          id?: string
+          invoice_id?: string
+          line_total?: number
+          product_id?: string | null
+          quantity?: number
+          tax_amount?: number
+          total_cost?: number
+          unit_cost?: number
+          unit_price?: number
+          warehouse_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sales_invoice_lines_invoice_id_fkey"
+            columns: ["invoice_id"]
+            isOneToOne: false
+            referencedRelation: "sales_invoices"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      sales_invoices: {
+        Row: {
+          company_id: string
+          created_at: string
+          created_by: string | null
+          customer_id: string | null
+          discount_amount: number
+          id: string
+          invoice_date: string
+          invoice_number: string
+          journal_entry_id: string | null
+          notes: string | null
+          paid_amount: number
+          payment_method: string | null
+          source_reference_id: string | null
+          source_type: string
+          status: string
+          subtotal: number
+          tax_amount: number
+          total_amount: number
+          updated_at: string
+        }
+        Insert: {
+          company_id: string
+          created_at?: string
+          created_by?: string | null
+          customer_id?: string | null
+          discount_amount?: number
+          id?: string
+          invoice_date?: string
+          invoice_number: string
+          journal_entry_id?: string | null
+          notes?: string | null
+          paid_amount?: number
+          payment_method?: string | null
+          source_reference_id?: string | null
+          source_type?: string
+          status?: string
+          subtotal?: number
+          tax_amount?: number
+          total_amount?: number
+          updated_at?: string
+        }
+        Update: {
+          company_id?: string
+          created_at?: string
+          created_by?: string | null
+          customer_id?: string | null
+          discount_amount?: number
+          id?: string
+          invoice_date?: string
+          invoice_number?: string
+          journal_entry_id?: string | null
+          notes?: string | null
+          paid_amount?: number
+          payment_method?: string | null
+          source_reference_id?: string | null
+          source_type?: string
+          status?: string
+          subtotal?: number
+          tax_amount?: number
+          total_amount?: number
+          updated_at?: string
+        }
+        Relationships: []
       }
       sales_orders: {
         Row: {
@@ -10600,6 +11031,7 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      user_owns_company: { Args: { _company_id: string }; Returns: boolean }
     }
     Enums: {
       app_role:
