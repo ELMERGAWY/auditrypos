@@ -88,7 +88,7 @@ const Index = () => {
             <div className="w-10 h-10 rounded-xl gradient-bg flex items-center justify-center shadow-lg shadow-primary/20">
               <Zap className="w-6 h-6 text-white" />
             </div>
-            <span className="font-display text-2xl font-black tracking-tighter">Ventro<span className="text-primary">Pro</span></span>
+            <span className="font-display text-2xl font-black tracking-tighter">Auditry</span>
           </div>
           <div className="flex gap-4 items-center">
             <Button variant="ghost" className="text-white/70 hover:text-white" onClick={() => navigate('/login')}>تسجيل الدخول</Button>
@@ -112,7 +112,7 @@ const Index = () => {
               <span className="gradient-text bg-gradient-to-r from-primary via-purple-500 to-amber-500">مؤسسة ذكية</span>
             </h1>
             <p className="text-xl md:text-2xl text-white/60 max-w-3xl mx-auto mb-12 font-light leading-relaxed">
-              Ventro Pro ليس مجرد برنامج كاشير، بل هو عقل مدبر لعملك. اختر الموديولات التي تحتاجها فقط وابدأ رحلة التحول الرقمي اليوم.
+              Auditry ERP ليس مجرد برنامج كاشير، بل هو عقل مدبر لعملك. اختر الموديولات التي تحتاجها فقط وابدأ رحلة التحول الرقمي اليوم.
             </p>
             <div className="flex flex-col sm:flex-row gap-6 justify-center items-center">
               <Button size="lg" className="gradient-bg text-white border-0 text-xl px-10 py-8 rounded-2xl shadow-2xl shadow-primary/40 hover:scale-105 transition-transform font-bold"
@@ -233,7 +233,7 @@ const Index = () => {
           <div className="max-w-5xl mx-auto rounded-[3rem] p-16 relative overflow-hidden text-center border border-primary/20 bg-gradient-to-b from-primary/10 to-transparent">
             <div className="relative z-10">
               <h2 className="text-4xl md:text-6xl font-black mb-8 tracking-tight">هل أنت مستعد للانتقال للمستوى التالي؟</h2>
-              <p className="text-xl text-white/60 mb-12 max-w-2xl mx-auto">انضم إلى آلاف الشركات الناجحة التي تعتمد على Ventro Pro يومياً لإدارة أعمالها.</p>
+              <p className="text-xl text-white/60 mb-12 max-w-2xl mx-auto">انضم إلى آلاف الشركات الناجحة التي تعتمد على Auditry ERP يومياً لإدارة أعمالها.</p>
               <div className="flex flex-col sm:flex-row gap-6 justify-center">
                 <Button size="lg" className="gradient-bg text-white border-0 text-2xl px-12 py-10 rounded-[2rem] shadow-2xl shadow-primary/50 font-black"
                   onClick={() => navigate('/register')}>
@@ -254,7 +254,7 @@ const Index = () => {
               <div className="w-12 h-12 rounded-2xl gradient-bg flex items-center justify-center">
                 <Zap className="w-7 h-7 text-white" />
               </div>
-              <span className="font-display text-3xl font-black tracking-tighter">Ventro<span className="text-primary">Pro</span></span>
+              <span className="font-display text-3xl font-black tracking-tighter">Auditry</span>
             </div>
             <p className="text-white/40 text-lg leading-relaxed max-w-md">
               المنصة المتكاملة لإدارة الأعمال (Modular ERP) المصممة خصيصاً لتناسب طموح الشركات والمؤسسات العصرية في العالم العربي.
@@ -280,7 +280,7 @@ const Index = () => {
           </div>
         </div>
         <div className="max-w-7xl mx-auto pt-8 border-t border-white/5 flex flex-col md:flex-row items-center justify-between gap-4 text-white/30 text-sm">
-          <p>© 2026 Ventro Pro Cloud. جميع الحقوق محفوظة.</p>
+          <p>© 2026 Auditry ERP. جميع الحقوق محفوظة.</p>
           <div className="flex gap-6">
             <Globe className="w-5 h-5 hover:text-white cursor-pointer transition-colors" />
             <Smartphone className="w-5 h-5 hover:text-white cursor-pointer transition-colors" />

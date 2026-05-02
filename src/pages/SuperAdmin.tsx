@@ -156,7 +156,7 @@ const SuperAdmin = () => {
               <Shield className="w-7 h-7 text-destructive animate-pulse" />
             </div>
             <div>
-              <h1 className="text-xl font-bold font-display tracking-tight">Ventro Pro Portal</h1>
+              <h1 className="text-xl font-bold font-display tracking-tight">Auditry ERP Portal</h1>
               <p className="text-xs text-muted-foreground flex items-center gap-1">
                 <Activity className="w-3 h-3 text-green-500" /> لوحة السوبر أدمن المركزية
               </p>

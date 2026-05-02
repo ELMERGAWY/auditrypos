@@ -110,72 +110,14 @@ class JournalService {
     if (this.verifiedRestaurants.has(restaurantId)) return true;
 
     try {
-      // Step 1: Seed root accounts (no parent) using upsert
-      const rootAccounts = [
-        { code: '1000', name: 'الأصول',               account_type: 'asset' },
-        { code: '2000', name: 'الخصوم',               account_type: 'liability' },
-        { code: '3000', name: 'حقوق الملكية',          account_type: 'equity' },
-        { code: '4000', name: 'الإيرادات',             account_type: 'revenue' },
-        { code: '5000', name: 'تكلفة المبيعات (COGS)', account_type: 'expense' },
-        { code: '6000', name: 'المصروفات',             account_type: 'expense' },
-      ].map(a => ({ restaurant_id: restaurantId, code: a.code, name: a.name, account_type: a.account_type }));
-
-      const { error: rootErr } = await supabase
-        .from('chart_of_accounts')
-        .upsert(rootAccounts, { onConflict: 'restaurant_id,code', ignoreDuplicates: true });
-      if (rootErr) throw rootErr;
-
-      // Step 2: Fetch all current accounts to resolve parent IDs
-      const { data: allAccounts, error: fetchErr } = await supabase
-        .from('chart_of_accounts')
-        .select('id, code')
-        .eq('restaurant_id', restaurantId);
-      if (fetchErr) throw fetchErr;
-
-      const codeToId = new Map<string, string>();
-      allAccounts?.forEach(a => codeToId.set(a.code, a.id));
-
-      // Step 3: Seed child accounts using upsert
-      const childAccounts = [
-        { code: '1100', name: 'الصندوق / النقدية',           account_type: 'asset',     parent: '1000', is_cash_account: true,  is_bank_account: false },
-        { code: '1200', name: 'العملاء / الذمم المدينة',     account_type: 'asset',     parent: '1000', is_cash_account: false, is_bank_account: false },
-        { code: '1300', name: 'المخزون',                     account_type: 'asset',     parent: '1000', is_cash_account: false, is_bank_account: false },
-        { code: '1400', name: 'البنوك',                      account_type: 'asset',     parent: '1000', is_cash_account: false, is_bank_account: true  },
-        { code: '2100', name: 'الموردون / الذمم الدائنة',    account_type: 'liability', parent: '2000', is_cash_account: false, is_bank_account: false },
-        { code: '2150', name: 'الضرائب المستحقة (VAT)',      account_type: 'liability', parent: '2000', is_cash_account: false, is_bank_account: false },
-        { code: '3100', name: 'رأس المال',                   account_type: 'equity',    parent: '3000', is_cash_account: false, is_bank_account: false },
-        { code: '3200', name: 'الأرباح المحتجزة',            account_type: 'equity',    parent: '3000', is_cash_account: false, is_bank_account: false },
-        { code: '4100', name: 'إيرادات المبيعات',            account_type: 'revenue',   parent: '4000', is_cash_account: false, is_bank_account: false },
-        { code: '4120', name: 'خصم مبيعات',                  account_type: 'revenue',   parent: '4000', is_cash_account: false, is_bank_account: false },
-        { code: '4200', name: 'إيرادات الخدمات',             account_type: 'revenue',   parent: '4000', is_cash_account: false, is_bank_account: false },
-        { code: '4300', name: 'إيرادات التوصيل',             account_type: 'revenue',   parent: '4000', is_cash_account: false, is_bank_account: false },
-        { code: '4400', name: 'إيرادات الشحن',               account_type: 'revenue',   parent: '4000', is_cash_account: false, is_bank_account: false },
-        { code: '4500', name: 'إيرادات التوزيع',             account_type: 'revenue',   parent: '4000', is_cash_account: false, is_bank_account: false },
-        { code: '4600', name: 'إيرادات الخدمات الطبية',      account_type: 'revenue',   parent: '4000', is_cash_account: false, is_bank_account: false },
-        { code: '4700', name: 'إيرادات الإنتاج الصناعي',     account_type: 'revenue',   parent: '4000', is_cash_account: false, is_bank_account: false },
-        { code: '4800', name: 'إيرادات عقارية وتأجير',       account_type: 'revenue',   parent: '4000', is_cash_account: false, is_bank_account: false },
-        { code: '4900', name: 'إيرادات مقاولات وإنشاءات',    account_type: 'revenue',   parent: '4000', is_cash_account: false, is_bank_account: false },
-        { code: '5100', name: 'تكلفة البضاعة المباعة',       account_type: 'expense',   parent: '5000', is_cash_account: false, is_bank_account: false },
-        { code: '5150', name: 'تكلفة الخدمات المقدمة',       account_type: 'expense',   parent: '5000', is_cash_account: false, is_bank_account: false },
-        { code: '5300', name: 'تكلفة الإنتاج والتشغيل',      account_type: 'expense',   parent: '5000', is_cash_account: false, is_bank_account: false },
-        { code: '6100', name: 'الرواتب والأجور',             account_type: 'expense',   parent: '6000', is_cash_account: false, is_bank_account: false },
-        { code: '6200', name: 'الإيجار',                     account_type: 'expense',   parent: '6000', is_cash_account: false, is_bank_account: false },
-        { code: '6300', name: 'المرافق',                     account_type: 'expense',   parent: '6000', is_cash_account: false, is_bank_account: false },
-        { code: '6400', name: 'الإهلاك',                     account_type: 'expense',   parent: '6000', is_cash_account: false, is_bank_account: false },
-      ].map(a => ({
-        restaurant_id: restaurantId,
-        code: a.code,
-        name: a.name,
-        account_type: a.account_type,
-        parent_id: codeToId.get(a.parent) || null,
-        is_cash_account: a.is_cash_account,
-        is_bank_account: a.is_bank_account,
-      }));
-
-      const { error: childErr } = await supabase
-        .from('chart_of_accounts')
-        .upsert(childAccounts, { onConflict: 'restaurant_id,code', ignoreDuplicates: true });
-      if (childErr) throw childErr;
+      // Use RPC function to seed chart of accounts (bypasses RLS policy)
+      const { error: seedErr } = await supabase
+        .rpc('seed_global_coa', { 
+          p_restaurant_id: restaurantId,
+          p_profile: 'standard'
+        });
+      
+      if (seedErr) throw seedErr;
 
       this.verifiedRestaurants.add(restaurantId);
       this.clearCache();

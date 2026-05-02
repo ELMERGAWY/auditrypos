@@ -1,7 +1,7 @@
 
 // ============================================================
 // ACCOUNTING TYPES & INTERFACES
-// Double Entry Accounting System for Ventro Pro
+// Double Entry Accounting System for Auditry ERP
 // ============================================================
 
 export type AccountType = 'asset' | 'liability' | 'equity' | 'revenue' | 'cogs' | 'expense';

@@ -1,7 +1,7 @@
 
 // ============================================================
 // ACCOUNTING SYSTEM EXPORTS
-// Ventro Pro Double-Entry Accounting
+// Auditry ERP Double-Entry Accounting
 // ============================================================
 
 export { default as journalService } from './journalService';
@@ -27,4 +27,4 @@ export type {
 } from './types';
 
 // Version
-export const ACCOUNTING_SYSTEM_VERSION = '1.0.0-ventro-pro';
+export const ACCOUNTING_SYSTEM_VERSION = '1.0.0-auditry-erp';

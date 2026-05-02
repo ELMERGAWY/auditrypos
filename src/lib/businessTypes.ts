@@ -37,7 +37,7 @@ const BUSINESS_ITEM_ICONS: Record<BusinessType, string[]> = {
   other: ['🏢', '📦', '🛍️', '🧰', '📋', '🏷️', '🪑', '🧴', '📚', '🪙', '⚙️', '🧺'],
 };
 
-// Ventro Pro: Enhanced Business Type Configuration
+// Auditry ERP: Enhanced Business Type Configuration
 export interface BusinessTypeConfig {
   // Basic Info
   id: BusinessType;
