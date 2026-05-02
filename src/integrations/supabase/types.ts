@@ -1261,6 +1261,98 @@ export type Database = {
           },
         ]
       }
+      bill_of_materials: {
+        Row: {
+          company_id: string
+          created_at: string
+          expected_yield_percentage: number
+          expected_yield_quantity: number
+          id: string
+          is_active: boolean
+          product_id: string
+          standard_labor_cost: number
+          standard_overhead_cost: number
+          standard_total_cost: number
+          updated_at: string
+          version: string
+        }
+        Insert: {
+          company_id: string
+          created_at?: string
+          expected_yield_percentage?: number
+          expected_yield_quantity?: number
+          id?: string
+          is_active?: boolean
+          product_id: string
+          standard_labor_cost?: number
+          standard_overhead_cost?: number
+          standard_total_cost?: number
+          updated_at?: string
+          version?: string
+        }
+        Update: {
+          company_id?: string
+          created_at?: string
+          expected_yield_percentage?: number
+          expected_yield_quantity?: number
+          id?: string
+          is_active?: boolean
+          product_id?: string
+          standard_labor_cost?: number
+          standard_overhead_cost?: number
+          standard_total_cost?: number
+          updated_at?: string
+          version?: string
+        }
+        Relationships: []
+      }
+      bom_components: {
+        Row: {
+          bom_id: string
+          component_product_id: string
+          created_at: string
+          id: string
+          is_optional: boolean
+          notes: string | null
+          product_id: string
+          quantity_required: number
+          scrap_percentage: number
+          unit_of_measure: string
+        }
+        Insert: {
+          bom_id: string
+          component_product_id: string
+          created_at?: string
+          id?: string
+          is_optional?: boolean
+          notes?: string | null
+          product_id: string
+          quantity_required: number
+          scrap_percentage?: number
+          unit_of_measure?: string
+        }
+        Update: {
+          bom_id?: string
+          component_product_id?: string
+          created_at?: string
+          id?: string
+          is_optional?: boolean
+          notes?: string | null
+          product_id?: string
+          quantity_required?: number
+          scrap_percentage?: number
+          unit_of_measure?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "bom_components_bom_id_fkey"
+            columns: ["bom_id"]
+            isOneToOne: false
+            referencedRelation: "bill_of_materials"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       budget_variance_approvals: {
         Row: {
           account_id: string | null
