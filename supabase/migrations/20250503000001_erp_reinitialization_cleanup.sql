@@ -26,9 +26,8 @@ BEGIN
         'get_balance_sheet',
         'get_cash_flow',
         'link_entry_to_fiscal_period',
-        'seed_global_coa',
-        'create_fiscal_periods_for_year',
         'post_transaction'
+        -- NOTE: seed_global_coa and create_fiscal_periods_for_year are preserved
       )
   LOOP
     EXECUTE format('DROP FUNCTION IF EXISTS %I CASCADE', func_record.routine_name);
@@ -448,6 +447,196 @@ GRANT EXECUTE ON FUNCTION post_journal_entry TO authenticated;
 GRANT EXECUTE ON FUNCTION get_trial_balance TO authenticated;
 GRANT EXECUTE ON FUNCTION get_profit_and_loss TO authenticated;
 GRANT EXECUTE ON FUNCTION get_balance_sheet TO authenticated;
+
+-- ============================================
+-- PHASE 6: RE-CREATE ESSENTIAL SETUP FUNCTIONS
+-- ============================================
+
+-- Seed Global Chart of Accounts
+CREATE OR REPLACE FUNCTION seed_global_coa(
+  p_restaurant_id UUID,
+  p_profile TEXT DEFAULT 'standard'
+)
+RETURNS VOID
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+DECLARE
+  v_company_id UUID;
+  v_root_asset UUID;
+  v_root_liability UUID;
+  v_root_equity UUID;
+  v_root_revenue UUID;
+  v_root_expense UUID;
+BEGIN
+  -- Get company_id
+  SELECT company_id INTO v_company_id FROM restaurants WHERE id = p_restaurant_id;
+  
+  -- Skip if already seeded
+  IF EXISTS (SELECT 1 FROM chart_of_accounts WHERE restaurant_id = p_restaurant_id LIMIT 1) THEN
+    RETURN;
+  END IF;
+
+  -- Create root accounts (Level 1)
+  INSERT INTO chart_of_accounts (restaurant_id, company_id, code, name, account_type, subtype, level, path, is_active, created_at)
+  VALUES 
+    (p_restaurant_id, v_company_id, '1', 'الأصول', 'asset', 'current_asset', 1, '1', true, NOW())
+    RETURNING id INTO v_root_asset;
+    
+  INSERT INTO chart_of_accounts (restaurant_id, company_id, code, name, account_type, subtype, level, path, is_active, created_at)
+  VALUES 
+    (p_restaurant_id, v_company_id, '2', 'الخصوم', 'liability', 'current_liability', 1, '2', true, NOW())
+    RETURNING id INTO v_root_liability;
+    
+  INSERT INTO chart_of_accounts (restaurant_id, company_id, code, name, account_type, subtype, level, path, is_active, created_at)
+  VALUES 
+    (p_restaurant_id, v_company_id, '3', 'حقوق الملكية', 'equity', 'equity', 1, '3', true, NOW())
+    RETURNING id INTO v_root_equity;
+    
+  INSERT INTO chart_of_accounts (restaurant_id, company_id, code, name, account_type, subtype, level, path, is_active, created_at)
+  VALUES 
+    (p_restaurant_id, v_company_id, '4', 'الإيرادات', 'revenue', 'sales_revenue', 1, '4', true, NOW())
+    RETURNING id INTO v_root_revenue;
+    
+  INSERT INTO chart_of_accounts (restaurant_id, company_id, code, name, account_type, subtype, level, path, is_active, created_at)
+  VALUES 
+    (p_restaurant_id, v_company_id, '5', 'المصروفات', 'expense', 'operating_expense', 1, '5', true, NOW())
+    RETURNING id INTO v_root_expense;
+
+  -- Level 2 - Assets
+  INSERT INTO chart_of_accounts (restaurant_id, company_id, code, name, account_type, subtype, level, path, parent_id, is_active, created_at) VALUES
+    (p_restaurant_id, v_company_id, '1.1', 'الأصول المتداولة', 'asset', 'current_asset', 2, '1.1', v_root_asset, true, NOW()),
+    (p_restaurant_id, v_company_id, '1.2', 'الأصول الثابتة', 'asset', 'fixed_asset', 2, '1.2', v_root_asset, true, NOW());
+
+  -- Level 3 - Current Assets (Common Accounts)
+  INSERT INTO chart_of_accounts (restaurant_id, company_id, code, name, account_type, subtype, level, path, is_active, is_cash_account, created_at) VALUES
+    (p_restaurant_id, v_company_id, '1.1.001', 'الصندوق', 'asset', 'cash', 3, '1.1.001', true, true, NOW()),
+    (p_restaurant_id, v_company_id, '1.1.002', 'البنك', 'asset', 'bank', 3, '1.1.002', true, false, NOW()),
+    (p_restaurant_id, v_company_id, '1.1.003', 'العملاء', 'asset', 'receivable', 3, '1.1.003', true, false, NOW()),
+    (p_restaurant_id, v_company_id, '1.1.004', 'المخزون', 'asset', 'inventory', 3, '1.1.004', true, false, NOW()),
+    (p_restaurant_id, v_company_id, '1.1.005', 'مصروفات مدفوعة مقدماً', 'asset', 'current_asset', 3, '1.1.005', true, false, NOW());
+
+  -- Level 2 - Liabilities
+  INSERT INTO chart_of_accounts (restaurant_id, company_id, code, name, account_type, subtype, level, path, parent_id, is_active, created_at) VALUES
+    (p_restaurant_id, v_company_id, '2.1', 'الخصوم المتداولة', 'liability', 'current_liability', 2, '2.1', v_root_liability, true, NOW()),
+    (p_restaurant_id, v_company_id, '2.2', 'الخصوم طويلة الأجل', 'liability', 'long_term_liability', 2, '2.2', v_root_liability, true, NOW());
+
+  -- Level 3 - Payables
+  INSERT INTO chart_of_accounts (restaurant_id, company_id, code, name, account_type, subtype, level, path, is_active, created_at) VALUES
+    (p_restaurant_id, v_company_id, '2.1.001', 'الموردين', 'liability', 'payable', 3, '2.1.001', true, NOW()),
+    (p_restaurant_id, v_company_id, '2.1.002', 'الضرائب المستحقة', 'liability', 'current_liability', 3, '2.1.002', true, NOW()),
+    (p_restaurant_id, v_company_id, '2.1.003', 'الرواتب المستحقة', 'liability', 'current_liability', 3, '2.1.003', true, NOW());
+
+  -- Level 2 & 3 - Equity
+  INSERT INTO chart_of_accounts (restaurant_id, company_id, code, name, account_type, subtype, level, path, is_active, created_at) VALUES
+    (p_restaurant_id, v_company_id, '3.1', 'رأس المال', 'equity', 'equity', 2, '3.1', true, NOW()),
+    (p_restaurant_id, v_company_id, '3.2', 'الأرباح المحتجزة', 'equity', 'retained_earnings', 2, '3.2', true, NOW()),
+    (p_restaurant_id, v_company_id, '3.1.001', 'رأس المال المدفوع', 'equity', 'equity', 3, '3.1.001', true, NOW()),
+    (p_restaurant_id, v_company_id, '3.2.001', 'أرباح العام الحالي', 'equity', 'retained_earnings', 3, '3.2.001', true, NOW());
+
+  -- Level 2 & 3 - Revenue
+  INSERT INTO chart_of_accounts (restaurant_id, company_id, code, name, account_type, subtype, level, path, is_active, created_at) VALUES
+    (p_restaurant_id, v_company_id, '4.1', 'إيرادات المبيعات', 'revenue', 'sales_revenue', 2, '4.1', true, NOW()),
+    (p_restaurant_id, v_company_id, '4.2', 'إيرادات الخدمات', 'revenue', 'other_revenue', 2, '4.2', true, NOW()),
+    (p_restaurant_id, v_company_id, '4.3', 'إيرادات أخرى', 'revenue', 'other_revenue', 2, '4.3', true, NOW()),
+    (p_restaurant_id, v_company_id, '4.1.001', 'مبيعات نقدية', 'revenue', 'sales_revenue', 3, '4.1.001', true, NOW()),
+    (p_restaurant_id, v_company_id, '4.1.002', 'مبيعات آجلة', 'revenue', 'sales_revenue', 3, '4.1.002', true, NOW()),
+    (p_restaurant_id, v_company_id, '4.3.001', 'إيرادات متنوعة', 'revenue', 'other_revenue', 3, '4.3.001', true, NOW());
+
+  -- Level 2 & 3 - COGS
+  INSERT INTO chart_of_accounts (restaurant_id, company_id, code, name, account_type, subtype, level, path, is_active, created_at) VALUES
+    (p_restaurant_id, v_company_id, '5.0', 'تكلفة البضاعة المباعة', 'expense', 'cogs', 2, '5.0', true, NOW()),
+    (p_restaurant_id, v_company_id, '5.0.001', 'تكلفة المبيعات', 'expense', 'cogs', 3, '5.0.001', true, NOW()),
+    (p_restaurant_id, v_company_id, '5.0.002', 'هالك المخزون', 'expense', 'cogs', 3, '5.0.002', true, NOW());
+
+  -- Level 2 & 3 - Operating Expenses
+  INSERT INTO chart_of_accounts (restaurant_id, company_id, code, name, account_type, subtype, level, path, is_active, created_at) VALUES
+    (p_restaurant_id, v_company_id, '5.1', 'مصروفات تشغيلية', 'expense', 'operating_expense', 2, '5.1', true, NOW()),
+    (p_restaurant_id, v_company_id, '5.2', 'مصروفات إدارية', 'expense', 'admin_expense', 2, '5.2', true, NOW()),
+    (p_restaurant_id, v_company_id, '5.3', 'مصروفات مالية', 'expense', 'financial_expense', 2, '5.3', true, NOW()),
+    (p_restaurant_id, v_company_id, '5.1.001', 'رواتب وأجور', 'expense', 'operating_expense', 3, '5.1.001', true, NOW()),
+    (p_restaurant_id, v_company_id, '5.1.002', 'إيجارات', 'expense', 'operating_expense', 3, '5.1.002', true, NOW()),
+    (p_restaurant_id, v_company_id, '5.1.003', 'مرافق وخدمات', 'expense', 'operating_expense', 3, '5.1.003', true, NOW()),
+    (p_restaurant_id, v_company_id, '5.1.004', 'إهلاكات', 'expense', 'operating_expense', 3, '5.1.004', true, NOW()),
+    (p_restaurant_id, v_company_id, '5.1.005', 'صيانة وقطع غيار', 'expense', 'operating_expense', 3, '5.1.005', true, NOW()),
+    (p_restaurant_id, v_company_id, '5.2.001', 'مصروفات مكتبية', 'expense', 'admin_expense', 3, '5.2.001', true, NOW()),
+    (p_restaurant_id, v_company_id, '5.2.002', 'مصروفات تسويق', 'expense', 'admin_expense', 3, '5.2.002', true, NOW()),
+    (p_restaurant_id, v_company_id, '5.3.001', 'فوائد بنكية', 'expense', 'financial_expense', 3, '5.3.001', true, NOW()),
+    (p_restaurant_id, v_company_id, '5.3.002', 'مصروفات تحويل', 'expense', 'financial_expense', 3, '5.3.002', true, NOW());
+
+  -- VAT Account
+  INSERT INTO chart_of_accounts (restaurant_id, company_id, code, name, account_type, subtype, level, path, is_active, created_at)
+  VALUES (p_restaurant_id, v_company_id, '2.1.010', 'ضريبة القيمة المضافة', 'liability', 'current_liability', 3, '2.1.010', true, NOW());
+
+  RAISE NOTICE 'Chart of accounts seeded for restaurant: %', p_restaurant_id;
+END;
+$$;
+
+-- Create Fiscal Periods for Year
+CREATE OR REPLACE FUNCTION create_fiscal_periods_for_year(
+  p_company_id UUID,
+  p_year INTEGER
+)
+RETURNS VOID
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+DECLARE
+  v_fiscal_year_id UUID;
+  v_month INT;
+  v_start_date DATE;
+  v_end_date DATE;
+  v_period_name TEXT;
+BEGIN
+  -- Create fiscal year
+  INSERT INTO fiscal_years (company_id, year_number, start_date, end_date, status)
+  VALUES (p_company_id, p_year, make_date(p_year, 1, 1), make_date(p_year, 12, 31), 'open')
+  ON CONFLICT (company_id, year_number) DO NOTHING
+  RETURNING id INTO v_fiscal_year_id;
+
+  IF v_fiscal_year_id IS NULL THEN
+    SELECT id INTO v_fiscal_year_id 
+    FROM fiscal_years 
+    WHERE company_id = p_company_id AND year_number = p_year;
+  END IF;
+
+  -- Create 12 monthly periods
+  FOR v_month IN 1..12 LOOP
+    v_start_date := make_date(p_year, v_month, 1);
+    v_end_date := (v_start_date + INTERVAL '1 month' - INTERVAL '1 day')::DATE;
+    v_period_name := CASE v_month
+      WHEN 1 THEN 'يناير'
+      WHEN 2 THEN 'فبراير'
+      WHEN 3 THEN 'مارس'
+      WHEN 4 THEN 'أبريل'
+      WHEN 5 THEN 'مايو'
+      WHEN 6 THEN 'يونيو'
+      WHEN 7 THEN 'يوليو'
+      WHEN 8 THEN 'أغسطس'
+      WHEN 9 THEN 'سبتمبر'
+      WHEN 10 THEN 'أكتوبر'
+      WHEN 11 THEN 'نوفمبر'
+      WHEN 12 THEN 'ديسمبر'
+    END || ' ' || p_year;
+
+    INSERT INTO fiscal_periods (
+      company_id, fiscal_year_id, period_number, period_name,
+      start_date, end_date, status, is_posting_allowed
+    )
+    VALUES (
+      p_company_id, v_fiscal_year_id, v_month, v_period_name,
+      v_start_date, v_end_date, 'open', true
+    )
+    ON CONFLICT (company_id, period_number, fiscal_year_id) DO NOTHING;
+  END LOOP;
+
+  RAISE NOTICE 'Fiscal periods created for year %', p_year;
+END;
+$$;
+
+-- Grant permissions for setup functions
+GRANT EXECUTE ON FUNCTION seed_global_coa TO authenticated;
+GRANT EXECUTE ON FUNCTION create_fiscal_periods_for_year TO authenticated;
 
 -- ============================================
 -- DOCUMENTATION
