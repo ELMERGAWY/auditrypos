@@ -6537,6 +6537,128 @@ export type Database = {
           },
         ]
       }
+      sales_invoice_lines: {
+        Row: {
+          created_at: string
+          description: string | null
+          discount_amount: number
+          id: string
+          invoice_id: string
+          line_total: number
+          product_id: string | null
+          quantity: number
+          tax_amount: number
+          total_cost: number
+          unit_cost: number
+          unit_price: number
+          warehouse_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          discount_amount?: number
+          id?: string
+          invoice_id: string
+          line_total?: number
+          product_id?: string | null
+          quantity?: number
+          tax_amount?: number
+          total_cost?: number
+          unit_cost?: number
+          unit_price?: number
+          warehouse_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          discount_amount?: number
+          id?: string
+          invoice_id?: string
+          line_total?: number
+          product_id?: string | null
+          quantity?: number
+          tax_amount?: number
+          total_cost?: number
+          unit_cost?: number
+          unit_price?: number
+          warehouse_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sales_invoice_lines_invoice_id_fkey"
+            columns: ["invoice_id"]
+            isOneToOne: false
+            referencedRelation: "sales_invoices"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      sales_invoices: {
+        Row: {
+          company_id: string
+          created_at: string
+          created_by: string | null
+          customer_id: string | null
+          discount_amount: number
+          id: string
+          invoice_date: string
+          invoice_number: string
+          journal_entry_id: string | null
+          notes: string | null
+          paid_amount: number
+          payment_method: string | null
+          source_reference_id: string | null
+          source_type: string
+          status: string
+          subtotal: number
+          tax_amount: number
+          total_amount: number
+          updated_at: string
+        }
+        Insert: {
+          company_id: string
+          created_at?: string
+          created_by?: string | null
+          customer_id?: string | null
+          discount_amount?: number
+          id?: string
+          invoice_date?: string
+          invoice_number: string
+          journal_entry_id?: string | null
+          notes?: string | null
+          paid_amount?: number
+          payment_method?: string | null
+          source_reference_id?: string | null
+          source_type?: string
+          status?: string
+          subtotal?: number
+          tax_amount?: number
+          total_amount?: number
+          updated_at?: string
+        }
+        Update: {
+          company_id?: string
+          created_at?: string
+          created_by?: string | null
+          customer_id?: string | null
+          discount_amount?: number
+          id?: string
+          invoice_date?: string
+          invoice_number?: string
+          journal_entry_id?: string | null
+          notes?: string | null
+          paid_amount?: number
+          payment_method?: string | null
+          source_reference_id?: string | null
+          source_type?: string
+          status?: string
+          subtotal?: number
+          tax_amount?: number
+          total_amount?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
       sales_orders: {
         Row: {
           created_at: string | null
