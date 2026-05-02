@@ -11,26 +11,35 @@ export {
   ProfessionalPostingEngine,
   createPostingEngine,
   BusinessType,
+} from './posting_engine/professionalPostingEngine';
+
+export type {
   JournalEntry,
   JournalEntryLine,
-  PostingResult
+  PostingResult,
 } from './posting_engine/professionalPostingEngine';
 
 // Legacy Posting Engine
-export { 
-  PostingEngine, 
+export {
+  PostingEngine,
   createPostingEngine as createLegacyPostingEngine,
+} from './posting_engine/services/postingEngine';
+
+export type {
   TransactionContext,
   TransactionLineItem,
-  PostingResult as LegacyPostingResult
+  PostingResult as LegacyPostingResult,
 } from './posting_engine/services/postingEngine';
 
 // Inventory Costing Engine
 export {
   InventoryCostingEngine,
   createCostingEngine,
+} from './inventory_costing_engine/services/costingEngine';
+
+export type {
   CostingResult,
-  ConsumptionResult
+  ConsumptionResult,
 } from './inventory_costing_engine/services/costingEngine';
 
 export * from './inventory_costing_engine/types/inventory';
@@ -46,9 +55,12 @@ export * from './operations_modules/restaurant/restaurantOperations';
 export {
   FinancialReportingEngine,
   createFinancialReporting,
+} from './reporting_engine/financialReports';
+
+export type {
   TrialBalanceReport,
   ProfitLossReport,
   BalanceSheetReport,
   CashFlowReport,
-  FinancialIndicators
+  FinancialIndicators,
 } from './reporting_engine/financialReports';
