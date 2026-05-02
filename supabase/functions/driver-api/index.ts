@@ -5,6 +5,20 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
+const json = (body: unknown, status = 200) =>
+  new Response(JSON.stringify(body), {
+    status,
+    headers: { ...corsHeaders, "Content-Type": "application/json" },
+  });
+
+const SESSION_TTL_MS = 1000 * 60 * 60 * 24 * 7; // 7 days
+
+function newToken() {
+  const bytes = new Uint8Array(32);
+  crypto.getRandomValues(bytes);
+  return Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("");
+}
+
 async function createNotification(supabase: any, restaurantId: string, title: string, body: string, type: string, targetType = 'owner', targetId = '') {
   await supabase.from("notifications").insert({
     restaurant_id: restaurantId,
@@ -14,6 +28,23 @@ async function createNotification(supabase: any, restaurantId: string, title: st
     target_type: targetType,
     target_id: targetId,
   });
+}
+
+// Authenticate the caller via Bearer session_token. Returns the agent row or null.
+async function authenticateAgent(supabase: any, req: Request) {
+  const authHeader = req.headers.get("authorization") || "";
+  const token = authHeader.replace(/^Bearer\s+/i, "").trim();
+  if (!token) return null;
+
+  const { data: agent } = await supabase
+    .from("delivery_agents")
+    .select("*")
+    .eq("session_token", token)
+    .maybeSingle();
+
+  if (!agent) return null;
+  if (agent.session_expires_at && new Date(agent.session_expires_at) < new Date()) return null;
+  return agent;
 }
 
 Deno.serve(async (req) => {
@@ -27,51 +58,88 @@ Deno.serve(async (req) => {
   );
 
   try {
-    const { action, phone, agent_id, lat, lng, order_id, status } = await req.json();
+    const body = await req.json();
+    const { action } = body;
 
-    // Login by phone
+    // ── PUBLIC: Login by phone + PIN ─────────────────────────────────────
     if (action === "login") {
-      if (!phone) return new Response(JSON.stringify({ error: "Phone required" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
-      
-      const { data: agent, error } = await supabase
+      const { phone, pin } = body;
+      if (!phone || !pin) {
+        return json({ error: "Phone and PIN required" }, 400);
+      }
+
+      // Look up agent
+      const { data: agent } = await supabase
         .from("delivery_agents")
         .select("*, restaurants(name, logo_url, currency)")
         .eq("phone", phone)
         .maybeSingle();
 
+      // Generic message — never reveal whether the phone exists
       if (!agent) {
-        return new Response(JSON.stringify({ error: "لا يوجد مندوب بهذا الرقم" }), { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+        return json({ error: "بيانات الدخول غير صحيحة" }, 401);
       }
 
-      // Set agent online
-      await supabase.from("delivery_agents").update({ status: "available" }).eq("id", agent.id);
+      // Verify PIN against staff_profiles for this user (driver staff entry)
+      const { data: staff } = await supabase
+        .from("staff_profiles")
+        .select("pin")
+        .eq("phone", phone)
+        .eq("restaurant_id", agent.restaurant_id)
+        .maybeSingle();
 
-      // Notify owner
-      await createNotification(supabase, agent.restaurant_id, '🟢 مندوب متصل', `المندوب ${agent.name} أصبح متصلاً`, 'delivery');
+      if (!staff || String(staff.pin) !== String(pin)) {
+        return json({ error: "بيانات الدخول غير صحيحة" }, 401);
+      }
 
-      return new Response(JSON.stringify({ agent: { ...agent, status: "available" } }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      // Issue a fresh session token
+      const token = newToken();
+      const expiresAt = new Date(Date.now() + SESSION_TTL_MS).toISOString();
+
+      await supabase
+        .from("delivery_agents")
+        .update({
+          status: "available",
+          session_token: token,
+          session_expires_at: expiresAt,
+        })
+        .eq("id", agent.id);
+
+      await createNotification(
+        supabase,
+        agent.restaurant_id,
+        '🟢 مندوب متصل',
+        `المندوب ${agent.name} أصبح متصلاً`,
+        'delivery'
+      );
+
+      return json({
+        agent: { ...agent, status: "available", session_token: undefined, session_expires_at: undefined },
+        session_token: token,
+        expires_at: expiresAt,
+      });
     }
 
-    // Update location
+    // ── AUTHENTICATED actions below ──────────────────────────────────────
+    const agent = await authenticateAgent(supabase, req);
+    if (!agent) {
+      return json({ error: "Unauthorized" }, 401);
+    }
+
     if (action === "update-location") {
-      if (!agent_id || lat == null || lng == null) return new Response(JSON.stringify({ error: "Missing params" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
-      
+      const { lat, lng } = body;
+      if (lat == null || lng == null) return json({ error: "Missing params" }, 400);
+
       await supabase.from("delivery_agents").update({
         current_lat: lat,
         current_lng: lng,
         last_location_update: new Date().toISOString(),
-      }).eq("id", agent_id);
+      }).eq("id", agent.id);
 
-      return new Response(JSON.stringify({ success: true }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      return json({ success: true });
     }
 
-    // Get assigned orders + notifications for agent
     if (action === "get-orders") {
-      if (!agent_id) return new Response(JSON.stringify({ error: "Missing agent_id" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
-      
-      const { data: agent } = await supabase.from("delivery_agents").select("restaurant_id").eq("id", agent_id).single();
-      if (!agent) return new Response(JSON.stringify({ error: "Agent not found" }), { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } });
-
       const { data: orders } = await supabase
         .from("orders")
         .select("*")
@@ -87,13 +155,12 @@ Deno.serve(async (req) => {
         allItems = items || [];
       }
 
-      // Get agent notifications
       const { data: agentNotifications } = await supabase
         .from("notifications")
         .select("*")
         .eq("restaurant_id", agent.restaurant_id)
         .eq("target_type", "agent")
-        .eq("target_id", agent_id)
+        .eq("target_id", agent.id)
         .eq("is_read", false)
         .order("created_at", { ascending: false })
         .limit(20);
@@ -101,92 +168,114 @@ Deno.serve(async (req) => {
       const enriched = (orders || []).map((o: any) => ({
         ...o,
         items: allItems.filter((i: any) => i.order_id === o.id),
-        isMyOrder: o.delivery_agent_id === agent_id,
+        isMyOrder: o.delivery_agent_id === agent.id,
       }));
 
-      return new Response(JSON.stringify({ orders: enriched, notifications: agentNotifications || [] }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      return json({ orders: enriched, notifications: agentNotifications || [] });
     }
 
-    // Update order status
     if (action === "update-order-status") {
-      if (!order_id || !status) return new Response(JSON.stringify({ error: "Missing params" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
-      
-      // Get order and agent details for notification
-      const { data: order } = await supabase.from("orders").select("restaurant_id, order_number, customer_name").eq("id", order_id).single();
-      
+      const { order_id, status } = body;
+      if (!order_id || !status) return json({ error: "Missing params" }, 400);
+
+      // Authorization: order must belong to agent's restaurant AND be assigned to this agent
+      const { data: order } = await supabase
+        .from("orders")
+        .select("restaurant_id, order_number, customer_name, delivery_agent_id")
+        .eq("id", order_id)
+        .maybeSingle();
+
+      if (!order || order.restaurant_id !== agent.restaurant_id) {
+        return json({ error: "Forbidden" }, 403);
+      }
+      if (order.delivery_agent_id && order.delivery_agent_id !== agent.id) {
+        return json({ error: "Forbidden" }, 403);
+      }
+
       await supabase.from("orders").update({ status }).eq("id", order_id);
-      
-      // If completed, set agent back to available
-      if (status === "completed" && agent_id) {
-        await supabase.from("delivery_agents").update({ status: "available" }).eq("id", agent_id);
+
+      if (status === "completed") {
+        await supabase.from("delivery_agents").update({ status: "available" }).eq("id", agent.id);
       }
 
-      // Notify owner about status change
-      if (order) {
-        const statusLabels: Record<string, string> = {
-          preparing: 'قيد التحضير',
-          ready: 'جاهز للتسليم',
-          completed: 'تم التسليم ✅',
-        };
-        await createNotification(
-          supabase, order.restaurant_id,
-          `📦 تحديث طلب #${order.order_number?.slice(-4)}`,
-          `الطلب ${order.customer_name ? 'للعميل ' + order.customer_name : ''} أصبح: ${statusLabels[status] || status}`,
-          'order'
-        );
-      }
+      const statusLabels: Record<string, string> = {
+        preparing: 'قيد التحضير',
+        ready: 'جاهز للتسليم',
+        completed: 'تم التسليم ✅',
+      };
+      await createNotification(
+        supabase, order.restaurant_id,
+        `📦 تحديث طلب #${order.order_number?.slice(-4)}`,
+        `الطلب ${order.customer_name ? 'للعميل ' + order.customer_name : ''} أصبح: ${statusLabels[status] || status}`,
+        'order'
+      );
 
-      return new Response(JSON.stringify({ success: true }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      return json({ success: true });
     }
 
-    // Accept order (assign to self)
     if (action === "accept-order") {
-      if (!order_id || !agent_id) return new Response(JSON.stringify({ error: "Missing params" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
-      
-      const { data: order } = await supabase.from("orders").select("restaurant_id, order_number, customer_name").eq("id", order_id).single();
-      const { data: agentData } = await supabase.from("delivery_agents").select("name").eq("id", agent_id).single();
-      
-      await supabase.from("orders").update({ delivery_agent_id: agent_id }).eq("id", order_id);
-      await supabase.from("delivery_agents").update({ status: "busy" }).eq("id", agent_id);
+      const { order_id } = body;
+      if (!order_id) return json({ error: "Missing params" }, 400);
 
-      // Notify owner
-      if (order) {
-        await createNotification(
-          supabase, order.restaurant_id,
-          `🛵 مندوب قبل طلب #${order.order_number?.slice(-4)}`,
-          `المندوب ${agentData?.name || ''} قبل الطلب ${order.customer_name ? 'للعميل ' + order.customer_name : ''}`,
-          'delivery'
-        );
+      const { data: order } = await supabase
+        .from("orders")
+        .select("restaurant_id, order_number, customer_name, delivery_agent_id")
+        .eq("id", order_id)
+        .maybeSingle();
+
+      if (!order || order.restaurant_id !== agent.restaurant_id) {
+        return json({ error: "Forbidden" }, 403);
+      }
+      if (order.delivery_agent_id && order.delivery_agent_id !== agent.id) {
+        return json({ error: "Order already assigned" }, 409);
       }
 
-      return new Response(JSON.stringify({ success: true }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      await supabase.from("orders").update({ delivery_agent_id: agent.id }).eq("id", order_id);
+      await supabase.from("delivery_agents").update({ status: "busy" }).eq("id", agent.id);
+
+      await createNotification(
+        supabase, order.restaurant_id,
+        `🛵 مندوب قبل طلب #${order.order_number?.slice(-4)}`,
+        `المندوب ${agent.name} قبل الطلب ${order.customer_name ? 'للعميل ' + order.customer_name : ''}`,
+        'delivery'
+      );
+
+      return json({ success: true });
     }
 
-    // Go offline
     if (action === "go-offline") {
-      if (!agent_id) return new Response(JSON.stringify({ error: "Missing agent_id" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
-      
-      const { data: agent } = await supabase.from("delivery_agents").select("name, restaurant_id").eq("id", agent_id).single();
-      await supabase.from("delivery_agents").update({ status: "offline" }).eq("id", agent_id);
-      
-      if (agent) {
-        await createNotification(supabase, agent.restaurant_id, '🔴 مندوب غير متصل', `المندوب ${agent.name} أصبح غير متصل`, 'delivery');
-      }
+      await supabase
+        .from("delivery_agents")
+        .update({ status: "offline", session_token: null, session_expires_at: null })
+        .eq("id", agent.id);
 
-      return new Response(JSON.stringify({ success: true }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      await createNotification(
+        supabase, agent.restaurant_id,
+        '🔴 مندوب غير متصل',
+        `المندوب ${agent.name} أصبح غير متصل`,
+        'delivery'
+      );
+
+      return json({ success: true });
     }
 
-    // Send notification to agent
     if (action === "notify-agent") {
-      const { restaurant_id, title, body } = await req.json();
-      if (!agent_id || !restaurant_id) return new Response(JSON.stringify({ error: "Missing params" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
-      
-      await createNotification(supabase, restaurant_id, title || 'إشعار جديد', body || '', 'order', 'agent', agent_id);
-      return new Response(JSON.stringify({ success: true }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      // Agents can only send notifications scoped to their own restaurant/themselves
+      const { title, body: msgBody } = body;
+      await createNotification(
+        supabase, agent.restaurant_id,
+        title || 'إشعار جديد',
+        msgBody || '',
+        'order',
+        'agent',
+        agent.id
+      );
+      return json({ success: true });
     }
 
-    return new Response(JSON.stringify({ error: "Unknown action" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    return json({ error: "Unknown action" }, 400);
   } catch (e) {
-    return new Response(JSON.stringify({ error: e.message }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    console.error('[driver-api] Unhandled error:', e);
+    return json({ error: "An unexpected error occurred. Please try again." }, 500);
   }
 });
