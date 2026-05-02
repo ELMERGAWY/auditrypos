@@ -2546,6 +2546,8 @@ export type Database = {
           name: string
           phone: string
           restaurant_id: string
+          session_expires_at: string | null
+          session_token: string | null
           status: string
           workspace_id: string | null
         }
@@ -2559,6 +2561,8 @@ export type Database = {
           name: string
           phone?: string
           restaurant_id: string
+          session_expires_at?: string | null
+          session_token?: string | null
           status?: string
           workspace_id?: string | null
         }
@@ -2572,6 +2576,8 @@ export type Database = {
           name?: string
           phone?: string
           restaurant_id?: string
+          session_expires_at?: string | null
+          session_token?: string | null
           status?: string
           workspace_id?: string | null
         }
