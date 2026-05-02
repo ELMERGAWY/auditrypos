@@ -39,6 +39,7 @@ const FinancialsTab = lazy(() => import('./dashboard/FinancialsTab').then(m => (
 const OverheadManager = lazy(() => import('./dashboard/OverheadManager').then(m => ({ default: m.OverheadManager })));
 const AdvancedReportsHub = lazy(() => import('./dashboard/AdvancedReportsHub').then(m => ({ default: m.AdvancedReportsHub })));
 const AccountingAssistantChat = lazy(() => import('./dashboard/AccountingAssistantChat').then(m => ({ default: m.AccountingAssistantChat })));
+const HomeDashboard = lazy(() => import('./dashboard/HomeDashboard').then(m => ({ default: m.HomeDashboard })));
 const CreateRestaurantForm = lazy(() => import('@/components/dashboard/CreateRestaurantForm').then(m => ({ default: m.CreateRestaurantForm })));
 import { BarcodeScanner } from './dashboard/BarcodeScanner';
 const POSGrid = lazy(() => import('./dashboard/pos/POSGrid').then(m => ({ default: m.POSGrid })));
@@ -78,7 +79,7 @@ export default function Dashboard() {
     soundEnabled, setSoundEnabled, taxes
   } = useDashboardData();
 
-  const [activeTab, setActiveTab] = useState<SidebarTab>('pos');
+  const [activeTab, setActiveTab] = useState<SidebarTab>('home');
   const [activeSubView, setActiveSubView] = useState<'stock' | 'bom'>('stock');
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
@@ -751,6 +752,16 @@ export default function Dashboard() {
 
         <main className="flex-1 overflow-auto bg-background/30 custom-scrollbar p-0">
           <Suspense fallback={<div className="h-full flex items-center justify-center p-12"><RefreshCcw className="w-10 h-10 animate-spin text-primary" /></div>}>
+            {/* ===================== HOME DASHBOARD ===================== */}
+            {activeTab === 'home' && (
+              <HomeDashboard 
+                restaurantId={restaurant!.id} 
+                currency={currency}
+                userId={user?.id || ''}
+                onNavigate={(tab) => setActiveTab(tab as SidebarTab)}
+              />
+            )}
+            
             {/* ===================== POS TAB ===================== */}
             {activeTab === 'pos' && (
             <div className="flex flex-col lg:flex-row h-full">

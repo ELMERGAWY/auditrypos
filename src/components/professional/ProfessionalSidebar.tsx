@@ -17,7 +17,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/comp
 import { getBusinessConfig, type BusinessType } from '@/lib/businessTypes';
 
 export type SidebarTab = 
-  | 'pos' | 'orders' | 'menu' | 'delivery' | 'shifts' | 'stats' 
+  | 'home' | 'pos' | 'orders' | 'menu' | 'delivery' | 'shifts' | 'stats' 
   | 'inventory' | 'customers' | 'suppliers' | 'expenses' | 'qr' 
   | 'waiter' | 'staff' | 'financials' | 'notifications' | 'settings' | 'overheads'
   | 'customer_accounts' | 'sales_returns' | 'supplier_accounts' | 'inventory_receipts'
@@ -111,6 +111,7 @@ export function ProfessionalSidebar({
   const lockedTabs: SidebarTab[] = isTrial ? ['orders', 'delivery', 'shifts', 'stats'] : [];
 
   const ALL_NAV_ITEMS: Record<string, Partial<NavItem>> = {
+    home: { label: 'لوحة التحكم', icon: TrendingUp, section: 'main' },
     pos: { label: 'نقطة البيع', icon: LayoutGrid, section: 'main', shortcut: 'F1' },
     shifts: { label: 'الورديات', icon: CalendarClock, section: 'main' },
     delivery: { label: 'التوصيل', icon: Truck, section: 'main', badge: stats.deliveryOrders },

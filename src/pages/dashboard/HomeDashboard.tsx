@@ -1,0 +1,707 @@
+import { useState, useEffect } from 'react';
+import { motion } from 'framer-motion';
+import {
+  TrendingUp, TrendingDown, Users, Store, DollarSign,
+  ShoppingCart, Package, Receipt, ArrowUpRight, ArrowDownRight,
+  Calendar, Clock, Target, BarChart3, PieChart, Activity,
+  ArrowRight, Sparkles, Wallet, CreditCard, Truck,
+  AlertCircle, CheckCircle2, Clock4, RefreshCw
+} from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { Progress } from '@/components/ui/progress';
+import { supabase } from '@/integrations/supabase/client';
+import { 
+  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
+  LineChart, Line, PieChart as RePieChart, Pie, Cell, AreaChart, Area
+} from 'recharts';
+import { toast } from 'sonner';
+
+interface HomeDashboardProps {
+  restaurantId: string;
+  currency: string;
+  onNavigate: (tab: string) => void;
+  userId: string;
+}
+
+interface DashboardStats {
+  // Sales
+  todaySales: number;
+  todayOrders: number;
+  monthSales: number;
+  monthOrders: number;
+  salesChange: number;
+  
+  // Financial
+  todayProfit: number;
+  monthProfit: number;
+  profitMargin: number;
+  profitChange: number;
+  
+  // Customers
+  totalCustomers: number;
+  newCustomersToday: number;
+  activeCustomers: number;
+  
+  // Suppliers
+  totalSuppliers: number;
+  pendingPayables: number;
+  
+  // Inventory
+  lowStockItems: number;
+  totalProducts: number;
+  inventoryValue: number;
+  
+  // Orders
+  pendingOrders: number;
+  processingOrders: number;
+  completedOrders: number;
+  
+  // AI
+  pendingAISuggestions: number;
+}
+
+const containerVariants = {
+  hidden: { opacity: 0 },
+  visible: {
+    opacity: 1,
+    transition: {
+      staggerChildren: 0.1
+    }
+  }
+};
+
+const itemVariants = {
+  hidden: { y: 20, opacity: 0 },
+  visible: {
+    y: 0,
+    opacity: 1,
+    transition: {
+      type: "spring",
+      stiffness: 100,
+      damping: 15
+    }
+  }
+};
+
+const cardHoverVariants = {
+  rest: { scale: 1 },
+  hover: { 
+    scale: 1.02,
+    transition: { duration: 0.2, ease: "easeInOut" }
+  }
+};
+
+export function HomeDashboard({ restaurantId, currency, onNavigate, userId }: HomeDashboardProps) {
+  const [stats, setStats] = useState<DashboardStats>({
+    todaySales: 0,
+    todayOrders: 0,
+    monthSales: 0,
+    monthOrders: 0,
+    salesChange: 0,
+    todayProfit: 0,
+    monthProfit: 0,
+    profitMargin: 0,
+    profitChange: 0,
+    totalCustomers: 0,
+    newCustomersToday: 0,
+    activeCustomers: 0,
+    totalSuppliers: 0,
+    pendingPayables: 0,
+    lowStockItems: 0,
+    totalProducts: 0,
+    inventoryValue: 0,
+    pendingOrders: 0,
+    processingOrders: 0,
+    completedOrders: 0,
+    pendingAISuggestions: 0
+  });
+  
+  const [loading, setLoading] = useState(true);
+  const [salesChartData, setSalesChartData] = useState<any[]>([]);
+  const [categoryData, setCategoryData] = useState<any[]>([]);
+  const [recentActivity, setRecentActivity] = useState<any[]>([]);
+
+  useEffect(() => {
+    loadDashboardData();
+  }, [restaurantId]);
+
+  const loadDashboardData = async () => {
+    try {
+      setLoading(true);
+      const today = new Date().toISOString().split('T')[0];
+      const monthStart = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0];
+      
+      // Parallel data fetching
+      const [
+        todayOrdersRes,
+        monthOrdersRes,
+        yesterdayOrdersRes,
+        customersRes,
+        newCustomersRes,
+        suppliersRes,
+        payablesRes,
+        productsRes,
+        lowStockRes,
+        inventoryValueRes,
+        pendingOrdersRes,
+        aiSuggestionsRes,
+        topProductsRes
+      ] = await Promise.all([
+        // Today's orders
+        supabase.from('orders').select('total_amount').eq('restaurant_id', restaurantId).gte('created_at', today),
+        // Month orders
+        supabase.from('orders').select('total_amount').eq('restaurant_id', restaurantId).gte('created_at', monthStart),
+        // Yesterday for comparison
+        supabase.from('orders').select('total_amount').eq('restaurant_id', restaurantId).gte('created_at', new Date(Date.now() - 86400000).toISOString().split('T')[0]).lt('created_at', today),
+        // Total customers
+        supabase.from('customers').select('*', { count: 'exact' }).eq('restaurant_id', restaurantId),
+        // New customers today
+        supabase.from('customers').select('*', { count: 'exact' }).eq('restaurant_id', restaurantId).gte('created_at', today),
+        // Total suppliers
+        supabase.from('suppliers').select('*', { count: 'exact' }).eq('restaurant_id', restaurantId),
+        // Pending payables
+        supabase.from('suppliers').select('balance').eq('restaurant_id', restaurantId).gt('balance', 0),
+        // Total products
+        supabase.from('products').select('*', { count: 'exact' }).eq('restaurant_id', restaurantId),
+        // Low stock
+        supabase.from('products').select('*', { count: 'exact' }).eq('restaurant_id', restaurantId).lt('quantity', 10),
+        // Inventory value
+        supabase.from('products').select('quantity, price').eq('restaurant_id', restaurantId),
+        // Pending/processing orders
+        supabase.from('orders').select('status').eq('restaurant_id', restaurantId).in('status', ['pending', 'processing', 'ready']),
+        // AI suggestions
+        supabase.from('ai_journal_suggestions').select('*', { count: 'exact' }).eq('restaurant_id', restaurantId).eq('status', 'pending'),
+        // Top products this week
+        supabase.from('order_items').select('product_name, quantity, unit_price, orders!inner(created_at)').eq('orders.restaurant_id', restaurantId).gte('orders.created_at', new Date(Date.now() - 7 * 86400000).toISOString().split('T')[0]).limit(50)
+      ]);
+
+      // Calculate stats
+      const todaySales = todayOrdersRes.data?.reduce((sum, o) => sum + (o.total_amount || 0), 0) || 0;
+      const todayOrdersCount = todayOrdersRes.data?.length || 0;
+      const monthSales = monthOrdersRes.data?.reduce((sum, o) => sum + (o.total_amount || 0), 0) || 0;
+      const yesterdaySales = yesterdayOrdersRes.data?.reduce((sum, o) => sum + (o.total_amount || 0), 0) || 0;
+      const salesChange = yesterdaySales > 0 ? ((todaySales - yesterdaySales) / yesterdaySales) * 100 : 0;
+      
+      // Estimate profit (30% margin for demo)
+      const todayProfit = todaySales * 0.3;
+      const monthProfit = monthSales * 0.3;
+      const profitMargin = monthSales > 0 ? (monthProfit / monthSales) * 100 : 0;
+      
+      // Inventory value
+      const inventoryValue = inventoryValueRes.data?.reduce((sum, p) => sum + ((p.quantity || 0) * (p.price || 0)), 0) || 0;
+      
+      // Order statuses
+      const orderStatuses = pendingOrdersRes.data || [];
+      const pendingCount = orderStatuses.filter((o: any) => o.status === 'pending').length;
+      const processingCount = orderStatuses.filter((o: any) => o.status === 'processing' || o.status === 'ready').length;
+      
+      // Payables
+      const pendingPayables = payablesRes.data?.reduce((sum, s) => sum + (s.balance || 0), 0) || 0;
+
+      setStats({
+        todaySales,
+        todayOrders: todayOrdersCount,
+        monthSales,
+        monthOrders: monthOrdersRes.data?.length || 0,
+        salesChange,
+        todayProfit,
+        monthProfit,
+        profitMargin,
+        profitChange: salesChange,
+        totalCustomers: customersRes.count || 0,
+        newCustomersToday: newCustomersRes.count || 0,
+        activeCustomers: customersRes.count || 0,
+        totalSuppliers: suppliersRes.count || 0,
+        pendingPayables,
+        lowStockItems: lowStockRes.count || 0,
+        totalProducts: productsRes.count || 0,
+        inventoryValue,
+        pendingOrders: pendingCount,
+        processingOrders: processingCount,
+        completedOrders: todayOrdersCount - pendingCount - processingCount,
+        pendingAISuggestions: aiSuggestionsRes.count || 0
+      });
+
+      // Generate chart data (last 7 days)
+      const chartData = [];
+      for (let i = 6; i >= 0; i--) {
+        const date = new Date();
+        date.setDate(date.getDate() - i);
+        const dateStr = date.toISOString().split('T')[0];
+        const dayName = date.toLocaleDateString('ar-EG', { weekday: 'short' });
+        
+        // Simulated data - in real app, query for each day
+        chartData.push({
+          name: dayName,
+          sales: Math.round(todaySales * (0.8 + Math.random() * 0.4)),
+          profit: Math.round(todayProfit * (0.8 + Math.random() * 0.4))
+        });
+      }
+      setSalesChartData(chartData);
+
+      // Category data
+      setCategoryData([
+        { name: 'المبيعات', value: todaySales, color: '#10b981' },
+        { name: 'المشتريات', value: todaySales * 0.6, color: '#f59e0b' },
+        { name: 'المصروفات', value: todaySales * 0.2, color: '#ef4444' },
+        { name: 'الربح', value: todayProfit, color: '#3b82f6' }
+      ]);
+
+      // Recent activity
+      setRecentActivity([
+        { type: 'order', title: 'طلب جديد #1234', time: 'منذ 5 دقائق', amount: 450, status: 'success' },
+        { type: 'payment', title: 'سداد من العميل أحمد', time: 'منذ 15 دقيقة', amount: 1200, status: 'success' },
+        { type: 'alert', title: 'انخفاض مخزون: منتج X', time: 'منذ 30 دقيقة', amount: null, status: 'warning' },
+        { type: 'ai', title: 'اقتراح قيد محاسبي', time: 'منذ ساعة', amount: null, status: 'info' }
+      ]);
+
+    } catch (error) {
+      console.error('Dashboard load error:', error);
+      toast.error('حدث خطأ في تحميل البيانات');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const formatCurrency = (amount: number) => {
+    return amount.toLocaleString('ar-EG') + ' ' + currency;
+  };
+
+  const QuickActionCard = ({ 
+    icon: Icon, 
+    title, 
+    description, 
+    color, 
+    onClick,
+    badge 
+  }: { 
+    icon: any, 
+    title: string, 
+    description: string, 
+    color: string, 
+    onClick: () => void,
+    badge?: number 
+  }) => (
+    <motion.div
+      variants={cardHoverVariants}
+      initial="rest"
+      whileHover="hover"
+    >
+      <Card 
+        className="cursor-pointer border-2 hover:border-primary/50 transition-all overflow-hidden group"
+        onClick={onClick}
+      >
+        <CardContent className="p-6">
+          <div className="flex items-start justify-between">
+            <div className={`w-12 h-12 rounded-2xl ${color} flex items-center justify-center mb-4 group-hover:scale-110 transition-transform`}>
+              <Icon className="w-6 h-6 text-white" />
+            </div>
+            {badge !== undefined && badge > 0 && (
+              <Badge className="bg-primary text-white">{badge}</Badge>
+            )}
+          </div>
+          <h3 className="font-bold text-lg mb-1">{title}</h3>
+          <p className="text-sm text-muted-foreground">{description}</p>
+        </CardContent>
+      </Card>
+    </motion.div>
+  );
+
+  const StatCard = ({ 
+    title, 
+    value, 
+    change, 
+    icon: Icon, 
+    color,
+    subtitle
+  }: { 
+    title: string, 
+    value: string | number, 
+    change?: number, 
+    icon: any, 
+    color: string,
+    subtitle?: string
+  }) => (
+    <motion.div variants={itemVariants}>
+      <Card className="relative overflow-hidden">
+        <div className={`absolute top-0 right-0 w-24 h-24 ${color} opacity-10 rounded-bl-full`} />
+        <CardHeader className="pb-2">
+          <div className="flex items-center justify-between">
+            <CardDescription className="text-sm font-medium">{title}</CardDescription>
+            <div className={`w-8 h-8 rounded-lg ${color} bg-opacity-20 flex items-center justify-center`}>
+              <Icon className={`w-4 h-4 ${color.replace('bg-', 'text-')}`} />
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <div className="text-2xl font-black mb-1">{value}</div>
+          {change !== undefined && (
+            <div className={`flex items-center text-sm ${change >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
+              {change >= 0 ? <ArrowUpRight className="w-4 h-4 mr-1" /> : <ArrowDownRight className="w-4 h-4 mr-1" />}
+              {Math.abs(change).toFixed(1)}% عن الأمس
+            </div>
+          )}
+          {subtitle && <div className="text-sm text-muted-foreground mt-1">{subtitle}</div>}
+        </CardContent>
+      </Card>
+    </motion.div>
+  );
+
+  if (loading) {
+    return (
+      <div className="h-full flex items-center justify-center">
+        <div className="flex flex-col items-center gap-4">
+          <RefreshCw className="w-8 h-8 animate-spin text-primary" />
+          <p className="text-muted-foreground">جاري تحميل لوحة التحكم...</p>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <motion.div
+      variants={containerVariants}
+      initial="hidden"
+      animate="visible"
+      className="p-6 space-y-6 h-full overflow-y-auto"
+    >
+      {/* Header */}
+      <motion.div variants={itemVariants} className="flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-black">لوحة التحكم</h1>
+          <p className="text-muted-foreground mt-1">
+            نظرة شاملة على أداء نشاطك التجاري
+          </p>
+        </div>
+        <div className="flex gap-2">
+          <Button variant="outline" size="sm" onClick={() => loadDashboardData()}>
+            <RefreshCw className="w-4 h-4 mr-2" />
+            تحديث
+          </Button>
+          <Button size="sm" onClick={() => onNavigate('pos')}>
+            <ShoppingCart className="w-4 h-4 mr-2" />
+            نقطة البيع
+          </Button>
+        </div>
+      </motion.div>
+
+      {/* AI Alert Banner */}
+      {stats.pendingAISuggestions > 0 && (
+        <motion.div variants={itemVariants}>
+          <Card className="bg-gradient-to-r from-violet-500/10 to-purple-500/10 border-violet-500/30">
+            <CardContent className="p-4 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-full bg-violet-500/20 flex items-center justify-center">
+                  <Sparkles className="w-5 h-5 text-violet-600" />
+                </div>
+                <div>
+                  <h3 className="font-bold">لديك {stats.pendingAISuggestions} اقتراح محاسبي من AI</h3>
+                  <p className="text-sm text-muted-foreground">المحاسب الذكي اقترح قيود جديدة للمراجعة</p>
+                </div>
+              </div>
+              <Button size="sm" variant="outline" onClick={() => onNavigate('ai_assistant')}>
+                مراجعة الاقتراحات
+                <ArrowRight className="w-4 h-4 mr-2" />
+              </Button>
+            </CardContent>
+          </Card>
+        </motion.div>
+      )}
+
+      {/* Stats Grid */}
+      <motion.div variants={itemVariants} className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        <StatCard
+          title="مبيعات اليوم"
+          value={formatCurrency(stats.todaySales)}
+          change={stats.salesChange}
+          icon={DollarSign}
+          color="bg-emerald-500"
+          subtitle={`${stats.todayOrders} طلب`}
+        />
+        <StatCard
+          title="صافي الربح"
+          value={formatCurrency(stats.todayProfit)}
+          change={stats.profitChange}
+          icon={TrendingUp}
+          color="bg-blue-500"
+          subtitle={`هامش ${stats.profitMargin.toFixed(1)}%`}
+        />
+        <StatCard
+          title="العملاء النشطين"
+          value={stats.totalCustomers}
+          icon={Users}
+          color="bg-violet-500"
+          subtitle={`+${stats.newCustomersToday} جديد اليوم`}
+        />
+        <StatCard
+          title="الطلبات المعلقة"
+          value={stats.pendingOrders}
+          icon={Clock}
+          color="bg-amber-500"
+          subtitle={`${stats.processingOrders} قيد التنفيذ`}
+        />
+      </motion.div>
+
+      {/* Charts Row */}
+      <motion.div variants={itemVariants} className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Sales Chart */}
+        <Card className="lg:col-span-2">
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle className="text-lg font-bold">مؤشر المبيعات والأرباح</CardTitle>
+                <CardDescription>آخر 7 أيام</CardDescription>
+              </div>
+              <div className="flex gap-2">
+                <Badge variant="outline" className="bg-emerald-500/10 text-emerald-600">
+                  <div className="w-2 h-2 rounded-full bg-emerald-500 mr-1" />
+                  المبيعات
+                </Badge>
+                <Badge variant="outline" className="bg-blue-500/10 text-blue-600">
+                  <div className="w-2 h-2 rounded-full bg-blue-500 mr-1" />
+                  الربح
+                </Badge>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="h-[250px]">
+              <ResponsiveContainer width="100%" height="100%">
+                <AreaChart data={salesChartData}>
+                  <defs>
+                    <linearGradient id="colorSales" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#10b981" stopOpacity={0.3}/>
+                      <stop offset="95%" stopColor="#10b981" stopOpacity={0}/>
+                    </linearGradient>
+                    <linearGradient id="colorProfit" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.3}/>
+                      <stop offset="95%" stopColor="#3b82f6" stopOpacity={0}/>
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                  <XAxis dataKey="name" className="text-xs" />
+                  <YAxis className="text-xs" />
+                  <Tooltip 
+                    contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}
+                    formatter={(value: number) => formatCurrency(value)}
+                  />
+                  <Area type="monotone" dataKey="sales" stroke="#10b981" fillOpacity={1} fill="url(#colorSales)" strokeWidth={2} />
+                  <Area type="monotone" dataKey="profit" stroke="#3b82f6" fillOpacity={1} fill="url(#colorProfit)" strokeWidth={2} />
+                </AreaChart>
+              </ResponsiveContainer>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Categories Pie Chart */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-lg font-bold">توزيع اليوم</CardTitle>
+            <CardDescription>إيرادات vs مصروفات</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="h-[200px]">
+              <ResponsiveContainer width="100%" height="100%">
+                <RePieChart>
+                  <Pie
+                    data={categoryData}
+                    cx="50%"
+                    cy="50%"
+                    innerRadius={60}
+                    outerRadius={80}
+                    paddingAngle={5}
+                    dataKey="value"
+                  >
+                    {categoryData.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={entry.color} />
+                    ))}
+                  </Pie>
+                  <Tooltip formatter={(value: number) => formatCurrency(value)} />
+                </RePieChart>
+              </ResponsiveContainer>
+            </div>
+            <div className="grid grid-cols-2 gap-2 mt-4">
+              {categoryData.map((item, idx) => (
+                <div key={idx} className="flex items-center gap-2 text-sm">
+                  <div className="w-3 h-3 rounded-full" style={{ backgroundColor: item.color }} />
+                  <span className="text-muted-foreground">{item.name}</span>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      </motion.div>
+
+      {/* Quick Actions & Inventory Alert */}
+      <motion.div variants={itemVariants} className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Quick Actions */}
+        <div className="lg:col-span-2">
+          <h3 className="font-bold text-lg mb-4 flex items-center gap-2">
+            <Target className="w-5 h-5 text-primary" />
+            الوصول السريع
+          </h3>
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+            <QuickActionCard
+              icon={ShoppingCart}
+              title="طلب بيع"
+              description="إنشاء فاتورة مبيعات جديدة"
+              color="bg-emerald-500"
+              onClick={() => onNavigate('pos')}
+            />
+            <QuickActionCard
+              icon={Package}
+              title="استلام مخزون"
+              description="تسجيل واردات جديدة"
+              color="bg-blue-500"
+              onClick={() => onNavigate('inventory_receipts')}
+            />
+            <QuickActionCard
+              icon={Receipt}
+              title="مصروف جديد"
+              description="تسجيل مصروف يومي"
+              color="bg-amber-500"
+              onClick={() => onNavigate('expenses')}
+            />
+            <QuickActionCard
+              icon={Users}
+              title="عميل جديد"
+              description="إضافة عميل للنظام"
+              color="bg-violet-500"
+              onClick={() => onNavigate('customers')}
+            />
+            <QuickActionCard
+              icon={Sparkles}
+              title="AI مساعد"
+              description="اقتراح قيد محاسبي"
+              color="bg-purple-500"
+              onClick={() => onNavigate('ai_assistant')}
+              badge={stats.pendingAISuggestions}
+            />
+            <QuickActionCard
+              icon={BarChart3}
+              title="التقارير"
+              description="عرض التحليلات المالية"
+              color="bg-cyan-500"
+              onClick={() => onNavigate('stats')}
+            />
+          </div>
+        </div>
+
+        {/* Alerts & Activity */}
+        <div className="space-y-4">
+          {/* Low Stock Alert */}
+          {stats.lowStockItems > 0 && (
+            <Card className="border-amber-500/30 bg-amber-500/5">
+              <CardContent className="p-4">
+                <div className="flex items-start gap-3">
+                  <div className="w-10 h-10 rounded-full bg-amber-500/20 flex items-center justify-center shrink-0">
+                    <AlertCircle className="w-5 h-5 text-amber-600" />
+                  </div>
+                  <div className="flex-1">
+                    <h4 className="font-bold text-amber-700">تنبيه المخزون</h4>
+                    <p className="text-sm text-amber-600 mt-1">
+                      {stats.lowStockItems} منتجات تحتاج إعادة توريد
+                    </p>
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      className="mt-2 w-full border-amber-500/30 hover:bg-amber-500/10"
+                      onClick={() => onNavigate('inventory')}
+                    >
+                      مراجعة المخزون
+                    </Button>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Recent Activity */}
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-lg font-bold flex items-center gap-2">
+                <Activity className="w-5 h-5" />
+                النشاط الأخير
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {recentActivity.map((activity, idx) => (
+                <div key={idx} className="flex items-center gap-3 p-2 rounded-lg hover:bg-muted/50 transition-colors">
+                  <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 ${
+                    activity.status === 'success' ? 'bg-emerald-500/20' :
+                    activity.status === 'warning' ? 'bg-amber-500/20' :
+                    'bg-blue-500/20'
+                  }`}>
+                    {activity.status === 'success' ? <CheckCircle2 className="w-4 h-4 text-emerald-600" /> :
+                     activity.status === 'warning' ? <AlertCircle className="w-4 h-4 text-amber-600" /> :
+                     <Sparkles className="w-4 h-4 text-blue-600" />}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium truncate">{activity.title}</p>
+                    <p className="text-xs text-muted-foreground">{activity.time}</p>
+                  </div>
+                  {activity.amount && (
+                    <span className="text-sm font-bold text-emerald-600">
+                      +{formatCurrency(activity.amount)}
+                    </span>
+                  )}
+                </div>
+              ))}
+            </CardContent>
+          </Card>
+        </div>
+      </motion.div>
+
+      {/* Monthly Overview */}
+      <motion.div variants={itemVariants}>
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-lg font-bold">ملخص الشهر الحالي</CardTitle>
+            <CardDescription>{new Date().toLocaleDateString('ar-EG', { month: 'long', year: 'numeric' })}</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+              <div className="space-y-2">
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-muted-foreground">إجمالي المبيعات</span>
+                  <span className="font-bold">{formatCurrency(stats.monthSales)}</span>
+                </div>
+                <Progress value={75} className="h-2" />
+                <p className="text-xs text-muted-foreground">75% من الهدف الشهري</p>
+              </div>
+              
+              <div className="space-y-2">
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-muted-foreground">صافي الربح</span>
+                  <span className="font-bold">{formatCurrency(stats.monthProfit)}</span>
+                </div>
+                <Progress value={60} className="h-2" />
+                <p className="text-xs text-muted-foreground">هامش ربح {stats.profitMargin.toFixed(0)}%</p>
+              </div>
+              
+              <div className="space-y-2">
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-muted-foreground">المدفوعات المعلقة</span>
+                  <span className="font-bold text-amber-600">{formatCurrency(stats.pendingPayables)}</span>
+                </div>
+                <Progress value={40} className="h-2 bg-amber-100" />
+                <p className="text-xs text-muted-foreground">{stats.totalSuppliers} مورد</p>
+              </div>
+              
+              <div className="space-y-2">
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-muted-foreground">قيمة المخزون</span>
+                  <span className="font-bold">{formatCurrency(stats.inventoryValue)}</span>
+                </div>
+                <Progress value={85} className="h-2 bg-blue-100" />
+                <p className="text-xs text-muted-foreground">{stats.totalProducts} منتج</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </motion.div>
+    </motion.div>
+  );
+}
