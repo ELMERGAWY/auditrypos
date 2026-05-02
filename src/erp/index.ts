@@ -10,8 +10,9 @@ export * from './financial_core/types';
 export {
   ProfessionalPostingEngine,
   createPostingEngine,
-  BusinessType,
 } from './posting_engine/professionalPostingEngine';
+
+export type { BusinessType } from './posting_engine/professionalPostingEngine';
 
 export type {
   JournalEntry,
