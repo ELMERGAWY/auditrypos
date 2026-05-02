@@ -55,7 +55,12 @@ export function useDashboardData() {
     }>(CACHE_KEY_PREFIX + userId);
 
     if (cached) {
-      if (cached.restaurant) setRestaurant(cached.restaurant);
+      if (cached.restaurant) {
+        setRestaurant(cached.restaurant);
+        // Restore business_id to localStorage from cache
+        localStorage.setItem('current_business_id', cached.restaurant.id);
+        localStorage.setItem('current_business_name', cached.restaurant.name);
+      }
       if (cached.menuItems?.length) setMenuItems(cached.menuItems);
       if (cached.orders?.length) setOrders(cached.orders);
       if (cached.waiterCalls?.length) setWaiterCalls(cached.waiterCalls);
@@ -92,9 +97,37 @@ export function useDashboardData() {
     const pName = profileRes.data?.full_name || '';
     if (pName) setProfileName(pName);
 
-    const rest = restsRes.data?.[0];
+    let rest = restsRes.data?.[0];
+
+    // If no restaurant found as owner, try finding through company_users relationship
+    if (!rest) {
+      const { data: userCompanies } = await supabase
+        .from('company_users')
+        .select('company_id')
+        .eq('user_id', user.id)
+        .eq('is_active', true)
+        .limit(1);
+
+      if (userCompanies && userCompanies.length > 0) {
+        const companyId = userCompanies[0].company_id;
+        const { data: companyRestaurants } = await supabase
+          .from('restaurants')
+          .select('*')
+          .eq('company_id', companyId)
+          .limit(1);
+
+        if (companyRestaurants && companyRestaurants.length > 0) {
+          rest = companyRestaurants[0];
+        }
+      }
+    }
+
     if (!rest) { setRestaurant(null); setDataLoaded(true); return; }
     setRestaurant(rest as unknown as Restaurant);
+    
+    // Store business_id in localStorage for persistence across refreshes
+    localStorage.setItem('current_business_id', rest.id);
+    localStorage.setItem('current_business_name', rest.name);
 
     const suspended = rest.status === 'suspended' || (rest.subscription_end && new Date(rest.subscription_end) < new Date());
 
