@@ -52,42 +52,51 @@ class CheckoutIntegration {
     }
   ): Promise<CheckoutResult> {
     try {
-      // 0. Ensure accounting accounts exist (Self-healing)
+      // 0. Ensure accounting accounts exist (Self-healing) — non-blocking
       if (context.isOnline) {
-        await journalService.ensureAccountingSetup(context.restaurantId, context.currency);
+        try {
+          await journalService.ensureAccountingSetup(context.restaurantId, context.currency);
+        } catch (e) {
+          console.warn('[checkout] ensureAccountingSetup failed (continuing):', e);
+        }
       }
 
       const isDelivery = orderData.orderType === 'delivery';
       const inventoryItems = orderData.cart.filter(item => (item as any).product_id || item.menu_item_id);
 
-      // 1, 6, 8. Run independent calculations in parallel for speed
-      const [taxCalculation, cogsResult, customerId] = await Promise.all([
-        taxService.calculateOrderTaxes(
-          context.restaurantId,
-          orderData.cart.map(item => ({
-            product_id: (item as any).product_id || item.menu_item_id,
-            category: (item as any).category || 'general',
-            price: item.price,
-            quantity: item.quantity,
-          })),
-          {
-            isDelivery,
-            deliveryFee: isDelivery ? await this.getDeliveryFee(context.restaurantId) : 0,
-            discount: orderData.discount || 0,
-          }
-        ),
-        inventoryCosting.calculateOrderCOGS(
-          inventoryItems,
-          context.restaurantId
-        ),
-        orderData.customerName?.trim() ? this.findOrCreateCustomer(
-          context.restaurantId,
-          orderData.customerName.trim(),
-          orderData.customerPhone
-        ) : Promise.resolve(null)
-      ]);
+      // 1, 6, 8. Run independent calculations in parallel — each isolated so a single failure does NOT abort the sale
+      const safeTax = taxService.calculateOrderTaxes(
+        context.restaurantId,
+        orderData.cart.map(item => ({
+          product_id: (item as any).product_id || item.menu_item_id,
+          category: (item as any).category || 'general',
+          price: item.price,
+          quantity: item.quantity,
+        })),
+        {
+          isDelivery,
+          deliveryFee: isDelivery ? await this.getDeliveryFee(context.restaurantId).catch(() => 0) : 0,
+          discount: orderData.discount || 0,
+        }
+      ).catch((e) => {
+        console.warn('[checkout] tax calc failed:', e);
+        return { subtotal: 0, taxAmount: 0, total: 0, isInclusive: true, taxLines: [] as any[] };
+      });
 
-      const deliveryFee = isDelivery ? await this.getDeliveryFee(context.restaurantId) : 0;
+      const safeCogs = inventoryCosting.calculateOrderCOGS(inventoryItems, context.restaurantId)
+        .catch((e) => {
+          console.warn('[checkout] COGS calc failed:', e);
+          return { totalCOGS: 0, itemsWithCost: [] as any[] };
+        });
+
+      const safeCustomer = orderData.customerName?.trim()
+        ? this.findOrCreateCustomer(context.restaurantId, orderData.customerName.trim(), orderData.customerPhone)
+            .catch((e) => { console.warn('[checkout] customer upsert failed:', e); return null; })
+        : Promise.resolve(null);
+
+      const [taxCalculation, cogsResult, customerId] = await Promise.all([safeTax, safeCogs, safeCustomer]);
+
+      const deliveryFee = isDelivery ? await this.getDeliveryFee(context.restaurantId).catch(() => 0) : 0;
       const cogs = cogsResult.totalCOGS;
 
       // 2. Calculate subtotal
