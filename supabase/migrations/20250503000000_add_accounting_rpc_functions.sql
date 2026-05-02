@@ -3,6 +3,15 @@
 -- Add missing RPC functions for unified ERP accounting layer
 -- ============================================================
 
+-- Drop existing functions first (to handle signature changes)
+DROP FUNCTION IF EXISTS post_journal_entry(UUID);
+DROP FUNCTION IF EXISTS update_account_balance(UUID, DECIMAL, UUID);
+DROP FUNCTION IF EXISTS get_trial_balance(UUID, DATE);
+DROP FUNCTION IF EXISTS get_profit_and_loss(UUID, DATE, DATE);
+DROP FUNCTION IF EXISTS get_balance_sheet(UUID, DATE);
+DROP TRIGGER IF EXISTS tr_link_entry_to_period ON journal_entries;
+DROP FUNCTION IF EXISTS link_entry_to_fiscal_period();
+
 -- 1. Function: Update Account Balance
 -- Updates account_balances table when journal entries are posted
 CREATE OR REPLACE FUNCTION update_account_balance(
