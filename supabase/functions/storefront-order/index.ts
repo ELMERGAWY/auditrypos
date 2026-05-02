@@ -79,7 +79,8 @@ Deno.serve(async (req) => {
     }).select().single();
 
     if (error) {
-      return new Response(JSON.stringify({ error: error.message }), {
+      console.error('[storefront-order] Insert error:', error);
+      return new Response(JSON.stringify({ error: "Could not create order. Please try again." }), {
         status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" }
       });
     }
@@ -109,7 +110,8 @@ Deno.serve(async (req) => {
       headers: { ...corsHeaders, "Content-Type": "application/json" }
     });
   } catch (e) {
-    return new Response(JSON.stringify({ error: e.message }), {
+    console.error('[storefront-order] Unhandled error:', e);
+    return new Response(JSON.stringify({ error: "An unexpected error occurred. Please try again." }), {
       status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" }
     });
   }
