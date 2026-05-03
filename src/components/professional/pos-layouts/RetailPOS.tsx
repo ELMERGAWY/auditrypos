@@ -260,7 +260,7 @@ export function RetailPOS({
               {/* Stock Badge */}
               {product.stock !== undefined && product.stock <= 5 && (
                 <Badge 
-                  variant={product.stock === 0 ? "destructive" : "warning"}
+                  variant={product.stock === 0 ? "destructive" : "secondary"}
                   className="absolute top-2 left-2 text-[8px]"
                 >
                   {product.stock === 0 ? 'نفذ' : `${product.stock} متبقي`}
