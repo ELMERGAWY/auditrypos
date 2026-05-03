@@ -293,7 +293,7 @@ export function ProfessionalSidebar({
                   <motion.div
                     initial={isCollapsed ? false : { height: 0, opacity: 0 }}
                     animate={{ height: 'auto', opacity: 1 }}
-                    exit={isCollapsed ? false : { height: 0, opacity: 0 }}
+                    exit={isCollapsed ? undefined : { height: 0, opacity: 0 }}
                     className="space-y-1 overflow-hidden"
                   >
                     {items.map((item) => {
