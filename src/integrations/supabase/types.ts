@@ -4355,6 +4355,7 @@ export type Database = {
           description: string
           entry_date: string
           entry_number: string
+          fiscal_period_id: string | null
           id: string
           is_posted: boolean | null
           posted_at: string | null
@@ -4385,6 +4386,7 @@ export type Database = {
           description: string
           entry_date?: string
           entry_number: string
+          fiscal_period_id?: string | null
           id?: string
           is_posted?: boolean | null
           posted_at?: string | null
@@ -4415,6 +4417,7 @@ export type Database = {
           description?: string
           entry_date?: string
           entry_number?: string
+          fiscal_period_id?: string | null
           id?: string
           is_posted?: boolean | null
           posted_at?: string | null
@@ -4442,6 +4445,13 @@ export type Database = {
             columns: ["company_id"]
             isOneToOne: false
             referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "journal_entries_fiscal_period_id_fkey"
+            columns: ["fiscal_period_id"]
+            isOneToOne: false
+            referencedRelation: "fiscal_periods"
             referencedColumns: ["id"]
           },
           {
@@ -11134,6 +11144,7 @@ export type Database = {
           description: string
           entry_date: string
           entry_number: string
+          fiscal_period_id: string | null
           id: string
           is_posted: boolean | null
           posted_at: string | null
@@ -11235,6 +11246,10 @@ export type Database = {
       }
       create_default_fiscal_periods: {
         Args: { p_restaurant_id: string; p_year?: number }
+        Returns: undefined
+      }
+      create_fiscal_periods_for_year: {
+        Args: { p_company_id: string; p_year: number }
         Returns: undefined
       }
       create_treasury_reconciliation_snapshot: {
@@ -11529,15 +11544,9 @@ export type Database = {
         Returns: string
       }
       get_balance_sheet: {
-        Args: {
-          p_as_of_date?: string
-          p_fiscal_period_id?: string
-          p_restaurant_id: string
-        }
+        Args: { p_as_of_date?: string; p_restaurant_id: string }
         Returns: {
-          account_code: string
-          account_id: string
-          account_name: string
+          account_type: string
           amount: number
           section: string
         }[]
@@ -11562,17 +11571,14 @@ export type Database = {
       }
       get_profit_and_loss: {
         Args: {
-          p_end_date?: string
-          p_fiscal_period_id?: string
+          p_end_date: string
           p_restaurant_id: string
-          p_start_date?: string
+          p_start_date: string
         }
         Returns: {
-          account_code: string
-          account_id: string
-          account_name: string
           amount: number
           category: string
+          line_type: string
         }[]
       }
       get_sales_account: { Args: { p_restaurant_id: string }; Returns: string }
@@ -11581,21 +11587,18 @@ export type Database = {
         Returns: string
       }
       get_trial_balance: {
-        Args: {
-          p_as_of_date?: string
-          p_fiscal_period_id?: string
-          p_restaurant_id: string
-        }
+        Args: { p_as_of_date?: string; p_restaurant_id: string }
         Returns: {
           account_code: string
           account_id: string
           account_name: string
           account_type: string
+          budget_amount: number
           closing_balance: number
           credit_movement: number
           debit_movement: number
-          net_movement: number
           opening_balance: number
+          variance: number
         }[]
       }
       has_role: {
@@ -11625,6 +11628,7 @@ export type Database = {
           description: string
           entry_date: string
           entry_number: string
+          fiscal_period_id: string | null
           id: string
           is_posted: boolean | null
           posted_at: string | null
@@ -11653,7 +11657,7 @@ export type Database = {
           isSetofReturn: false
         }
       }
-      post_journal_entry: { Args: { p_entry_id: string }; Returns: Json }
+      post_journal_entry: { Args: { p_entry_id: string }; Returns: boolean }
       recalc_ap_item_status: { Args: { p_item_id: string }; Returns: undefined }
       recalc_ar_item_status: { Args: { p_item_id: string }; Returns: undefined }
       recalc_journal_totals: {
@@ -11671,6 +11675,7 @@ export type Database = {
           description: string
           entry_date: string
           entry_number: string
+          fiscal_period_id: string | null
           id: string
           is_posted: boolean | null
           posted_at: string | null
@@ -11747,6 +11752,7 @@ export type Database = {
           description: string
           entry_date: string
           entry_number: string
+          fiscal_period_id: string | null
           id: string
           is_posted: boolean | null
           posted_at: string | null
@@ -11774,6 +11780,14 @@ export type Database = {
           isOneToOne: true
           isSetofReturn: false
         }
+      }
+      update_account_balance: {
+        Args: {
+          p_account_id: string
+          p_amount: number
+          p_fiscal_period_id?: string
+        }
+        Returns: undefined
       }
       user_owns_company: { Args: { _company_id: string }; Returns: boolean }
     }
