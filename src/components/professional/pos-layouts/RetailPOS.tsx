@@ -343,7 +343,7 @@ export function RetailPOS({
                     >
                       <span className="text-sm">{customer.name}</span>
                       {customer.credit_balance > 0 && (
-                        <Badge variant="warning" className="text-[10px]">
+                        <Badge variant="secondary" className="text-[10px]">
                           {customer.credit_balance} {currency}
                         </Badge>
                       )}
