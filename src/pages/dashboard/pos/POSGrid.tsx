@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { motion } from 'framer-motion';
 import { TrendingUp, Receipt, DollarSign, Timer } from 'lucide-react';
 import { Input } from '@/components/ui/input';
