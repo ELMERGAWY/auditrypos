@@ -657,7 +657,7 @@ export function AdvancedReportsHub({ restaurantId, currency }: Props) {
               <Button variant="outline" size="sm" className="gap-2 h-9 px-4 rounded-xl border-primary/20 hover:bg-primary/5 transition-all" disabled={isPlaceholder}>
                 <Download className="w-4 h-4" /> Excel
               </Button>
-              <Button variant="primary" size="sm" className="gap-2 h-9 px-4 rounded-xl gradient-bg text-white border-0 shadow-lg shadow-primary/20" onClick={handlePrint} disabled={isPlaceholder}>
+              <Button variant="default" size="sm" className="gap-2 h-9 px-4 rounded-xl gradient-bg text-white border-0 shadow-lg shadow-primary/20" onClick={handlePrint} disabled={isPlaceholder}>
                 <Printer className="w-4 h-4" /> طباعة
               </Button>
            </div>

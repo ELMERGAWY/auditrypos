@@ -105,15 +105,15 @@ export function AccountingAssistantChat({ restaurantId, userId, fiscalPeriodId }
       .limit(50);
     
     if (data) {
-      setMessages(data.map(m => ({
+      setMessages(data.map((m: any) => ({
         id: m.id,
         role: m.role as 'user' | 'assistant' | 'system',
         content: m.content,
-        message_type: m.message_type,
+        message_type: (m.message_type || 'general') as any,
         metadata: m.metadata,
         created_at: m.created_at,
         status: 'completed'
-      })));
+      })) as any);
     }
   };
 
@@ -126,9 +126,9 @@ export function AccountingAssistantChat({ restaurantId, userId, fiscalPeriodId }
       .order('created_at', { ascending: false });
     
     if (data) {
-      setSuggestions(data.map(s => ({
+      setSuggestions(data.map((s: any) => ({
         id: s.id,
-        ...s.suggestion_data
+        ...(s.suggestion_data || {})
       })));
     }
   };

@@ -92,8 +92,8 @@ export function BankCashModule({ restaurantId, currency }: Props) {
          ]);
 
          // 3. Update Balances
-         await supabase.rpc('update_account_balance', { acc_id: transfer.from });
-         await supabase.rpc('update_account_balance', { acc_id: transfer.to });
+         await (supabase as any).rpc('update_account_balance', { acc_id: transfer.from });
+         await (supabase as any).rpc('update_account_balance', { acc_id: transfer.to });
 
          toast.success('تمت عملية التحويل بنجاح وتوليد القيد المحاسبي');
          setShowTransfer(false);
