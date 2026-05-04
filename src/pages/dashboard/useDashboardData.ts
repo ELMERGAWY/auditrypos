@@ -122,7 +122,20 @@ export function useDashboardData() {
       }
     }
 
-    if (!rest) { setRestaurant(null); setDataLoaded(true); return; }
+    if (!rest) {
+      // CRITICAL: Do NOT wipe an already-loaded restaurant (from cache or previous load).
+      // A transient RLS/network glitch on refresh must not throw the user back to the
+      // "choose business" screen. Only set null if we have never successfully loaded one.
+      setRestaurant(prev => {
+        if (prev) {
+          console.warn('[Dashboard] restaurants query returned empty but a restaurant is already loaded — keeping existing one to avoid logout-style redirect.');
+          return prev;
+        }
+        return null;
+      });
+      setDataLoaded(true);
+      return;
+    }
     setRestaurant(rest as unknown as Restaurant);
     
     // Store business_id in localStorage for persistence across refreshes
