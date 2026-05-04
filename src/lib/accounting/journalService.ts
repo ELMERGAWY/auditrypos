@@ -3,8 +3,10 @@
 // JOURNAL SERVICE - Double Entry Accounting Engine
 // ============================================================
 
-import { supabase } from '@/integrations/supabase/client';
+import { supabase as _supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+// Loose-typed alias to bypass strict generated DB types for legacy ERP code
+const supabase = _supabase as any;
 import { 
   type JournalEntry, 
   type JournalEntryLine, 
