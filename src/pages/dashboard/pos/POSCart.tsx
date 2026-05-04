@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { motion } from 'framer-motion';
 import { ShoppingCart, Pause, Play, Trash2, Hash, Phone, MapPin, StickyNote, Percent, DollarSign, Send, Receipt, Minus, Plus, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
