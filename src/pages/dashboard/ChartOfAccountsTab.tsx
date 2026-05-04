@@ -45,9 +45,9 @@ export function ChartOfAccountsTab({ restaurantId, currency }: Props) {
     if (error) {
       toast.error('فشل في تحميل شجرة الحسابات');
     } else {
-      setAccounts(data || []);
+      setAccounts((data || []) as any);
       // Auto expand root nodes
-      const roots = (data || []).filter(a => !a.parent_id).map(a => a.id);
+      const roots = ((data || []) as any[]).filter((a: any) => !a.parent_id).map((a: any) => a.id);
       setExpandedNodes(new Set(roots));
     }
     setLoading(false);

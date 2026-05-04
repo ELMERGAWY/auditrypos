@@ -28,7 +28,7 @@ export function BalanceSheet({ restaurantId, currency }: Props) {
       // Cash & Bank (Simplified from journal lines)
       let cash = 0;
       let bank = 0;
-      (journalRes.data || []).forEach(line => {
+      ((journalRes.data || []) as any[]).forEach((line: any) => {
         if (line.account_code?.startsWith('1100')) cash += (Number(line.debit) - Number(line.credit));
         if (line.account_code?.startsWith('1200')) bank += (Number(line.debit) - Number(line.credit));
       });
