@@ -76,7 +76,7 @@ class InventoryCostingService {
       return null;
     }
 
-    return data as InventoryCostLayer;
+    return data as unknown as InventoryCostLayer;
   }
 
   async getCostLayers(
@@ -105,7 +105,7 @@ class InventoryCostingService {
       return [];
     }
 
-    return (data || []) as InventoryCostLayer[];
+    return (data || []) as unknown as InventoryCostLayer[];
   }
 
   // ============================================================
@@ -151,14 +151,14 @@ class InventoryCostingService {
   }
 
   private async consumeFromLayer(layerId: string, qty: number): Promise<void> {
-    const { error } = await supabase
+    const { error } = await (supabase as any)
       .from('inventory_cost_layers')
       .update({
-        remaining_qty: supabase.rpc('decrement_remaining_qty', { 
+        remaining_qty: (supabase as any).rpc('decrement_remaining_qty', { 
           p_layer_id: layerId, 
           p_qty: qty 
         }),
-        is_consumed: supabase.rpc('check_layer_consumed', { p_layer_id: layerId }),
+        is_consumed: (supabase as any).rpc('check_layer_consumed', { p_layer_id: layerId }),
         consumed_at: new Date().toISOString(),
       })
       .eq('id', layerId);
@@ -299,7 +299,7 @@ class InventoryCostingService {
     cogs: number,
     unitCost: number
   ): Promise<void> {
-    const { error } = await supabase
+    const { error } = await (supabase as any)
       .from('inventory_consumption')
       .insert({
         product_id: productId,

@@ -72,36 +72,7 @@ export interface CostCenter {
   is_active: boolean;
 }
 
-// Business-Specific Account Mappings
-// ============================================================
-
-export interface BusinessAccountMapping {
-  // Asset Accounts
-  cashAccount: string;           // 1100
-  bankAccount: string;         // 1400
-  accountsReceivable: string;  // 1200
-  inventoryAccount: string;    // 1300
-  
-  // Liability Accounts
-  accountsPayable: string;     // 2100
-  taxPayable: string;          // 2150
-  accruedExpenses: string;     // 2200
-  
-  // Revenue Accounts
-  salesRevenue: string;        // 4100
-  serviceRevenue: string;      // 4200
-  deliveryRevenue: string;   // 4300 (for restaurants)
-  
-  // COGS Accounts
-  cogsAccount: string;         // 5100
-  wastageAccount: string;      // 5200 (restaurants)
-  
-  // Expense Accounts
-  salariesExpense: string;   // 6100
-  rentExpense: string;       // 6200
-  utilitiesExpense: string;  // 6300
-  marketingExpense: string;    // 6400
-}
+// (BusinessAccountMapping interface defined below)
 
 export type BusinessType = 
   | 'services' | 'retail' | 'restaurant' | 'pharmacy' | 'grocery' 

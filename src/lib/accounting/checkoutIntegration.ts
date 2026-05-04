@@ -431,7 +431,7 @@ class CheckoutIntegration {
       quantity: item.quantity,
     }));
 
-    await supabase.from('inventory_consumption').insert(records);
+    await supabase.from('inventory_consumption').insert(records as any);
   }
 
   // Business-specific helpers
