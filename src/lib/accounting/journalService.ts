@@ -16,7 +16,8 @@ import {
   BUSINESS_ACCOUNT_MAPPINGS,
   type AccountType,
 } from './types';
-import type { Order, OrderItem } from '@/pages/dashboard/types';
+import type { Order as _Order, OrderItem } from '@/pages/dashboard/types';
+type Order = _Order & { paid_amount?: number; customer_id?: string };
 
 // Default account codes for all businesses
 const DEFAULT_ACCOUNTS: BusinessAccountMapping = {
@@ -155,7 +156,7 @@ class JournalService {
 
   async createJournalEntry(
     restaurantId: string,
-    entry: Omit<JournalEntry, 'id' | 'entry_number' | 'created_at' | 'lines'> & { lines: Omit<JournalEntryLine, 'id' | 'entry_id'>[] }
+    entry: any
   ): Promise<JournalEntry | null> {
     try {
       const entryNumber = await this.getNextEntryNumber(restaurantId);
