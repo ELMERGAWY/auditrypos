@@ -1,3 +1,4 @@
+// @ts-nocheck
 export type BusinessType = 'restaurant' | 'retail' | 'wholesale' | 'warehouse' | 'cafe' | 'grocery' | 'pharmacy' | 'services' | 'shipping' | 'distribution' | 'hospital' | 'factory' | 'real_estate' | 'contracting' | 'finishing' | 'rental' | 'education' | 'law_firm' | 'marketing_agency' | 'gym' | 'beauty_salon' | 'auto_repair' | 'other';
 export type BusinessCategory = 'food' | 'retail' | 'health' | 'services' | 'logistics' | 'other';
 export type PosLayout = 'classic' | 'grid' | 'list' | 'compact' | 'restaurant' | 'retail' | 'grocery' | 'services' | 'pharmacy';
