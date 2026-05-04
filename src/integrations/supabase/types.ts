@@ -614,6 +614,7 @@ export type Database = {
       }
       ai_journal_suggestions: {
         Row: {
+          analysis_standard: string | null
           chat_message_id: string | null
           confidence_score: number | null
           created_at: string | null
@@ -637,6 +638,7 @@ export type Database = {
           validation_results: Json | null
         }
         Insert: {
+          analysis_standard?: string | null
           chat_message_id?: string | null
           confidence_score?: number | null
           created_at?: string | null
@@ -660,6 +662,7 @@ export type Database = {
           validation_results?: Json | null
         }
         Update: {
+          analysis_standard?: string | null
           chat_message_id?: string | null
           confidence_score?: number | null
           created_at?: string | null
@@ -8078,6 +8081,44 @@ export type Database = {
             columns: ["restaurant_id"]
             isOneToOne: false
             referencedRelation: "restaurants_public"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      telegram_bot_state: {
+        Row: {
+          created_at: string
+          id: string
+          last_polled_at: string | null
+          restaurant_id: string
+          telegram_bot_id: string
+          update_offset: number
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          last_polled_at?: string | null
+          restaurant_id: string
+          telegram_bot_id: string
+          update_offset?: number
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          last_polled_at?: string | null
+          restaurant_id?: string
+          telegram_bot_id?: string
+          update_offset?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "telegram_bot_state_telegram_bot_id_fkey"
+            columns: ["telegram_bot_id"]
+            isOneToOne: true
+            referencedRelation: "telegram_bots"
             referencedColumns: ["id"]
           },
         ]
