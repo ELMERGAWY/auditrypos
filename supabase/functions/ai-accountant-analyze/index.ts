@@ -74,6 +74,27 @@ Deno.serve(async (req) => {
   const standard = body.standard || 'EAS';
   const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
+  // Resolve user_id from auth header (required by ai_journal_suggestions.user_id NOT NULL)
+  let userId: string | null = null;
+  const authHeader = req.headers.get('Authorization');
+  if (authHeader) {
+    try {
+      const token = authHeader.replace('Bearer ', '');
+      const { data: userData } = await supabase.auth.getUser(token);
+      userId = userData?.user?.id ?? null;
+    } catch (e) { console.error('getUser failed', e); }
+  }
+  if (!userId) {
+    // fallback: restaurant owner
+    const { data: r } = await supabase.from('restaurants').select('owner_id').eq('id', body.restaurant_id).maybeSingle();
+    userId = (r as any)?.owner_id ?? null;
+  }
+  if (!userId) {
+    return new Response(JSON.stringify({ error: 'Unable to resolve user_id' }), {
+      status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    });
+  }
+
   // Load chart of accounts for context
   const { data: accounts } = await supabase
     .from('chart_of_accounts')
@@ -133,6 +154,7 @@ Deno.serve(async (req) => {
     .from('ai_journal_suggestions')
     .insert({
       restaurant_id: body.restaurant_id,
+      user_id: userId,
       chat_message_id: body.chat_message_id ?? null,
       source_type: body.source_type,
       source_reference: body.source_message_id ?? null,
