@@ -156,7 +156,7 @@ Deno.serve(async (req) => {
       restaurant_id: body.restaurant_id,
       user_id: userId,
       chat_message_id: body.chat_message_id ?? null,
-      source_type: body.source_type,
+      source_type: body.source_type === 'chat' ? 'ai_chat' : body.source_type,
       source_reference: body.source_message_id ?? null,
       title: suggestion.title ?? 'اقتراح قيد محاسبي',
       description: suggestion.description ?? body.text.slice(0, 200),
