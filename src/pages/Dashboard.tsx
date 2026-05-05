@@ -39,7 +39,7 @@ const NotificationsTab = lazy(() => import('./dashboard/NotificationsTab').then(
 const FinancialsTab = lazy(() => import('./dashboard/FinancialsTab').then(m => ({ default: m.FinancialsTab })));
 const OverheadManager = lazy(() => import('./dashboard/OverheadManager').then(m => ({ default: m.OverheadManager })));
 const AdvancedReportsHub = lazy(() => import('./dashboard/AdvancedReportsHub').then(m => ({ default: m.AdvancedReportsHub })));
-const AccountingAssistantChat = lazy(() => import('./dashboard/AccountingAssistantChat').then(m => ({ default: m.AccountingAssistantChat })));
+const AIAccountantUnified = lazy(() => import('./dashboard/AIAccountantUnified').then(m => ({ default: m.default })));
 const HomeDashboard = lazy(() => import('./dashboard/HomeDashboard').then(m => ({ default: m.HomeDashboard })));
 const CreateRestaurantForm = lazy(() => import('@/components/dashboard/CreateRestaurantForm').then(m => ({ default: m.CreateRestaurantForm })));
 import { BarcodeScanner } from './dashboard/BarcodeScanner';
@@ -1006,10 +1006,7 @@ export default function Dashboard() {
             
             {activeTab === 'ai_assistant' && (
               <ModuleErrorBoundary moduleName="مساعد المحاسب (AI)">
-                <AccountingAssistantChat 
-                  restaurantId={restaurant!.id} 
-                  userId={user?.id || ''} 
-                />
+                <AIAccountantUnified restaurantId={restaurant!.id} />
               </ModuleErrorBoundary>
             )}
             
