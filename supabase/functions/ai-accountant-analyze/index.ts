@@ -154,6 +154,7 @@ Deno.serve(async (req) => {
     .from('ai_journal_suggestions')
     .insert({
       restaurant_id: body.restaurant_id,
+      user_id: userId,
       chat_message_id: body.chat_message_id ?? null,
       source_type: body.source_type,
       source_reference: body.source_message_id ?? null,
