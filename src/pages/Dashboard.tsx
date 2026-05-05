@@ -1006,10 +1006,7 @@ export default function Dashboard() {
             
             {activeTab === 'ai_assistant' && (
               <ModuleErrorBoundary moduleName="مساعد المحاسب (AI)">
-                <AccountingAssistantChat 
-                  restaurantId={restaurant!.id} 
-                  userId={user?.id || ''} 
-                />
+                <AIAccountantUnified restaurantId={restaurant!.id} />
               </ModuleErrorBoundary>
             )}
             
