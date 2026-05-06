@@ -10,7 +10,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { 
   Truck, Plus, Search, Phone, MapPin, FileText, TrendingUp, 
   TrendingDown, Wallet, Download, CreditCard, AlertCircle, Receipt,
-  ArrowRight, Package, DollarSign, Eye
+  ArrowRight, Package, DollarSign, Eye, Banknote
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 
@@ -64,8 +64,19 @@ export function SupplierManager({ restaurantId, currency }: Props) {
   const [showAddModal, setShowAddModal] = useState(false);
   const [showStatementModal, setShowStatementModal] = useState(false);
   const [showReturnsModal, setShowReturnsModal] = useState(false);
+  const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [transactions, setTransactions] = useState<SupplierTransaction[]>([]);
   const [returns, setReturns] = useState<SupplierPurchaseReturn[]>([]);
+  
+  // Payment form state
+  const [paymentForm, setPaymentForm] = useState({
+    amount: '',
+    payment_method: 'cash',
+    reference_number: '',
+    notes: '',
+    payment_date: new Date().toISOString().split('T')[0]
+  });
+  const [processingPayment, setProcessingPayment] = useState(false);
   
   // Form state
   const [formData, setFormData] = useState({
@@ -92,7 +103,7 @@ export function SupplierManager({ restaurantId, currency }: Props) {
         .select(`
           id, name, phone, email, address, balance, credit_limit, tax_number, 
           contact_person, payment_terms, created_at,
-          inventory_receipts(id, total_amount, receipt_date),
+          purchase_invoices(id, total_amount, tax_amount, net_amount, invoice_date, status),
           supplier_transactions(id, amount, type, created_at)
         `)
         .eq('restaurant_id', restaurantId)
@@ -101,7 +112,7 @@ export function SupplierManager({ restaurantId, currency }: Props) {
       if (error) throw error;
 
       const formattedSuppliers: Supplier[] = (data || []).map((s: any) => {
-        const purchases = s.inventory_receipts?.reduce((sum: number, r: any) => sum + Number(r.total_amount), 0) || 0;
+        const purchases = s.purchase_invoices?.reduce((sum: number, inv: any) => sum + Number(inv.net_amount || inv.total_amount), 0) || 0;
         
         const lastTx = s.supplier_transactions?.sort((a: any, b: any) => 
           new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
@@ -134,12 +145,13 @@ export function SupplierManager({ restaurantId, currency }: Props) {
 
   const loadSupplierStatement = async (supplierId: string) => {
     try {
-      // Get inventory receipts (purchases)
-      const { data: receipts } = await supabase
-        .from('inventory_receipts')
-        .select('id, receipt_number, receipt_date, total_amount, paid_amount')
+      // Get purchase invoices
+      const { data: invoices } = await supabase
+        .from('purchase_invoices')
+        .select('id, invoice_number, invoice_date, total_amount, tax_amount, net_amount, paid_amount, status')
         .eq('supplier_id', supplierId)
-        .order('receipt_date', { ascending: true });
+        .eq('status', 'posted')
+        .order('invoice_date', { ascending: true });
 
       // Get supplier transactions (payments)
       const { data: payments } = await supabase
@@ -161,14 +173,14 @@ export function SupplierManager({ restaurantId, currency }: Props) {
       const statement: SupplierTransaction[] = [];
 
       // Add purchases as debits (we owe supplier)
-      receipts?.forEach((receipt: any) => {
-        const amount = Number(receipt.total_amount);
+      invoices?.forEach((invoice: any) => {
+        const amount = Number(invoice.net_amount || invoice.total_amount);
         runningBalance += amount;
         statement.push({
-          id: receipt.id,
-          date: receipt.receipt_date,
+          id: invoice.id,
+          date: invoice.invoice_date,
           type: 'purchase',
-          reference: receipt.receipt_number,
+          reference: invoice.invoice_number,
           description: 'فاتورة مشتريات',
           debit: amount,
           credit: 0,
@@ -484,6 +496,24 @@ export function SupplierManager({ restaurantId, currency }: Props) {
                         <Button variant="ghost" size="sm" onClick={() => startEdit(supplier)}>
                           <Eye className="w-4 h-4" />
                         </Button>
+                        <Button 
+                          variant="ghost" 
+                          size="sm"
+                          disabled={supplier.balance <= 0}
+                          onClick={() => {
+                            setSelectedSupplier(supplier);
+                            setPaymentForm({
+                              amount: supplier.balance.toString(),
+                              payment_method: 'cash',
+                              reference_number: '',
+                              notes: '',
+                              payment_date: new Date().toISOString().split('T')[0]
+                            });
+                            setShowPaymentModal(true);
+                          }}
+                        >
+                          <Banknote className="w-4 h-4" />
+                        </Button>
                       </div>
                     </td>
                   </tr>
@@ -693,6 +723,124 @@ export function SupplierManager({ restaurantId, currency }: Props) {
                 </tbody>
               </table>
             )}
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Payment Modal */}
+      <Dialog open={showPaymentModal} onOpenChange={setShowPaymentModal}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>دفع للمورد: {selectedSupplier?.name}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 mt-4">
+            <div className="bg-secondary/50 p-3 rounded-lg">
+              <p className="text-sm text-muted-foreground">الرصيد المستحق</p>
+              <p className="text-2xl font-bold text-destructive">{selectedSupplier?.balance?.toFixed(2)} {currency}</p>
+            </div>
+            
+            <div>
+              <Label>المبلغ *</Label>
+              <Input 
+                type="number"
+                value={paymentForm.amount}
+                onChange={(e) => setPaymentForm({ ...paymentForm, amount: e.target.value })}
+                placeholder="0.00"
+              />
+            </div>
+            
+            <div>
+              <Label>طريقة الدفع</Label>
+              <select 
+                value={paymentForm.payment_method}
+                onChange={(e) => setPaymentForm({ ...paymentForm, payment_method: e.target.value })}
+                className="w-full h-10 rounded-md border border-input bg-background px-3"
+              >
+                <option value="cash">نقدي</option>
+                <option value="bank">تحويل بنكي</option>
+                <option value="check">شيك</option>
+              </select>
+            </div>
+            
+            <div>
+              <Label>تاريخ الدفع</Label>
+              <Input 
+                type="date"
+                value={paymentForm.payment_date}
+                onChange={(e) => setPaymentForm({ ...paymentForm, payment_date: e.target.value })}
+              />
+            </div>
+            
+            <div>
+              <Label>رقم المرجع (اختياري)</Label>
+              <Input 
+                value={paymentForm.reference_number}
+                onChange={(e) => setPaymentForm({ ...paymentForm, reference_number: e.target.value })}
+                placeholder="رقم الشيك أو الإيصال"
+              />
+            </div>
+            
+            <div>
+              <Label>ملاحظات</Label>
+              <Input 
+                value={paymentForm.notes}
+                onChange={(e) => setPaymentForm({ ...paymentForm, notes: e.target.value })}
+                placeholder="ملاحظات إضافية"
+              />
+            </div>
+            
+            <div className="flex gap-2 pt-2">
+              <Button 
+                className="flex-1" 
+                disabled={processingPayment || !paymentForm.amount}
+                onClick={async () => {
+                  if (!selectedSupplier) return;
+                  const amount = parseFloat(paymentForm.amount);
+                  if (amount <= 0) {
+                    toast.error('المبلغ يجب أن يكون أكبر من صفر');
+                    return;
+                  }
+                  
+                  setProcessingPayment(true);
+                  try {
+                    const { error } = await supabase.rpc('record_supplier_payment', {
+                      p_restaurant_id: restaurantId,
+                      p_supplier_id: selectedSupplier.id,
+                      p_amount: amount,
+                      p_payment_method: paymentForm.payment_method,
+                      p_reference_number: paymentForm.reference_number || null,
+                      p_notes: paymentForm.notes || null,
+                      p_payment_date: paymentForm.payment_date
+                    });
+                    
+                    if (error) throw error;
+                    
+                    toast.success(`تم تسجيل دفع ${amount.toFixed(2)} ${currency} بنجاح`);
+                    setShowPaymentModal(false);
+                    loadSuppliers();
+                    if (showStatementModal) {
+                      loadSupplierStatement(selectedSupplier.id);
+                    }
+                  } catch (error: any) {
+                    toast.error('فشل تسجيل الدفع: ' + error.message);
+                  } finally {
+                    setProcessingPayment(false);
+                  }
+                }}
+              >
+                {processingPayment ? (
+                  <span className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                ) : (
+                  <>
+                    <Banknote className="w-4 h-4 ml-2" />
+                    تسجيل الدفع
+                  </>
+                )}
+              </Button>
+              <Button variant="outline" onClick={() => setShowPaymentModal(false)}>
+                إلغاء
+              </Button>
+            </div>
           </div>
         </DialogContent>
       </Dialog>

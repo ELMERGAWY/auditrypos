@@ -78,10 +78,16 @@ export function PurchaseInvoices({ restaurantId, currency }: Props) {
         .from('purchase_invoices')
         .insert({
           restaurant_id: restaurantId,
+          supplier_id: form.supplier_id,
           invoice_number: form.invoice_number || `PI-${Date.now()}`,
           invoice_date: form.invoice_date,
           supplier_name: supplier?.name,
           total_amount: total,
+          tax_amount: tax,
+          net_amount: net,
+          paid_amount: paid,
+          is_credit: form.is_credit && paid < net,
+          notes: form.notes,
         })
         .select()
         .single();
