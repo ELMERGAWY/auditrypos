@@ -170,7 +170,7 @@ export default function Dashboard() {
       const toStr = dateRange.to.toISOString();
 
       const [ordersRes, salesRes, purchaseRes, expensesRes, returnsRes, receiptsRes, custRes, suppRes] = await Promise.all([
-        supabase.from('orders').select('*', { count: 'exact', head: true }).eq('restaurant_id', restaurant.id).gte('created_at', fromStr).lte('created_at', toStr).neq('status', 'cancelled'),
+        supabase.from('orders').select('total').eq('restaurant_id', restaurant.id).gte('created_at', fromStr).lte('created_at', toStr).neq('status', 'cancelled'),
         supabase.from('sales_invoices').select('*', { count: 'exact', head: true }).eq('restaurant_id', restaurant.id).gte('created_at', fromStr).lte('created_at', toStr),
         supabase.from('purchase_invoices').select('*', { count: 'exact', head: true }).eq('restaurant_id', restaurant.id).gte('created_at', fromStr).lte('created_at', toStr),
         supabase.from('expenses').select('*', { count: 'exact', head: true }).eq('restaurant_id', restaurant.id).gte('created_at', fromStr).lte('created_at', toStr),
@@ -180,15 +180,21 @@ export default function Dashboard() {
         supabase.from('suppliers').select('*', { count: 'exact', head: true }).eq('restaurant_id', restaurant.id),
       ]);
 
+      const fetchedOrders = ordersRes.data || [];
+      const totalSales = fetchedOrders.reduce((sum, order) => sum + Number(order.total || 0), 0);
+      const estimatedProfit = totalSales * 0.3; // Estimated 30% profit margin if actual profit is not calculable directly here.
+
       setCounts({
-        orders: ordersRes.count || 0,
+        orders: fetchedOrders.length,
         salesInvoices: salesRes.count || 0,
         purchaseInvoices: purchaseRes.count || 0,
         expenses: expensesRes.count || 0,
         returns: returnsRes.count || 0,
         inventoryReceipts: receiptsRes.count || 0,
         customers: custRes.count || 0,
-        suppliers: suppRes.count || 0
+        suppliers: suppRes.count || 0,
+        totalSales,
+        totalProfit: estimatedProfit
       });
     } catch (err) {
       console.error('Failed to fetch counts:', err);
@@ -856,7 +862,7 @@ export default function Dashboard() {
         restaurant={restaurant!}
         user={{ email: user?.email, full_name: profileName }}
         stats={{
-          pendingOrders: pendingOrders.length,
+          pendingOrders: counts.orders,
           deliveryOrders: deliveryOrders.length,
           unackCalls: unackCalls.length,
           todayRevenue,
@@ -867,7 +873,10 @@ export default function Dashboard() {
           returnsCount: counts.returns,
           customersCount: counts.customers,
           suppliersCount: counts.suppliers,
-          inventoryReceiptsCount: counts.inventoryReceipts
+          inventoryReceiptsCount: counts.inventoryReceipts,
+          totalSales: counts.totalSales,
+          totalProfit: counts.totalProfit,
+          currency: currency
         }}
         isTrial={isTrial}
         trialDaysLeft={trialDaysLeft}

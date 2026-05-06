@@ -262,6 +262,32 @@ export function ProfessionalSidebar({
             </AnimatePresence>
           </div>
 
+          {/* Financial Mini-Stats */}
+          {!isCollapsed && stats.totalSales !== undefined && (
+            <div className="px-4 py-3 bg-primary/5 border-b border-border/50">
+              <div className="grid grid-cols-2 gap-2">
+                <div className="bg-background/50 rounded-lg p-2 border border-border/50">
+                  <p className="text-[10px] text-muted-foreground mb-1 font-bold">المبيعات</p>
+                  <p className="text-xs font-black text-primary truncate">
+                    {(stats.totalSales || 0).toLocaleString()} <span className="text-[8px] font-medium">{stats.currency}</span>
+                  </p>
+                </div>
+                <div className={cn(
+                  "rounded-lg p-2 border border-border/50",
+                  (stats.totalProfit || 0) >= 0 ? "bg-green-500/5 border-green-500/10" : "bg-red-500/5 border-red-500/10"
+                )}>
+                  <p className="text-[10px] text-muted-foreground mb-1 font-bold">الأرباح</p>
+                  <p className={cn(
+                    "text-xs font-black truncate",
+                    (stats.totalProfit || 0) >= 0 ? "text-green-500" : "text-red-500"
+                  )}>
+                    {(stats.totalProfit || 0).toLocaleString()} <span className="text-[8px] font-medium">{stats.currency}</span>
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Trial Banner */}
           <AnimatePresence>
             {!isCollapsed && isTrial && !isSuspended && (
