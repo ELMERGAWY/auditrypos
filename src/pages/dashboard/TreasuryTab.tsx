@@ -218,8 +218,8 @@ export function TreasuryTab({ restaurantId, currency }: TreasuryTabProps) {
             </div>
           </div>
           <div className="mt-4 flex justify-end">
-             <Button variant="ghost" size="sm" className="gap-2 text-primary" onClick={() => setShowAddCash(true)}>
-                <Plus className="w-4 h-4" /> إضافة خزينة
+             <Button variant="outline" size="sm" className="gap-2 text-primary border-primary/20 hover:bg-primary/5" onClick={() => setShowAddCash(true)}>
+                <Plus className="w-4 h-4" /> إنشاء خزينة جديدة
              </Button>
           </div>
           <div className="mt-6 space-y-3">
@@ -244,8 +244,8 @@ export function TreasuryTab({ restaurantId, currency }: TreasuryTabProps) {
             </div>
           </div>
           <div className="mt-4 flex justify-end">
-             <Button variant="ghost" size="sm" className="gap-2 text-emerald-500" onClick={() => setShowAddBank(true)}>
-                <Plus className="w-4 h-4" /> إضافة حساب بنكي
+             <Button variant="outline" size="sm" className="gap-2 text-emerald-500 border-emerald-500/20 hover:bg-emerald-500/5" onClick={() => setShowAddBank(true)}>
+                <Plus className="w-4 h-4" /> إنشاء حساب بنكي جديد
              </Button>
           </div>
           <div className="mt-6 space-y-3">

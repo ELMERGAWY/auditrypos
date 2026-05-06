@@ -10,7 +10,7 @@ import {
   Clock, TrendingUp, UtensilsCrossed, AlertCircle, CheckCircle,
   Timer, StickyNote, DollarSign, Truck, CalendarClock, MapPin, Phone, Lock, CreditCard,
   Volume2, VolumeX, Package, Wallet, Store, UsersRound, Camera, Sun, Moon, Send,
-  FileText, RotateCcw, Heart, Landmark, RefreshCcw, Filter, Construction, ArrowRightLeft
+  FileText, RotateCcw, Heart, Landmark, RefreshCcw, Filter, Construction, ArrowRightLeft, Network, Settings2
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -42,6 +42,8 @@ const OverheadManager = lazy(() => import('./dashboard/OverheadManager').then(m 
 const AdvancedReportsHub = lazy(() => import('./dashboard/AdvancedReportsHub').then(m => ({ default: m.AdvancedReportsHub })));
 const AIAccountantUnified = lazy(() => import('./dashboard/AIAccountantUnified').then(m => ({ default: m.default })));
 const TreasuryTab = lazy(() => import('./dashboard/TreasuryTab').then(m => ({ default: m.TreasuryTab })));
+const ChartOfAccountsTab = lazy(() => import('./dashboard/ChartOfAccountsTab').then(m => ({ default: m.ChartOfAccountsTab })));
+const AccountingMappingTab = lazy(() => import('./dashboard/AccountingMappingTab').then(m => ({ default: m.AccountingMappingTab })));
 const ManualJournalTab = lazy(() => import('./dashboard/ManualJournalTab').then(m => ({ default: m.ManualJournalTab })));
 const ContractingDashboard = lazy(() => import('./dashboard/ContractingDashboard').then(m => ({ default: m.ContractingDashboard })));
 const HomeDashboard = lazy(() => import('./dashboard/HomeDashboard').then(m => ({ default: m.HomeDashboard })));
@@ -843,6 +845,9 @@ export default function Dashboard() {
     { id: 'projects', label: 'المشاريع والمستخلصات', icon: Construction },
     { id: 'crm', label: 'إدارة العملاء CRM', icon: Heart },
     { id: 'accounting', label: 'المحاسبة والمالية', icon: Landmark },
+    { id: 'chart_of_accounts', label: 'شجرة الحسابات', icon: Network },
+    { id: 'accounting_mapping', label: 'التوجيه المحاسبي', icon: Settings2 },
+    { id: 'treasury', label: 'الخزينة والبنوك', icon: Wallet },
     { id: 'manual_journal', label: 'قيود اليومية اليدوية', icon: ArrowRightLeft },
     { id: 'analytics', label: 'التقارير المخصصة', icon: BarChart3 },
     { id: 'settings', label: 'الإعدادات', icon: Settings },
@@ -1221,6 +1226,21 @@ export default function Dashboard() {
             {activeTab === 'manual_journal' && (
               <ModuleErrorBoundary moduleName="قيود اليومية">
                 <ManualJournalTab restaurantId={restaurant!.id} currency={currency} />
+              </ModuleErrorBoundary>
+            )}
+            {activeTab === 'chart_of_accounts' && (
+              <ModuleErrorBoundary moduleName="شجرة الحسابات">
+                <ChartOfAccountsTab restaurantId={restaurant!.id} currency={currency} />
+              </ModuleErrorBoundary>
+            )}
+            {activeTab === 'treasury' && (
+              <ModuleErrorBoundary moduleName="الخزينة والبنوك">
+                <TreasuryTab restaurantId={restaurant!.id} currency={currency} />
+              </ModuleErrorBoundary>
+            )}
+            {activeTab === 'accounting_mapping' && (
+              <ModuleErrorBoundary moduleName="التوجيه المحاسبي">
+                <AccountingMappingTab restaurantId={restaurant!.id} currency={currency} />
               </ModuleErrorBoundary>
             )}
             {activeTab === 'overheads' && <OverheadManager restaurantId={restaurant!.id} currency={currency} />}

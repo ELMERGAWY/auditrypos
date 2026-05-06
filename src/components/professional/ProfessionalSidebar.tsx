@@ -21,7 +21,7 @@ export type SidebarTab =
   | 'inventory' | 'customers' | 'suppliers' | 'expenses' | 'qr' 
   | 'waiter' | 'staff' | 'financials' | 'notifications' | 'settings' | 'overheads'
   | 'customer_accounts' | 'sales_returns' | 'supplier_accounts' | 'inventory_receipts'
-  | 'ai_assistant' | 'treasury' | 'users' | 'sales_invoices' | 'purchase_invoices' | 'sales_orders' | 'purchase_orders' | 'projects' | 'manual_journal';
+  | 'ai_assistant' | 'treasury' | 'users' | 'sales_invoices' | 'purchase_invoices' | 'sales_orders' | 'purchase_orders' | 'projects' | 'manual_journal' | 'chart_of_accounts' | 'accounting_mapping';
 
 interface NavItem {
   id: SidebarTab;
@@ -149,6 +149,8 @@ export function ProfessionalSidebar({
     inventory_receipts: { label: 'استلام المخزون', icon: FileText, badge: stats.inventoryReceiptsCount, section: 'inventory' },
     overheads: { label: 'التكاليف الثابتة', icon: Activity, section: 'inventory' },
 
+    chart_of_accounts: { label: 'شجرة الحسابات', icon: Network, section: 'accounting' },
+    accounting_mapping: { label: 'التوجيه المحاسبي', icon: Settings2, section: 'accounting' },
     treasury: { label: 'الخزينة والبنوك', icon: Landmark, section: 'accounting' },
     financials: { label: 'التقارير المالية', icon: Wallet, section: 'accounting' },
     expenses: { label: 'المصروفات', icon: DollarSign, badge: stats.expensesCount, section: 'accounting' },
