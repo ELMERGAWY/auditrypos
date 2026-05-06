@@ -295,12 +295,36 @@ export class FinancialReportingEngine {
     const endDate = periodEnd || new Date().toISOString().split('T')[0];
     const startDate = periodStart || new Date(new Date().getFullYear(), 0, 1).toISOString().split('T')[0];
 
-    // Get accounts by type
+    // Get revenue/expense accounts
     const { data: accounts } = await supabase
       .from('chart_of_accounts')
-      .select('id, code, name, account_type, current_balance')
+      .select('id, code, name, account_type')
       .eq('restaurant_id', this.restaurantId)
       .in('account_type', ['revenue', 'expense']);
+
+    // Sum journal lines within period
+    const accountIds = (accounts || []).map(a => a.id);
+    const balanceMap = new Map<string, number>();
+    if (accountIds.length) {
+      const { data: lines } = await supabase
+        .from('journal_entry_lines')
+        .select('account_id, debit, credit, journal_entries!inner(entry_date, is_posted, restaurant_id)')
+        .eq('journal_entries.restaurant_id', this.restaurantId)
+        .eq('journal_entries.is_posted', true)
+        .gte('journal_entries.entry_date', startDate)
+        .lte('journal_entries.entry_date', endDate)
+        .in('account_id', accountIds);
+      lines?.forEach((l: any) => {
+        const acc = (accounts || []).find(a => a.id === l.account_id);
+        if (!acc) return;
+        const isRev = acc.account_type === 'revenue';
+        // revenue normal credit -> credit-debit; expense normal debit -> debit-credit
+        const delta = isRev ? (l.credit - l.debit) : (l.debit - l.credit);
+        balanceMap.set(l.account_id, (balanceMap.get(l.account_id) || 0) + delta);
+      });
+    }
+    // Inject computed balances back
+    (accounts || []).forEach((a: any) => { a.current_balance = balanceMap.get(a.id) || 0; });
 
     const report: ProfitLossReport = {
       period_start: startDate,
