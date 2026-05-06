@@ -8,7 +8,7 @@ import {
   CalendarClock, Package, Users, Truck, Wallet, Store,
   UsersRound, DollarSign, Lock, ChevronLeft, ChevronRight, ChevronDown,
   Sparkles, Crown, Zap, Moon, Sun, Volume2, VolumeX,
-  CreditCard, TrendingUp, Shield, HelpCircle, RotateCcw, FileText, Activity
+  CreditCard, TrendingUp, Shield, HelpCircle, RotateCcw, FileText, Activity, Landmark
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
