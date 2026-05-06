@@ -10,7 +10,7 @@ import { RecipeManager } from './RecipeManager';
 import * as XLSX from 'xlsx';
 import type { MenuItem, Restaurant } from './types';
 import { AnimatePresence, motion } from 'framer-motion';
-import { getItemIconOptions, getDefaultItemIcon, type BusinessType, BUSINESS_TYPES } from '@/lib/businessTypes';
+import { getItemIconOptions, getDefaultItemIcon, isInventoryDrivenBusiness, type BusinessType, BUSINESS_TYPES } from '@/lib/businessTypes';
 
 export interface MenuFormState {
   name: string;
