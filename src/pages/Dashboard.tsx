@@ -651,69 +651,109 @@ export default function Dashboard() {
           })),
           paid_amount: paidNum,
           payment_method: paymentMethod,
-        } as Order;
+        if (result.success) {
+          const newOrder = {
+            ...result.order,
+            items: cart.map(i => ({
+              menu_item_id: i.item.id,
+              quantity: i.qty,
+              price: i.item.price
+            })),
+            paid_amount: paidNum,
+            payment_method: paymentMethod,
+          } as Order;
 
-        setOrders(prev => [newOrder, ...prev]);
-        setLastReceipt(newOrder);
-        setShowReceipt(true);
+          setOrders(prev => [newOrder, ...prev]);
+          setLastReceipt(newOrder);
+          setShowReceipt(true);
 
-        // Handle delivery agent
-        if (orderType === 'delivery' && selectedDeliveryAgent) {
-          setAgents(agents.map(a => a.id === selectedDeliveryAgent ? { ...a, status: 'busy' } : a));
-          await supabase.from('notifications').insert({
-            restaurant_id: restaurant!.id,
-            title: `🆕 طلب توصيل جديد #${result.order.order_number?.slice(-4)}`,
-            body: `${customerName || 'عميل'} — ${deliveryAddress || ''} — ${result.order.total?.toFixed(2)} ${currency}`,
-            type: 'order',
-            target_type: 'agent',
-            target_id: selectedDeliveryAgent,
-          } as any);
+          // Handle delivery agent
+          if (orderType === 'delivery' && selectedDeliveryAgent) {
+            setAgents(agents.map(a => a.id === selectedDeliveryAgent ? { ...a, status: 'busy' } : a));
+            await supabase.from('notifications').insert({
+              restaurant_id: restaurant!.id,
+              title: `🆕 طلب توصيل جديد #${result.order.order_number?.slice(-4)}`,
+              body: `${customerName || 'عميل'} — ${deliveryAddress || ''} — ${result.order.total?.toFixed(2)} ${currency}`,
+              type: 'order',
+              target_type: 'agent',
+              target_id: selectedDeliveryAgent,
+            } as any);
+          }
+
+          // Clear invoice tab if used
+          if (activeInvoiceId) setInvoiceTabs(prev => prev.filter(t => t.id !== activeInvoiceId));
+
+          // Show success message with accounting details
+          let successMsg = `✅ تم إنشاء الطلب #${result.order.order_number?.slice(-4)} — ${result.order.total?.toFixed(2)} ${currency}`;
+          if (result.journalEntryId) {
+            successMsg += ` 📊 (قيد محاسبي: ${result.journalEntryId.slice(-4)})`;
+          }
+          toast.success(successMsg);
+          clearCart();
+        } else {
+          toast.error(result.error || 'فشل في إتمام الطلب');
+          
+          // Only fallback to offline queue if it's a network error or we are offline
+          if (result.isNetworkError || !navigator.onLine) {
+             const orderNum = `ORD-${Date.now().toString().slice(-6)}`;
+             const clientOrderId = `${restaurant!.id}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+             
+             const cartItems = cart.map(c => ({
+               menu_item_id: c.item.id,
+               menu_item_name: c.item.name,
+               menu_item_image: c.item.image,
+               quantity: c.qty,
+               price: c.item.price,
+               sold_unit: c.unitMode || '',
+               unit_factor: 1,
+               cost_price_snapshot: (c.item as any).cost_price || 0,
+             }));
+
+             await queueOrderOffline(
+               {
+                 restaurant_id: restaurant!.id,
+                 order_number: orderNum,
+                 total: cartTotal,
+                 status: sendToPrep ? 'pending' : 'completed',
+                 client_order_id: clientOrderId,
+               } as any,
+               cartItems,
+               orderNum
+             );
+          }
         }
-
-        // Clear invoice tab if used
-        if (activeInvoiceId) setInvoiceTabs(prev => prev.filter(t => t.id !== activeInvoiceId));
-
-        // Show success message with accounting details
-        let successMsg = `✅ تم إنشاء الطلب #${result.order.order_number?.slice(-4)} — ${result.order.total?.toFixed(2)} ${currency}`;
-        if (result.journalEntryId) {
-          successMsg += ` 📊 (قيد محاسبي: ${result.journalEntryId.slice(-4)})`;
-        }
-        toast.success(successMsg);
-
-        clearCart();
-      } else {
-        toast.error(result.error || 'فشل في إتمام الطلب');
-      }
     } catch (error: any) {
       console.error('Checkout error:', error);
       toast.error(`خطأ في إتمام الطلب: ${error.message}`);
       
-      // Fallback to offline queue on error
-      const orderNum = `ORD-${Date.now().toString().slice(-6)}`;
-      const clientOrderId = `${restaurant!.id}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-      
-      const cartItems = cart.map(c => ({
-        menu_item_id: c.item.id,
-        menu_item_name: c.item.name,
-        menu_item_image: c.item.image,
-        quantity: c.qty,
-        price: c.item.price,
-        sold_unit: c.unitMode || '',
-        unit_factor: 1,
-        cost_price_snapshot: (c.item as any).cost_price || 0,
-      }));
+      // Fallback to offline queue ONLY on network errors
+      if (!navigator.onLine || error.message?.includes('fetch') || error.message?.includes('Network')) {
+        const orderNum = `ORD-${Date.now().toString().slice(-6)}`;
+        const clientOrderId = `${restaurant!.id}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+        
+        const cartItems = cart.map(c => ({
+          menu_item_id: c.item.id,
+          menu_item_name: c.item.name,
+          menu_item_image: c.item.image,
+          quantity: c.qty,
+          price: c.item.price,
+          sold_unit: c.unitMode || '',
+          unit_factor: 1,
+          cost_price_snapshot: (c.item as any).cost_price || 0,
+        }));
 
-      await queueOrderOffline(
-        {
-          restaurant_id: restaurant!.id,
-          order_number: orderNum,
-          total: cartTotal,
-          status: sendToPrep ? 'pending' : 'completed',
-          client_order_id: clientOrderId,
-        } as any,
-        cartItems,
-        orderNum
-      );
+        await queueOrderOffline(
+          {
+            restaurant_id: restaurant!.id,
+            order_number: orderNum,
+            total: cartTotal,
+            status: sendToPrep ? 'pending' : 'completed',
+            client_order_id: clientOrderId,
+          } as any,
+          cartItems,
+          orderNum
+        );
+      }
     }
   };
 

@@ -252,67 +252,54 @@ class CheckoutIntegration {
     } catch (error: any) {
       console.error('Checkout failed:', error);
       
-      // Handle specific connection errors
       let errorMsg = error?.message || 'فشل في إتمام الطلب';
-      let errorCode = 'UNKNOWN';
+      let errorCode = error?.code || 'UNKNOWN';
+      let isNetworkError = false;
       
-      // Connection/Network errors
+      // Categorize error
       if (error?.message?.includes('upstream connect error') || 
           error?.message?.includes('connection termination') ||
           error?.message?.includes('NetworkError') ||
           error?.message?.includes('Failed to fetch') ||
           error?.code === 'ECONNRESET' ||
-          error?.code === 'ETIMEDOUT') {
+          error?.code === 'ETIMEDOUT' ||
+          !navigator.onLine) {
         errorMsg = '📡 مشكلة في الاتصال بالخادم. جاري المحاولة مرة أخرى...';
         errorCode = 'CONNECTION_ERROR';
+        isNetworkError = true;
         
         // Auto-retry once for connection errors
         toast.info('🔄 إعادة المحاولة...');
         try {
-          await new Promise(resolve => setTimeout(resolve, 1500)); // Wait 1.5s
-          return await this.processCheckout(context, orderData); // Retry
+          await new Promise(resolve => setTimeout(resolve, 1500));
+          return await this.processCheckout(context, orderData);
         } catch (retryError) {
           errorMsg = '❌ فشل الاتصال بعد إعادة المحاولة. سيتم الحفظ محلياً.';
           errorCode = 'CONNECTION_FAILED';
+          isNetworkError = true;
         }
       }
-      
-      // RLS/Permission errors
+      // RLS/Permission
       else if (error?.code === '42501' || error?.message?.includes('permission denied')) {
         errorMsg = '⛔ ليس لديك صلاحية كافية لإنشاء الطلب';
         errorCode = 'PERMISSION_DENIED';
       }
-      
-      // Foreign key violations
-      else if (error?.code === '23503') {
-        errorMsg = '⚠️ بيانات غير صحيحة: عميل أو منتج غير موجود';
-        errorCode = 'FK_VIOLATION';
+      // Inventory
+      else if (error?.code === '23514' || error?.code === 'P0001' || error?.message?.includes('stock')) {
+        errorMsg = '⚠️ المخزون غير كافٍ للكمية المطلوبة';
+        errorCode = 'INVENTORY_ERROR';
       }
-      
-      // Unique constraint
+      // Duplicate
       else if (error?.code === '23505') {
         errorMsg = '⚠️ رقم الطلب مكرر - يرجى المحاولة مرة أخرى';
         errorCode = 'DUPLICATE';
       }
-      
-      // Check constraint (e.g., inventory)
-      else if (error?.code === '23514' || error?.code === 'P0001') {
-        errorMsg = '⚠️ المخزون غير كافٍ للكمية المطلوبة';
-        errorCode = 'INVENTORY';
-      }
-      
-      // Timeout
-      else if (error?.message?.includes('timeout') || error?.code === '57014') {
-        errorMsg = '⏱️ انتهت مهلة الاتصال - يرجى المحاولة مرة أخرى';
-        errorCode = 'TIMEOUT';
-      }
-      
-      toast.error(errorMsg);
-      
+
       return {
         success: false,
         error: errorMsg,
         errorCode,
+        isNetworkError
       };
     }
   }
