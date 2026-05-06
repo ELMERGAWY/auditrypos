@@ -152,11 +152,11 @@ export function HomeDashboard({ restaurantId, currency, onNavigate, userId }: Ho
         topProductsRes
       ] = await Promise.all([
         // Today's orders
-        supabase.from('orders').select('total_amount').eq('restaurant_id', restaurantId).gte('created_at', today),
+        supabase.from('orders').select('total').eq('restaurant_id', restaurantId).gte('created_at', today),
         // Month orders
-        supabase.from('orders').select('total_amount').eq('restaurant_id', restaurantId).gte('created_at', monthStart),
+        supabase.from('orders').select('total').eq('restaurant_id', restaurantId).gte('created_at', monthStart),
         // Yesterday for comparison
-        supabase.from('orders').select('total_amount').eq('restaurant_id', restaurantId).gte('created_at', new Date(Date.now() - 86400000).toISOString().split('T')[0]).lt('created_at', today),
+        supabase.from('orders').select('total').eq('restaurant_id', restaurantId).gte('created_at', new Date(Date.now() - 86400000).toISOString().split('T')[0]).lt('created_at', today),
         // Total customers
         supabase.from('customers').select('*', { count: 'exact' }).eq('restaurant_id', restaurantId),
         // New customers today
@@ -191,9 +191,9 @@ export function HomeDashboard({ restaurantId, currency, onNavigate, userId }: Ho
         engine.generateBalanceSheet(today),
       ]);
 
-      const todaySales = plToday.revenue.total || (todayOrdersRes.data?.reduce((s, o) => s + (o.total_amount || 0), 0) || 0);
+      const todaySales = plToday.revenue.total || (todayOrdersRes.data?.reduce((s, o) => s + (o.total || 0), 0) || 0);
       const todayOrdersCount = todayOrdersRes.data?.length || 0;
-      const monthSales = plMonth.revenue.total || (monthOrdersRes.data?.reduce((s, o) => s + (o.total_amount || 0), 0) || 0);
+      const monthSales = plMonth.revenue.total || (monthOrdersRes.data?.reduce((s, o) => s + (o.total || 0), 0) || 0);
       const yesterdaySales = plYest.revenue.total;
       const salesChange = yesterdaySales > 0 ? ((todaySales - yesterdaySales) / yesterdaySales) * 100 : 0;
 

@@ -58,6 +58,7 @@ import { useAuth } from '@/lib/AuthContext';
 import { useDarkMode } from '@/lib/useDarkMode';
 import { CustomerSearch } from './dashboard/CustomerSearch';
 import { checkoutIntegration } from '@/lib/accounting';
+import { auditLogService } from '@/lib/auditLog';
 import type {
   DashboardTab, OrderStatus, OrderType, MenuItem, Order, OrderItem, HeldInvoice
 } from './dashboard/types';
@@ -366,9 +367,152 @@ export default function Dashboard() {
     toast.success('تم حذف الفاتورة المعلّقة');
   };
 
-  const checkout = async (sendToPrep: boolean = false) => {
-    if (cart.length === 0) return;
+  const [isProcessingCheckout, setIsProcessingCheckout] = useState(false);
 
+  const validateCheckout = (): string | null => {
+    if (cart.length === 0) return 'السلة فارغة';
+    if (!restaurant?.id) return 'لم يتم تحديد المطعم';
+    if (orderType === 'delivery' && !selectedDeliveryAgent) return 'يجب اختيار مندوب التوصيل';
+    if (orderType === 'delivery' && !deliveryAddress.trim()) return 'يجب إدخال عنوان التوصيل';
+    if (paidNum < 0) return 'المبلغ المدفوع لا يمكن أن يكون سالباً';
+    if (discountAmount > cartTotal) return 'الخصم لا يمكن أن يتجاوز الإجمالي';
+    return null;
+  };
+
+  const checkout = async (sendToPrep: boolean = false) => {
+    const validationError = validateCheckout();
+    if (validationError) {
+      toast.error(`❌ ${validationError}`);
+      return;
+    }
+
+    setIsProcessingCheckout(true);
+
+    try {
+      await performCheckout(sendToPrep);
+    } catch (error: any) {
+      console.error('Checkout error:', error);
+      
+      // Enhanced error messages for common issues
+      let errorMsg = error?.message || 'فشل في إتمام الطلب';
+      
+      if (error?.code === '42501' || error?.message?.includes('permission denied') || error?.message?.includes('row level security')) {
+        errorMsg = '⚠️ ليس لديك صلاحية لإنشاء فواتير. يرجى التواصل مع المسؤول.';
+      } else if (error?.code === '23503') {
+        errorMsg = '⚠️ خطأ في البيانات: عميل أو منتج غير موجود';
+      } else if (error?.code === '23505') {
+        errorMsg = '⚠️ رقم الطلب مكرر، يرجى المحاولة مرة أخرى';
+      } else if (error?.code === 'P0001') {
+        errorMsg = '⚠️ خطأ في المخزون: المنتج غير متوفر بالكمية المطلوبة';
+      } else if (!navigator.onLine) {
+        errorMsg = '📴 لا يوجد اتصال بالإنترنت، سيتم الحفظ محلياً';
+      }
+      
+      toast.error(errorMsg);
+      
+      // Log error for debugging
+      await auditLogService.logCheckoutError(
+        restaurant!.id,
+        error,
+        cart,
+        cartTotal
+      );
+      
+      // Auto-fallback to offline mode on RLS or connection errors
+      if (error?.code === '42501' || !navigator.onLine) {
+        toast.info('💾 جاري الحفظ في الوضع المحلي...');
+        await performOfflineCheckout(sendToPrep);
+      }
+    } finally {
+      setIsProcessingCheckout(false);
+    }
+  };
+
+  const performOfflineCheckout = async (sendToPrep: boolean) => {
+    const orderNum = `ORD-${Date.now().toString().slice(-6)}`;
+    const clientOrderId = `${restaurant!.id}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    
+    const cartItems = cart.map(c => ({
+      menu_item_id: c.item.id,
+      menu_item_name: c.item.name,
+      menu_item_image: c.item.image,
+      quantity: c.qty,
+      price: c.item.price,
+      sold_unit: c.unitMode || '',
+      unit_factor: 1,
+      cost_price_snapshot: (c.item as any).cost_price || 0,
+    }));
+
+    await queueOrderOffline(
+      {
+        restaurant_id: restaurant!.id,
+        order_number: orderNum,
+        total: cartTotal,
+        status: sendToPrep ? 'pending' : 'completed',
+        client_order_id: clientOrderId,
+      } as any,
+      cartItems,
+      orderNum
+    );
+    
+    toast.success(`📴 تم حفظ الطلب محلياً #${orderNum.slice(-4)} — سيتم المزامنة عند استعادة الاتصال`);
+    clearCart();
+  };
+
+  const performCheckout = async (sendToPrep: boolean) => {
+    // Handle offline mode with legacy system
+    if (!isOnline) {
+      await performOfflineCheckout(sendToPrep);
+      return;
+    }
+
+    const orderNum = `ORD-${Date.now().toString().slice(-6)}`;
+    const clientOrderId = `${restaurant!.id}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    
+    const cartItems = cart.map(c => {
+      const units = getUnitOptions(c.item);
+      const selectedUnit = units.find(u => u.label === c.unitMode);
+      const unitFactor = selectedUnit?.factor || 1;
+      return {
+        menu_item_id: isInventoryDrivenBusiness(businessType) ? null : c.item.id,
+        product_id: isInventoryDrivenBusiness(businessType) ? (c.item.product_id || c.item.id) : null,
+        menu_item_name: c.item.name,
+        menu_item_image: c.item.image,
+        quantity: c.qty,
+        price: c.item.price * unitFactor,
+        sold_unit: c.unitMode || '',
+        unit_factor: unitFactor,
+        cost_price_snapshot: (c.item as any).cost_price || 0,
+      };
+    });
+
+    const orderData = {
+      restaurant_id: restaurant!.id,
+      order_number: orderNum,
+      total: cartTotal,
+      status: sendToPrep ? 'pending' : 'completed',
+      synced: false,
+      table_number: tableNumber ? Number(tableNumber) : null,
+      discount: discountAmount,
+      notes: orderNotes,
+      customer_name: customerName,
+      customer_phone: customerPhone,
+      order_type: orderType,
+      delivery_address: deliveryAddress,
+      delivery_agent_id: selectedDeliveryAgent || null,
+      payment_method: paymentMethod,
+      paid_amount: paidNum,
+      client_order_id: clientOrderId,
+      customer_id: null,
+    };
+
+    await queueOrderOffline(orderData as any, cartItems, orderNum);
+    return;
+  }
+
+  // Legacy offline checkout (for reference, now integrated above)
+  const legacyOfflineCheckout = async (sendToPrep: boolean) => {
+    if (true) return; // Disabled - now handled in performOfflineCheckout
     // Handle offline mode with legacy system
     if (!isOnline) {
       const orderNum = `ORD-${Date.now().toString().slice(-6)}`;
