@@ -88,10 +88,22 @@ export function ExpensesTab({ restaurantId, currency }: Props) {
   const [activeView, setActiveView] = useState<'expenses' | 'overheads' | 'calculator'>('expenses');
   const [selectedPeriod, setSelectedPeriod] = useState<'today' | 'week' | 'month'>('month');
   const [paymentAccounts, setPaymentAccounts] = useState<any[]>([]);
+  const [expenseAccounts, setExpenseAccounts] = useState<any[]>([]);
   const [projects, setProjects] = useState<any[]>([]);
   const [blocks, setBlocks] = useState<any[]>([]);
 
   const load = async () => {
+    const { data: coa } = await supabase
+      .from('chart_of_accounts')
+      .select('*')
+      .eq('restaurant_id', restaurantId)
+      .eq('is_active', true);
+
+    if (coa) {
+      setExpenseAccounts(coa.filter(a => a.account_type === 'expense'));
+      setPaymentAccounts(coa.filter(a => a.is_cash_account || a.is_bank_account));
+    }
+
     const { data: expensesData } = await supabase
       .from('expenses')
       .select('*')
@@ -410,10 +422,14 @@ export function ExpensesTab({ restaurantId, currency }: Props) {
               
               {/* Basic Info */}
               <div className="space-y-3">
-                <Label className="text-xs">الفئة</Label>
-                <select value={form.category} onChange={e => setForm(f => ({ ...f, category: e.target.value }))}
+                <Label className="text-xs">حساب المصروف (من الدليل) *</Label>
+                <select value={form.account_code} onChange={e => {
+                    const acc = expenseAccounts.find(a => a.code === e.target.value);
+                    setForm(f => ({ ...f, account_code: e.target.value, category: acc?.name || f.category }));
+                  }}
                   className="w-full px-3 py-2 rounded-lg bg-secondary text-secondary-foreground border border-border text-sm">
-                  {EXPENSE_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
+                  <option value="">اختر الحساب...</option>
+                  {expenseAccounts.map(a => <option key={a.code} value={a.code}>[{a.code}] {a.name}</option>)}
                 </select>
                 
                 <Label className="text-xs">المبلغ *</Label>
@@ -426,17 +442,17 @@ export function ExpensesTab({ restaurantId, currency }: Props) {
 
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <Label className="text-xs">كود الحساب (المصروف)</Label>
-                    <select value={form.account_code} onChange={e => setForm(f => ({ ...f, account_code: e.target.value }))}
+                    <Label className="text-xs">مركز التكلفة</Label>
+                    <select value={form.cost_center} onChange={e => setForm(f => ({ ...f, cost_center: e.target.value }))}
                       className="w-full px-3 py-2 rounded-lg bg-secondary text-secondary-foreground border border-border text-sm">
-                      {ACCOUNT_CODES.map(a => <option key={a.code} value={a.code}>{a.label} ({a.code})</option>)}
+                      {COST_CENTERS.map(c => <option key={c.id} value={c.id}>{c.label}</option>)}
                     </select>
                   </div>
                   <div>
                     <Label className="text-xs">حساب الدفع (الخزينة/البنك)</Label>
                     <select value={form.payment_account_code} onChange={e => setForm(f => ({ ...f, payment_account_code: e.target.value }))}
                       className="w-full px-3 py-2 rounded-lg bg-secondary text-secondary-foreground border border-border text-sm">
-                      <option value="">تلقائي</option>
+                      <option value="">تلقائي (الخزينة الرئيسية)</option>
                       {paymentAccounts.map(a => <option key={a.code} value={a.code}>{a.name} ({a.code})</option>)}
                     </select>
                   </div>
