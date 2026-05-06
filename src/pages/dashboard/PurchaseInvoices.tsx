@@ -256,13 +256,51 @@ export function PurchaseInvoices({ restaurantId, currency }: Props) {
           <DialogHeader>
             <DialogTitle className="text-2xl font-black">إضافة فاتورة مشتريات</DialogTitle>
           </DialogHeader>
-          <div className="py-20 text-center space-y-4">
-            <div className="w-20 h-20 rounded-full bg-primary/5 flex items-center justify-center mx-auto">
-              <FileText className="w-10 h-10 text-primary opacity-20" />
+          <div className="grid grid-cols-2 gap-4 py-4">
+            <div className="col-span-2">
+              <Label>المورد *</Label>
+              <Select value={form.supplier_id} onValueChange={v => setForm({ ...form, supplier_id: v })}>
+                <SelectTrigger><SelectValue placeholder="اختر المورد" /></SelectTrigger>
+                <SelectContent>
+                  {suppliers.map(s => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}
+                </SelectContent>
+              </Select>
             </div>
-            <p className="text-muted-foreground">جاري تجهيز واجهة الإدخال المتقدمة للفواتير...</p>
-            <Button variant="outline" onClick={() => setShowAddModal(false)}>إغلاق</Button>
+            <div>
+              <Label>رقم الفاتورة</Label>
+              <Input value={form.invoice_number} onChange={e => setForm({ ...form, invoice_number: e.target.value })} placeholder="تلقائي" />
+            </div>
+            <div>
+              <Label>التاريخ</Label>
+              <Input type="date" value={form.invoice_date} onChange={e => setForm({ ...form, invoice_date: e.target.value })} />
+            </div>
+            <div>
+              <Label>المبلغ قبل الضريبة *</Label>
+              <Input type="number" value={form.total_amount} onChange={e => setForm({ ...form, total_amount: e.target.value })} />
+            </div>
+            <div>
+              <Label>الضريبة</Label>
+              <Input type="number" value={form.tax_amount} onChange={e => setForm({ ...form, tax_amount: e.target.value })} />
+            </div>
+            <div>
+              <Label>المدفوع نقداً</Label>
+              <Input type="number" value={form.paid_amount} onChange={e => setForm({ ...form, paid_amount: e.target.value })} placeholder="0 = آجل بالكامل" />
+            </div>
+            <div className="flex items-end gap-2">
+              <input type="checkbox" id="iscredit" checked={form.is_credit} onChange={e => setForm({ ...form, is_credit: e.target.checked })} />
+              <Label htmlFor="iscredit">ذمم آجلة</Label>
+            </div>
+            <div className="col-span-2">
+              <Label>ملاحظات</Label>
+              <Textarea value={form.notes} onChange={e => setForm({ ...form, notes: e.target.value })} rows={2} />
+            </div>
           </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowAddModal(false)}>إلغاء</Button>
+            <Button className="gradient-bg border-0 text-white" onClick={handleSave} disabled={saving}>
+              {saving ? 'جاري الحفظ...' : 'حفظ وترحيل القيد'}
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>
