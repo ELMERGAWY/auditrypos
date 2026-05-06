@@ -54,6 +54,13 @@ interface ProfessionalSidebarProps {
     unackCalls: number;
     todayRevenue: number;
     isOnline: boolean;
+    salesInvoicesCount?: number;
+    purchaseInvoicesCount?: number;
+    expensesCount?: number;
+    returnsCount?: number;
+    customersCount?: number;
+    suppliersCount?: number;
+    inventoryReceiptsCount?: number;
   };
   isTrial?: boolean;
   trialDaysLeft?: number;
@@ -120,14 +127,14 @@ export function ProfessionalSidebar({
 
     orders: { label: config.labels.orders, icon: Receipt, badge: stats.pendingOrders, section: 'sales' },
     sales_orders: { label: 'أوامر البيع', icon: FileText, section: 'sales' },
-    sales_invoices: { label: 'فواتير البيع', icon: Receipt, section: 'sales' },
-    sales_returns: { label: 'مرتجع المبيعات', icon: RotateCcw, section: 'sales' },
-    customers: { label: config.labels.customers, icon: Users, section: 'sales' },
+    sales_invoices: { label: 'فواتير البيع', icon: Receipt, badge: stats.salesInvoicesCount, section: 'sales' },
+    sales_returns: { label: 'مرتجع المبيعات', icon: RotateCcw, badge: stats.returnsCount, section: 'sales' },
+    customers: { label: config.labels.customers, icon: Users, badge: stats.customersCount, section: 'sales' },
     crm: { label: 'Ventro CRM', icon: Sparkles, section: 'sales' },
 
     purchase_orders: { label: 'أوامر الشراء', icon: ShoppingCart, section: 'purchases' },
-    purchase_invoices: { label: 'فواتير المشتريات', icon: DollarSign, section: 'purchases' },
-    suppliers: { label: 'الموردين', icon: UsersRound, section: 'purchases' },
+    purchase_invoices: { label: 'فواتير المشتريات', icon: DollarSign, badge: stats.purchaseInvoicesCount, section: 'purchases' },
+    suppliers: { label: 'الموردين', icon: UsersRound, badge: stats.suppliersCount, section: 'purchases' },
 
     menu: { 
       label: config.labels.menu, 
@@ -135,12 +142,12 @@ export function ProfessionalSidebar({
       section: 'inventory' 
     },
     inventory: { label: 'جرد المخزون', icon: Package, section: 'inventory' },
-    inventory_receipts: { label: 'استلام المخزون', icon: FileText, section: 'inventory' },
+    inventory_receipts: { label: 'استلام المخزون', icon: FileText, badge: stats.inventoryReceiptsCount, section: 'inventory' },
     overheads: { label: 'التكاليف الثابتة', icon: Activity, section: 'inventory' },
 
     treasury: { label: 'الخزينة والبنوك', icon: Landmark, section: 'accounting' },
     financials: { label: 'التقارير المالية', icon: Wallet, section: 'accounting' },
-    expenses: { label: 'المصروفات', icon: DollarSign, section: 'accounting' },
+    expenses: { label: 'المصروفات', icon: DollarSign, badge: stats.expensesCount, section: 'accounting' },
     customer_accounts: { label: 'حسابات العملاء', icon: CreditCard, section: 'accounting' },
     supplier_accounts: { label: 'حسابات الموردين', icon: Wallet, section: 'accounting' },
 

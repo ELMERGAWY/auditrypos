@@ -1,5 +1,6 @@
 // @ts-nocheck
-import { useState, useRef, useEffect, useCallback, Suspense, lazy } from 'react';
+import { useState, useRef, useEffect, useCallback, Suspense, lazy, useMemo } from 'react';
+import { format, startOfMonth, endOfDay, isWithinInterval } from 'date-fns';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
@@ -9,7 +10,7 @@ import {
   Clock, TrendingUp, UtensilsCrossed, AlertCircle, CheckCircle,
   Timer, StickyNote, DollarSign, Truck, CalendarClock, MapPin, Phone, Lock, CreditCard,
   Volume2, VolumeX, Package, Wallet, Store, UsersRound, Camera, Sun, Moon, Send,
-  FileText, RotateCcw, Heart, Landmark, RefreshCcw
+  FileText, RotateCcw, Heart, Landmark, RefreshCcw, Filter
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -144,6 +145,59 @@ export default function Dashboard() {
 
   // Orders filter
   const [orderFilter, setOrderFilter] = useState<'all' | OrderStatus>('all');
+
+  // Date Range Filter State
+  const [dateRange, setDateRange] = useState<{ from: Date; to: Date }>({
+    from: startOfMonth(new Date()),
+    to: endOfDay(new Date())
+  });
+  const [counts, setCounts] = useState({
+    orders: 0,
+    salesInvoices: 0,
+    purchaseInvoices: 0,
+    expenses: 0,
+    returns: 0,
+    inventoryReceipts: 0,
+    customers: 0,
+    suppliers: 0
+  });
+
+  const fetchCounts = useCallback(async () => {
+    if (!restaurant?.id) return;
+    
+    try {
+      const fromStr = dateRange.from.toISOString();
+      const toStr = dateRange.to.toISOString();
+
+      const [ordersRes, salesRes, purchaseRes, expensesRes, returnsRes, receiptsRes, custRes, suppRes] = await Promise.all([
+        supabase.from('orders').select('*', { count: 'exact', head: true }).eq('restaurant_id', restaurant.id).gte('created_at', fromStr).lte('created_at', toStr).neq('status', 'cancelled'),
+        supabase.from('sales_invoices').select('*', { count: 'exact', head: true }).eq('restaurant_id', restaurant.id).gte('created_at', fromStr).lte('created_at', toStr),
+        supabase.from('purchase_invoices').select('*', { count: 'exact', head: true }).eq('restaurant_id', restaurant.id).gte('created_at', fromStr).lte('created_at', toStr),
+        supabase.from('expenses').select('*', { count: 'exact', head: true }).eq('restaurant_id', restaurant.id).gte('created_at', fromStr).lte('created_at', toStr),
+        supabase.from('sales_returns').select('*', { count: 'exact', head: true }).eq('restaurant_id', restaurant.id).gte('created_at', fromStr).lte('created_at', toStr),
+        supabase.from('inventory_receipts').select('*', { count: 'exact', head: true }).eq('restaurant_id', restaurant.id).gte('created_at', fromStr).lte('created_at', toStr),
+        supabase.from('customers').select('*', { count: 'exact', head: true }).eq('restaurant_id', restaurant.id),
+        supabase.from('suppliers').select('*', { count: 'exact', head: true }).eq('restaurant_id', restaurant.id),
+      ]);
+
+      setCounts({
+        orders: ordersRes.count || 0,
+        salesInvoices: salesRes.count || 0,
+        purchaseInvoices: purchaseRes.count || 0,
+        expenses: expensesRes.count || 0,
+        returns: returnsRes.count || 0,
+        inventoryReceipts: receiptsRes.count || 0,
+        customers: custRes.count || 0,
+        suppliers: suppRes.count || 0
+      });
+    } catch (err) {
+      console.error('Failed to fetch counts:', err);
+    }
+  }, [restaurant?.id, dateRange]);
+
+  useEffect(() => {
+    fetchCounts();
+  }, [fetchCounts]);
 
   // Barcode scanner (MUST be here - before any early returns to follow Rules of Hooks)
   const [showBarcodeScanner, setShowBarcodeScanner] = useState(false);
@@ -806,7 +860,14 @@ export default function Dashboard() {
           deliveryOrders: deliveryOrders.length,
           unackCalls: unackCalls.length,
           todayRevenue,
-          isOnline
+          isOnline,
+          salesInvoicesCount: counts.salesInvoices,
+          purchaseInvoicesCount: counts.purchaseInvoices,
+          expensesCount: counts.expenses,
+          returnsCount: counts.returns,
+          customersCount: counts.customers,
+          suppliersCount: counts.suppliers,
+          inventoryReceiptsCount: counts.inventoryReceipts
         }}
         isTrial={isTrial}
         trialDaysLeft={trialDaysLeft}
@@ -826,6 +887,40 @@ export default function Dashboard() {
       )}>
         <main className="p-10">
           <div className="max-w-[1800px] mx-auto glass-card p-12 min-h-[calc(100vh-80px)] shadow-2xl border-white/20 relative overflow-hidden">
+            
+            {/* Header & Date Range Filter */}
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-12 border-b border-border/50 pb-8">
+              <div>
+                <h1 className="text-4xl font-black mb-2 flex items-center gap-3">
+                  {activeTab === 'home' ? 'لوحة التحكم الرئيسية' : ProfessionalSidebar.ALL_NAV_ITEMS[activeTab]?.label}
+                  <Badge variant="outline" className="text-xs font-medium">نظام Edara الموحد</Badge>
+                </h1>
+                <p className="text-muted-foreground font-medium">متابعة الأداء والعمليات المالية والتشغيلية</p>
+              </div>
+
+              <div className="flex items-center gap-3 bg-secondary/30 p-2 rounded-2xl border border-border/50 shadow-inner">
+                <div className="flex items-center gap-2 px-3">
+                  <Filter className="w-4 h-4 text-primary" />
+                  <span className="text-xs font-bold whitespace-nowrap">فلترة الفترة:</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Input 
+                    type="date" 
+                    value={format(dateRange.from, 'yyyy-MM-dd')}
+                    onChange={(e) => setDateRange(prev => ({ ...prev, from: new Date(e.target.value) }))}
+                    className="h-9 bg-background/50 border-none shadow-sm text-xs font-bold w-36"
+                  />
+                  <span className="text-muted-foreground text-xs">إلى</span>
+                  <Input 
+                    type="date" 
+                    value={format(dateRange.to, 'yyyy-MM-dd')}
+                    onChange={(e) => setDateRange(prev => ({ ...prev, to: new Date(e.target.value) }))}
+                    className="h-9 bg-background/50 border-none shadow-sm text-xs font-bold w-36"
+                  />
+                </div>
+              </div>
+            </div>
+
             {/* Sync Status Overlay */}
             <AnimatePresence>
               {isSyncing && (
