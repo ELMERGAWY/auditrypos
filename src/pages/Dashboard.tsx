@@ -64,6 +64,7 @@ import type {
   DashboardTab, OrderStatus, OrderType, MenuItem, Order, OrderItem, HeldInvoice
 } from './dashboard/types';
 import { STATUS_CONFIG, ORDER_TYPE_CONFIG } from './dashboard/types';
+import { cn } from '@/lib/utils';
 
 
 const CHART_COLORS = [
@@ -81,6 +82,13 @@ export default function Dashboard() {
     currentShift, setCurrentShift, profileName, dataLoaded, loadData, handleLogout,
     soundEnabled, setSoundEnabled, taxes
   } = useDashboardData();
+
+  const businessType = (restaurant?.business_type || 'restaurant') as BusinessType;
+  const currency = restaurant?.currency || 'ج.م';
+  const isSuspended = restaurant?.status === 'suspended';
+  const isTrial = restaurant?.subscription_status === 'trial';
+  const trialDaysLeft = restaurant?.subscription_end ? Math.max(0, Math.ceil((new Date(restaurant.subscription_end).getTime() - new Date().getTime()) / (1000 * 3600 * 24))) : 0;
+  const lockedTabs = restaurant?.locked_tabs || [];
 
   const [activeTab, setActiveTab] = useState<SidebarTab>('home');
   const [activeSubView, setActiveSubView] = useState<'stock' | 'bom'>('stock');
@@ -141,7 +149,6 @@ export default function Dashboard() {
 
   // Menu form
   const [showAddItem, setShowAddItem] = useState(false);
-  const [editingItem, setEditingItem] = useState<MenuItem | null>(null);
   const [menuForm, setMenuForm] = useState({ 
     name: '', 
     price: '', 
@@ -153,55 +160,22 @@ export default function Dashboard() {
     product_id: ''
   });
 
-  // --- Derived state (safe with optional chaining) ---
-  const businessType = (restaurant?.business_type || 'restaurant') as BusinessType;
-
-  const isSuspended = restaurant
-    ? restaurant.status === 'suspended' || (restaurant.subscription_end && new Date(restaurant.subscription_end) < new Date())
-    : false;
-
-  // Trial detection
-  const isTrial = restaurant
-    ? restaurant.status === 'active' && restaurant.subscription_end && new Date(restaurant.subscription_end) >= new Date()
-      && (new Date(restaurant.subscription_end).getTime() - new Date().getTime()) <= 15 * 86400000
-    : false;
-
-  const trialDaysLeft = restaurant?.subscription_end
-    ? Math.max(0, Math.ceil((new Date(restaurant.subscription_end).getTime() - Date.now()) / (1000 * 60 * 60 * 24)))
-    : 0;
-
-  // (showBarcodeScanner is now declared above with other state hooks)
-
-  // Features locked during trial
-  const lockedTabs: DashboardTab[] = isTrial ? ['orders', 'delivery', 'shifts', 'stats'] : [];
-
-  // Computed — safe with optional chaining
-  const currency = restaurant?.currency || 'ج.م';
-  const categories = [...new Set(menuItems.map(i => i.category))];
-  const filteredItems = menuItems.filter(i => {
-    if (selectedCategory !== 'all' && i.category !== selectedCategory) return false;
-    if (searchQuery) {
-      const q = searchQuery.toLowerCase();
-      const matchName = i.name.toLowerCase().includes(q);
-      const matchBarcode = (i as any).barcode && (i as any).barcode.includes(q);
-      const matchSku = (i as any).sku && (i as any).sku.includes(q);
-      if (!matchName && !matchBarcode && !matchSku) return false;
-    }
-    return i.available;
+  // POS Calculations & Derived State
+  const categories = ['all', ...new Set(menuItems.map(item => item.category))];
+  const filteredItems = menuItems.filter(item => {
+    const matchesCategory = selectedCategory === 'all' || item.category === selectedCategory;
+    const matchesSearch = item.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
+                         (item.barcode && item.barcode.includes(searchQuery)) ||
+                         (item.sku && item.sku.toLowerCase().includes(searchQuery.toLowerCase()));
+    return matchesCategory && matchesSearch && item.available;
   });
 
-  // Unit conversion helpers - uses product's own secondary_unit & conversion_factor
   const getUnitOptions = (item: MenuItem) => {
     const product = (item as any);
     const baseUnit = product.unit || 'قطعة';
     const options = [{ label: baseUnit, factor: 1 }];
-    
-    // If product has a secondary unit defined, use it
     if (product.secondary_unit && product.unit_conversion_factor && Number(product.unit_conversion_factor) > 1) {
-      options.push({
-        label: product.secondary_unit,
-        factor: Number(product.unit_conversion_factor),
-      });
+      options.push({ label: product.secondary_unit, factor: Number(product.unit_conversion_factor) });
     }
     return options;
   };
@@ -211,42 +185,29 @@ export default function Dashboard() {
     const unitFactor = units.find(u => u.label === c.unitMode)?.factor || 1;
     return s + (c.item.price * unitFactor * c.qty);
   }, 0);
-  const discountAmount = discountType === 'percent'
-    ? cartSubtotal * (Number(discount) || 0) / 100
-    : Number(discount) || 0;
-
+  
+  const discountAmount = discountType === 'percent' 
+    ? (cartSubtotal * Number(discount || 0)) / 100 
+    : Number(discount || 0);
+    
   const taxableAmount = Math.max(0, cartSubtotal - discountAmount);
-  let totalTax = 0;
-  if (taxes) {
-    taxes.forEach(tax => {
-      if (!tax.is_included_in_price) {
-        totalTax += taxableAmount * (tax.rate / 100);
-      }
-    });
-  }
-
+  const totalTax = taxes.reduce((sum, tax) => {
+    if (!tax.is_included_in_price) return sum + (taxableAmount * (tax.rate / 100));
+    return sum;
+  }, 0);
+  
   const cartTotal = taxableAmount + totalTax;
-  const paidNum = Number(paidAmount) || 0;
+  const paidNum = Number(paidAmount || 0);
   const remaining = Math.max(0, cartTotal - paidNum);
 
+  // Dashboard Stats
   const pendingOrders = orders.filter(o => o.status === 'pending' || o.status === 'preparing');
+  const deliveryOrders = orders.filter(o => (o.order_type === 'delivery' || o.delivery_agent_id) && o.status !== 'completed' && o.status !== 'cancelled');
   const unackCalls = waiterCalls.filter(c => !c.acknowledged);
-  const todayOrders = orders.filter(o => new Date(o.created_at).toDateString() === new Date().toDateString());
-  const todayRevenue = todayOrders.filter(o => o.status !== 'cancelled').reduce((s, o) => s + Number(o.total), 0);
-  const avgOrderValue = todayOrders.length > 0 ? Math.round(todayRevenue / todayOrders.length) : 0;
-  const totalRevenue = orders.filter(o => o.status !== 'cancelled').reduce((s, o) => s + Number(o.total), 0);
-  const deliveryOrders = orders.filter(o => o.order_type === 'delivery' && (o.status === 'pending' || o.status === 'preparing' || o.status === 'ready'));
-
-  const last7Days = Array.from({ length: 7 }, (_, i) => {
-    const date = new Date(); date.setDate(date.getDate() - (6 - i));
-    const dayOrders = orders.filter(o => o.status !== 'cancelled' && new Date(o.created_at).toDateString() === date.toDateString());
-    return { day: date.toLocaleDateString('ar-EG', { weekday: 'short' }), revenue: dayOrders.reduce((s, o) => s + Number(o.total), 0), orders: dayOrders.length };
-  });
-
-  const categoryData = categories.map(cat => {
-    const val = orders.filter(o => o.status !== 'cancelled').flatMap(o => o.items.filter(i => menuItems.find(m => m.name === i.menu_item_name)?.category === cat)).reduce((s, i) => s + i.price * i.quantity, 0);
-    return { name: cat, value: val };
-  }).filter(d => d.value > 0);
+  const todayOrdersList = orders.filter(o => new Date(o.created_at).toDateString() === new Date().toDateString());
+  const todayRevenue = todayOrdersList.filter(o => o.status !== 'cancelled').reduce((sum, o) => sum + Number(o.total || 0), 0);
+  const todayOrders = todayOrdersList.length;
+  const avgOrderValue = todayOrders > 0 ? todayRevenue / todayOrders : 0;
 
   const itemSales = new Map<string, number>();
   orders.filter(o => o.status !== 'cancelled').forEach(o => o.items.forEach(i => itemSales.set(i.menu_item_name, (itemSales.get(i.menu_item_name) || 0) + i.quantity)));
