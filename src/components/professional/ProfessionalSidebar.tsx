@@ -75,6 +75,7 @@ interface ProfessionalSidebarProps {
   onUpgrade?: () => void;
   isCollapsed?: boolean;
   onToggleCollapse?: () => void;
+  tabs?: SidebarTab[];
 }
 
 const SECTIONS = {
@@ -103,7 +104,8 @@ export function ProfessionalSidebar({
   onLogout,
   onUpgrade,
   isCollapsed = false,
-  onToggleCollapse
+  onToggleCollapse,
+  tabs
 }: ProfessionalSidebarProps) {
   const config = getBusinessConfig(businessType);
   const [hoveredItem, setHoveredItem] = useState<string | null>(null);
@@ -167,7 +169,8 @@ export function ProfessionalSidebar({
     settings: { label: 'إعدادات النظام', icon: Settings, section: 'system' }
   };
 
-  const navItems: NavItem[] = config.tabs
+  const displayTabs = tabs || config.tabs;
+  const navItems: NavItem[] = displayTabs
     .map(tabId => {
       const item = ALL_NAV_ITEMS[tabId];
       if (!item) return null;

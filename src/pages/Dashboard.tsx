@@ -815,8 +815,6 @@ export default function Dashboard() {
     setWaiterCalls(prev => prev.map(c => c.id === id ? { ...c, acknowledged: true } : c));
   };
 
-  const baseAllowedTabs = BUSINESS_TABS[businessType] || BUSINESS_TABS.restaurant;
-  const allowedTabs = [...baseAllowedTabs, 'accounting', 'chart_of_accounts', 'accounting_mapping', 'treasury', 'manual_journal', 'financials'];
   const config = BUSINESS_TYPES[businessType] || BUSINESS_TYPES.other;
 
   // Reset orderType when restaurant loads to match sector
@@ -893,6 +891,9 @@ export default function Dashboard() {
     </div>
   );
 
+  const baseAllowedTabs = BUSINESS_TABS[businessType] || BUSINESS_TABS.restaurant;
+  const allowedTabs = Array.from(new Set([...baseAllowedTabs, 'accounting', 'chart_of_accounts', 'accounting_mapping', 'treasury', 'manual_journal', 'financials']));
+  
   return (
     <DashboardErrorBoundary>
     <div className="min-h-screen bg-background relative overflow-hidden mesh-bg" dir="rtl">
@@ -902,6 +903,7 @@ export default function Dashboard() {
         onTabChange={handleTabClick}
         restaurant={restaurant!}
         user={{ email: user?.email, full_name: profileName }}
+        tabs={allowedTabs as SidebarTab[]}
         stats={{
           pendingOrders: counts.orders,
           deliveryOrders: deliveryOrders.length,
