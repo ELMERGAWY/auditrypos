@@ -825,6 +825,9 @@ export default function Dashboard() {
     }
   }, [restaurant?.id]);
   
+  const baseAllowedTabs = BUSINESS_TABS[businessType] || BUSINESS_TABS.restaurant;
+  const allowedTabs = Array.from(new Set([...baseAllowedTabs, 'accounting', 'chart_of_accounts', 'accounting_mapping', 'treasury', 'manual_journal', 'financials']));
+
   const allTabs: { id: DashboardTab; label: string; icon: any; badge?: number; locked?: boolean }[] = [
     { id: 'pos', label: 'نقطة البيع', icon: LayoutGrid },
     { id: 'orders', label: 'أوامر البيع (Sales Orders)', icon: FileText, badge: pendingOrders.length, locked: lockedTabs.includes('orders') },
@@ -891,9 +894,7 @@ export default function Dashboard() {
     </div>
   );
 
-  const baseAllowedTabs = BUSINESS_TABS[businessType] || BUSINESS_TABS.restaurant;
-  const allowedTabs = Array.from(new Set([...baseAllowedTabs, 'accounting', 'chart_of_accounts', 'accounting_mapping', 'treasury', 'manual_journal', 'financials']));
-  
+
   return (
     <DashboardErrorBoundary>
     <div className="min-h-screen bg-background relative overflow-hidden mesh-bg" dir="rtl">
