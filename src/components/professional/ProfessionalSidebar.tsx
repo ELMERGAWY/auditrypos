@@ -61,6 +61,9 @@ interface ProfessionalSidebarProps {
     customersCount?: number;
     suppliersCount?: number;
     inventoryReceiptsCount?: number;
+    totalSales?: number;
+    totalProfit?: number;
+    currency?: string;
   };
   isTrial?: boolean;
   trialDaysLeft?: number;
