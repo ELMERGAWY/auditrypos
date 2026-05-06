@@ -10,7 +10,7 @@ import {
   Clock, TrendingUp, UtensilsCrossed, AlertCircle, CheckCircle,
   Timer, StickyNote, DollarSign, Truck, CalendarClock, MapPin, Phone, Lock, CreditCard,
   Volume2, VolumeX, Package, Wallet, Store, UsersRound, Camera, Sun, Moon, Send,
-  FileText, RotateCcw, Heart, Landmark, RefreshCcw, Filter, HardHat, ArrowRightLeft
+  FileText, RotateCcw, Heart, Landmark, RefreshCcw, Filter, Construction, ArrowRightLeft
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -800,7 +800,7 @@ export default function Dashboard() {
     { id: 'invoices', label: 'فواتير البيع (Invoices)', icon: Receipt },
     { id: 'returns', label: 'المرتفعات (Credit Notes)', icon: RotateCcw },
     { id: 'inventory', label: 'المخزون والتكاليف', icon: Package },
-    { id: 'projects', label: 'المشاريع والمستخلصات', icon: HardHat },
+    { id: 'projects', label: 'المشاريع والمستخلصات', icon: Construction },
     { id: 'crm', label: 'إدارة العملاء CRM', icon: Heart },
     { id: 'accounting', label: 'المحاسبة والمالية', icon: Landmark },
     { id: 'manual_journal', label: 'قيود اليومية اليدوية', icon: ArrowRightLeft },

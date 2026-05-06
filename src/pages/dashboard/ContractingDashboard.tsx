@@ -5,7 +5,7 @@ import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Plus, Building2, HardHat, Receipt, AlertCircle, Trash2, ArrowLeft } from 'lucide-react';
+import { Plus, Building2, Construction, Receipt, AlertCircle, Trash2, ArrowLeft } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 interface Props {
@@ -127,7 +127,7 @@ export function ContractingDashboard({ restaurantId, currency }: Props) {
       <header className="flex justify-between items-center bg-card p-6 rounded-2xl border shadow-sm">
         <div className="flex items-center gap-4">
           <div className="p-3 bg-primary/10 rounded-xl">
-            <HardHat className="w-8 h-8 text-primary" />
+            <Construction className="w-8 h-8 text-primary" />
           </div>
           <div>
             <h2 className="text-3xl font-black">إدارة المشاريع والمقاولات</h2>
