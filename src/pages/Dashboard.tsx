@@ -815,7 +815,8 @@ export default function Dashboard() {
     setWaiterCalls(prev => prev.map(c => c.id === id ? { ...c, acknowledged: true } : c));
   };
 
-  const allowedTabs = BUSINESS_TABS[businessType] || BUSINESS_TABS.restaurant;
+  const baseAllowedTabs = BUSINESS_TABS[businessType] || BUSINESS_TABS.restaurant;
+  const allowedTabs = [...baseAllowedTabs, 'accounting', 'chart_of_accounts', 'accounting_mapping', 'treasury', 'manual_journal', 'financials'];
   const config = BUSINESS_TYPES[businessType] || BUSINESS_TYPES.other;
 
   // Reset orderType when restaurant loads to match sector
