@@ -43,10 +43,77 @@ export function PurchaseInvoices({ restaurantId, currency }: Props) {
   const [loading, setLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [showAddModal, setShowAddModal] = useState(false);
+  const [suppliers, setSuppliers] = useState<{ id: string; name: string }[]>([]);
+  const [form, setForm] = useState({
+    supplier_id: '',
+    invoice_number: '',
+    invoice_date: new Date().toISOString().split('T')[0],
+    total_amount: '',
+    tax_amount: '',
+    paid_amount: '',
+    is_credit: true,
+    notes: ''
+  });
+  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     loadInvoices();
+    supabase.from('suppliers').select('id,name').eq('restaurant_id', restaurantId).then(({ data }) => setSuppliers(data || []));
   }, [restaurantId]);
+
+  const handleSave = async () => {
+    if (!form.supplier_id || !form.total_amount) {
+      toast.error('المورد والمبلغ مطلوبين');
+      return;
+    }
+    setSaving(true);
+    try {
+      const total = parseFloat(form.total_amount);
+      const tax = parseFloat(form.tax_amount || '0');
+      const net = total + tax;
+      const paid = parseFloat(form.paid_amount || '0');
+      const supplier = suppliers.find(s => s.id === form.supplier_id);
+
+      const { data: inv, error } = await supabase
+        .from('purchase_invoices')
+        .insert({
+          restaurant_id: restaurantId,
+          invoice_number: form.invoice_number || `PI-${Date.now()}`,
+          invoice_date: form.invoice_date,
+          supplier_name: supplier?.name,
+          total_amount: total,
+        })
+        .select()
+        .single();
+      if (error) throw error;
+
+      // Auto-post journal entry
+      try {
+        const je = await journalService.createPurchaseJournalEntry(restaurantId, {
+          id: inv.id,
+          supplierId: form.supplier_id,
+          supplierName: supplier?.name || 'مورد',
+          amount: net,
+          description: form.invoice_number || inv.invoice_number,
+          isCredit: form.is_credit && paid < net,
+          date: form.invoice_date,
+        });
+        if (je?.id) {
+          await supabase.from('purchase_invoices').update({ journal_entry_id: je.id }).eq('id', inv.id);
+        }
+        toast.success('تم تسجيل الفاتورة وترحيل القيد المحاسبي');
+      } catch (jeErr: any) {
+        toast.warning('تم حفظ الفاتورة لكن فشل ترحيل القيد: ' + jeErr.message);
+      }
+      setShowAddModal(false);
+      setForm({ supplier_id: '', invoice_number: '', invoice_date: new Date().toISOString().split('T')[0], total_amount: '', tax_amount: '', paid_amount: '', is_credit: true, notes: '' });
+      loadInvoices();
+    } catch (e: any) {
+      toast.error('خطأ: ' + e.message);
+    } finally {
+      setSaving(false);
+    }
+  };
 
   const loadInvoices = async () => {
     try {
