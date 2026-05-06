@@ -126,10 +126,7 @@ export function PurchaseInvoices({ restaurantId, currency }: Props) {
       setLoading(true);
       const { data, error } = await supabase
         .from('purchase_invoices')
-        .select(`
-          *,
-          suppliers(name)
-        `)
+        .select('*')
         .eq('restaurant_id', restaurantId)
         .order('invoice_date', { ascending: false });
 
@@ -144,7 +141,7 @@ export function PurchaseInvoices({ restaurantId, currency }: Props) {
 
       setInvoices((data || []).map(r => ({
         ...r,
-        supplier_name: r.suppliers?.name,
+        supplier_name: r.supplier_name,
         total_amount: Number(r.total_amount),
         tax_amount: Number(r.tax_amount),
         net_amount: Number(r.net_amount),

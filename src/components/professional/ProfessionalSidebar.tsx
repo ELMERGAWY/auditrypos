@@ -21,7 +21,7 @@ export type SidebarTab =
   | 'inventory' | 'customers' | 'suppliers' | 'expenses' | 'qr' 
   | 'waiter' | 'staff' | 'financials' | 'notifications' | 'settings' | 'overheads'
   | 'customer_accounts' | 'sales_returns' | 'supplier_accounts' | 'inventory_receipts'
-  | 'ai_assistant';
+  | 'ai_assistant' | 'treasury' | 'users' | 'sales_invoices' | 'purchase_invoices' | 'sales_orders' | 'purchase_orders';
 
 interface NavItem {
   id: SidebarTab;
@@ -68,11 +68,11 @@ interface ProfessionalSidebarProps {
 }
 
 const SECTIONS = {
-  main: 'العمليات الأساسية',
-  sales: 'المبيعات والعملاء',
+  main: 'لوحة التحكم والبيع (POS)',
+  sales: 'المبيعات والعملاء (CRM)',
   purchases: 'المشتريات والموردين',
-  inventory: 'المخزون والتصنيع',
-  accounting: 'الحسابات والمالية',
+  inventory: 'المخزون والإنتاج',
+  accounting: 'المالية والخزينة',
   analytics: 'التقارير والذكاء الاصطناعي',
   system: 'إدارة النظام'
 };
@@ -120,6 +120,7 @@ export function ProfessionalSidebar({
 
     orders: { label: config.labels.orders, icon: Receipt, badge: stats.pendingOrders, section: 'sales' },
     sales_orders: { label: 'أوامر البيع', icon: FileText, section: 'sales' },
+    sales_invoices: { label: 'فواتير البيع', icon: Receipt, section: 'sales' },
     sales_returns: { label: 'مرتجع المبيعات', icon: RotateCcw, section: 'sales' },
     customers: { label: config.labels.customers, icon: Users, section: 'sales' },
     crm: { label: 'Ventro CRM', icon: Sparkles, section: 'sales' },
@@ -137,6 +138,7 @@ export function ProfessionalSidebar({
     inventory_receipts: { label: 'استلام المخزون', icon: FileText, section: 'inventory' },
     overheads: { label: 'التكاليف الثابتة', icon: Activity, section: 'inventory' },
 
+    treasury: { label: 'الخزينة والبنوك', icon: Landmark, section: 'accounting' },
     financials: { label: 'التقارير المالية', icon: Wallet, section: 'accounting' },
     expenses: { label: 'المصروفات', icon: DollarSign, section: 'accounting' },
     customer_accounts: { label: 'حسابات العملاء', icon: CreditCard, section: 'accounting' },
@@ -146,6 +148,7 @@ export function ProfessionalSidebar({
     ai_assistant: { label: 'مساعد المحاسب (AI)', icon: Sparkles, section: 'analytics' },
 
     staff: { label: 'إدارة الموظفين', icon: Users, section: 'system' },
+    users: { label: 'إدارة الصلاحيات', icon: Shield, section: 'system' },
     notifications: { label: 'التنبيهات', icon: Bell, section: 'system' },
     settings: { label: 'إعدادات النظام', icon: Settings, section: 'system' }
   };

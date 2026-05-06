@@ -40,6 +40,7 @@ const FinancialsTab = lazy(() => import('./dashboard/FinancialsTab').then(m => (
 const OverheadManager = lazy(() => import('./dashboard/OverheadManager').then(m => ({ default: m.OverheadManager })));
 const AdvancedReportsHub = lazy(() => import('./dashboard/AdvancedReportsHub').then(m => ({ default: m.AdvancedReportsHub })));
 const AIAccountantUnified = lazy(() => import('./dashboard/AIAccountantUnified').then(m => ({ default: m.default })));
+const TreasuryTab = lazy(() => import('./dashboard/TreasuryTab').then(m => ({ default: m.TreasuryTab })));
 const HomeDashboard = lazy(() => import('./dashboard/HomeDashboard').then(m => ({ default: m.HomeDashboard })));
 const CreateRestaurantForm = lazy(() => import('@/components/dashboard/CreateRestaurantForm').then(m => ({ default: m.CreateRestaurantForm })));
 import { BarcodeScanner } from './dashboard/BarcodeScanner';
@@ -1040,7 +1041,9 @@ export default function Dashboard() {
             {activeTab === 'purchase_invoices' && <PurchaseInvoices restaurantId={restaurant!.id} currency={currency} />}
             {activeTab === 'purchase_orders' && <PurchaseOrders restaurantId={restaurant!.id} currency={currency} />}
             {activeTab === 'orders' && <SalesOrders restaurantId={restaurant!.id} currency={currency} />}
-            {activeTab === 'invoices' && <SalesInvoices restaurantId={restaurant!.id} currency={currency} />}
+            {activeTab === 'sales_orders' && <SalesOrders restaurantId={restaurant!.id} currency={currency} />}
+            {activeTab === 'sales_invoices' && <SalesInvoices restaurantId={restaurant!.id} currency={currency} />}
+            {activeTab === 'treasury' && <TreasuryTab restaurantId={restaurant!.id} currency={currency} />}
             {activeTab === 'returns' && <SalesReturnsManager restaurantId={restaurant!.id} currency={currency} />}
             {activeTab === 'sales_orders' && <SalesOrders restaurantId={restaurant!.id} currency={currency} />}
             
