@@ -21,7 +21,7 @@ export type SidebarTab =
   | 'inventory' | 'customers' | 'suppliers' | 'expenses' | 'qr' 
   | 'waiter' | 'staff' | 'financials' | 'notifications' | 'settings' | 'overheads'
   | 'customer_accounts' | 'sales_returns' | 'supplier_accounts' | 'inventory_receipts'
-  | 'ai_assistant' | 'treasury' | 'users' | 'sales_invoices' | 'purchase_invoices' | 'sales_orders' | 'purchase_orders';
+  | 'ai_assistant' | 'treasury' | 'users' | 'sales_invoices' | 'purchase_invoices' | 'sales_orders' | 'purchase_orders' | 'projects' | 'manual_journal';
 
 interface NavItem {
   id: SidebarTab;
