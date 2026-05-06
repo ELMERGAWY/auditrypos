@@ -653,17 +653,7 @@ export default function Dashboard() {
           })),
           paid_amount: paidNum,
           payment_method: paymentMethod,
-        if (result.success) {
-          const newOrder = {
-            ...result.order,
-            items: cart.map(i => ({
-              menu_item_id: i.item.id,
-              quantity: i.qty,
-              price: i.item.price
-            })),
-            paid_amount: paidNum,
-            payment_method: paymentMethod,
-          } as Order;
+        } as Order;
 
           setOrders(prev => [newOrder, ...prev]);
           setLastReceipt(newOrder);
