@@ -288,7 +288,7 @@ export const BUSINESS_TYPES: Record<BusinessType, BusinessTypeConfig> = {
       requireCustomer: false
     },
     
-    tabs: ['home', 'pos', 'orders', 'menu', 'inventory', 'inventory_receipts', 'purchase_invoices', 'purchase_orders', 'sales_orders', 'crm', 'delivery', 'customers', 'customer_accounts', 'sales_returns', 'shifts', 'stats', 'ai_assistant', 'financials', 'accounting', 'qr', 'waiter', 'expenses', 'staff', 'notifications', 'settings']
+    tabs: ['home', 'pos', 'orders', 'menu', 'inventory', 'inventory_receipts', 'purchase_invoices', 'purchase_orders', 'sales_invoices', 'sales_orders', 'crm', 'delivery', 'customers', 'customer_accounts', 'sales_returns', 'suppliers', 'supplier_accounts', 'shifts', 'stats', 'ai_assistant', 'financials', 'treasury', 'expenses', 'staff', 'users', 'notifications', 'settings'],
   },
   
   retail: {
@@ -440,7 +440,7 @@ export const BUSINESS_TYPES: Record<BusinessType, BusinessTypeConfig> = {
       requireCustomer: false
     },
     
-    tabs: ['home', 'pos', 'orders', 'menu', 'inventory', 'inventory_receipts', 'purchase_invoices', 'purchase_orders', 'crm', 'customers', 'customer_accounts', 'sales_returns', 'suppliers', 'supplier_accounts', 'shifts', 'stats', 'ai_assistant', 'financials', 'accounting', 'expenses', 'staff', 'notifications', 'settings'],
+    tabs: ['home', 'pos', 'orders', 'menu', 'inventory', 'inventory_receipts', 'purchase_invoices', 'purchase_orders', 'sales_invoices', 'sales_orders', 'crm', 'delivery', 'customers', 'customer_accounts', 'sales_returns', 'suppliers', 'supplier_accounts', 'shifts', 'stats', 'ai_assistant', 'financials', 'treasury', 'expenses', 'staff', 'users', 'notifications', 'settings'],
     
     specialFields: [
       { name: 'expiry_date', type: 'date', label: 'تاريخ الصلاحية', required: false },
@@ -678,7 +678,7 @@ export const BUSINESS_TYPES: Record<BusinessType, BusinessTypeConfig> = {
       requireCustomer: true
     },
     
-    tabs: ['home', 'inventory', 'inventory_receipts', 'orders', 'menu', 'purchase_invoices', 'purchase_orders', 'sales_orders', 'crm', 'delivery', 'customers', 'customer_accounts', 'sales_returns', 'suppliers', 'supplier_accounts', 'shifts', 'stats', 'ai_assistant', 'financials', 'accounting', 'expenses', 'staff', 'notifications', 'settings']
+    tabs: ['home', 'inventory', 'inventory_receipts', 'orders', 'menu', 'purchase_invoices', 'purchase_orders', 'sales_invoices', 'sales_orders', 'crm', 'delivery', 'customers', 'customer_accounts', 'sales_returns', 'suppliers', 'supplier_accounts', 'shifts', 'stats', 'ai_assistant', 'financials', 'treasury', 'expenses', 'staff', 'users', 'notifications', 'settings'],
   },
   
   services: {
@@ -752,7 +752,7 @@ export const BUSINESS_TYPES: Record<BusinessType, BusinessTypeConfig> = {
       requireCustomer: true
     },
     
-    tabs: ['home', 'pos', 'orders', 'menu', 'inventory', 'inventory_receipts', 'purchase_invoices', 'purchase_orders', 'sales_orders', 'crm', 'customers', 'customer_accounts', 'sales_returns', 'shifts', 'stats', 'ai_assistant', 'financials', 'accounting', 'expenses', 'staff', 'notifications', 'settings'],
+    tabs: ['home', 'pos', 'orders', 'menu', 'inventory', 'inventory_receipts', 'purchase_invoices', 'purchase_orders', 'sales_invoices', 'sales_orders', 'crm', 'customers', 'customer_accounts', 'sales_returns', 'shifts', 'stats', 'ai_assistant', 'financials', 'treasury', 'expenses', 'staff', 'users', 'notifications', 'settings'],
     
     specialFields: [
       { name: 'pickup_date', type: 'date', label: 'تاريخ الاستلام', required: true },
@@ -832,7 +832,7 @@ export const BUSINESS_TYPES: Record<BusinessType, BusinessTypeConfig> = {
       requireCustomer: false
     },
     
-    tabs: ['home', 'pos', 'orders', 'menu', 'inventory', 'inventory_receipts', 'purchase_invoices', 'purchase_orders', 'sales_orders', 'crm', 'delivery', 'customers', 'customer_accounts', 'sales_returns', 'suppliers', 'supplier_accounts', 'shifts', 'stats', 'ai_assistant', 'financials', 'accounting', 'expenses', 'staff', 'notifications', 'settings']
+    tabs: ['home', 'pos', 'orders', 'menu', 'inventory', 'inventory_receipts', 'purchase_invoices', 'purchase_orders', 'sales_invoices', 'sales_orders', 'crm', 'delivery', 'customers', 'customer_accounts', 'sales_returns', 'suppliers', 'supplier_accounts', 'shifts', 'stats', 'ai_assistant', 'financials', 'treasury', 'expenses', 'staff', 'users', 'notifications', 'settings']
   },
   shipping: {
     id: 'shipping',

@@ -41,6 +41,8 @@ export function MenuTab({
   menuForm, setMenuForm, showAddItem, setShowAddItem,
   editingItem, setEditingItem, loadData
 }: Props) {
+  if (!restaurant) return <div className="p-8 text-center">جاري تحميل بيانات النشاط...</div>;
+  
   const fileInputRef = useRef<HTMLInputElement>(null);
   const logoInputRef = useRef<HTMLInputElement>(null);
   const businessType = (restaurant.business_type || 'restaurant') as BusinessType;
@@ -110,32 +112,43 @@ export function MenuTab({
       toast.error('يرجى ملء جميع الحقول');
       return;
     }
-    if (editingItem) {
-      const { error } = await supabase.from('menu_items').update({
-        name: menuForm.name,
-        price: Number(menuForm.price),
-        category: menuForm.category,
-        image: menuForm.image,
+
+    const isInventoryBusiness = isInventoryDrivenBusiness(businessType);
+    const targetTable = isInventoryBusiness ? 'products' : 'menu_items';
+
+    const payload = {
+      name: menuForm.name,
+      price: Number(menuForm.price),
+      category: menuForm.category,
+      image: menuForm.image,
+      available: true,
+      ...(isInventoryBusiness ? {
+        cost_price: menuForm.product_type === 'inventory' ? (inventoryProducts.find(p => p.id === menuForm.product_id)?.cost_price || 0) : 0,
+        restaurant_id: restaurant.id
+      } : {
+        restaurant_id: restaurant.id,
         product_type: menuForm.product_type,
         pricing_method: menuForm.pricing_method,
         profit_margin_percent: Number(menuForm.profit_margin_percent),
         product_id: menuForm.product_type === 'inventory' ? menuForm.product_id : null,
-      }).eq('id', editingItem.id);
-      if (error) { toast.error('خطأ في التحديث'); return; }
+      })
+    };
+
+    if (editingItem) {
+      const { error } = await supabase.from(targetTable).update(payload).eq('id', editingItem.id);
+      if (error) { 
+        console.error('Save error:', error);
+        toast.error('خطأ في التحديث: ' + error.message); 
+        return; 
+      }
       toast.success('تم تحديث العنصر');
     } else {
-      const { error } = await supabase.from('menu_items').insert({
-        restaurant_id: restaurant.id,
-        name: menuForm.name,
-        price: Number(menuForm.price),
-        category: menuForm.category,
-        image: menuForm.image,
-        product_type: menuForm.product_type,
-        pricing_method: menuForm.pricing_method,
-        profit_margin_percent: Number(menuForm.profit_margin_percent),
-        product_id: menuForm.product_type === 'inventory' ? menuForm.product_id : null,
-      });
-      if (error) { toast.error('خطأ في الإضافة'); return; }
+      const { error } = await supabase.from(targetTable).insert(payload);
+      if (error) { 
+        console.error('Save error:', error);
+        toast.error('خطأ في الإضافة: ' + error.message); 
+        return; 
+      }
       toast.success('تم إضافة العنصر');
     }
     resetForm();
@@ -143,13 +156,19 @@ export function MenuTab({
   };
 
   const handleDeleteItem = async (id: string) => {
-    await supabase.from('menu_items').delete().eq('id', id);
+    const isInventoryBusiness = isInventoryDrivenBusiness(businessType);
+    const targetTable = isInventoryBusiness ? 'products' : 'menu_items';
+    
+    await supabase.from(targetTable).delete().eq('id', id);
     setMenuItems(menuItems.filter(i => i.id !== id));
     toast.success('تم حذف العنصر');
   };
 
   const handleToggleAvailability = async (item: MenuItem) => {
-    await supabase.from('menu_items').update({ available: !item.available }).eq('id', item.id);
+    const isInventoryBusiness = isInventoryDrivenBusiness(businessType);
+    const targetTable = isInventoryBusiness ? 'products' : 'menu_items';
+    
+    await supabase.from(targetTable).update({ available: !item.available }).eq('id', item.id);
     setMenuItems(menuItems.map(i => i.id === item.id ? { ...i, available: !i.available } : i));
   };
 

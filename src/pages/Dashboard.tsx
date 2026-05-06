@@ -1044,9 +1044,7 @@ export default function Dashboard() {
             {activeTab === 'sales_orders' && <SalesOrders restaurantId={restaurant!.id} currency={currency} />}
             {activeTab === 'sales_invoices' && <SalesInvoices restaurantId={restaurant!.id} currency={currency} />}
             {activeTab === 'treasury' && <TreasuryTab restaurantId={restaurant!.id} currency={currency} />}
-            {activeTab === 'returns' && <SalesReturnsManager restaurantId={restaurant!.id} currency={currency} />}
-            {activeTab === 'sales_orders' && <SalesOrders restaurantId={restaurant!.id} currency={currency} />}
-            
+            {activeTab === 'users' && <StaffTab restaurantId={restaurant!.id} />}
             {activeTab === 'crm' && <VentroCRM restaurantId={restaurant!.id} currency={currency} />}
             
             {activeTab === 'customers' && <CustomerManager restaurantId={restaurant!.id} currency={currency} />}
