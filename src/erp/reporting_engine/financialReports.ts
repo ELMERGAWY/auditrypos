@@ -364,7 +364,7 @@ export class FinancialReportingEngine {
     };
 
     for (const acc of accounts || []) {
-      const balance = Math.abs(acc.current_balance || 0);
+      const balance = Math.abs((acc as any).current_balance || 0);
 
       // Revenue classification
       if (acc.account_type === 'revenue') {
