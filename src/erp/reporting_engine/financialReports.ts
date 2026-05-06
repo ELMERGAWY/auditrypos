@@ -499,7 +499,7 @@ export class FinancialReportingEngine {
     };
 
     for (const acc of accounts || []) {
-      const balance = acc.current_balance || 0;
+      const balance = (acc as any).current_balance || 0;
 
       // Asset classification
       if (acc.account_type === 'asset') {
