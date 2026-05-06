@@ -1,4 +1,4 @@
-export type DashboardTab = 'pos' | 'orders' | 'menu' | 'delivery' | 'shifts' | 'qr' | 'waiter' | 'stats' | 'settings' | 'inventory' | 'customers' | 'suppliers' | 'expenses' | 'staff' | 'notifications' | 'financials' | 'overheads' | 'customer_accounts' | 'sales_returns' | 'supplier_accounts' | 'inventory_receipts';
+export type DashboardTab = 'pos' | 'orders' | 'menu' | 'delivery' | 'shifts' | 'qr' | 'waiter' | 'stats' | 'settings' | 'inventory' | 'customers' | 'suppliers' | 'expenses' | 'staff' | 'notifications' | 'financials' | 'overheads' | 'customer_accounts' | 'sales_returns' | 'supplier_accounts' | 'inventory_receipts' | 'manual_journal' | 'projects';
 export type OrderStatus = 'pending' | 'preparing' | 'ready' | 'completed' | 'cancelled';
 export type OrderType = 'dine_in' | 'takeaway' | 'delivery' | 'pickup';
 export type AgentStatus = 'available' | 'busy' | 'offline';
@@ -34,6 +34,7 @@ export interface Order {
   id: string;
   order_number: string;
   total: number;
+  total_cost?: number;
   status: string;
   created_at: string;
   synced: boolean;
@@ -136,3 +137,23 @@ export const ORDER_TYPE_CONFIG: Record<OrderType, { label: string; icon: string 
 };
 
 export const EMOJI_OPTIONS = ['🍔', '🍕', '🥗', '🍗', '🍟', '🍝', '🧃', '🍰', '🥩', '🌯', '☕', '🍦', '🥤', '🌮', '🍣', '🥘', '🧁', '🍩', '🫕', '🥙', '🍱', '🧆', '🍛', '🫔', '🥐', '🍞'];
+
+export interface Project {
+  id: string;
+  restaurant_id: string;
+  name: string;
+  client_name?: string;
+  start_date?: string;
+  end_date?: string;
+  total_budget?: number;
+  status: 'active' | 'completed' | 'suspended';
+  created_at: string;
+}
+
+export interface ProjectBlock {
+  id: string;
+  project_id: string;
+  name: string;
+  estimated_cost?: number;
+  created_at: string;
+}

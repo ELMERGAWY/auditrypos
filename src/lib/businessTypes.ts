@@ -1218,7 +1218,7 @@ export const BUSINESS_TYPES: Record<BusinessType, BusinessTypeConfig> = {
       allowCredit: true,
       requireCustomer: true
     },
-    tabs: ['home', 'pos', 'orders', 'menu', 'inventory', 'inventory_receipts', 'purchase_invoices', 'purchase_orders', 'crm', 'customers', 'customer_accounts', 'suppliers', 'supplier_accounts', 'stats', 'ai_assistant', 'financials', 'accounting', 'settings']
+    tabs: ['home', 'projects', 'pos', 'orders', 'menu', 'inventory', 'inventory_receipts', 'purchase_invoices', 'purchase_orders', 'crm', 'customers', 'customer_accounts', 'suppliers', 'supplier_accounts', 'stats', 'ai_assistant', 'financials', 'accounting', 'settings']
   },
   finishing: {
     id: 'finishing',

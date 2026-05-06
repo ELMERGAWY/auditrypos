@@ -142,6 +142,7 @@ class CheckoutIntegration {
         restaurant_id: context.restaurantId,
         order_number: orderNum,
         total: finalTotal,
+        total_cost: cogs, // Added for accurate profit tracking
         discount: discountAmount,
         status: isDirectSell ? 'completed' as const : 'pending' as const,
         table_number: orderData.tableNumber || null,

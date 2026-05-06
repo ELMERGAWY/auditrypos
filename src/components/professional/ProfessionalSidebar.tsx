@@ -134,6 +134,7 @@ export function ProfessionalSidebar({
     sales_returns: { label: 'مرتجع المبيعات', icon: RotateCcw, badge: stats.returnsCount, section: 'sales' },
     customers: { label: config.labels.customers, icon: Users, badge: stats.customersCount, section: 'sales' },
     crm: { label: 'Ventro CRM', icon: Sparkles, section: 'sales' },
+    projects: { label: 'المشاريع والمقاولات', icon: FileText, section: 'sales' },
 
     purchase_orders: { label: 'أوامر الشراء', icon: ShoppingCart, section: 'purchases' },
     purchase_invoices: { label: 'فواتير المشتريات', icon: DollarSign, badge: stats.purchaseInvoicesCount, section: 'purchases' },
@@ -151,6 +152,7 @@ export function ProfessionalSidebar({
     treasury: { label: 'الخزينة والبنوك', icon: Landmark, section: 'accounting' },
     financials: { label: 'التقارير المالية', icon: Wallet, section: 'accounting' },
     expenses: { label: 'المصروفات', icon: DollarSign, badge: stats.expensesCount, section: 'accounting' },
+    manual_journal: { label: 'قيود اليومية اليدوية', icon: FileText, section: 'accounting' },
     customer_accounts: { label: 'حسابات العملاء', icon: CreditCard, section: 'accounting' },
     supplier_accounts: { label: 'حسابات الموردين', icon: Wallet, section: 'accounting' },
 

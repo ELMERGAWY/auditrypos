@@ -76,15 +76,20 @@ export function ExpensesTab({ restaurantId, currency }: Props) {
     amount: '', 
     description: '', 
     date: new Date().toISOString().split('T')[0],
-    distributionType: 'monthly' as DistributionType,
+    distributionType: 'monthly',
     distributionDays: 30,
-    workingDays: [0, 1, 2, 3, 4, 5, 6] as number[],
+    workingDays: [0, 1, 2, 3, 4, 5, 6],
     cost_center: 'admin',
     account_code: '5200',
-    payment_account_code: '1100'
+    payment_account_code: '1100',
+    project_id: '',
+    block_id: ''
   });
   const [activeView, setActiveView] = useState<'expenses' | 'overheads' | 'calculator'>('expenses');
   const [selectedPeriod, setSelectedPeriod] = useState<'today' | 'week' | 'month'>('month');
+  const [paymentAccounts, setPaymentAccounts] = useState<any[]>([]);
+  const [projects, setProjects] = useState<any[]>([]);
+  const [blocks, setBlocks] = useState<any[]>([]);
 
   const load = async () => {
     const { data: expensesData } = await supabase
@@ -103,6 +108,22 @@ export function ExpensesTab({ restaurantId, currency }: Props) {
       .gte('overhead_date', dateFrom)
       .order('overhead_date', { ascending: false });
     setOverheads((overheadsData || []) as DailyOverhead[]);
+
+    // Load Treasury/Bank accounts
+    const { data: accountsData } = await supabase
+      .from('chart_of_accounts')
+      .select('*')
+      .eq('restaurant_id', restaurantId)
+      .in('account_type', ['asset', 'bank', 'cash'])
+      .order('code');
+    setPaymentAccounts(accountsData || []);
+
+    // Load Projects
+    const { data: projectsData } = await supabase
+      .from('projects')
+      .select('*, project_blocks(*)')
+      .eq('restaurant_id', restaurantId);
+    setProjects(projectsData || []);
   };
 
   useEffect(() => { load(); }, [restaurantId, selectedPeriod]);
@@ -185,6 +206,8 @@ export function ExpensesTab({ restaurantId, currency }: Props) {
         amount: amount,
         description: form.description, 
         date: form.date,
+        project_id: form.project_id || null,
+        block_id: form.block_id || null
       })
       .select()
       .single();
@@ -194,16 +217,19 @@ export function ExpensesTab({ restaurantId, currency }: Props) {
       return;
     }
 
-    // 1.1 Create Journal Entry for Accounting Link
-    await journalService.createExpenseJournalEntry(restaurantId, {
-      amount: amount,
+    // 1.1 Create Journal Entry for Accounting Link using specific accounts if selected
+    const debitAccount = form.account_code || '5200';
+    const creditAccount = form.payment_account_code || '1100'; // Default cash
+    
+    await journalService.createJournalEntry(restaurantId, {
+      entry_date: new Date(form.date),
       description: form.description || `مصروف ${form.category}`,
-      category: form.category === 'إيجار' ? 'rent' : 
-                form.category === 'رواتب' ? 'salaries' :
-                form.category === 'كهرباء ومياه' ? 'utilities' :
-                form.category === 'إعلانات' ? 'marketing' : 'general',
-      payment_method: 'cash', // Defaulting to cash for now
-      date: new Date(form.date)
+      source: 'expense',
+      is_posted: true,
+      lines: [
+        { account_id: debitAccount, debit: amount, credit: 0, description: `مصروف - ${form.category}` },
+        { account_id: creditAccount, debit: 0, credit: amount, description: `سداد مصروف - ${form.category}` }
+      ]
     });
 
     // 2. Create daily overheads distributed over working days
@@ -400,19 +426,43 @@ export function ExpensesTab({ restaurantId, currency }: Props) {
 
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <Label className="text-xs">مركز التكلفة</Label>
-                    <select value={form.cost_center} onChange={e => setForm(f => ({ ...f, cost_center: e.target.value }))}
-                      className="w-full px-3 py-2 rounded-lg bg-secondary text-secondary-foreground border border-border text-sm">
-                      {COST_CENTERS.map(c => <option key={c.id} value={c.id}>{c.label}</option>)}
-                    </select>
-                  </div>
-                  <div>
-                    <Label className="text-xs">كود الحساب</Label>
+                    <Label className="text-xs">كود الحساب (المصروف)</Label>
                     <select value={form.account_code} onChange={e => setForm(f => ({ ...f, account_code: e.target.value }))}
                       className="w-full px-3 py-2 rounded-lg bg-secondary text-secondary-foreground border border-border text-sm">
                       {ACCOUNT_CODES.map(a => <option key={a.code} value={a.code}>{a.label} ({a.code})</option>)}
                     </select>
                   </div>
+                  <div>
+                    <Label className="text-xs">حساب الدفع (الخزينة/البنك)</Label>
+                    <select value={form.payment_account_code} onChange={e => setForm(f => ({ ...f, payment_account_code: e.target.value }))}
+                      className="w-full px-3 py-2 rounded-lg bg-secondary text-secondary-foreground border border-border text-sm">
+                      <option value="">تلقائي</option>
+                      {paymentAccounts.map(a => <option key={a.code} value={a.code}>{a.name} ({a.code})</option>)}
+                    </select>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <Label className="text-xs">ربط بمشروع (اختياري)</Label>
+                    <select value={form.project_id} onChange={e => setForm(f => ({ ...f, project_id: e.target.value, block_id: '' }))}
+                      className="w-full px-3 py-2 rounded-lg bg-secondary text-secondary-foreground border border-border text-sm">
+                      <option value="">بدون مشروع</option>
+                      {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                    </select>
+                  </div>
+                  {form.project_id && (
+                    <div>
+                      <Label className="text-xs">المرحلة / البلوك</Label>
+                      <select value={form.block_id} onChange={e => setForm(f => ({ ...f, block_id: e.target.value }))}
+                        className="w-full px-3 py-2 rounded-lg bg-secondary text-secondary-foreground border border-border text-sm">
+                        <option value="">الكل</option>
+                        {projects.find(p => p.id === form.project_id)?.project_blocks?.map((b: any) => 
+                          <option key={b.id} value={b.id}>{b.name}</option>
+                        )}
+                      </select>
+                    </div>
+                  )}
                 </div>
               </div>
 

@@ -42,6 +42,8 @@ const OverheadManager = lazy(() => import('./dashboard/OverheadManager').then(m 
 const AdvancedReportsHub = lazy(() => import('./dashboard/AdvancedReportsHub').then(m => ({ default: m.AdvancedReportsHub })));
 const AIAccountantUnified = lazy(() => import('./dashboard/AIAccountantUnified').then(m => ({ default: m.default })));
 const TreasuryTab = lazy(() => import('./dashboard/TreasuryTab').then(m => ({ default: m.TreasuryTab })));
+const ManualJournalTab = lazy(() => import('./dashboard/ManualJournalTab').then(m => ({ default: m.ManualJournalTab })));
+const ContractingDashboard = lazy(() => import('./dashboard/ContractingDashboard').then(m => ({ default: m.ContractingDashboard })));
 const HomeDashboard = lazy(() => import('./dashboard/HomeDashboard').then(m => ({ default: m.HomeDashboard })));
 const CreateRestaurantForm = lazy(() => import('@/components/dashboard/CreateRestaurantForm').then(m => ({ default: m.CreateRestaurantForm })));
 import { BarcodeScanner } from './dashboard/BarcodeScanner';
@@ -182,7 +184,8 @@ export default function Dashboard() {
 
       const fetchedOrders = ordersRes.data || [];
       const totalSales = fetchedOrders.reduce((sum, order) => sum + Number(order.total || 0), 0);
-      const estimatedProfit = totalSales * 0.3; // Estimated 30% profit margin if actual profit is not calculable directly here.
+      const totalCost = fetchedOrders.reduce((sum, order) => sum + Number(order.total_cost || 0), 0);
+      const actualProfit = totalSales - totalCost;
 
       setCounts({
         orders: fetchedOrders.length,
@@ -194,7 +197,7 @@ export default function Dashboard() {
         customers: custRes.count || 0,
         suppliers: suppRes.count || 0,
         totalSales,
-        totalProfit: estimatedProfit
+        totalProfit: actualProfit
       });
     } catch (err) {
       console.error('Failed to fetch counts:', err);
@@ -797,8 +800,10 @@ export default function Dashboard() {
     { id: 'invoices', label: 'فواتير البيع (Invoices)', icon: Receipt },
     { id: 'returns', label: 'المرتفعات (Credit Notes)', icon: RotateCcw },
     { id: 'inventory', label: 'المخزون والتكاليف', icon: Package },
+    { id: 'projects', label: 'المشاريع والمستخلصات', icon: HardHat },
     { id: 'crm', label: 'إدارة العملاء CRM', icon: Heart },
     { id: 'accounting', label: 'المحاسبة والمالية', icon: Landmark },
+    { id: 'manual_journal', label: 'قيود اليومية اليدوية', icon: ArrowRightLeft },
     { id: 'analytics', label: 'التقارير المخصصة', icon: BarChart3 },
     { id: 'settings', label: 'الإعدادات', icon: Settings },
   ];
@@ -1166,6 +1171,16 @@ export default function Dashboard() {
             {activeTab === 'financials' && (
               <ModuleErrorBoundary moduleName="التقارير المالية">
                 <FinancialsTab restaurantId={restaurant!.id} currency={currency} />
+              </ModuleErrorBoundary>
+            )}
+            {activeTab === 'projects' && (
+              <ModuleErrorBoundary moduleName="إدارة المشاريع">
+                <ContractingDashboard restaurantId={restaurant!.id} currency={currency} />
+              </ModuleErrorBoundary>
+            )}
+            {activeTab === 'manual_journal' && (
+              <ModuleErrorBoundary moduleName="قيود اليومية">
+                <ManualJournalTab restaurantId={restaurant!.id} currency={currency} />
               </ModuleErrorBoundary>
             )}
             {activeTab === 'overheads' && <OverheadManager restaurantId={restaurant!.id} currency={currency} />}

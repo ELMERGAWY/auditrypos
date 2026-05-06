@@ -33,6 +33,9 @@ export function TreasuryTab({ restaurantId, currency }: TreasuryTabProps) {
     amount: '',
     notes: ''
   });
+  const [showAddBank, setShowAddBank] = useState(false);
+  const [showAddCash, setShowAddCash] = useState(false);
+  const [newAccountForm, setNewAccountForm] = useState({ name: '', number: '', initialBalance: '' });
 
   const loadData = async () => {
     try {
@@ -100,6 +103,78 @@ export function TreasuryTab({ restaurantId, currency }: TreasuryTabProps) {
     }
   };
 
+  const handleAddBank = async () => {
+    if (!newAccountForm.name || !newAccountForm.number) {
+      toast.error('يرجى إدخال اسم البنك ورقم الحساب');
+      return;
+    }
+    
+    // 1. Create Chart of Account under Banks (140x)
+    const newCode = `140${banks.length + 1}`;
+    const { data: coa, error: coaError } = await supabase.from('chart_of_accounts').insert({
+      restaurant_id: restaurantId,
+      code: newCode,
+      name: `بنك - ${newAccountForm.name}`,
+      account_type: 'asset',
+      description: 'حساب بنكي',
+      is_active: true
+    }).select().single();
+
+    if (coaError) {
+      toast.error('فشل في إنشاء الحساب الدليلي');
+      return;
+    }
+
+    // 2. Create Bank Account
+    const { error } = await supabase.from('bank_accounts').insert({
+      restaurant_id: restaurantId,
+      bank_name: newAccountForm.name,
+      account_name: newAccountForm.name,
+      account_number: newAccountForm.number,
+      current_balance: Number(newAccountForm.initialBalance) || 0,
+      ledger_account_id: coa.code
+    });
+
+    if (!error) {
+      toast.success('تمت إضافة الحساب البنكي بنجاح');
+      setShowAddBank(false);
+      setNewAccountForm({ name: '', number: '', initialBalance: '' });
+      loadData();
+    } else {
+      toast.error('فشل في إضافة البنك');
+    }
+  };
+
+  const handleAddCash = async () => {
+    if (!newAccountForm.name) {
+      toast.error('يرجى إدخال اسم الخزينة');
+      return;
+    }
+    
+    // Create Chart of Account under Cash (110x)
+    const cashCount = cashAccounts.length;
+    const newCode = `110${cashCount + 1}`;
+    
+    const { error } = await supabase.from('chart_of_accounts').insert({
+      restaurant_id: restaurantId,
+      code: newCode,
+      name: `خزينة - ${newAccountForm.name}`,
+      account_type: 'asset',
+      description: 'نقدية بالصندوق',
+      current_balance: Number(newAccountForm.initialBalance) || 0,
+      is_active: true
+    });
+
+    if (!error) {
+      toast.success('تمت إضافة الخزينة بنجاح');
+      setShowAddCash(false);
+      setNewAccountForm({ name: '', number: '', initialBalance: '' });
+      loadData();
+    } else {
+      toast.error('فشل في إضافة الخزينة');
+    }
+  };
+
   return (
     <div className="space-y-6 fade-in p-4">
       <header className="flex justify-between items-center">
@@ -142,6 +217,11 @@ export function TreasuryTab({ restaurantId, currency }: TreasuryTabProps) {
               <Wallet className="w-8 h-8" />
             </div>
           </div>
+          <div className="mt-4 flex justify-end">
+             <Button variant="ghost" size="sm" className="gap-2 text-primary" onClick={() => setShowAddCash(true)}>
+                <Plus className="w-4 h-4" /> إضافة خزينة
+             </Button>
+          </div>
           <div className="mt-6 space-y-3">
             {cashAccounts.map(acc => (
               <div key={acc.id} className="flex justify-between items-center p-2 rounded-lg hover:bg-white/5 transition-colors">
@@ -162,6 +242,11 @@ export function TreasuryTab({ restaurantId, currency }: TreasuryTabProps) {
             <div className="p-4 rounded-2xl bg-emerald-500/10 text-emerald-500 shadow-inner">
               <Building2 className="w-8 h-8" />
             </div>
+          </div>
+          <div className="mt-4 flex justify-end">
+             <Button variant="ghost" size="sm" className="gap-2 text-emerald-500" onClick={() => setShowAddBank(true)}>
+                <Plus className="w-4 h-4" /> إضافة حساب بنكي
+             </Button>
           </div>
           <div className="mt-6 space-y-3">
             {banks.map(bank => (
@@ -234,6 +319,60 @@ export function TreasuryTab({ restaurantId, currency }: TreasuryTabProps) {
               <div className="flex gap-3 pt-4">
                 <Button className="flex-1 gradient-bg border-0 text-white h-12 text-lg font-bold" onClick={handleTransfer}>إتمام التحويل</Button>
                 <Button variant="outline" className="h-12" onClick={() => setShowTransferModal(false)}>إلغاء</Button>
+              </div>
+            </div>
+          </motion.div>
+        </div>
+      )}
+
+      {/* Add Bank Modal */}
+      {showAddBank && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+          <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="glass-card p-8 max-w-md w-full">
+            <h3 className="text-2xl font-black mb-6 flex items-center gap-2">
+              <Building2 className="text-emerald-500" /> إضافة حساب بنكي
+            </h3>
+            <div className="space-y-4">
+              <div>
+                <Label>اسم البنك</Label>
+                <Input placeholder="مثال: البنك الأهلي" value={newAccountForm.name} onChange={e => setNewAccountForm({...newAccountForm, name: e.target.value})} />
+              </div>
+              <div>
+                <Label>رقم الحساب</Label>
+                <Input placeholder="رقم الحساب أو الآيبان" value={newAccountForm.number} onChange={e => setNewAccountForm({...newAccountForm, number: e.target.value})} />
+              </div>
+              <div>
+                <Label>الرصيد الافتتاحي (اختياري)</Label>
+                <Input type="number" placeholder="0.00" value={newAccountForm.initialBalance} onChange={e => setNewAccountForm({...newAccountForm, initialBalance: e.target.value})} />
+              </div>
+              <div className="flex gap-3 pt-4">
+                <Button className="flex-1 bg-emerald-500 hover:bg-emerald-600 text-white" onClick={handleAddBank}>إضافة الحساب</Button>
+                <Button variant="outline" onClick={() => setShowAddBank(false)}>إلغاء</Button>
+              </div>
+            </div>
+          </motion.div>
+        </div>
+      )}
+
+      {/* Add Cash Modal */}
+      {showAddCash && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+          <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="glass-card p-8 max-w-md w-full">
+            <h3 className="text-2xl font-black mb-6 flex items-center gap-2">
+              <Wallet className="text-primary" /> إضافة خزينة نقدية
+            </h3>
+            <div className="space-y-4">
+              <div>
+                <Label>اسم الخزينة</Label>
+                <Input placeholder="مثال: الخزينة الرئيسية، صندوق فرع المهندسين" value={newAccountForm.name} onChange={e => setNewAccountForm({...newAccountForm, name: e.target.value})} />
+              </div>
+              <div>
+                <Label>الرصيد الافتتاحي (اختياري)</Label>
+                <Input type="number" placeholder="0.00" value={newAccountForm.initialBalance} onChange={e => setNewAccountForm({...newAccountForm, initialBalance: e.target.value})} />
+              </div>
+              <div className="flex gap-3 pt-4">
+                <Button className="flex-1 gradient-bg text-white" onClick={handleAddCash}>إضافة الخزينة</Button>
+                <Button variant="outline" onClick={() => setShowAddCash(false)}>إلغاء</Button>
               </div>
             </div>
           </motion.div>
