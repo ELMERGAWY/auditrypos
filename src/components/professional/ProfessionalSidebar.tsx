@@ -186,11 +186,16 @@ export function ProfessionalSidebar({
     <TooltipProvider delayDuration={0}>
       <motion.aside
         initial={false}
-        animate={{ width: isCollapsed ? 80 : 280 }}
+        animate={{ 
+          width: isCollapsed ? 80 : 280,
+          right: 16,
+          top: 16,
+          bottom: 16,
+        }}
         transition={{ duration: 0.3, ease: [0.4, 0, 0.2, 1] }}
         className={cn(
-          "h-screen flex flex-col shrink-0 border-l border-border bg-card/95 backdrop-blur-xl",
-          "relative z-50"
+          "h-[calc(100vh-32px)] flex flex-col shrink-0 glass-card !rounded-[2.5rem] !border-white/20",
+          "fixed z-50 overflow-hidden"
         )}
       >
         {/* Collapse Toggle */}

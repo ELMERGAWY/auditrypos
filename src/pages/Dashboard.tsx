@@ -53,6 +53,7 @@ const InvoiceTabs = lazy(() => import('./dashboard/pos/InvoiceTabs').then(m => (
 const SalesOrders = lazy(() => import('./dashboard/SalesOrders').then(m => ({ default: m.SalesOrders })));
 const PurchaseOrders = lazy(() => import('./dashboard/PurchaseOrders').then(m => ({ default: m.PurchaseOrders })));
 const PurchaseInvoices = lazy(() => import('./dashboard/PurchaseInvoices').then(m => ({ default: m.PurchaseInvoices })));
+const SalesInvoices = lazy(() => import('./dashboard/SalesInvoices').then(m => ({ default: m.SalesInvoices })));
 import { BUSINESS_TYPES, BUSINESS_TABS, getAddressPlaceholder, getCheckoutButtonLabel, getCustomerPlaceholder, getDefaultOrderType, getNotesPlaceholder, getPosSearchPlaceholder, isFoodSector, isInventoryDrivenBusiness, type BusinessType } from '@/lib/businessTypes';
 import { useAuth } from '@/lib/AuthContext';
 import { useDarkMode } from '@/lib/useDarkMode';
@@ -84,6 +85,28 @@ export default function Dashboard() {
   const [activeTab, setActiveTab] = useState<SidebarTab>('home');
   const [activeSubView, setActiveSubView] = useState<'stock' | 'bom'>('stock');
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [syncStatus, setSyncStatus] = useState<{ synced: number; errors: number; lastSync: Date | null }>({ synced: 0, errors: 0, lastSync: null });
+  const [isSyncing, setIsSyncing] = useState(false);
+
+  useEffect(() => {
+    const handleSync = async () => {
+      if (isOnline && !isSyncing) {
+        setIsSyncing(true);
+        try {
+          const { syncPendingData } = await import('@/lib/offlineEngine');
+          const result = await syncPendingData();
+          setSyncStatus({ ...result, lastSync: new Date() });
+          if (result.synced > 0) toast.success(`تم مزامنة ${result.synced} عمليات بنجاح`);
+        } catch (err) {
+          console.error('Sync failed:', err);
+        } finally {
+          setIsSyncing(false);
+        }
+      }
+    };
+    const interval = setInterval(handleSync, 30000); // Sync every 30s
+    return () => clearInterval(interval);
+  }, [isOnline, isSyncing]);
 
   // POS State
   const [cart, setCart] = useState<{ item: MenuItem; qty: number; qtyText: string; unitMode: string }[]>([]);
@@ -747,7 +770,9 @@ export default function Dashboard() {
   
   const allTabs: { id: DashboardTab; label: string; icon: any; badge?: number; locked?: boolean }[] = [
     { id: 'pos', label: 'نقطة البيع', icon: LayoutGrid },
-    { id: 'orders', label: 'الطلبات', icon: Receipt, badge: pendingOrders.length, locked: lockedTabs.includes('orders') },
+    { id: 'orders', label: 'أوامر البيع (Sales Orders)', icon: FileText, badge: pendingOrders.length, locked: lockedTabs.includes('orders') },
+    { id: 'invoices', label: 'فواتير البيع (Invoices)', icon: Receipt },
+    { id: 'returns', label: 'المرتفعات (Credit Notes)', icon: RotateCcw },
     { id: 'inventory', label: 'المخزون والتكاليف', icon: Package },
     { id: 'crm', label: 'إدارة العملاء CRM', icon: Heart },
     { id: 'accounting', label: 'المحاسبة والمالية', icon: Landmark },
@@ -806,61 +831,12 @@ export default function Dashboard() {
 
   return (
     <DashboardErrorBoundary>
-    <div className={`min-h-screen bg-background flex theme-${businessType}`} dir="rtl">
-      {/* Suspended Overlay */}
-      <AnimatePresence>
-        {isSuspended && (
-          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-            className="fixed inset-0 z-50 bg-background/95 backdrop-blur-sm flex items-center justify-center p-4">
-            <div className="glass-card p-8 max-w-md text-center">
-              <div className="w-16 h-16 rounded-full bg-destructive/20 flex items-center justify-center mx-auto mb-4">
-                <X className="w-8 h-8 text-destructive" />
-              </div>
-              <h2 className="font-display text-2xl font-bold mb-2">الحساب موقوف</h2>
-              <p className="text-muted-foreground mb-6">انتهت صلاحية اشتراكك. يرجى تجديد الاشتراك للمتابعة.</p>
-              <Button onClick={() => navigate('/payment')} className="gradient-bg text-primary-foreground border-0">
-                <CreditCard className="w-4 h-4 ml-2" /> تجديد الاشتراك
-              </Button>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {/* Receipt Modal */}
-      <AnimatePresence>
-        {showReceipt && lastReceipt && (
-          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-            className="fixed inset-0 z-50 bg-background/80 backdrop-blur-sm flex items-center justify-center p-4"
-            onClick={() => setShowReceipt(false)}>
-            <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.9, opacity: 0 }}
-              className="glass-card p-6 max-w-sm w-full" onClick={e => e.stopPropagation()}>
-              <h3 className="font-display font-bold mb-4 flex items-center gap-2"><Receipt className="w-5 h-5 text-primary" /> إيصال الطلب</h3>
-              <ReceiptModalWrapper order={lastReceipt} restaurant={restaurant} onClose={() => setShowReceipt(false)} />
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {/* Invoice Tabs Modal */}
-      <Suspense fallback={null}>
-        <InvoiceTabs
-          show={showInvoiceTabs}
-          onClose={() => setShowInvoiceTabs(false)}
-          invoiceTabs={invoiceTabs}
-          activeInvoiceId={activeInvoiceId}
-          recallInvoice={recallInvoice}
-          deleteInvoiceTab={deleteInvoiceTab}
-          clearCart={clearCart}
-          currency={currency}
-        />
-      </Suspense>
-
-      {/* Professional Sidebar */}
+    <div className="min-h-screen bg-background relative overflow-hidden mesh-bg" dir="rtl">
       <ProfessionalSidebar
         businessType={businessType}
         activeTab={activeTab}
-        onTabChange={(tab) => setActiveTab(tab)}
-        restaurant={restaurant}
+        onTabChange={handleTabClick}
+        restaurant={restaurant!}
         user={{ email: user?.email, full_name: profileName }}
         stats={{
           pendingOrders: pendingOrders.length,
@@ -881,21 +857,26 @@ export default function Dashboard() {
         onToggleCollapse={() => setSidebarCollapsed(!sidebarCollapsed)}
       />
 
-      <div className="flex-1 flex flex-col min-w-0">
-        {/* Mobile header */}
-        <header className="lg:hidden flex items-center gap-2 p-3 border-b border-border overflow-x-auto bg-card shrink-0">
-          {restaurant.logo_url && <img src={restaurant.logo_url} alt="logo" className="w-8 h-8 rounded-lg object-contain bg-secondary/50 shrink-0" />}
-          {tabs.map(tab => (
-            <button key={tab.id} onClick={() => handleTabClick(tab.id)}
-              className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs whitespace-nowrap transition-colors ${activeTab === tab.id ? 'gradient-bg text-primary-foreground' : 'text-muted-foreground hover:bg-secondary'} ${tab.locked ? 'opacity-50' : ''}`}>
-              <tab.icon className="w-4 h-4" />{tab.label}
-              {tab.locked ? <Lock className="w-3 h-3" /> : null}
-              {tab.badge && !tab.locked ? <span className="w-4 h-4 rounded-full bg-destructive text-destructive-foreground text-[10px] flex items-center justify-center">{tab.badge}</span> : null}
-            </button>
-          ))}
-        </header>
-
-        <main className="flex-1 overflow-auto bg-background/30 custom-scrollbar p-0">
+      <div className={cn(
+        "transition-all duration-500 min-h-screen",
+        sidebarCollapsed ? "mr-24" : "mr-80"
+      )}>
+        <main className="p-10">
+          <div className="max-w-[1800px] mx-auto glass-card p-12 min-h-[calc(100vh-80px)] shadow-2xl border-white/20 relative overflow-hidden">
+            {/* Sync Status Overlay */}
+            <AnimatePresence>
+              {isSyncing && (
+                <motion.div 
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: 10 }}
+                  className="absolute top-6 left-6 z-[100] floating-glass flex items-center gap-3 text-sm font-bold text-primary"
+                >
+                  <RefreshCcw className="w-4 h-4 animate-spin" />
+                  <span>جاري المزامنة...</span>
+                </motion.div>
+              )}
+            </AnimatePresence>
           <Suspense fallback={<div className="h-full flex items-center justify-center p-12"><RefreshCcw className="w-10 h-10 animate-spin text-primary" /></div>}>
             {/* ===================== HOME DASHBOARD ===================== */}
             {activeTab === 'home' && (
@@ -1097,6 +1078,9 @@ export default function Dashboard() {
             {activeTab === 'inventory_receipts' && <InventoryReceiptsManager restaurantId={restaurant!.id} currency={currency} />}
             {activeTab === 'purchase_invoices' && <PurchaseInvoices restaurantId={restaurant!.id} currency={currency} />}
             {activeTab === 'purchase_orders' && <PurchaseOrders restaurantId={restaurant!.id} currency={currency} />}
+            {activeTab === 'orders' && <SalesOrders restaurantId={restaurant!.id} currency={currency} />}
+            {activeTab === 'invoices' && <SalesInvoices restaurantId={restaurant!.id} currency={currency} />}
+            {activeTab === 'returns' && <SalesReturnsManager restaurantId={restaurant!.id} currency={currency} />}
             {activeTab === 'sales_orders' && <SalesOrders restaurantId={restaurant!.id} currency={currency} />}
             
             {activeTab === 'crm' && <VentroCRM restaurantId={restaurant!.id} currency={currency} />}
@@ -1219,6 +1203,7 @@ export default function Dashboard() {
 
           </Suspense>
           </Suspense>
+          </div>
         </main>
       </div>
     </div>

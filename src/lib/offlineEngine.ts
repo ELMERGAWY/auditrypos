@@ -1,8 +1,8 @@
 // Offline-First Engine: Cache data locally & sync when online
 
 const DB_NAME = 'smartpos_offline';
-const DB_VERSION = 1;
-const STORES = ['pendingOrders', 'pendingStatusUpdates', 'cachedData'] as const;
+const DB_VERSION = 2;
+const STORES = ['pendingOrders', 'pendingStatusUpdates', 'pendingTransactions', 'cachedData'] as const;
 
 function isIndexedDbAvailable() {
   return typeof window !== 'undefined' && typeof indexedDB !== 'undefined';
@@ -90,6 +90,41 @@ export async function removePendingStatusUpdate(id: string) {
   const db = await openDB();
   const tx = db.transaction('pendingStatusUpdates', 'readwrite');
   tx.objectStore('pendingStatusUpdates').delete(id);
+}
+
+// ─── Pending Transactions Queue (General ERP) ───
+export interface PendingTransaction {
+  id: string;
+  type: 'expense' | 'sales_order' | 'crm_log' | 'return' | 'stock_adjustment';
+  payload: any;
+  timestamp: number;
+}
+
+export async function queueTransaction(txData: PendingTransaction) {
+  try {
+    const db = await openDB();
+    const tx = db.transaction('pendingTransactions', 'readwrite');
+    tx.objectStore('pendingTransactions').put(txData);
+  } catch (err) {
+    console.error('Failed to queue offline transaction:', err);
+  }
+}
+
+export async function getPendingTransactions(): Promise<PendingTransaction[]> {
+  try {
+    const db = await openDB();
+    const tx = db.transaction('pendingTransactions', 'readonly');
+    const req = tx.objectStore('pendingTransactions').getAll();
+    return await new Promise((res) => { req.onsuccess = () => res(req.result); req.onerror = () => res([]); });
+  } catch { return []; }
+}
+
+export async function removePendingTransaction(id: string) {
+  try {
+    const db = await openDB();
+    const tx = db.transaction('pendingTransactions', 'readwrite');
+    tx.objectStore('pendingTransactions').delete(id);
+  } catch {}
 }
 
 // ─── Cache Dashboard Data ───
@@ -189,6 +224,32 @@ export async function syncPendingData(): Promise<{ synced: number; errors: numbe
       const { error } = await supabase.from('orders').update({ status: pu.status }).eq('id', pu.orderId);
       if (!error) {
         await removePendingStatusUpdate(pu.id);
+        synced++;
+      } else { errors++; }
+    } catch { errors++; }
+  }
+
+  // Sync pending ERP transactions
+  const pendingTxs = await getPendingTransactions();
+  for (const ptx of pendingTxs) {
+    try {
+      let success = false;
+      switch (ptx.type) {
+        case 'expense':
+          const { error: expErr } = await supabase.from('expenses').insert(ptx.payload);
+          if (!expErr) success = true;
+          break;
+        case 'crm_log':
+          const { error: crmErr } = await supabase.from('crm_communication_logs').insert(ptx.payload);
+          if (!crmErr) success = true;
+          break;
+        case 'sales_order':
+          const { error: soErr } = await supabase.from('orders').insert(ptx.payload);
+          if (!soErr) success = true;
+          break;
+      }
+      if (success) {
+        await removePendingTransaction(ptx.id);
         synced++;
       } else { errors++; }
     } catch { errors++; }

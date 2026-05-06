@@ -1,3 +1,4 @@
+
 // @ts-nocheck
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
@@ -9,7 +10,12 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Loader2, Send, CheckCircle2, XCircle, Bot, FileSearch, MessageCircle, Plus } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
+import { 
+  Loader2, Send, CheckCircle2, XCircle, Bot, 
+  FileSearch, MessageCircle, Plus, Sparkles, 
+  BrainCircuit, TrendingUp, ShieldCheck 
+} from "lucide-react";
 import { toast } from "sonner";
 
 type Standard = "EAS" | "IFRS" | "US_GAAP";
@@ -21,20 +27,12 @@ interface Props {
 export default function AIAccountantUnified({ restaurantId }: Props) {
   const [standard, setStandard] = useState<Standard>("EAS");
   const [tab, setTab] = useState("chat");
-
-  // Chat state
   const [messages, setMessages] = useState<any[]>([]);
   const [input, setInput] = useState("");
   const [chatLoading, setChatLoading] = useState(false);
-
-  // Suggestions
   const [suggestions, setSuggestions] = useState<any[]>([]);
-
-  // Review
   const [reviewLoading, setReviewLoading] = useState(false);
   const [reviewReport, setReviewReport] = useState<any>(null);
-
-  // Telegram bots
   const [bots, setBots] = useState<any[]>([]);
   const [newBotUsername, setNewBotUsername] = useState("");
 
@@ -84,7 +82,6 @@ export default function AIAccountantUnified({ restaurantId }: Props) {
     setInput("");
     setChatLoading(true);
 
-    // Persist user message
     const { data: userMsg } = await supabase.from("ai_chat_messages").insert({
       restaurant_id: restaurantId,
       role: "user",
@@ -92,7 +89,6 @@ export default function AIAccountantUnified({ restaurantId }: Props) {
       message_type: "general",
     }).select().single();
 
-    // Call analyze function
     const { data, error } = await supabase.functions.invoke("ai-accountant-analyze", {
       body: { restaurant_id: restaurantId, source_type: "chat", chat_message_id: userMsg?.id, text, standard },
     });
@@ -103,297 +99,143 @@ export default function AIAccountantUnified({ restaurantId }: Props) {
       await supabase.from("ai_chat_messages").insert({
         restaurant_id: restaurantId,
         role: "assistant",
-        content: `تم اقتراح قيد محاسبي بثقة ${Math.round((data.suggestion.confidence_score ?? 0) * 100)}%. راجعه في تبويب "الاقتراحات".`,
+        content: `تم تحليل العملية بنجاح. القيد المقترح جاهز للمراجعة في تبويب الاقتراحات (بنسبة ثقة ${Math.round((data.suggestion.confidence_score ?? 0) * 100)}%).`,
         message_type: "journal_suggestion",
       });
-      toast.success("تم توليد اقتراح قيد محاسبي");
+      toast.success("تم توليد اقتراح قيد محاسبي ذكي");
     }
 
     setChatLoading(false);
   }
 
-  async function approveSuggestion(s: any) {
-    // Create journal_entry + lines from suggested_entry
-    const entry = s.suggested_entry || {};
-    const lines = entry.lines || [];
-
-    const totalDebit = lines.reduce((sum: number, l: any) => sum + Number(l.debit || 0), 0);
-    const totalCredit = lines.reduce((sum: number, l: any) => sum + Number(l.credit || 0), 0);
-
-    const { data: created, error: e1 } = await supabase.from("journal_entries").insert({
-      restaurant_id: restaurantId,
-      entry_date: s.suggested_entry_date,
-      description: s.title,
-      total_debit: totalDebit,
-      total_credit: totalCredit,
-      status: "posted",
-      reference: `AI:${s.id.slice(0, 8)}`,
-    } as any).select().single();
-
-    if (e1 || !created) {
-      toast.error("فشل ترحيل القيد: " + (e1?.message || ""));
-      return;
-    }
-
-    if (lines.length > 0) {
-      const lineRows = lines.map((l: any) => ({
-        entry_id: created.id,
-        account_code: l.account_code,
-        account_name: l.account_name,
-        debit: Number(l.debit || 0),
-        credit: Number(l.credit || 0),
-        description: l.description,
-      }));
-      await supabase.from("journal_entry_lines").insert(lineRows as any);
-    }
-
-    await supabase.from("ai_journal_suggestions").update({
-      status: "approved",
-      reviewed_at: new Date().toISOString(),
-      posted_entry_id: created.id,
-    }).eq("id", s.id);
-
-    toast.success("تم اعتماد القيد وترحيله");
-    loadSuggestions();
-  }
-
-  async function rejectSuggestion(s: any) {
-    const reason = window.prompt("سبب الرفض (اختياري)") || "";
-    await supabase.from("ai_journal_suggestions").update({
-      status: "rejected",
-      reviewed_at: new Date().toISOString(),
-      rejection_reason: reason,
-    }).eq("id", s.id);
-    toast.info("تم رفض الاقتراح");
-    loadSuggestions();
-  }
-
-  async function runReview() {
-    setReviewLoading(true);
-    setReviewReport(null);
-    const { data, error } = await supabase.functions.invoke("ai-accountant-review", {
-      body: { restaurant_id: restaurantId, standard },
-    });
-    if (error) toast.error("فشل المراجعة: " + error.message);
-    else setReviewReport(data?.report);
-    setReviewLoading(false);
-  }
-
-  async function addBot() {
-    if (!newBotUsername.trim()) return;
-    const { error } = await supabase.from("telegram_bots").insert({
-      restaurant_id: restaurantId,
-      bot_username: newBotUsername.trim(),
-      bot_token_hash: "managed-by-connector",
-      is_active: true,
-      auto_suggest_entries: true,
-      require_approval: true,
-      allowed_chat_ids: [],
-    } as any);
-    if (error) toast.error(error.message);
-    else { setNewBotUsername(""); loadBots(); toast.success("تمت إضافة البوت"); }
-  }
-
-  async function toggleBot(b: any) {
-    await supabase.from("telegram_bots").update({ is_active: !b.is_active } as any).eq("id", b.id);
-    loadBots();
-  }
-
   return (
-    <div className="space-y-4 p-4">
-      <header className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold">المساعد المحاسبي الذكي</h1>
-          <p className="text-sm text-muted-foreground">تحليل تلقائي للرسائل، توليد قيود، ومراجعة القوائم المالية</p>
+    <div className="space-y-8 fade-in h-full flex flex-col">
+      <header className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div className="flex items-center gap-4">
+          <div className="w-16 h-16 rounded-[2rem] bg-indigo-500/10 flex items-center justify-center text-indigo-500 glow-soft">
+            <BrainCircuit className="w-8 h-8" />
+          </div>
+          <div>
+            <h1 className="text-3xl font-black gradient-text">المساعد المحاسبي الذكي</h1>
+            <p className="text-muted-foreground font-medium">ذكاء اصطناعي متخصص في المعايير المحاسبية الدولية والمحلية</p>
+          </div>
         </div>
-        <div className="flex items-center gap-2">
-          <span className="text-sm text-muted-foreground">المعيار:</span>
+        
+        <div className="flex items-center gap-3 glass-card p-2 !rounded-2xl">
+          <span className="text-xs font-bold text-muted-foreground mr-2">معيار التقرير:</span>
           <Select value={standard} onValueChange={(v) => setStandard(v as Standard)}>
-            <SelectTrigger className="w-40"><SelectValue /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="EAS">المصري EAS</SelectItem>
-              <SelectItem value="IFRS">الدولي IFRS</SelectItem>
-              <SelectItem value="US_GAAP">الأمريكي US GAAP</SelectItem>
+            <SelectTrigger className="w-44 bg-transparent border-0 font-bold focus:ring-0 h-9">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent className="glass-card">
+              <SelectItem value="EAS">المصري (EAS)</SelectItem>
+              <SelectItem value="IFRS">الدولي (IFRS)</SelectItem>
+              <SelectItem value="US_GAAP">الأمريكي (US GAAP)</SelectItem>
             </SelectContent>
           </Select>
         </div>
       </header>
 
-      <Tabs value={tab} onValueChange={setTab} className="w-full">
-        <TabsList className="grid grid-cols-4 w-full max-w-2xl">
-          <TabsTrigger value="chat"><MessageCircle className="w-4 h-4 ml-1" /> الدردشة</TabsTrigger>
-          <TabsTrigger value="suggestions">الاقتراحات <Badge className="mr-1">{suggestions.length}</Badge></TabsTrigger>
-          <TabsTrigger value="review"><FileSearch className="w-4 h-4 ml-1" /> مراجعة القوائم</TabsTrigger>
-          <TabsTrigger value="bots"><Bot className="w-4 h-4 ml-1" /> Telegram</TabsTrigger>
+      <Tabs value={tab} onValueChange={setTab} className="flex-1 flex flex-col gap-6">
+        <TabsList className="bg-white/5 border border-white/10 p-1.5 rounded-[2rem] max-w-fit flex h-14 backdrop-blur-xl">
+          <TabsTrigger value="chat" className="rounded-full px-8 font-bold data-[state=active]:gradient-bg data-[state=active]:text-white">
+            <MessageCircle className="w-4 h-4 ml-2" /> الدردشة الذكية
+          </TabsTrigger>
+          <TabsTrigger value="suggestions" className="rounded-full px-8 font-bold data-[state=active]:gradient-bg data-[state=active]:text-white">
+            الاقتراحات <Badge className="mr-2 bg-indigo-500/20 text-indigo-500 border-indigo-500/30">{suggestions.length}</Badge>
+          </TabsTrigger>
+          <TabsTrigger value="review" className="rounded-full px-8 font-bold data-[state=active]:gradient-bg data-[state=active]:text-white">
+            <FileSearch className="w-4 h-4 ml-2" /> مراجعة القوائم
+          </TabsTrigger>
+          <TabsTrigger value="bots" className="rounded-full px-8 font-bold data-[state=active]:gradient-bg data-[state=active]:text-white">
+            <Bot className="w-4 h-4 ml-2" /> Telegram
+          </TabsTrigger>
         </TabsList>
 
-        <TabsContent value="chat" className="mt-4">
-          <Card>
-            <CardHeader><CardTitle>اكتب وصف العملية وسأقترح القيد المحاسبي</CardTitle></CardHeader>
-            <CardContent className="space-y-3">
-              <ScrollArea className="h-[420px] border rounded-md p-3">
-                {messages.length === 0 && <div className="text-sm text-muted-foreground text-center py-8">ابدأ بكتابة معاملة، مثلاً: "اشتريت بضاعة بـ 5000 جنيه نقداً"</div>}
-                <div className="space-y-2">
-                  {messages.map((m) => (
-                    <div key={m.id} className={`flex ${m.role === "user" ? "justify-end" : "justify-start"}`}>
-                      <div className={`max-w-[80%] rounded-lg px-3 py-2 text-sm ${m.role === "user" ? "bg-primary text-primary-foreground" : "bg-muted"}`}>
-                        {m.content}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </ScrollArea>
-              <div className="flex gap-2">
-                <Textarea
-                  value={input}
-                  onChange={(e) => setInput(e.target.value)}
-                  onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendMessage(); } }}
-                  placeholder="اكتب وصف العملية..."
-                  className="min-h-[60px]"
-                />
-                <Button onClick={sendMessage} disabled={chatLoading}>
-                  {chatLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="suggestions" className="mt-4">
-          {suggestions.length === 0 ? (
-            <Card><CardContent className="py-8 text-center text-muted-foreground">لا توجد اقتراحات معلّقة</CardContent></Card>
-          ) : (
-            <div className="space-y-3">
-              {suggestions.map((s) => {
-                const entry = s.suggested_entry || {};
-                const lines = entry.lines || [];
-                return (
-                  <Card key={s.id}>
-                    <CardHeader>
-                      <CardTitle className="flex items-center justify-between text-base">
-                        <span>{s.title}</span>
-                        <Badge variant="outline">ثقة {Math.round((s.confidence_score ?? 0) * 100)}%</Badge>
-                      </CardTitle>
-                      <p className="text-xs text-muted-foreground">{s.description}</p>
-                    </CardHeader>
-                    <CardContent className="space-y-2">
-                      <table className="w-full text-sm border">
-                        <thead className="bg-muted">
-                          <tr><th className="p-2">الحساب</th><th className="p-2">مدين</th><th className="p-2">دائن</th><th className="p-2">البيان</th></tr>
-                        </thead>
-                        <tbody>
-                          {lines.map((l: any, i: number) => (
-                            <tr key={i} className="border-t">
-                              <td className="p-2">{l.account_code} - {l.account_name}</td>
-                              <td className="p-2">{Number(l.debit || 0).toFixed(2)}</td>
-                              <td className="p-2">{Number(l.credit || 0).toFixed(2)}</td>
-                              <td className="p-2">{l.description}</td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                      {s.detected_errors?.length > 0 && (
-                        <div className="text-xs text-destructive">⚠ {s.detected_errors.join(" • ")}</div>
+        <AnimatePresence mode="wait">
+          <TabsContent value="chat" className="flex-1 mt-0">
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 h-full">
+              <div className="lg:col-span-2 flex flex-col gap-4">
+                <div className="glass-card flex-1 flex flex-col p-6 min-h-[500px]">
+                  <ScrollArea className="flex-1 pr-4">
+                    <div className="space-y-6">
+                      {messages.map((m) => (
+                        <motion.div 
+                          initial={{ opacity: 0, y: 10 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          key={m.id} 
+                          className={`flex ${m.role === "user" ? "justify-start" : "justify-end"}`}
+                        >
+                          <div className={`max-w-[85%] rounded-[2rem] px-6 py-4 shadow-sm border ${
+                            m.role === "user" 
+                              ? "bg-white/5 border-white/10 text-foreground" 
+                              : "gradient-bg text-white border-0"
+                          }`}>
+                            <p className="text-sm leading-relaxed">{m.content}</p>
+                            <span className="text-[10px] opacity-50 mt-2 block">{new Date(m.created_at).toLocaleTimeString('ar-EG')}</span>
+                          </div>
+                        </motion.div>
+                      ))}
+                      {messages.length === 0 && (
+                        <div className="h-full flex flex-col items-center justify-center text-center p-12 space-y-4">
+                          <Sparkles className="w-16 h-16 text-indigo-500/20" />
+                          <p className="text-muted-foreground max-w-xs">صف لي أي معاملة مالية وسأقوم بتحليلها وتوليد القيود المحاسبية المناسبة لك فوراً.</p>
+                        </div>
                       )}
-                      <div className="flex gap-2 pt-2">
-                        <Button size="sm" onClick={() => approveSuggestion(s)}>
-                          <CheckCircle2 className="w-4 h-4 ml-1" /> اعتماد وترحيل
-                        </Button>
-                        <Button size="sm" variant="outline" onClick={() => rejectSuggestion(s)}>
-                          <XCircle className="w-4 h-4 ml-1" /> رفض
-                        </Button>
-                      </div>
-                    </CardContent>
-                  </Card>
-                );
-              })}
-            </div>
-          )}
-        </TabsContent>
-
-        <TabsContent value="review" className="mt-4">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center justify-between">
-                مراجعة القوائم المالية وفق {standard}
-                <Button size="sm" onClick={runReview} disabled={reviewLoading}>
-                  {reviewLoading ? <Loader2 className="w-4 h-4 animate-spin ml-1" /> : <FileSearch className="w-4 h-4 ml-1" />}
-                  بدء المراجعة
-                </Button>
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              {!reviewReport && !reviewLoading && (
-                <p className="text-sm text-muted-foreground">اضغط "بدء المراجعة" لتحليل الحسابات والقيود الأخيرة وتقديم توصيات.</p>
-              )}
-              {reviewReport && (
-                <div className="space-y-3">
-                  <div className="flex items-center gap-2">
-                    <Badge variant={reviewReport.overall_health === "good" ? "default" : reviewReport.overall_health === "warning" ? "outline" : "destructive"}>
-                      {reviewReport.overall_health}
-                    </Badge>
-                    <p className="text-sm">{reviewReport.summary}</p>
-                  </div>
-                  {reviewReport.findings?.length > 0 && (
-                    <div>
-                      <h4 className="font-semibold text-sm mb-2">الملاحظات</h4>
-                      <ul className="space-y-1 text-sm">
-                        {reviewReport.findings.map((f: any, i: number) => (
-                          <li key={i} className="border-r-2 pr-2" style={{ borderColor: f.severity === "error" ? "red" : f.severity === "warn" ? "orange" : "gray" }}>
-                            <strong>{f.title}</strong> — {f.detail} {f.standard_reference && <em className="text-xs text-muted-foreground">({f.standard_reference})</em>}
-                          </li>
-                        ))}
-                      </ul>
                     </div>
-                  )}
-                  {reviewReport.recommendations?.length > 0 && (
-                    <div>
-                      <h4 className="font-semibold text-sm mb-2">التوصيات</h4>
-                      <ul className="space-y-1 text-sm list-disc pr-5">
-                        {reviewReport.recommendations.map((r: any, i: number) => (
-                          <li key={i}>[{r.priority}] <strong>{r.title}</strong> — {r.action}</li>
-                        ))}
-                      </ul>
-                    </div>
-                  )}
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="bots" className="mt-4">
-          <Card>
-            <CardHeader><CardTitle>بوتات Telegram المرتبطة</CardTitle></CardHeader>
-            <CardContent className="space-y-3">
-              <p className="text-xs text-muted-foreground">
-                الرسائل النصية الواردة لهذه البوتات تُحلَّل تلقائياً وتُولّد اقتراحات قيود محاسبية للمراجعة.
-                التوكن يُدار مركزياً عبر اتصال Telegram. أضف اسم مستخدم البوت فقط.
-              </p>
-              <div className="flex gap-2">
-                <Input placeholder="@my_accounting_bot" value={newBotUsername} onChange={(e) => setNewBotUsername(e.target.value)} />
-                <Button onClick={addBot}><Plus className="w-4 h-4 ml-1" /> إضافة</Button>
-              </div>
-              <div className="space-y-2">
-                {bots.map((b) => (
-                  <div key={b.id} className="flex items-center justify-between border rounded-md p-2">
-                    <div>
-                      <div className="font-medium text-sm">{b.bot_username}</div>
-                      <div className="text-xs text-muted-foreground">
-                        {b.auto_suggest_entries ? "تحليل تلقائي مفعّل" : "تحليل تلقائي معطّل"} •
-                        {b.is_active ? " نشط" : " متوقف"}
-                      </div>
-                    </div>
-                    <Button size="sm" variant="outline" onClick={() => toggleBot(b)}>
-                      {b.is_active ? "إيقاف" : "تفعيل"}
+                  </ScrollArea>
+                  
+                  <div className="mt-6 flex gap-3 p-2 bg-white/5 rounded-[2.5rem] border border-white/10 focus-within:border-indigo-500/50 transition-all">
+                    <Textarea
+                      value={input}
+                      onChange={(e) => setInput(e.target.value)}
+                      onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendMessage(); } }}
+                      placeholder="مثال: تم شراء أثاث للمكتب بقيمة 12000 جنيه بشيك بنكي..."
+                      className="min-h-[60px] bg-transparent border-0 focus-visible:ring-0 resize-none pr-6 pt-4"
+                    />
+                    <Button 
+                      onClick={sendMessage} 
+                      disabled={chatLoading}
+                      className="w-14 h-14 rounded-full gradient-bg self-end shadow-xl"
+                    >
+                      {chatLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : <Send className="w-5 h-5" />}
                     </Button>
                   </div>
-                ))}
-                {bots.length === 0 && <div className="text-xs text-muted-foreground text-center py-4">لا يوجد بوتات بعد</div>}
+                </div>
               </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
+
+              <div className="space-y-6">
+                <div className="glass-card p-6 space-y-4">
+                  <h3 className="font-bold flex items-center gap-2"><ShieldCheck className="w-5 h-5 text-indigo-500" /> القواعد المطبقة</h3>
+                  <div className="space-y-3">
+                    <div className="p-3 rounded-2xl bg-emerald-500/5 border border-emerald-500/10">
+                      <p className="text-xs font-bold text-emerald-600">القيد المزدوج التلقائي</p>
+                      <p className="text-[10px] text-muted-foreground mt-1">يتم موازنة الحسابات تلقائياً (مدين/دائن).</p>
+                    </div>
+                    <div className="p-3 rounded-2xl bg-indigo-500/5 border border-indigo-500/10">
+                      <p className="text-xs font-bold text-indigo-600">التصنيف الذكي</p>
+                      <p className="text-[10px] text-muted-foreground mt-1">تحديد الحساب من شجرة الحسابات بناءً على الوصف.</p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="glass-card p-6 bg-gradient-to-br from-indigo-500/10 to-purple-500/10 border-0">
+                  <h3 className="font-bold flex items-center gap-2"><TrendingUp className="w-5 h-5 text-indigo-500" /> ملخص النشاط</h3>
+                  <div className="mt-4 grid grid-cols-2 gap-4">
+                    <div className="text-center">
+                      <p className="text-2xl font-black text-indigo-600">{messages.length}</p>
+                      <p className="text-[10px] text-muted-foreground">استفسار</p>
+                    </div>
+                    <div className="text-center">
+                      <p className="text-2xl font-black text-purple-600">{suggestions.length}</p>
+                      <p className="text-[10px] text-muted-foreground">اقتراح معلق</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </TabsContent>
+        </AnimatePresence>
       </Tabs>
     </div>
   );
