@@ -424,12 +424,35 @@ export class FinancialReportingEngine {
   async generateBalanceSheet(asOfDate?: string): Promise<BalanceSheetReport> {
     const date = asOfDate || new Date().toISOString().split('T')[0];
 
-    // Get all balance sheet accounts
+    // Get balance sheet accounts
     const { data: accounts } = await supabase
       .from('chart_of_accounts')
-      .select('id, code, name, account_type, current_balance')
+      .select('id, code, name, account_type, opening_balance')
       .eq('restaurant_id', this.restaurantId)
       .in('account_type', ['asset', 'liability', 'equity']);
+
+    // Compute balance from journal entries up to date
+    const accountIds = (accounts || []).map(a => a.id);
+    const balMap = new Map<string, number>();
+    if (accountIds.length) {
+      const { data: lines } = await supabase
+        .from('journal_entry_lines')
+        .select('account_id, debit, credit, journal_entries!inner(entry_date, is_posted, restaurant_id)')
+        .eq('journal_entries.restaurant_id', this.restaurantId)
+        .eq('journal_entries.is_posted', true)
+        .lte('journal_entries.entry_date', date)
+        .in('account_id', accountIds);
+      lines?.forEach((l: any) => {
+        const acc = (accounts || []).find(a => a.id === l.account_id);
+        if (!acc) return;
+        const isDebitNormal = acc.account_type === 'asset';
+        const delta = isDebitNormal ? (l.debit - l.credit) : (l.credit - l.debit);
+        balMap.set(l.account_id, (balMap.get(l.account_id) || 0) + delta);
+      });
+    }
+    (accounts || []).forEach((a: any) => {
+      a.current_balance = (a.opening_balance || 0) + (balMap.get(a.id) || 0);
+    });
 
     const report: BalanceSheetReport = {
       as_of_date: date,
