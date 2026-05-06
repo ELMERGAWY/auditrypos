@@ -7,13 +7,16 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select';
+import { Textarea } from '@/components/ui/textarea';
 import { 
   FileText, Plus, Search, Calendar, Package, DollarSign, 
-  CheckCircle, Clock, XCircle, Download, Eye,
+  CheckCircle, Clock, XCircle, Download, Eye, RefreshCcw,
   TrendingUp, TrendingDown, Warehouse, Users
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
+import { journalService } from '@/lib/accounting/journalService';
 
 interface PurchaseInvoice {
   id: string;
