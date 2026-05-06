@@ -179,20 +179,32 @@ export function HomeDashboard({ restaurantId, currency, onNavigate, userId }: Ho
         supabase.from('order_items').select('product_name, quantity, unit_price, orders!inner(created_at)').eq('orders.restaurant_id', restaurantId).gte('orders.created_at', new Date(Date.now() - 7 * 86400000).toISOString().split('T')[0]).limit(50)
       ]);
 
-      // Calculate stats
-      const todaySales = todayOrdersRes.data?.reduce((sum, o) => sum + (o.total_amount || 0), 0) || 0;
+      // === ACCURATE numbers from journal entries ===
+      const engine = createFinancialReporting(restaurantId);
+      const monthStartDate = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0];
+      const yesterday = new Date(Date.now() - 86400000).toISOString().split('T')[0];
+
+      const [plToday, plYest, plMonth, bs] = await Promise.all([
+        engine.generateProfitLoss(today, today),
+        engine.generateProfitLoss(yesterday, yesterday),
+        engine.generateProfitLoss(monthStartDate, today),
+        engine.generateBalanceSheet(today),
+      ]);
+
+      const todaySales = plToday.revenue.total || (todayOrdersRes.data?.reduce((s, o) => s + (o.total_amount || 0), 0) || 0);
       const todayOrdersCount = todayOrdersRes.data?.length || 0;
-      const monthSales = monthOrdersRes.data?.reduce((sum, o) => sum + (o.total_amount || 0), 0) || 0;
-      const yesterdaySales = yesterdayOrdersRes.data?.reduce((sum, o) => sum + (o.total_amount || 0), 0) || 0;
+      const monthSales = plMonth.revenue.total || (monthOrdersRes.data?.reduce((s, o) => s + (o.total_amount || 0), 0) || 0);
+      const yesterdaySales = plYest.revenue.total;
       const salesChange = yesterdaySales > 0 ? ((todaySales - yesterdaySales) / yesterdaySales) * 100 : 0;
-      
-      // Estimate profit (30% margin for demo)
-      const todayProfit = todaySales * 0.3;
-      const monthProfit = monthSales * 0.3;
+
+      const todayProfit = plToday.net_profit;
+      const monthProfit = plMonth.net_profit;
       const profitMargin = monthSales > 0 ? (monthProfit / monthSales) * 100 : 0;
-      
-      // Inventory value
-      const inventoryValue = inventoryValueRes.data?.reduce((sum, p) => sum + ((p.quantity || 0) * (p.price || 0)), 0) || 0;
+      const yProfit = plYest.net_profit;
+      const profitChange = yProfit !== 0 ? ((todayProfit - yProfit) / Math.abs(yProfit)) * 100 : 0;
+
+      // Inventory value from balance sheet
+      const inventoryValue = bs.assets.current.inventory || (inventoryValueRes.data?.reduce((s, p) => s + ((p.quantity || 0) * (p.price || 0)), 0) || 0);
       
       // Order statuses
       const orderStatuses = pendingOrdersRes.data || [];
@@ -200,7 +212,7 @@ export function HomeDashboard({ restaurantId, currency, onNavigate, userId }: Ho
       const processingCount = orderStatuses.filter((o: any) => o.status === 'processing' || o.status === 'ready').length;
       
       // Payables
-      const pendingPayables = payablesRes.data?.reduce((sum, s) => sum + (s.balance || 0), 0) || 0;
+      const pendingPayables = bs.liabilities.current.payables || (payablesRes.data?.reduce((sum, s) => sum + (s.balance || 0), 0) || 0);
 
       setStats({
         todaySales,
@@ -211,7 +223,7 @@ export function HomeDashboard({ restaurantId, currency, onNavigate, userId }: Ho
         todayProfit,
         monthProfit,
         profitMargin,
-        profitChange: salesChange,
+        profitChange,
         totalCustomers: customersRes.count || 0,
         newCustomersToday: newCustomersRes.count || 0,
         activeCustomers: customersRes.count || 0,
@@ -226,38 +238,50 @@ export function HomeDashboard({ restaurantId, currency, onNavigate, userId }: Ho
         pendingAISuggestions: aiSuggestionsRes.count || 0
       });
 
-      // Generate chart data (last 7 days)
-      const chartData = [];
+      // Real per-day chart from journal (last 7 days)
+      const chartData: any[] = [];
+      const dayPromises: Promise<any>[] = [];
+      const dayNames: string[] = [];
       for (let i = 6; i >= 0; i--) {
-        const date = new Date();
-        date.setDate(date.getDate() - i);
-        const dateStr = date.toISOString().split('T')[0];
-        const dayName = date.toLocaleDateString('ar-EG', { weekday: 'short' });
-        
-        // Simulated data - in real app, query for each day
-        chartData.push({
-          name: dayName,
-          sales: Math.round(todaySales * (0.8 + Math.random() * 0.4)),
-          profit: Math.round(todayProfit * (0.8 + Math.random() * 0.4))
-        });
+        const d = new Date();
+        d.setDate(d.getDate() - i);
+        const ds = d.toISOString().split('T')[0];
+        dayNames.push(d.toLocaleDateString('ar-EG', { weekday: 'short' }));
+        dayPromises.push(engine.generateProfitLoss(ds, ds));
       }
+      const dayPLs = await Promise.all(dayPromises);
+      dayPLs.forEach((pl, i) => {
+        chartData.push({
+          name: dayNames[i],
+          sales: Math.round(pl.revenue.total),
+          profit: Math.round(pl.net_profit),
+        });
+      });
       setSalesChartData(chartData);
 
-      // Category data
+      // Category split from real P&L
       setCategoryData([
-        { name: 'المبيعات', value: todaySales, color: '#10b981' },
-        { name: 'المشتريات', value: todaySales * 0.6, color: '#f59e0b' },
-        { name: 'المصروفات', value: todaySales * 0.2, color: '#ef4444' },
-        { name: 'الربح', value: todayProfit, color: '#3b82f6' }
+        { name: 'الإيرادات', value: plMonth.revenue.total, color: '#10b981' },
+        { name: 'تكلفة المبيعات', value: plMonth.cogs.total, color: '#f59e0b' },
+        { name: 'المصروفات', value: plMonth.operating_expenses.total, color: '#ef4444' },
+        { name: 'صافي الربح', value: Math.max(0, plMonth.net_profit), color: '#3b82f6' }
       ]);
 
-      // Recent activity
-      setRecentActivity([
-        { type: 'order', title: 'طلب جديد #1234', time: 'منذ 5 دقائق', amount: 450, status: 'success' },
-        { type: 'payment', title: 'سداد من العميل أحمد', time: 'منذ 15 دقيقة', amount: 1200, status: 'success' },
-        { type: 'alert', title: 'انخفاض مخزون: منتج X', time: 'منذ 30 دقيقة', amount: null, status: 'warning' },
-        { type: 'ai', title: 'اقتراح قيد محاسبي', time: 'منذ ساعة', amount: null, status: 'info' }
-      ]);
+      // Recent activity from journal entries
+      const { data: recentJE } = await supabase
+        .from('journal_entries')
+        .select('entry_number, description, total_debit, entry_date, source, created_at')
+        .eq('restaurant_id', restaurantId)
+        .eq('is_posted', true)
+        .order('created_at', { ascending: false })
+        .limit(6);
+      setRecentActivity((recentJE || []).map((j: any) => ({
+        type: 'journal',
+        title: `${j.entry_number} - ${j.description || 'قيد محاسبي'}`,
+        time: new Date(j.created_at).toLocaleString('ar-EG', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit' }),
+        amount: Number(j.total_debit) || 0,
+        status: 'success'
+      })));
 
     } catch (error) {
       console.error('Dashboard load error:', error);
