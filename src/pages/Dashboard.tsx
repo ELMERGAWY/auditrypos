@@ -901,7 +901,7 @@ export default function Dashboard() {
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-12 border-b border-border/50 pb-8">
               <div>
                 <h1 className="text-4xl font-black mb-2 flex items-center gap-3">
-                  {activeTab === 'home' ? 'لوحة التحكم الرئيسية' : ProfessionalSidebar.ALL_NAV_ITEMS[activeTab]?.label}
+                  {activeTab === 'home' ? 'لوحة التحكم الرئيسية' : (allTabs.find(t => t.id === activeTab)?.label || 'إدارة النظام')}
                   <Badge variant="outline" className="text-xs font-medium">نظام Edara الموحد</Badge>
                 </h1>
                 <p className="text-muted-foreground font-medium">متابعة الأداء والعمليات المالية والتشغيلية</p>
