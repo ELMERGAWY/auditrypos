@@ -150,6 +150,7 @@ export default function Dashboard() {
 
   // Menu form
   const [showAddItem, setShowAddItem] = useState(false);
+  const [editingItem, setEditingItem] = useState<MenuItem | null>(null);
   const [menuForm, setMenuForm] = useState({ 
     name: '', 
     price: '', 
