@@ -7,13 +7,16 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select';
+import { Textarea } from '@/components/ui/textarea';
 import { 
   FileText, Plus, Search, Calendar, Package, DollarSign, 
-  CheckCircle, Clock, XCircle, Download, Eye,
+  CheckCircle, Clock, XCircle, Download, Eye, RefreshCcw,
   TrendingUp, TrendingDown, Warehouse, Users
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
+import { journalService } from '@/lib/accounting/journalService';
 
 interface PurchaseInvoice {
   id: string;
@@ -40,10 +43,77 @@ export function PurchaseInvoices({ restaurantId, currency }: Props) {
   const [loading, setLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [showAddModal, setShowAddModal] = useState(false);
+  const [suppliers, setSuppliers] = useState<{ id: string; name: string }[]>([]);
+  const [form, setForm] = useState({
+    supplier_id: '',
+    invoice_number: '',
+    invoice_date: new Date().toISOString().split('T')[0],
+    total_amount: '',
+    tax_amount: '',
+    paid_amount: '',
+    is_credit: true,
+    notes: ''
+  });
+  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     loadInvoices();
+    supabase.from('suppliers').select('id,name').eq('restaurant_id', restaurantId).then(({ data }) => setSuppliers(data || []));
   }, [restaurantId]);
+
+  const handleSave = async () => {
+    if (!form.supplier_id || !form.total_amount) {
+      toast.error('المورد والمبلغ مطلوبين');
+      return;
+    }
+    setSaving(true);
+    try {
+      const total = parseFloat(form.total_amount);
+      const tax = parseFloat(form.tax_amount || '0');
+      const net = total + tax;
+      const paid = parseFloat(form.paid_amount || '0');
+      const supplier = suppliers.find(s => s.id === form.supplier_id);
+
+      const { data: inv, error } = await supabase
+        .from('purchase_invoices')
+        .insert({
+          restaurant_id: restaurantId,
+          invoice_number: form.invoice_number || `PI-${Date.now()}`,
+          invoice_date: form.invoice_date,
+          supplier_name: supplier?.name,
+          total_amount: total,
+        })
+        .select()
+        .single();
+      if (error) throw error;
+
+      // Auto-post journal entry
+      try {
+        const je = await journalService.createPurchaseJournalEntry(restaurantId, {
+          id: inv.id,
+          supplierId: form.supplier_id,
+          supplierName: supplier?.name || 'مورد',
+          amount: net,
+          description: form.invoice_number || inv.invoice_number,
+          isCredit: form.is_credit && paid < net,
+          date: form.invoice_date,
+        });
+        if (je?.id) {
+          await supabase.from('purchase_invoices').update({ journal_entry_id: je.id }).eq('id', inv.id);
+        }
+        toast.success('تم تسجيل الفاتورة وترحيل القيد المحاسبي');
+      } catch (jeErr: any) {
+        toast.warning('تم حفظ الفاتورة لكن فشل ترحيل القيد: ' + jeErr.message);
+      }
+      setShowAddModal(false);
+      setForm({ supplier_id: '', invoice_number: '', invoice_date: new Date().toISOString().split('T')[0], total_amount: '', tax_amount: '', paid_amount: '', is_credit: true, notes: '' });
+      loadInvoices();
+    } catch (e: any) {
+      toast.error('خطأ: ' + e.message);
+    } finally {
+      setSaving(false);
+    }
+  };
 
   const loadInvoices = async () => {
     try {
@@ -186,13 +256,51 @@ export function PurchaseInvoices({ restaurantId, currency }: Props) {
           <DialogHeader>
             <DialogTitle className="text-2xl font-black">إضافة فاتورة مشتريات</DialogTitle>
           </DialogHeader>
-          <div className="py-20 text-center space-y-4">
-            <div className="w-20 h-20 rounded-full bg-primary/5 flex items-center justify-center mx-auto">
-              <FileText className="w-10 h-10 text-primary opacity-20" />
+          <div className="grid grid-cols-2 gap-4 py-4">
+            <div className="col-span-2">
+              <Label>المورد *</Label>
+              <Select value={form.supplier_id} onValueChange={v => setForm({ ...form, supplier_id: v })}>
+                <SelectTrigger><SelectValue placeholder="اختر المورد" /></SelectTrigger>
+                <SelectContent>
+                  {suppliers.map(s => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}
+                </SelectContent>
+              </Select>
             </div>
-            <p className="text-muted-foreground">جاري تجهيز واجهة الإدخال المتقدمة للفواتير...</p>
-            <Button variant="outline" onClick={() => setShowAddModal(false)}>إغلاق</Button>
+            <div>
+              <Label>رقم الفاتورة</Label>
+              <Input value={form.invoice_number} onChange={e => setForm({ ...form, invoice_number: e.target.value })} placeholder="تلقائي" />
+            </div>
+            <div>
+              <Label>التاريخ</Label>
+              <Input type="date" value={form.invoice_date} onChange={e => setForm({ ...form, invoice_date: e.target.value })} />
+            </div>
+            <div>
+              <Label>المبلغ قبل الضريبة *</Label>
+              <Input type="number" value={form.total_amount} onChange={e => setForm({ ...form, total_amount: e.target.value })} />
+            </div>
+            <div>
+              <Label>الضريبة</Label>
+              <Input type="number" value={form.tax_amount} onChange={e => setForm({ ...form, tax_amount: e.target.value })} />
+            </div>
+            <div>
+              <Label>المدفوع نقداً</Label>
+              <Input type="number" value={form.paid_amount} onChange={e => setForm({ ...form, paid_amount: e.target.value })} placeholder="0 = آجل بالكامل" />
+            </div>
+            <div className="flex items-end gap-2">
+              <input type="checkbox" id="iscredit" checked={form.is_credit} onChange={e => setForm({ ...form, is_credit: e.target.checked })} />
+              <Label htmlFor="iscredit">ذمم آجلة</Label>
+            </div>
+            <div className="col-span-2">
+              <Label>ملاحظات</Label>
+              <Textarea value={form.notes} onChange={e => setForm({ ...form, notes: e.target.value })} rows={2} />
+            </div>
           </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowAddModal(false)}>إلغاء</Button>
+            <Button className="gradient-bg border-0 text-white" onClick={handleSave} disabled={saving}>
+              {saving ? 'جاري الحفظ...' : 'حفظ وترحيل القيد'}
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>
