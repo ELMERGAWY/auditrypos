@@ -230,19 +230,28 @@ export function ExpensesTab({ restaurantId, currency }: Props) {
     }
 
     // 1.1 Create Journal Entry for Accounting Link using specific accounts if selected
-    const debitAccount = form.account_code || '5200';
-    const creditAccount = form.payment_account_code || '1100'; // Default cash
-    
-    await journalService.createJournalEntry(restaurantId, {
-      entry_date: new Date(form.date),
-      description: form.description || `مصروف ${form.category}`,
-      source: 'expense',
-      is_posted: true,
-      lines: [
-        { account_id: debitAccount, debit: amount, credit: 0, description: `مصروف - ${form.category}` },
-        { account_id: creditAccount, debit: 0, credit: amount, description: `سداد مصروف - ${form.category}` }
-      ]
-    });
+    // Resolve UUIDs from codes
+    const debitAccObj = expenseAccounts.find(a => a.code === form.account_code || a.id === form.account_code);
+    const creditAccObj = paymentAccounts.find(a => a.code === form.payment_account_code || a.id === form.payment_account_code);
+
+    const debitAccountId = debitAccObj?.id;
+    const creditAccountId = creditAccObj?.id;
+
+    if (debitAccountId && creditAccountId) {
+      await journalService.createJournalEntry(restaurantId, {
+        entry_date: new Date(form.date),
+        description: form.description || `مصروف ${form.category}`,
+        source: 'expense',
+        is_posted: true,
+        lines: [
+          { account_id: debitAccountId, debit: amount, credit: 0, description: `مصروف - ${form.category}` },
+          { account_id: creditAccountId, debit: 0, credit: amount, description: `سداد مصروف - ${form.category}` }
+        ]
+      });
+    } else {
+      console.warn('Could not resolve account UUIDs for expense journal entry', { debitAccountId, creditAccountId });
+      toast.warning('تم حفظ المصروف ولكن فشل إنشاء القيد المحاسبي لعدم تحديد الحسابات بدقة');
+    }
 
     // 2. Create daily overheads distributed over working days
     const now = new Date();
