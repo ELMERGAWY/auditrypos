@@ -60,6 +60,7 @@ const SalesOrders = lazy(() => import('./dashboard/SalesOrders').then(m => ({ de
 const PurchaseOrders = lazy(() => import('./dashboard/PurchaseOrders').then(m => ({ default: m.PurchaseOrders })));
 const PurchaseInvoices = lazy(() => import('./dashboard/PurchaseInvoices').then(m => ({ default: m.PurchaseInvoices })));
 const SalesInvoices = lazy(() => import('./dashboard/SalesInvoices').then(m => ({ default: m.SalesInvoices })));
+const FixedAssetsTab = lazy(() => import('./dashboard/FixedAssetsTab').then(m => ({ default: m.FixedAssetsTab })));
 import { BUSINESS_TYPES, BUSINESS_TABS, getAddressPlaceholder, getCheckoutButtonLabel, getCustomerPlaceholder, getDefaultOrderType, getNotesPlaceholder, getPosSearchPlaceholder, isFoodSector, isInventoryDrivenBusiness, type BusinessType } from '@/lib/businessTypes';
 import { useAuth } from '@/lib/AuthContext';
 import { useDarkMode } from '@/lib/useDarkMode';
@@ -1317,6 +1318,11 @@ export default function Dashboard() {
             {activeTab === 'treasury' && (
               <ModuleErrorBoundary moduleName="الخزينة والبنوك">
                 <TreasuryTab restaurantId={restaurant!.id} currency={currency} />
+              </ModuleErrorBoundary>
+            )}
+            {activeTab === 'fixed_assets' && (
+              <ModuleErrorBoundary moduleName="الأصول الثابتة">
+                <FixedAssetsTab restaurantId={restaurant!.id} currency={currency} />
               </ModuleErrorBoundary>
             )}
             {activeTab === 'accounting_mapping' && (

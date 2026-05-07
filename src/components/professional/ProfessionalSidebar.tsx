@@ -21,7 +21,7 @@ export type SidebarTab =
   | 'inventory' | 'customers' | 'suppliers' | 'expenses' | 'qr' 
   | 'waiter' | 'staff' | 'financials' | 'notifications' | 'settings' | 'overheads'
   | 'customer_accounts' | 'sales_returns' | 'supplier_accounts' | 'inventory_receipts'
-  | 'ai_assistant' | 'treasury' | 'users' | 'sales_invoices' | 'purchase_invoices' | 'sales_orders' | 'purchase_orders' | 'projects' | 'manual_journal' | 'chart_of_accounts' | 'accounting_mapping';
+  | 'ai_assistant' | 'treasury' | 'users' | 'sales_invoices' | 'purchase_invoices' | 'sales_orders' | 'purchase_orders' | 'projects' | 'manual_journal' | 'chart_of_accounts' | 'accounting_mapping' | 'fixed_assets';
 
 interface NavItem {
   id: SidebarTab;
@@ -159,6 +159,7 @@ export function ProfessionalSidebar({
     manual_journal: { label: 'قيود اليومية اليدوية', icon: FileText, section: 'accounting' },
     customer_accounts: { label: 'حسابات العملاء', icon: CreditCard, section: 'accounting' },
     supplier_accounts: { label: 'حسابات الموردين', icon: Wallet, section: 'accounting' },
+    fixed_assets: { label: 'الأصول الثابتة', icon: Building2, section: 'accounting' },
 
     stats: { label: 'الإحصائيات الشاملة', icon: BarChart3, section: 'analytics' },
     ai_assistant: { label: 'مساعد المحاسب (AI)', icon: Sparkles, section: 'analytics' },

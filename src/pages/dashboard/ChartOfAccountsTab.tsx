@@ -96,37 +96,33 @@ export function ChartOfAccountsTab({ restaurantId, currency }: Props) {
     try {
       // Basic common accounts required by the system (must exactly match POS mapping)
       const standardAccounts = [
-        { code: '1000', name: 'الأصول', account_type: 'asset', is_active: true, parent_code: null },
-        { code: '1100', name: 'الصندوق / النقدية', account_type: 'asset', subtype: 'cash', is_cash_account: true, is_active: true, parent_code: '1000' },
-        { code: '1200', name: 'العملاء / الذمم المدينة', account_type: 'asset', subtype: 'receivable', is_active: true, parent_code: '1000' },
-        { code: '1300', name: 'المخزون', account_type: 'asset', subtype: 'inventory', is_active: true, parent_code: '1000' },
-        { code: '1400', name: 'البنوك', account_type: 'asset', subtype: 'bank', is_bank_account: true, is_active: true, parent_code: '1000' },
-        { code: '1500', name: 'الأصول الثابتة', account_type: 'asset', subtype: 'fixed_asset', is_active: true, parent_code: '1000' },
+        { code: '1000', name: 'الأصول / Assets', account_type: 'asset', is_active: true, parent_code: null },
+        { code: '1100', name: 'النقدية بالخزينة / Cash on Hand', account_type: 'asset', subtype: 'cash', is_cash_account: true, is_active: true, parent_code: '1000' },
+        { code: '1200', name: 'البنوك / Bank Accounts', account_type: 'asset', subtype: 'bank', is_bank_account: true, is_active: true, parent_code: '1000' },
+        { code: '1300', name: 'العملاء / Accounts Receivable', account_type: 'asset', subtype: 'receivable', is_active: true, parent_code: '1000' },
+        { code: '1400', name: 'المخزون / Inventory', account_type: 'asset', subtype: 'inventory', is_active: true, parent_code: '1000' },
+        { code: '1500', name: 'الأصول الثابتة / Fixed Assets', account_type: 'asset', subtype: 'fixed_asset', is_active: true, parent_code: '1000' },
         
-        { code: '2000', name: 'الخصوم', account_type: 'liability', is_active: true, parent_code: null },
-        { code: '2100', name: 'الموردون / الذمم الدائنة', account_type: 'liability', subtype: 'payable', is_active: true, parent_code: '2000' },
-        { code: '2150', name: 'الضرائب المستحقة (VAT)', account_type: 'liability', subtype: 'current_liability', is_active: true, parent_code: '2000' },
-        { code: '2200', name: 'مصروفات مستحقة', account_type: 'liability', subtype: 'current_liability', is_active: true, parent_code: '2000' },
+        { code: '2000', name: 'الخصوم / Liabilities', account_type: 'liability', is_active: true, parent_code: null },
+        { code: '2100', name: 'الموردون / Accounts Payable', account_type: 'liability', subtype: 'payable', is_active: true, parent_code: '2000' },
+        { code: '2150', name: 'الضرائب المستحقة / VAT Payable', account_type: 'liability', subtype: 'current_liability', is_active: true, parent_code: '2000' },
+        { code: '2200', name: 'مصروفات مستحقة / Accrued Expenses', account_type: 'liability', subtype: 'current_liability', is_active: true, parent_code: '2000' },
         
-        { code: '3000', name: 'حقوق الملكية', account_type: 'equity', is_active: true, parent_code: null },
-        { code: '3100', name: 'رأس المال', account_type: 'equity', subtype: 'capital', is_active: true, parent_code: '3000' },
-        { code: '3200', name: 'الأرباح المحتجزة', account_type: 'equity', subtype: 'retained_earnings', is_active: true, parent_code: '3000' },
+        { code: '3000', name: 'حقوق الملكية / Equity', account_type: 'equity', is_active: true, parent_code: null },
+        { code: '3100', name: 'رأس المال / Capital', account_type: 'equity', subtype: 'capital', is_active: true, parent_code: '3000' },
+        { code: '3200', name: 'الأرباح المحتجزة / Retained Earnings', account_type: 'equity', subtype: 'retained_earnings', is_active: true, parent_code: '3000' },
 
-        { code: '4000', name: 'الإيرادات', account_type: 'revenue', is_active: true, parent_code: null },
-        { code: '4100', name: 'إيرادات المبيعات', account_type: 'revenue', subtype: 'operating_revenue', is_active: true, parent_code: '4000' },
-        { code: '4200', name: 'إيرادات الخدمات', account_type: 'revenue', subtype: 'operating_revenue', is_active: true, parent_code: '4000' },
-        { code: '4300', name: 'إيرادات التوصيل', account_type: 'revenue', subtype: 'operating_revenue', is_active: true, parent_code: '4000' },
+        { code: '4000', name: 'الإيرادات / Revenue', account_type: 'revenue', is_active: true, parent_code: null },
+        { code: '4100', name: 'إيرادات المبيعات / Sales Revenue', account_type: 'revenue', subtype: 'operating_revenue', is_active: true, parent_code: '4000' },
+        { code: '4200', name: 'إيرادات الخدمات / Service Revenue', account_type: 'revenue', subtype: 'operating_revenue', is_active: true, parent_code: '4000' },
         
-        { code: '5000', name: 'تكلفة المبيعات (COGS)', account_type: 'cogs', is_active: true, parent_code: null },
-        { code: '5100', name: 'تكلفة البضاعة المباعة', account_type: 'cogs', subtype: 'direct_cogs', is_active: true, parent_code: '5000' },
-        { code: '5200', name: 'عجز وتوالف المخزون', account_type: 'cogs', subtype: 'direct_cogs', is_active: true, parent_code: '5000' },
+        { code: '5000', name: 'تكلفة المبيعات / COGS', account_type: 'cogs', is_active: true, parent_code: null },
+        { code: '5100', name: 'تكلفة البضاعة المباعة / Cost of Goods Sold', account_type: 'cogs', subtype: 'direct_cogs', is_active: true, parent_code: '5000' },
 
-        { code: '6000', name: 'المصروفات', account_type: 'expense', is_active: true, parent_code: null },
-        { code: '6100', name: 'الرواتب والأجور', account_type: 'expense', subtype: 'operating_expense', is_active: true, parent_code: '6000' },
-        { code: '6200', name: 'الإيجارات', account_type: 'expense', subtype: 'operating_expense', is_active: true, parent_code: '6000' },
-        { code: '6300', name: 'الكهرباء والمياه', account_type: 'expense', subtype: 'operating_expense', is_active: true, parent_code: '6000' },
-        { code: '6400', name: 'التسويق والدعاية', account_type: 'expense', subtype: 'selling_expense', is_active: true, parent_code: '6000' },
-        { code: '6500', name: 'مصروفات بنكية', account_type: 'expense', subtype: 'admin_expense', is_active: true, parent_code: '6000' },
+        { code: '6000', name: 'المصروفات / Expenses', account_type: 'expense', is_active: true, parent_code: null },
+        { code: '6100', name: 'الرواتب والأجور / Salaries & Wages', account_type: 'expense', subtype: 'operating_expense', is_active: true, parent_code: '6000' },
+        { code: '6200', name: 'الإيجارات / Rent Expense', account_type: 'expense', subtype: 'operating_expense', is_active: true, parent_code: '6000' },
+        { code: '6500', name: 'مصروفات بنكية / Bank Charges', account_type: 'expense', subtype: 'admin_expense', is_active: true, parent_code: '6000' },
       ];
 
       // First insert parent nodes using upsert
