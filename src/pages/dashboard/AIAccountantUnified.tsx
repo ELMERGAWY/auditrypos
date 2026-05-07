@@ -343,7 +343,8 @@ export default function AIAccountantUnified({ restaurantId }: Props) {
                 </div>
               </div>
             </div>
-          </TabsContent>
+          </div>
+        </TabsContent>
 
           <TabsContent value="suggestions" className="flex-1 mt-0">
             <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
