@@ -42,7 +42,7 @@ Deno.serve(async (req) => {
   // Pull recent journal entries summary
   const { data: entries } = await supabase
     .from('journal_entries')
-    .select('id, entry_date, description, total_debit, total_credit, status')
+    .select('id, entry_date, description, total_debit, total_credit')
     .eq('restaurant_id', body.restaurant_id)
     .order('entry_date', { ascending: false })
     .limit(50);

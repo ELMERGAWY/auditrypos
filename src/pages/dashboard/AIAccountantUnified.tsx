@@ -168,17 +168,15 @@ export default function AIAccountantUnified({ restaurantId }: Props) {
   async function runFinancialReview() {
     setReviewLoading(true);
     try {
-      const { data, error } = await supabase.functions.invoke("ai-accountant-analyze", {
+      const { data, error } = await supabase.functions.invoke("ai-accountant-review", {
         body: { 
           restaurant_id: restaurantId, 
-          source_type: "manual", 
-          text: "قم بمراجعة القوائم المالية الحالية واكتشاف أي ثغرات أو أخطاء محاسبية محتملة.",
           standard 
         },
       });
       if (error) throw error;
-      setReviewReport(data.suggestion);
-      toast.success("تم الانتهاء من المراجعة الذكية");
+      setReviewReport(data.report);
+      toast.success("تم الانتهاء من المراجعة الذكية للميزانية والقيود");
     } catch (err: any) {
       toast.error("فشل المراجعة: " + err.message);
     } finally {
@@ -422,27 +420,78 @@ export default function AIAccountantUnified({ restaurantId }: Props) {
                   className="glass-card p-8 space-y-6 border-indigo-500/30"
                 >
                   <div className="flex items-center justify-between border-b border-white/10 pb-4">
-                    <h3 className="text-xl font-black">نتائج التحليل الذكي</h3>
-                    <Badge className="bg-indigo-500 text-white border-0">تقرير #{Date.now().toString().slice(-6)}</Badge>
+                    <div className="flex items-center gap-3">
+                      <h3 className="text-xl font-black">نتائج التحليل الذكي</h3>
+                      <Badge className={`${
+                        reviewReport.overall_health === 'good' ? 'bg-emerald-500/20 text-emerald-500' : 
+                        reviewReport.overall_health === 'critical' ? 'bg-destructive/20 text-destructive' : 
+                        'bg-warning/20 text-warning'
+                      } border-0`}>
+                        {reviewReport.overall_health === 'good' ? 'حالة مستقرة' : 
+                         reviewReport.overall_health === 'critical' ? 'تنبيه حرج' : 'ملاحظات متوسطة'}
+                      </Badge>
+                    </div>
+                    <Badge className="bg-indigo-500 text-white border-0">تقرير المراجعة #{Date.now().toString().slice(-6)}</Badge>
                   </div>
                   
                   <div className="prose prose-invert max-w-none text-sm leading-relaxed">
                     <div className="p-6 rounded-2xl bg-white/5 border border-white/10">
-                      <p className="whitespace-pre-wrap">{reviewReport.description}</p>
+                      <p className="whitespace-pre-wrap font-medium">{reviewReport.summary}</p>
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-6">
-                    {reviewReport.detected_errors?.map((err: any, i: number) => (
-                      <div key={i} className="p-4 rounded-xl bg-destructive/10 border border-destructive/20 flex gap-3 items-start">
-                        <ShieldAlert className="w-5 h-5 text-destructive shrink-0 mt-0.5" />
-                        <div>
-                          <p className="text-sm font-bold text-destructive">{err.type}</p>
-                          <p className="text-xs text-destructive/80 mt-1">{err.message}</p>
-                        </div>
+                  {reviewReport.findings?.length > 0 && (
+                    <div className="space-y-4">
+                      <h4 className="font-bold text-sm text-muted-foreground flex items-center gap-2">
+                        <ShieldAlert className="w-4 h-4" /> الملاحظات المكتشفة ({reviewReport.findings.length})
+                      </h4>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {reviewReport.findings.map((err: any, i: number) => (
+                          <div key={i} className={`p-4 rounded-xl border flex gap-3 items-start ${
+                            err.severity === 'error' ? 'bg-destructive/10 border-destructive/20' : 
+                            err.severity === 'warn' ? 'bg-warning/10 border-warning/20' : 
+                            'bg-blue-500/10 border-blue-500/20'
+                          }`}>
+                            <div className="shrink-0 mt-0.5">
+                              {err.severity === 'error' ? <ShieldAlert className="w-5 h-5 text-destructive" /> : 
+                               err.severity === 'warn' ? <ShieldAlert className="w-5 h-5 text-warning" /> : 
+                               <ShieldCheck className="w-5 h-5 text-blue-500" />}
+                            </div>
+                            <div>
+                              <p className={`text-sm font-bold ${
+                                err.severity === 'error' ? 'text-destructive' : 
+                                err.severity === 'warn' ? 'text-warning' : 'text-blue-500'
+                              }`}>{err.title}</p>
+                              <p className="text-xs opacity-80 mt-1">{err.detail}</p>
+                              {err.standard_reference && <p className="text-[9px] mt-2 font-mono opacity-50">{err.standard_reference}</p>}
+                            </div>
+                          </div>
+                        ))}
                       </div>
-                    ))}
-                  </div>
+                    </div>
+                  )}
+
+                  {reviewReport.recommendations?.length > 0 && (
+                    <div className="space-y-4 pt-4 border-t border-white/5">
+                      <h4 className="font-bold text-sm text-muted-foreground flex items-center gap-2">
+                        <Sparkles className="w-4 h-4 text-indigo-500" /> التوصيات المقترحة
+                      </h4>
+                      <div className="space-y-2">
+                        {reviewReport.recommendations.map((rec: any, i: number) => (
+                          <div key={i} className="p-3 rounded-xl bg-indigo-500/5 border border-indigo-500/10 flex justify-between items-center">
+                            <div className="flex gap-3 items-center">
+                              <div className="w-2 h-2 rounded-full bg-indigo-500" />
+                              <div className="text-sm">
+                                <span className="font-bold">{rec.title}: </span>
+                                <span className="text-muted-foreground">{rec.action}</span>
+                              </div>
+                            </div>
+                            <Badge variant="outline" className="text-[9px] uppercase">{rec.priority}</Badge>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </motion.div>
               )}
             </div>
