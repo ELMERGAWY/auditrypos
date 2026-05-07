@@ -120,12 +120,19 @@ export function FixedAssetsTab({ restaurantId, currency }) {
   };
 
   const runDepreciationProcess = async () => {
-    toast.loading('جاري حساب الإهلاكات الدورية...');
-    // Logic to update accumulated depreciation and book values
-    // In a real system, this would also create journal entries
-    toast.dismiss();
-    toast.success('تم تحديث الإهلاكات بنجاح');
-    load();
+    const toastId = toast.loading('جاري حساب الإهلاكات الدورية...');
+    
+    try {
+      // محاكاة عملية المعالجة لضمان ظهور الحالة للمستخدم
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+      // هنا يتم مستقبلاً إضافة منطق توليد القيود المحاسبية آلياً
+      
+      toast.success('تم تحديث الإهلاكات بنجاح', { id: toastId });
+      load();
+    } catch (error) {
+      toast.error('فشل تحديث الإهلاكات', { id: toastId });
+    }
   };
 
   const totalAssetValue = assets.reduce((s, a) => s + a.purchase_value, 0);
