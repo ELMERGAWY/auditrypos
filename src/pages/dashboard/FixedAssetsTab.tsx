@@ -290,6 +290,7 @@ export function FixedAssetsTab({ restaurantId, currency }) {
                 <Label className="text-xs">العمر الإنتاجي (سنوات)</Label>
                 <Input type="number" value={form.useful_life_years} onChange={e => setForm({...form, useful_life_years: Number(e.target.value)})} />
               </div>
+              <div className="space-y-2">
                 <Label className="text-xs">ربط بحساب الأصل</Label>
                 <select 
                   className="w-full h-10 px-3 rounded-lg bg-white/5 border border-white/10 text-sm"
