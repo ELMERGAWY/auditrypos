@@ -122,13 +122,13 @@ export default function AIAccountantUnified({ restaurantId }: Props) {
       const { data: entry, error: entryErr } = await supabase.from("journal_entries").insert({
         restaurant_id: restaurantId,
         entry_number: `AI-${Date.now()}`,
-        entry_date: suggestion.suggested_entry_date || new Date().toISOString(),
+        entry_date: suggestion.suggested_entry_date || new Date().toISOString().split('T')[0],
         description: suggestion.description,
         source: 'auto',
         total_debit: suggestion.suggested_entry.lines.reduce((s: number, l: any) => s + (l.debit || 0), 0),
         total_credit: suggestion.suggested_entry.lines.reduce((s: number, l: any) => s + (l.credit || 0), 0),
         is_posted: true,
-        status: 'posted'
+        posted_at: new Date().toISOString()
       }).select().single();
 
       if (entryErr) throw entryErr;
@@ -136,10 +136,10 @@ export default function AIAccountantUnified({ restaurantId }: Props) {
       // 2. Create lines
       const lines = suggestion.suggested_entry.lines.map((l: any, i: number) => ({
         entry_id: entry.id,
-        account_id: l.account_id || (bots[0]?.restaurant_id), // Fallback or lookup
+        account_id: l.account_id, 
         debit: l.debit || 0,
         credit: l.credit || 0,
-        description: l.description,
+        description: l.description || suggestion.description,
         line_order: i
       }));
 

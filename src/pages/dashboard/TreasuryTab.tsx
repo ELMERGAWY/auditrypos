@@ -129,8 +129,7 @@ export function TreasuryTab({ restaurantId, currency }: TreasuryTabProps) {
       code: newCode,
       name: `بنك - ${newAccountForm.name}`,
       account_type: 'asset',
-      description: 'حساب بنكي',
-      is_active: true,
+      notes: 'حساب بنكي',
       is_bank_account: true,
       opening_balance: Number(newAccountForm.initialBalance) || 0,
       current_balance: Number(newAccountForm.initialBalance) || 0
@@ -188,10 +187,9 @@ export function TreasuryTab({ restaurantId, currency }: TreasuryTabProps) {
       code: newCode,
       name: `خزينة - ${newAccountForm.name}`,
       account_type: 'asset',
-      description: 'نقدية بالصندوق',
+      notes: 'نقدية بالصندوق',
       opening_balance: Number(newAccountForm.initialBalance) || 0,
       current_balance: Number(newAccountForm.initialBalance) || 0,
-      is_active: true,
       is_cash_account: true
     });
 
