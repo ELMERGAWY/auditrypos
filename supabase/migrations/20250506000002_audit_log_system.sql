@@ -188,10 +188,10 @@ BEGIN
     NEW.id,
     jsonb_build_object(
       'entry_number', NEW.entry_number,
-      'source_type', NEW.source_type,
-      'source_id', NEW.source_id,
-      'is_posted', NEW.is_posted,
-      'fiscal_period_id', NEW.fiscal_period_id
+      'source', NEW.source,
+      'reference_type', NEW.reference_type,
+      'reference_id', NEW.reference_id,
+      'is_posted', NEW.is_posted
     ),
     NEW.total_debit,
     NULL,
