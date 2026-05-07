@@ -50,6 +50,7 @@ class CheckoutIntegration {
       discount?: number;
       discountType?: 'fixed' | 'percentage';
       notes?: string;
+      destinationAccountId?: string | null;
     }
   ): Promise<CheckoutResult> {
     try {
@@ -212,7 +213,8 @@ class CheckoutIntegration {
           { ...order, items: orderItems } as Order,
           context.businessType,
           cogs,
-          taxCalculation.taxAmount
+          taxCalculation.taxAmount,
+          orderData.destinationAccountId
         );
 
         if (journalEntry) {

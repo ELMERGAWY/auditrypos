@@ -136,6 +136,8 @@ export default function Dashboard() {
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [paymentMethod, setPaymentMethod] = useState('cash');
+  const [selectedAccountId, setSelectedAccountId] = useState<string | null>(null);
+  const [accountingAccounts, setAccountingAccounts] = useState<ChartOfAccount[]>([]);
   const [paidAmount, setPaidAmount] = useState('');
 
   // Invoices (multiple held tabs)
@@ -205,6 +207,26 @@ export default function Dashboard() {
       console.error('Failed to fetch counts:', err);
     }
   }, [restaurant?.id, dateRange]);
+
+  useEffect(() => {
+    const fetchAccountingAccounts = async () => {
+      if (!restaurant?.id) return;
+      const { data } = await supabase
+        .from('chart_of_accounts')
+        .select('*')
+        .eq('restaurant_id', restaurant.id)
+        .or('is_cash_account.eq.true,is_bank_account.eq.true')
+        .eq('is_active', true);
+      setAccountingAccounts(data || []);
+      
+      // Default selected account based on payment method
+      if (data && data.length > 0) {
+        const defaultCash = data.find(a => a.is_cash_account && a.code === '1100');
+        if (defaultCash) setSelectedAccountId(defaultCash.id);
+      }
+    };
+    fetchAccountingAccounts();
+  }, [restaurant?.id]);
 
   useEffect(() => {
     fetchCounts();
@@ -555,8 +577,70 @@ export default function Dashboard() {
       paid_amount: paidNum,
       client_order_id: clientOrderId,
       customer_id: null,
+      destination_account_id: selectedAccountId, // Pass the selected treasury/bank account
     };
 
+    // Use accounting-integrated checkout if online
+    if (isOnline) {
+      const result = await checkoutIntegration.processCheckout(
+        {
+          restaurantId: restaurant!.id,
+          businessType: businessType as any,
+          currency: currency,
+          isOnline: true,
+          userId: user?.id,
+          skipPreparation: !sendToPrep,
+        },
+        {
+          cart: cart.map(c => ({
+            ...c.item,
+            quantity: c.qty,
+            unitMode: c.unitMode,
+            unitFactor: getUnitOptions(c.item).find(u => u.label === c.unitMode)?.factor || 1,
+          })),
+          customerName,
+          customerPhone,
+          tableNumber: tableNumber ? Number(tableNumber) : undefined,
+          orderType: orderType as any,
+          deliveryAddress,
+          deliveryAgentId: selectedDeliveryAgent,
+          paymentMethod: paymentMethod as any,
+          paidAmount: paidNum,
+          discount: discountAmount,
+          discountType: discountType === 'percent' ? 'percentage' : 'fixed',
+          notes: orderNotes,
+          destinationAccountId: selectedAccountId,
+        }
+      );
+
+      if (result.success && result.order) {
+        const newOrder = {
+          ...result.order,
+          items: cart.map(i => ({
+            menu_item_name: i.item.name,
+            quantity: i.qty,
+            price: i.item.price
+          })),
+          paid_amount: paidNum,
+          payment_method: paymentMethod,
+        } as Order;
+
+        setOrders(prev => [newOrder, ...prev]);
+        setLastReceipt(newOrder);
+        setShowReceipt(true);
+        if (activeInvoiceId) setInvoiceTabs(prev => prev.filter(t => t.id !== activeInvoiceId));
+        
+        let successMsg = `✅ تم إنشاء الطلب #${result.order.order_number?.slice(-4)}`;
+        if (result.journalEntryId) successMsg += ` 📊 (قيد: ${result.journalEntryId.slice(-4)})`;
+        toast.success(successMsg);
+        clearCart();
+        return;
+      } else if (!result.isNetworkError) {
+        throw new Error(result.error);
+      }
+    }
+
+    // Fallback to offline if offline or network error
     await queueOrderOffline(orderData as any, cartItems, orderNum);
     return;
   }
@@ -1066,6 +1150,9 @@ export default function Dashboard() {
                 checkout={checkout}
                 updateValue={updateValue}
                 removeFromCart={removeFromCart}
+                accountingAccounts={accountingAccounts}
+                selectedAccountId={selectedAccountId}
+                setSelectedAccountId={setSelectedAccountId}
               />
             </div>
           )}

@@ -34,7 +34,10 @@ export default function AIAccountantUnified({ restaurantId }: Props) {
   const [reviewLoading, setReviewLoading] = useState(false);
   const [reviewReport, setReviewReport] = useState<any>(null);
   const [bots, setBots] = useState<any[]>([]);
+  const [waBots, setWaBots] = useState<any[]>([]);
   const [newBotUsername, setNewBotUsername] = useState("");
+  const [waInstanceId, setWaInstanceId] = useState("");
+  const [waToken, setWaToken] = useState("");
 
   useEffect(() => {
     if (!restaurantId) return;
@@ -54,7 +57,7 @@ export default function AIAccountantUnified({ restaurantId }: Props) {
   }, [restaurantId]);
 
   async function loadAll() {
-    await Promise.all([loadMessages(), loadSuggestions(), loadBots()]);
+    await Promise.all([loadMessages(), loadSuggestions(), loadBots(), loadWaBots()]);
   }
 
   async function loadMessages() {
@@ -74,6 +77,27 @@ export default function AIAccountantUnified({ restaurantId }: Props) {
     const { data } = await supabase.from("telegram_bots").select("*")
       .eq("restaurant_id", restaurantId).order("created_at", { ascending: false });
     setBots(data ?? []);
+  }
+
+  async function loadWaBots() {
+    const { data } = await supabase.from("whatsapp_bots").select("*")
+      .eq("restaurant_id", restaurantId).order("created_at", { ascending: false });
+    setWaBots(data ?? []);
+  }
+
+  async function addWaBot() {
+    if (!waInstanceId || !waToken) return;
+    const { error } = await supabase.from("whatsapp_bots").insert({
+      restaurant_id: restaurantId,
+      bot_name: "WhatsApp Bot",
+      instance_id: waInstanceId,
+      token_hash: waToken,
+    });
+    if (error) toast.error("خطأ في الإضافة: " + error.message);
+    else {
+      toast.success("تمت إضافة بوت واتساب بنجاح");
+      setWaInstanceId(""); setWaToken(""); loadWaBots();
+    }
   }
 
   async function sendMessage() {
@@ -233,6 +257,57 @@ export default function AIAccountantUnified({ restaurantId }: Props) {
                   </div>
                 </div>
               </div>
+            </div>
+          </TabsContent>
+
+          <TabsContent value="bots" className="flex-1 mt-0">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <Card className="glass-card">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2"><Bot className="w-5 h-5" /> Telegram Bot</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="flex gap-2">
+                    <Input placeholder="Bot Username" value={newBotUsername} onChange={e => setNewBotUsername(e.target.value)} />
+                    <Button variant="outline">إضافة</Button>
+                  </div>
+                  <div className="space-y-2">
+                    {bots.map(b => (
+                      <div key={b.id} className="p-3 bg-white/5 rounded-xl border border-white/10 flex justify-between items-center">
+                        <div>
+                          <p className="font-bold">@{b.bot_username}</p>
+                          <p className="text-[10px] text-muted-foreground">Status: {b.is_active ? 'Active' : 'Inactive'}</p>
+                        </div>
+                        <Badge variant={b.is_active ? 'default' : 'secondary'}>{b.is_active ? 'نشط' : 'معطل'}</Badge>
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card className="glass-card border-emerald-500/20">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2"><MessageCircle className="w-5 h-5 text-emerald-500" /> WhatsApp (UltraMsg)</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="space-y-2">
+                    <Input placeholder="Instance ID" value={waInstanceId} onChange={e => setWaInstanceId(e.target.value)} />
+                    <Input type="password" placeholder="Token" value={waToken} onChange={e => setWaToken(e.target.value)} />
+                    <Button onClick={addWaBot} className="w-full bg-emerald-600 hover:bg-emerald-700 text-white border-0">ربط واتساب</Button>
+                  </div>
+                  <div className="space-y-2">
+                    {waBots.map(b => (
+                      <div key={b.id} className="p-3 bg-white/5 rounded-xl border border-white/10 flex justify-between items-center">
+                        <div>
+                          <p className="font-bold">WhatsApp ({b.instance_id})</p>
+                          <p className="text-[10px] text-muted-foreground">Provider: {b.provider}</p>
+                        </div>
+                        <Badge className="bg-emerald-500/20 text-emerald-500 border-emerald-500/30">متصل</Badge>
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
             </div>
           </TabsContent>
         </AnimatePresence>

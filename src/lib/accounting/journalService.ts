@@ -253,7 +253,8 @@ class JournalService {
     order: Order,
     businessType: string,
     cogs?: number,
-    taxAmount: number = 0
+    taxAmount: number = 0,
+    destinationAccountId?: string | null
   ): Promise<JournalEntry | null> {
     const mapping = this.getBusinessMapping(businessType);
     const lines: Omit<JournalEntryLine, 'id' | 'entry_id'>[] = [];
@@ -270,7 +271,10 @@ class JournalService {
     if (businessType === 'education') targetRevenueAccount = mapping.educationRevenue || '4230';
 
     // Get account IDs with self-healing
-    let cashAcc = await this.getAccountByCode(restaurantId, mapping.cashAccount);
+    let cashAcc = destinationAccountId 
+      ? await supabase.from('chart_of_accounts').select('*').eq('id', destinationAccountId).single().then(r => r.data)
+      : await this.getAccountByCode(restaurantId, mapping.cashAccount);
+      
     let salesAcc = await this.getAccountByCode(restaurantId, targetRevenueAccount);
 
     if (!cashAcc || !salesAcc) {
@@ -279,7 +283,9 @@ class JournalService {
       
       // Retry fetching
       this.clearCache();
-      cashAcc = await this.getAccountByCode(restaurantId, mapping.cashAccount);
+      cashAcc = destinationAccountId 
+        ? await supabase.from('chart_of_accounts').select('*').eq('id', destinationAccountId).single().then(r => r.data)
+        : await this.getAccountByCode(restaurantId, mapping.cashAccount);
       salesAcc = await this.getAccountByCode(restaurantId, targetRevenueAccount);
     }
 

@@ -9,7 +9,11 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { supabase } from '@/integrations/supabase/client';
 import { createFinancialReporting, ProfitLossReport, BalanceSheetReport, CashFlowReport, FinancialIndicators, TrialBalanceReport } from '@/erp/reporting_engine/financialReports';
-import { generateTaxSummary, generateReceiptsPayments, generateSalesByItem } from '@/erp/reporting_engine/extendedReports';
+import { 
+  generateTaxSummary, generateReceiptsPayments, generateSalesByItem, 
+  generateGLTransactions, generateCustomerStatement, generateSupplierStatement,
+  generateInventoryMargin 
+} from '@/erp/reporting_engine/extendedReports';
 import { toast } from 'sonner';
 
 interface Props {
@@ -226,6 +230,12 @@ export function AdvancedReportsHub({ restaurantId, currency }: Props) {
         ]);
       } else if (activeReport === 'sales_by_item') {
         const data = await generateSalesByItem(restaurantId, startDate, endDate);
+        setListData(data);
+      } else if (activeReport === 'gl_transactions') {
+        const data = await generateGLTransactions(restaurantId, startDate, endDate);
+        setListData(data);
+      } else if (activeReport === 'inventory_margin') {
+        const data = await generateInventoryMargin(restaurantId, startDate, endDate);
         setListData(data);
       }
       // For other reports, they will show the placeholder automatically
@@ -617,6 +627,66 @@ export function AdvancedReportsHub({ restaurantId, currency }: Props) {
       );
     }
 
+    if (activeReport === 'gl_transactions') {
+      return (
+        <div className="overflow-x-auto">
+          <table className="w-full text-right text-xs border-collapse">
+            <thead>
+              <tr className="bg-muted font-black text-muted-foreground">
+                <th className="p-2 border">التاريخ</th>
+                <th className="p-2 border">رقم القيد</th>
+                <th className="p-2 border">الحساب</th>
+                <th className="p-2 border">الوصف</th>
+                <th className="p-2 border text-left">مدين</th>
+                <th className="p-2 border text-left">دائن</th>
+              </tr>
+            </thead>
+            <tbody>
+              {listData.map((row, i) => (
+                <tr key={i} className="border-b hover:bg-muted/30">
+                  <td className="p-2 border">{new Date(row.journal_entries.entry_date).toLocaleDateString()}</td>
+                  <td className="p-2 border font-mono">{row.journal_entries.entry_number}</td>
+                  <td className="p-2 border">{row.chart_of_accounts.code} - {row.chart_of_accounts.name}</td>
+                  <td className="p-2 border text-[10px]">{row.description || row.journal_entries.description}</td>
+                  <td className="p-2 border text-left">{row.debit > 0 ? row.debit.toLocaleString() : '-'}</td>
+                  <td className="p-2 border text-left">{row.credit > 0 ? row.credit.toLocaleString() : '-'}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      );
+    }
+
+    if (activeReport === 'inventory_margin') {
+      return (
+        <table className="w-full text-right text-sm border-collapse">
+          <thead>
+            <tr className="bg-muted font-black text-muted-foreground">
+              <th className="p-3 border">الصنف</th>
+              <th className="p-3 border text-center">الكمية</th>
+              <th className="p-3 border text-left">الإيراد</th>
+              <th className="p-3 border text-left">التكلفة</th>
+              <th className="p-3 border text-center">الهامش %</th>
+            </tr>
+          </thead>
+          <tbody>
+            {listData.map((row, i) => (
+              <tr key={i} className="border-b hover:bg-muted/30">
+                <td className="p-3 border font-bold">{row.name}</td>
+                <td className="p-3 border text-center">{row.qty}</td>
+                <td className="p-3 border text-left">{row.revenue.toLocaleString()}</td>
+                <td className="p-3 border text-left">{row.cost.toLocaleString()}</td>
+                <td className={`p-3 border text-center font-black ${row.margin > 0.2 ? 'text-emerald-600' : 'text-amber-600'}`}>
+                  {(row.margin * 100).toFixed(1)}%
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      );
+    }
+
     // Placeholder UI for reports not fully implemented yet
     return (
       <div className="flex flex-col items-center justify-center p-20 text-center border-2 border-dashed border-primary/20 rounded-2xl bg-primary/5">
@@ -633,7 +703,7 @@ export function AdvancedReportsHub({ restaurantId, currency }: Props) {
       'pnl', 'balance_sheet', 'cash_flow', 'indicators', 'trial_balance',
       'ar_aging', 'ap_aging', 'customers_summary', 'suppliers_summary',
       'inventory_value', 'inventory_qty', 'fixed_assets_summary', 'employees_summary',
-      'tax_summary', 'receipts_payments', 'sales_by_item'
+      'tax_summary', 'receipts_payments', 'sales_by_item', 'gl_transactions', 'inventory_margin'
     ].includes(activeReport);
 
     return (

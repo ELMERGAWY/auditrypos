@@ -54,6 +54,9 @@ interface POSCartProps {
   checkout: (sendToPrep: boolean) => void;
   updateValue: (id: string, value: number) => void;
   removeFromCart: (id: string) => void;
+  accountingAccounts: any[];
+  selectedAccountId: string | null;
+  setSelectedAccountId: (id: string) => void;
 }
 
 export function POSCart({
@@ -64,7 +67,8 @@ export function POSCart({
   orderNotes, setOrderNotes, discount, setDiscount, discountType, setDiscountType,
   currency, getUnitOptions, setCartItemUnit, updateQty, setCartItemQty,
   discountAmount, taxAmount, cartSubtotal, cartTotal, paymentMethod, setPaymentMethod,
-  paidAmount, setPaidAmount, remaining, checkout, updateValue, removeFromCart
+  paidAmount, setPaidAmount, remaining, checkout, updateValue, removeFromCart,
+  accountingAccounts, selectedAccountId, setSelectedAccountId
 }: POSCartProps) {
   const { hasPermission } = usePermissions(restaurant?.id);
   return (
@@ -215,12 +219,47 @@ export function POSCart({
         </div>
         <div className="flex gap-1 rounded-lg bg-secondary p-1">
           {['cash', 'instapay', 'vodafone_cash', 'bank'].map(m => (
-            <button key={m} onClick={() => setPaymentMethod(m)}
+            <button key={m} onClick={() => {
+              setPaymentMethod(m);
+              // Auto-select first matching account
+              const firstMatch = accountingAccounts.find(a => 
+                (m === 'cash' && a.is_cash_account) || 
+                (m === 'bank' && a.is_bank_account) ||
+                (['instapay', 'vodafone_cash'].includes(m) && a.is_bank_account)
+              );
+              if (firstMatch) setSelectedAccountId(firstMatch.id);
+            }}
               className={`flex-1 py-1.5 rounded-md text-[10px] transition-all ${paymentMethod === m ? 'gradient-bg text-primary-foreground' : 'text-muted-foreground'}`}>
               {m === 'cash' ? '💵 نقدي' : m === 'instapay' ? '📱 إنستاباي' : m === 'vodafone_cash' ? '📲 فودافون' : '🏦 بنك'}
             </button>
           ))}
         </div>
+
+        {/* Account Selection */}
+        {(paymentMethod === 'cash' || paymentMethod === 'bank' || paymentMethod === 'instapay' || paymentMethod === 'vodafone_cash') && (
+          <div className="space-y-1">
+            <label className="text-[10px] font-bold text-muted-foreground mr-1">
+              توجيه إلى {paymentMethod === 'cash' ? 'الخزينة' : 'البنك / المحفظة'}:
+            </label>
+            <select 
+              value={selectedAccountId || ''} 
+              onChange={e => setSelectedAccountId(e.target.value)}
+              className="w-full h-8 text-[10px] bg-secondary border-0 rounded-lg px-2 font-bold focus:ring-1 focus:ring-primary transition-all"
+            >
+              {accountingAccounts
+                .filter(a => 
+                  (paymentMethod === 'cash' && a.is_cash_account) || 
+                  (['bank', 'instapay', 'vodafone_cash'].includes(paymentMethod) && a.is_bank_account)
+                )
+                .map(acc => (
+                  <option key={acc.id} value={acc.id}>
+                    {acc.code} - {acc.name}
+                  </option>
+                ))}
+              {accountingAccounts.length === 0 && <option value="">لا توجد حسابات مهيأة</option>}
+            </select>
+          </div>
+        )}
         <div className="grid grid-cols-2 gap-2">
           <Input value={paidAmount} onChange={e => setPaidAmount(e.target.value)} placeholder="المدفوع" className="h-8 text-xs" type="number" />
           <div className="flex items-center justify-between px-3 py-1.5 rounded-lg bg-secondary/50 text-xs">

@@ -42,6 +42,13 @@ type TelegramRequest = {
   message_text: string;
 };
 
+type WhatsAppRequest = {
+  whatsapp_bot_id: string;
+  external_message_id: string;
+  sender_number: string;
+  message_text: string;
+};
+
 function jsonResponse(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
     status,
@@ -263,6 +270,11 @@ Deno.serve(async (req) => {
     // Handle Telegram webhook
     if (body.telegram_message_id) {
       return await handleTelegramMessage(supabase, geminiKey, body as TelegramRequest);
+    }
+
+    // Handle WhatsApp webhook
+    if (body.whatsapp_bot_id) {
+      return await handleWhatsAppMessage(supabase, geminiKey, body as WhatsAppRequest);
     }
 
     // Handle regular chat
@@ -507,6 +519,84 @@ async function handleTelegramMessage(supabase: any, geminiKey: string, body: Tel
 
   } catch (e: any) {
     console.error("Telegram processing error:", e);
+    return jsonResponse({ error: e?.message }, 500);
+  }
+}
+// Handle WhatsApp messages
+async function handleWhatsAppMessage(supabase: any, geminiKey: string, body: WhatsAppRequest) {
+  try {
+    // Save the message if not already saved (webhook might have saved it)
+    const { data: bot } = await supabase
+      .from('whatsapp_bots')
+      .select('restaurant_id, auto_suggest_entries')
+      .eq('id', body.whatsapp_bot_id)
+      .single();
+
+    if (!bot?.auto_suggest_entries) {
+      return jsonResponse({ ok: true, message: "Auto-suggestions disabled" });
+    }
+
+    // Get chart of accounts for context
+    const { data: accounts } = await supabase
+      .from('chart_of_accounts')
+      .select('code, name')
+      .eq('restaurant_id', bot.restaurant_id)
+      .eq('is_active', true)
+      .limit(50);
+
+    const accountsContext = accounts?.map((a: any) => `${a.code}: ${a.name}`).join('\n') || '';
+
+    // Process with Gemini
+    const prompt = SYSTEM_PROMPTS.journal_suggestion + 
+      "\n\nContext Accounts:\n" + accountsContext +
+      "\n\nMessage from WhatsApp (" + body.sender_number + "):\n" + body.message_text;
+
+    const gemini = await callGemini(geminiKey, prompt, 0.1);
+    const responseText = extractText(gemini);
+    const structuredData = safeJsonParse(responseText);
+
+    if (structuredData?.lines?.length > 0) {
+      // Resolve restaurant owner for user_id
+      const { data: r } = await supabase.from('restaurants').select('owner_id').eq('id', bot.restaurant_id).single();
+      
+      // Create AI suggestion
+      const { data: suggestion } = await supabase
+        .from('ai_journal_suggestions')
+        .insert({
+          restaurant_id: bot.restaurant_id,
+          user_id: r?.owner_id,
+          source_type: 'whatsapp',
+          source_reference: body.external_message_id,
+          title: `من WhatsApp: ${structuredData.title || body.message_text.substring(0, 50)}`,
+          description: body.message_text,
+          suggested_entry: structuredData,
+          confidence_score: 0.8,
+          status: 'pending'
+        })
+        .select('id')
+        .single();
+
+      // Update message
+      await supabase
+        .from('whatsapp_messages')
+        .update({
+          processing_status: 'processed',
+          processed_at: new Date().toISOString()
+        })
+        .eq('external_message_id', body.external_message_id);
+
+      return jsonResponse({
+        ok: true,
+        suggestion_created: true,
+        suggestion_id: suggestion?.id,
+        extracted_data: structuredData
+      });
+    }
+
+    return jsonResponse({ ok: true, suggestion_created: false });
+
+  } catch (e: any) {
+    console.error("WhatsApp processing error:", e);
     return jsonResponse({ error: e?.message }, 500);
   }
 }
