@@ -36,6 +36,7 @@ export default function AIAccountantUnified({ restaurantId }: Props) {
   const [bots, setBots] = useState<any[]>([]);
   const [waBots, setWaBots] = useState<any[]>([]);
   const [newBotUsername, setNewBotUsername] = useState("");
+  const [tgToken, setTgToken] = useState("");
   const [waInstanceId, setWaInstanceId] = useState("");
   const [waToken, setWaToken] = useState("");
 
@@ -85,6 +86,21 @@ export default function AIAccountantUnified({ restaurantId }: Props) {
     setWaBots(data ?? []);
   }
 
+  async function addTelegramBot() {
+    if (!newBotUsername || !tgToken) return;
+    const { error } = await supabase.from("telegram_bots").insert({
+      restaurant_id: restaurantId,
+      bot_username: newBotUsername.replace("@", ""),
+      bot_token_hash: tgToken,
+      is_active: true
+    });
+    if (error) toast.error("خطأ في إضافة تليجرام: " + error.message);
+    else {
+      toast.success("تم ربط بوت تليجرام بنجاح");
+      setNewBotUsername(""); setTgToken(""); loadBots();
+    }
+  }
+
   async function addWaBot() {
     if (!waInstanceId || !waToken) return;
     const { error } = await supabase.from("whatsapp_bots").insert({
@@ -97,6 +113,76 @@ export default function AIAccountantUnified({ restaurantId }: Props) {
     else {
       toast.success("تمت إضافة بوت واتساب بنجاح");
       setWaInstanceId(""); setWaToken(""); loadWaBots();
+    }
+  }
+
+  async function approveSuggestion(id: string, suggestion: any) {
+    try {
+      // 1. Create journal entry
+      const { data: entry, error: entryErr } = await supabase.from("journal_entries").insert({
+        restaurant_id: restaurantId,
+        entry_number: `AI-${Date.now()}`,
+        entry_date: suggestion.suggested_entry_date || new Date().toISOString(),
+        description: suggestion.description,
+        source: 'auto',
+        total_debit: suggestion.suggested_entry.lines.reduce((s: number, l: any) => s + (l.debit || 0), 0),
+        total_credit: suggestion.suggested_entry.lines.reduce((s: number, l: any) => s + (l.credit || 0), 0),
+        is_posted: true,
+        status: 'posted'
+      }).select().single();
+
+      if (entryErr) throw entryErr;
+
+      // 2. Create lines
+      const lines = suggestion.suggested_entry.lines.map((l: any, i: number) => ({
+        entry_id: entry.id,
+        account_id: l.account_id || (bots[0]?.restaurant_id), // Fallback or lookup
+        debit: l.debit || 0,
+        credit: l.credit || 0,
+        description: l.description,
+        line_order: i
+      }));
+
+      const { error: linesErr } = await supabase.from("journal_entry_lines").insert(lines);
+      if (linesErr) throw linesErr;
+
+      // 3. Update suggestion status
+      await supabase.from("ai_journal_suggestions").update({ 
+        status: 'approved', 
+        journal_entry_id: entry.id 
+      }).eq("id", id);
+
+      toast.success("تم اعتماد القيد وترحيله بنجاح");
+      loadSuggestions();
+    } catch (err: any) {
+      toast.error("فشل الاعتماد: " + err.message);
+    }
+  }
+
+  async function rejectSuggestion(id: string) {
+    await supabase.from("ai_journal_suggestions").update({ status: 'rejected' }).eq("id", id);
+    toast.info("تم رفض الاقتراح");
+    loadSuggestions();
+  }
+
+  async function runFinancialReview() {
+    setReviewLoading(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("ai-accountant-analyze", {
+        body: { 
+          restaurant_id: restaurantId, 
+          source_type: "manual", 
+          text: "قم بمراجعة القوائم المالية الحالية واكتشاف أي ثغرات أو أخطاء محاسبية محتملة.",
+          standard 
+        },
+      });
+      if (error) throw error;
+      setReviewReport(data.suggestion);
+      toast.success("تم الانتهاء من المراجعة الذكية");
+    } catch (err: any) {
+      toast.error("فشل المراجعة: " + err.message);
+    } finally {
+      setReviewLoading(false);
     }
   }
 
@@ -172,7 +258,7 @@ export default function AIAccountantUnified({ restaurantId }: Props) {
             <FileSearch className="w-4 h-4 ml-2" /> مراجعة القوائم
           </TabsTrigger>
           <TabsTrigger value="bots" className="rounded-full px-8 font-bold data-[state=active]:gradient-bg data-[state=active]:text-white">
-            <Bot className="w-4 h-4 ml-2" /> Telegram
+            <Bot className="w-4 h-4 ml-2" /> إعدادات الربط
           </TabsTrigger>
         </TabsList>
 
@@ -258,27 +344,139 @@ export default function AIAccountantUnified({ restaurantId }: Props) {
                 </div>
               </div>
             </div>
+          <TabsContent value="suggestions" className="flex-1 mt-0">
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+              {suggestions.map((s) => (
+                <Card key={s.id} className="glass-card border-indigo-500/20 overflow-hidden group">
+                  <div className="h-1.5 gradient-bg opacity-50" />
+                  <CardHeader className="pb-4">
+                    <div className="flex justify-between items-start mb-2">
+                      <Badge className="bg-indigo-500/10 text-indigo-500 border-0">{s.source_type}</Badge>
+                      <span className="text-[10px] text-muted-foreground">{new Date(s.created_at).toLocaleDateString('ar-EG')}</span>
+                    </div>
+                    <CardTitle className="text-lg font-black">{s.title}</CardTitle>
+                    <CardDescription className="text-xs line-clamp-2">{s.description}</CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="bg-white/5 rounded-xl p-3 space-y-2">
+                      {s.suggested_entry?.lines?.map((l: any, i: number) => (
+                        <div key={i} className="flex justify-between text-[11px] font-medium border-b border-white/5 pb-1 last:border-0">
+                          <span className="text-muted-foreground">{l.account_name || l.account_code}</span>
+                          <span className={l.debit > 0 ? "text-emerald-500" : "text-purple-500"}>
+                            {l.debit > 0 ? `+${l.debit}` : `-${l.credit}`}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                    <div className="flex gap-2">
+                      <Button 
+                        size="sm" 
+                        onClick={() => approveSuggestion(s.id, s)}
+                        className="flex-1 gradient-bg text-white border-0 h-9 font-bold text-xs"
+                      >اعتماد القيد</Button>
+                      <Button 
+                        size="sm" 
+                        variant="ghost" 
+                        onClick={() => rejectSuggestion(s.id)}
+                        className="flex-1 h-9 font-bold text-xs hover:bg-destructive/10 hover:text-destructive"
+                      >تجاهل</Button>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+              {suggestions.length === 0 && (
+                <div className="col-span-full flex flex-col items-center justify-center p-20 text-center border-2 border-dashed border-white/10 rounded-[2rem]">
+                  <ClipboardList className="w-16 h-16 text-muted-foreground/20 mb-4" />
+                  <p className="text-muted-foreground font-medium">لا توجد اقتراحات معلقة حالياً.</p>
+                </div>
+              )}
+            </div>
+          </TabsContent>
+
+          <TabsContent value="review" className="flex-1 mt-0">
+            <div className="max-w-4xl mx-auto space-y-6">
+              <div className="glass-card p-10 text-center space-y-6">
+                <div className="w-20 h-20 rounded-[2.5rem] bg-indigo-500/10 flex items-center justify-center text-indigo-500 mx-auto shadow-xl">
+                  <FileSearch className="w-10 h-10" />
+                </div>
+                <div className="space-y-2">
+                  <h2 className="text-2xl font-black">المراجعة المحاسبية الشاملة</h2>
+                  <p className="text-muted-foreground max-w-md mx-auto">سيقوم الذكاء الاصطناعي بتحليل كافة القيود والحسابات خلال الفترة الحالية واكتشاف أي خلل في التوازن أو مخالفة للمعايير.</p>
+                </div>
+                <Button 
+                  onClick={runFinancialReview} 
+                  disabled={reviewLoading}
+                  className="gradient-bg text-white border-0 px-10 h-14 rounded-full font-black text-lg shadow-xl shadow-indigo-500/20"
+                >
+                  {reviewLoading ? <Loader2 className="w-6 h-6 animate-spin mr-3" /> : <Sparkles className="w-6 h-6 mr-3" />}
+                  ابدأ المراجعة الآن
+                </Button>
+              </div>
+
+              {reviewReport && (
+                <motion.div 
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="glass-card p-8 space-y-6 border-indigo-500/30"
+                >
+                  <div className="flex items-center justify-between border-b border-white/10 pb-4">
+                    <h3 className="text-xl font-black">نتائج التحليل الذكي</h3>
+                    <Badge className="bg-indigo-500 text-white border-0">تقرير #{Date.now().toString().slice(-6)}</Badge>
+                  </div>
+                  
+                  <div className="prose prose-invert max-w-none text-sm leading-relaxed">
+                    <div className="p-6 rounded-2xl bg-white/5 border border-white/10">
+                      <p className="whitespace-pre-wrap">{reviewReport.description}</p>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-6">
+                    {reviewReport.detected_errors?.map((err: any, i: number) => (
+                      <div key={i} className="p-4 rounded-xl bg-destructive/10 border border-destructive/20 flex gap-3 items-start">
+                        <ShieldAlert className="w-5 h-5 text-destructive shrink-0 mt-0.5" />
+                        <div>
+                          <p className="text-sm font-bold text-destructive">{err.type}</p>
+                          <p className="text-xs text-destructive/80 mt-1">{err.message}</p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </motion.div>
+              )}
+            </div>
           </TabsContent>
 
           <TabsContent value="bots" className="flex-1 mt-0">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pb-20">
               <Card className="glass-card">
                 <CardHeader>
-                  <CardTitle className="flex items-center gap-2"><Bot className="w-5 h-5" /> Telegram Bot</CardTitle>
+                  <CardTitle className="flex items-center gap-2"><Bot className="w-5 h-5 text-sky-500" /> Telegram Bot Integration</CardTitle>
+                  <CardDescription className="text-[11px]">
+                    اربط المحاسب الذكي بتليجرام لاستخراج القيود من رسائل المجموعات.
+                  </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  <div className="flex gap-2">
-                    <Input placeholder="Bot Username" value={newBotUsername} onChange={e => setNewBotUsername(e.target.value)} />
-                    <Button variant="outline">إضافة</Button>
+                  <div className="p-3 bg-sky-500/5 border border-sky-500/10 rounded-xl space-y-2">
+                    <p className="text-[10px] font-bold text-sky-600">خطوات التفعيل:</p>
+                    <ol className="text-[9px] text-muted-foreground list-decimal list-inside space-y-1">
+                      <li>تحدث مع <a href="https://t.me/botfather" target="_blank" className="underline">@BotFather</a> وأنشئ بوت جديد.</li>
+                      <li>انسخ الـ API Token والصقه هنا مع اسم البوت.</li>
+                      <li>اضبط الـ Webhook في تليجرام ليشير إلى رابط النظام الخاص بك.</li>
+                    </ol>
                   </div>
                   <div className="space-y-2">
+                    <Input placeholder="Bot Username (e.g. AuditryBot)" value={newBotUsername} onChange={e => setNewBotUsername(e.target.value)} />
+                    <Input type="password" placeholder="Bot API Token" value={tgToken} onChange={e => setTgToken(e.target.value)} />
+                    <Button onClick={addTelegramBot} className="w-full bg-sky-600 hover:bg-sky-700 text-white border-0">ربط تليجرام</Button>
+                  </div>
+                  <div className="space-y-2 mt-4 pt-4 border-t border-white/5">
                     {bots.map(b => (
                       <div key={b.id} className="p-3 bg-white/5 rounded-xl border border-white/10 flex justify-between items-center">
                         <div>
-                          <p className="font-bold">@{b.bot_username}</p>
-                          <p className="text-[10px] text-muted-foreground">Status: {b.is_active ? 'Active' : 'Inactive'}</p>
+                          <p className="font-bold text-xs">@{b.bot_username}</p>
+                          <p className="text-[10px] text-muted-foreground">Status: Active</p>
                         </div>
-                        <Badge variant={b.is_active ? 'default' : 'secondary'}>{b.is_active ? 'نشط' : 'معطل'}</Badge>
+                        <Badge className="bg-sky-500/20 text-sky-500 border-sky-500/30 text-[10px]">نشط</Badge>
                       </div>
                     ))}
                   </div>
@@ -288,21 +486,32 @@ export default function AIAccountantUnified({ restaurantId }: Props) {
               <Card className="glass-card border-emerald-500/20">
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2"><MessageCircle className="w-5 h-5 text-emerald-500" /> WhatsApp (UltraMsg)</CardTitle>
+                  <CardDescription className="text-[11px]">
+                    اربط واتساب لاستقبال الاقتراحات المحاسبية مباشرة من رسائل المالك.
+                  </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
+                  <div className="p-3 bg-emerald-500/5 border border-emerald-500/10 rounded-xl space-y-2">
+                    <p className="text-[10px] font-bold text-emerald-600">خطوات التفعيل:</p>
+                    <ol className="text-[9px] text-muted-foreground list-decimal list-inside space-y-1">
+                      <li>سجل في <a href="https://ultramsg.com" target="_blank" className="underline">UltraMsg</a> واربط رقم الواتساب.</li>
+                      <li>انسخ الـ Instance ID والـ Token من لوحة التحكم الخاصة بهم.</li>
+                      <li>اضبط الـ Webhook URL لديهم ليشير لرابط Edge Function الخاص بنا.</li>
+                    </ol>
+                  </div>
                   <div className="space-y-2">
-                    <Input placeholder="Instance ID" value={waInstanceId} onChange={e => setWaInstanceId(e.target.value)} />
+                    <Input placeholder="Instance ID (e.g. instance123)" value={waInstanceId} onChange={e => setWaInstanceId(e.target.value)} />
                     <Input type="password" placeholder="Token" value={waToken} onChange={e => setWaToken(e.target.value)} />
                     <Button onClick={addWaBot} className="w-full bg-emerald-600 hover:bg-emerald-700 text-white border-0">ربط واتساب</Button>
                   </div>
-                  <div className="space-y-2">
+                  <div className="space-y-2 mt-4 pt-4 border-t border-white/5">
                     {waBots.map(b => (
                       <div key={b.id} className="p-3 bg-white/5 rounded-xl border border-white/10 flex justify-between items-center">
                         <div>
-                          <p className="font-bold">WhatsApp ({b.instance_id})</p>
+                          <p className="font-bold text-xs">WhatsApp ({b.instance_id})</p>
                           <p className="text-[10px] text-muted-foreground">Provider: {b.provider}</p>
                         </div>
-                        <Badge className="bg-emerald-500/20 text-emerald-500 border-emerald-500/30">متصل</Badge>
+                        <Badge className="bg-emerald-500/20 text-emerald-500 border-emerald-500/30 text-[10px]">متصل</Badge>
                       </div>
                     ))}
                   </div>

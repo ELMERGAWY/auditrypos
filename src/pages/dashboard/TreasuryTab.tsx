@@ -110,18 +110,35 @@ export function TreasuryTab({ restaurantId, currency }: TreasuryTabProps) {
     }
     
     // 1. Create Chart of Account under Banks (140x)
-    const newCode = `140${banks.length + 1}`;
+    // Find the max code in the 140x range
+    const { data: existingCodes } = await supabase
+      .from('chart_of_accounts')
+      .select('code')
+      .eq('restaurant_id', restaurantId)
+      .ilike('code', '140%');
+    
+    let nextNum = 1;
+    if (existingCodes && existingCodes.length > 0) {
+      const nums = existingCodes.map(c => parseInt(c.code.slice(3))).filter(n => !isNaN(n));
+      if (nums.length > 0) nextNum = Math.max(...nums) + 1;
+    }
+    const newCode = `140${nextNum}`;
+
     const { data: coa, error: coaError } = await supabase.from('chart_of_accounts').insert({
       restaurant_id: restaurantId,
       code: newCode,
       name: `بنك - ${newAccountForm.name}`,
       account_type: 'asset',
       description: 'حساب بنكي',
-      is_active: true
+      is_active: true,
+      is_bank_account: true,
+      opening_balance: Number(newAccountForm.initialBalance) || 0,
+      current_balance: Number(newAccountForm.initialBalance) || 0
     }).select().single();
 
     if (coaError) {
-      toast.error('فشل في إنشاء الحساب الدليلي');
+      console.error('COA Error:', coaError);
+      toast.error('فشل في إنشاء الحساب الدليلي: ' + coaError.message);
       return;
     }
 
@@ -132,7 +149,7 @@ export function TreasuryTab({ restaurantId, currency }: TreasuryTabProps) {
       account_name: newAccountForm.name,
       account_number: newAccountForm.number,
       current_balance: Number(newAccountForm.initialBalance) || 0,
-      ledger_account_id: coa.code
+      ledger_account_id: coa.id // Use UUID id, not code string
     });
 
     if (!error) {
@@ -141,7 +158,8 @@ export function TreasuryTab({ restaurantId, currency }: TreasuryTabProps) {
       setNewAccountForm({ name: '', number: '', initialBalance: '' });
       loadData();
     } else {
-      toast.error('فشل في إضافة البنك');
+      console.error('Bank Error:', error);
+      toast.error('فشل في إضافة البنك: ' + error.message);
     }
   };
 
@@ -152,8 +170,18 @@ export function TreasuryTab({ restaurantId, currency }: TreasuryTabProps) {
     }
     
     // Create Chart of Account under Cash (110x)
-    const cashCount = cashAccounts.length;
-    const newCode = `110${cashCount + 1}`;
+    const { data: existingCodes } = await supabase
+      .from('chart_of_accounts')
+      .select('code')
+      .eq('restaurant_id', restaurantId)
+      .ilike('code', '110%');
+    
+    let nextNum = 1;
+    if (existingCodes && existingCodes.length > 0) {
+      const nums = existingCodes.map(c => parseInt(c.code.slice(3))).filter(n => !isNaN(n));
+      if (nums.length > 0) nextNum = Math.max(...nums) + 1;
+    }
+    const newCode = `110${nextNum}`;
     
     const { error } = await supabase.from('chart_of_accounts').insert({
       restaurant_id: restaurantId,
@@ -161,8 +189,10 @@ export function TreasuryTab({ restaurantId, currency }: TreasuryTabProps) {
       name: `خزينة - ${newAccountForm.name}`,
       account_type: 'asset',
       description: 'نقدية بالصندوق',
+      opening_balance: Number(newAccountForm.initialBalance) || 0,
       current_balance: Number(newAccountForm.initialBalance) || 0,
-      is_active: true
+      is_active: true,
+      is_cash_account: true
     });
 
     if (!error) {
@@ -171,7 +201,8 @@ export function TreasuryTab({ restaurantId, currency }: TreasuryTabProps) {
       setNewAccountForm({ name: '', number: '', initialBalance: '' });
       loadData();
     } else {
-      toast.error('فشل في إضافة الخزينة');
+      console.error('Cash Error:', error);
+      toast.error('فشل في إضافة الخزينة: ' + error.message);
     }
   };
 
