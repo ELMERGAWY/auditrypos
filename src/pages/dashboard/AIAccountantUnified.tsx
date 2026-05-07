@@ -14,7 +14,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { 
   Loader2, Send, CheckCircle2, XCircle, Bot, 
   FileSearch, MessageCircle, Plus, Sparkles, 
-  BrainCircuit, TrendingUp, ShieldCheck 
+  BrainCircuit, TrendingUp, ShieldCheck, ClipboardList, ShieldAlert
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -340,10 +340,11 @@ export default function AIAccountantUnified({ restaurantId }: Props) {
                       <p className="text-2xl font-black text-purple-600">{suggestions.length}</p>
                       <p className="text-[10px] text-muted-foreground">اقتراح معلق</p>
                     </div>
-                  </div>
                 </div>
               </div>
             </div>
+          </TabsContent>
+
           <TabsContent value="suggestions" className="flex-1 mt-0">
             <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
               {suggestions.map((s) => (
