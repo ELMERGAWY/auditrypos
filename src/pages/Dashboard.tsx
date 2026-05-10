@@ -39,7 +39,7 @@ const StaffTab = lazy(() => import('./dashboard/StaffTab').then(m => ({ default:
 const NotificationsTab = lazy(() => import('./dashboard/NotificationsTab').then(m => ({ default: m.NotificationsTab })));
 const FinancialsTab = lazy(() => import('./dashboard/FinancialsTab').then(m => ({ default: m.FinancialsTab })));
 const OverheadManager = lazy(() => import('./dashboard/OverheadManager').then(m => ({ default: m.OverheadManager })));
-const AdvancedReportsHub = lazy(() => import('./dashboard/EnhancedReportsHub').then(m => ({ default: m.default || m.EnhancedReportsHub })));
+const AdvancedReportsHub = lazy(() => import('./dashboard/AuditryIntelligenceV3').then(m => ({ default: m.default })));
 const AIAccountantUnified = lazy(() => import('./dashboard/AIAccountantUnified').then(m => ({ default: m.default })));
 const TreasuryTab = lazy(() => import('./dashboard/TreasuryTab').then(m => ({ default: m.TreasuryTab })));
 const ChartOfAccountsTab = lazy(() => import('./dashboard/ChartOfAccountsTab').then(m => ({ default: m.ChartOfAccountsTab })));
@@ -51,7 +51,7 @@ const CreateRestaurantForm = lazy(() => import('@/components/dashboard/CreateRes
 import { BarcodeScanner } from './dashboard/BarcodeScanner';
 const POSGrid = lazy(() => import('./dashboard/pos/POSGrid').then(m => ({ default: m.POSGrid })));
 const POSCart = lazy(() => import('./dashboard/pos/POSCart').then(m => ({ default: m.POSCart })));
-const VentroCRM = lazy(() => import('./dashboard/VentroCRM').then(m => ({ default: m.VentroCRM })));
+const AuditryCRM = lazy(() => import('./dashboard/AuditryCRM').then(m => ({ default: m.AuditryCRM })));
 const TradingAccount = lazy(() => import('./dashboard/TradingAccount').then(m => ({ default: m.TradingAccount })));
 const BOMManager = lazy(() => import('./dashboard/BOMManager').then(m => ({ default: m.BOMManager })));
 const SettingsTab = lazy(() => import('./dashboard/SettingsTab').then(m => ({ default: m.SettingsTab })));
@@ -1326,7 +1326,7 @@ export default function Dashboard() {
             {activeTab === 'sales_invoices' && <SalesInvoices restaurantId={restaurant!.id} currency={currency} />}
             {activeTab === 'treasury' && <TreasuryTab restaurantId={restaurant!.id} currency={currency} />}
             {activeTab === 'users' && <StaffTab restaurantId={restaurant!.id} />}
-            {activeTab === 'crm' && <VentroCRM restaurantId={restaurant!.id} currency={currency} />}
+            {activeTab === 'crm' && <AuditryCRM restaurantId={restaurant!.id} currency={currency} />}
             
             {activeTab === 'customers' && <CustomerManager restaurantId={restaurant!.id} currency={currency} />}
             {activeTab === 'suppliers' && <SupplierManager restaurantId={restaurant!.id} currency={currency} />}
