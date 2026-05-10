@@ -110,8 +110,8 @@ export function ProfessionalSidebar({
   isCollapsed = false,
   onToggleCollapse,
   tabs,
-  pendingCount,
-  isSyncing,
+  pendingCount = 0,
+  isSyncing = false,
   syncStatus,
   onForceSync
 }: ProfessionalSidebarProps) {
@@ -478,7 +478,7 @@ export function ProfessionalSidebar({
                 </>
               )}
             </div>
-            {pendingCount !== undefined && pendingCount > 0 && (
+            {pendingCount > 0 && (
               <div className="flex items-center gap-1 text-amber-600">
                 <AlertTriangle className="w-3 h-3" />
                 {!isCollapsed && <span>{pendingCount} معلقة</span>}
