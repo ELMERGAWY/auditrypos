@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, Suspense, lazy } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   TrendingUp, TrendingDown, Wallet, Landmark, Clock, 
@@ -6,14 +6,12 @@ import {
   ArrowUp, ArrowDown, Minus, Plus, Users, Boxes, 
   Store, Truck, Calculator, Scale, FileText, Filter,
   Calendar, DollarSign, CreditCard, Activity, Gauge,
-  Target, Zap, Layers, RotateCcw
+  Target, Zap, Layers, RotateCcw, AlertCircle
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Card } from '@/components/ui/card';
-import { supabase } from '@/integrations/supabase/client';
-import { createFinancialReporting, type FinancialIndicators, type ProfitLossReport, type BalanceSheetReport, type CashFlowReport, type TrialBalanceReport } from '@/erp/reporting_engine/financialReports';
 import { toast } from 'sonner';
 
 interface Props {
@@ -51,22 +49,45 @@ export default function EnhancedReportsHub({ restaurantId, currency }: Props) {
   const loadDashboardData = async () => {
     setLoading(true);
     try {
-      const engine = createFinancialReporting(restaurantId);
+      // Try to load financial reporting engine
+      let engine;
+      try {
+        const { createFinancialReporting } = await import('@/erp/reporting_engine/financialReports');
+        engine = createFinancialReporting(restaurantId);
+      } catch (engineError) {
+        console.error('Failed to load reporting engine:', engineError);
+        // Use mock data if engine fails
+        setQuickStats([
+          { label: 'إجمالي الإيرادات', value: 0, format: 'currency' },
+          { label: 'إجمالي المصروفات', value: 0, format: 'currency' },
+          { label: 'صافي الربح', value: 0, format: 'currency' },
+          { label: 'هامش مجمل الربح', value: 0, format: 'percent' },
+          { label: 'هامش صافي الربح', value: 0, format: 'percent' },
+          { label: 'أرباح مستبقاة', value: 0, format: 'currency' }
+        ]);
+        setLoading(false);
+        return;
+      }
       
       const [indicatorsData, plDataResult] = await Promise.all([
-        engine.generateFinancialIndicators(dateRange.end),
-        engine.generateProfitLoss(dateRange.start, dateRange.end)
+        Promise.race([
+          engine.generateFinancialIndicators(dateRange.end),
+          new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout')), 5000))
+        ]),
+        Promise.race([
+          engine.generateProfitLoss(dateRange.start, dateRange.end),
+          new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout')), 5000))
+        ])
       ]);
       
-      setIndicators(indicatorsData);
-      setPlData(plDataResult);
+      setIndicators(indicatorsData as FinancialIndicators);
+      setPlData(plDataResult as ProfitLossReport);
 
-      const totalRevenue = plDataResult?.revenue.total || 0;
-      const totalExpenses = plDataResult?.operating_expenses.total || 0;
-      const netProfit = plDataResult?.net_profit || 0;
-      const grossProfit = plDataResult?.gross_profit || 0;
-      const grossMargin = plDataResult?.gross_margin || 0;
-      const netMargin = plDataResult?.net_margin || 0;
+      const totalRevenue = (plDataResult as ProfitLossReport)?.revenue?.total || 0;
+      const totalExpenses = (plDataResult as ProfitLossReport)?.operating_expenses?.total || 0;
+      const netProfit = (plDataResult as ProfitLossReport)?.net_profit || 0;
+      const grossMargin = (plDataResult as ProfitLossReport)?.gross_margin || 0;
+      const netMargin = (plDataResult as ProfitLossReport)?.net_margin || 0;
 
       setQuickStats([
         { label: 'إجمالي الإيرادات', value: totalRevenue, change: 12.5, trend: 'up', format: 'currency' },
@@ -74,10 +95,19 @@ export default function EnhancedReportsHub({ restaurantId, currency }: Props) {
         { label: 'صافي الربح', value: netProfit, change: netProfit > 0 ? 8.3 : -8.3, trend: netProfit > 0 ? 'up' : 'down', format: 'currency' },
         { label: 'هامش مجمل الربح', value: grossMargin, change: 2.1, trend: 'up', format: 'percent' },
         { label: 'هامش صافي الربح', value: netMargin, change: 1.5, trend: 'up', format: 'percent' },
-        { label: 'أرباح مستبقاة', value: plDataResult?.operating_profit || 0, format: 'currency' }
+        { label: 'أرباح مستبقاة', value: (plDataResult as ProfitLossReport)?.operating_profit || 0, format: 'currency' }
       ]);
     } catch (error) {
       console.error('Dashboard load error:', error);
+      // Keep showing available data or use defaults
+      setQuickStats([
+        { label: 'إجمالي الإيرادات', value: 0, format: 'currency' },
+        { label: 'إجمالي المصروفات', value: 0, format: 'currency' },
+        { label: 'صافي الربح', value: 0, format: 'currency' },
+        { label: 'هامش مجمل الربح', value: 0, format: 'percent' },
+        { label: 'هامش صافي الربح', value: 0, format: 'percent' },
+        { label: 'أرباح مستبقاة', value: 0, format: 'currency' }
+      ]);
     } finally {
       setLoading(false);
     }
@@ -136,7 +166,7 @@ export default function EnhancedReportsHub({ restaurantId, currency }: Props) {
                 {stat.change !== undefined && (
                   <Badge className={`text-[10px] ${getTrendColor(stat.change, stat.trend)} bg-transparent`}>
                     {getTrendIcon(stat.trend)}
-                    <span className="mr-1">{Math.abs(stat.change).toFixed(1)}%</span>
+                    <span className="mr-1">{Math.abs(stat.change || 0).toFixed(1)}%</span>
                   </Badge>
                 )}
               </div>
@@ -154,7 +184,7 @@ export default function EnhancedReportsHub({ restaurantId, currency }: Props) {
         ))}
       </div>
 
-      {indicators && (
+      {indicators ? (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <Card className="p-6 bg-gradient-to-br from-emerald-500/10 to-transparent border-emerald-500/20">
             <h3 className="font-bold text-lg mb-4 flex items-center gap-2">
