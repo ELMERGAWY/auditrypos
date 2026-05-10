@@ -109,7 +109,11 @@ export function ProfessionalSidebar({
   onUpgrade,
   isCollapsed = false,
   onToggleCollapse,
-  tabs
+  tabs,
+  pendingCount,
+  isSyncing,
+  syncStatus,
+  onForceSync
 }: ProfessionalSidebarProps) {
   const config = getBusinessConfig(businessType);
   const [hoveredItem, setHoveredItem] = useState<string | null>(null);
