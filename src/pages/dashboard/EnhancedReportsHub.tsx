@@ -12,7 +12,20 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Card } from '@/components/ui/card';
+import { 
+  BarChart, Bar as ReBar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
+  PieChart as RePieChart, Pie, Cell
+} from 'recharts';
 import { toast } from 'sonner';
+
+import { 
+  ProfitLossReport, 
+  BalanceSheetReport, 
+  CashFlowReport, 
+  FinancialIndicators,
+  createFinancialReporting 
+} from '@/erp/reporting_engine/financialReports';
+
 
 interface Props {
   restaurantId: string;
@@ -41,6 +54,11 @@ export default function EnhancedReportsHub({ restaurantId, currency }: Props) {
   const [quickStats, setQuickStats] = useState<QuickStat[]>([]);
   const [indicators, setIndicators] = useState<FinancialIndicators | null>(null);
   const [plData, setPlData] = useState<ProfitLossReport | null>(null);
+  const [bsData, setBsData] = useState<BalanceSheetReport | null>(null);
+  const [cfData, setCfData] = useState<CashFlowReport | null>(null);
+  const [topProducts, setTopProducts] = useState<any[]>([]);
+
+
 
   useEffect(() => {
     loadDashboardData();
@@ -69,7 +87,7 @@ export default function EnhancedReportsHub({ restaurantId, currency }: Props) {
         return;
       }
       
-      const [indicatorsData, plDataResult] = await Promise.all([
+      const [indicatorsData, plDataResult, bsDataResult, cfDataResult] = await Promise.all([
         Promise.race([
           engine.generateFinancialIndicators(dateRange.end),
           new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout')), 5000))
@@ -77,26 +95,43 @@ export default function EnhancedReportsHub({ restaurantId, currency }: Props) {
         Promise.race([
           engine.generateProfitLoss(dateRange.start, dateRange.end),
           new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout')), 5000))
+        ]),
+        Promise.race([
+          engine.generateBalanceSheet(dateRange.end),
+          new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout')), 5000))
+        ]),
+        Promise.race([
+          engine.generateCashFlow(dateRange.start, dateRange.end),
+          new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout')), 5000))
         ])
       ]);
       
       setIndicators(indicatorsData as FinancialIndicators);
       setPlData(plDataResult as ProfitLossReport);
+      setBsData(bsDataResult as BalanceSheetReport);
+      setCfData(cfDataResult as CashFlowReport);
 
       const totalRevenue = (plDataResult as ProfitLossReport)?.revenue?.total || 0;
       const totalExpenses = (plDataResult as ProfitLossReport)?.operating_expenses?.total || 0;
       const netProfit = (plDataResult as ProfitLossReport)?.net_profit || 0;
-      const grossMargin = (plDataResult as ProfitLossReport)?.gross_margin || 0;
-      const netMargin = (plDataResult as ProfitLossReport)?.net_margin || 0;
+      
+      const cashBalance = (bsDataResult as BalanceSheetReport)?.assets?.current?.cash || 0;
+      const bankBalance = (bsDataResult as BalanceSheetReport)?.assets?.current?.bank || 0;
+      const treasuryTotal = cashBalance + bankBalance;
+      
+      const receivables = (bsDataResult as BalanceSheetReport)?.assets?.current?.receivables || 0;
+      const payables = (bsDataResult as BalanceSheetReport)?.liabilities?.current?.payables || 0;
+      const inventoryValue = (bsDataResult as BalanceSheetReport)?.assets?.current?.inventory || 0;
 
       setQuickStats([
         { label: 'إجمالي الإيرادات', value: totalRevenue, change: 12.5, trend: 'up', format: 'currency' },
-        { label: 'إجمالي المصروفات', value: totalExpenses, change: -5.2, trend: 'down', format: 'currency' },
         { label: 'صافي الربح', value: netProfit, change: netProfit > 0 ? 8.3 : -8.3, trend: netProfit > 0 ? 'up' : 'down', format: 'currency' },
-        { label: 'هامش مجمل الربح', value: grossMargin, change: 2.1, trend: 'up', format: 'percent' },
-        { label: 'هامش صافي الربح', value: netMargin, change: 1.5, trend: 'up', format: 'percent' },
-        { label: 'أرباح مستبقاة', value: (plDataResult as ProfitLossReport)?.operating_profit || 0, format: 'currency' }
+        { label: 'رصيد الخزينة والبنوك', value: treasuryTotal, format: 'currency' },
+        { label: 'مديونيات العملاء', value: receivables, trend: 'up', format: 'currency' },
+        { label: 'مستحقات الموردين', value: payables, trend: 'down', format: 'currency' },
+        { label: 'قيمة المخزون', value: inventoryValue, format: 'currency' }
       ]);
+
     } catch (error) {
       console.error('Dashboard load error:', error);
       // Keep showing available data or use defaults
@@ -108,9 +143,30 @@ export default function EnhancedReportsHub({ restaurantId, currency }: Props) {
         { label: 'هامش صافي الربح', value: 0, format: 'percent' },
         { label: 'أرباح مستبقاة', value: 0, format: 'currency' }
       ]);
-    } finally {
-      setLoading(false);
-    }
+      // Fetch top products
+      const { data: topProductsData } = await supabase
+        .from('order_items')
+        .select('menu_item_name, quantity, price, orders!inner(created_at, restaurant_id)')
+        .eq('orders.restaurant_id', restaurantId)
+        .gte('orders.created_at', dateRange.start)
+        .lte('orders.created_at', dateRange.end);
+      
+      const productMap = new Map();
+      topProductsData?.forEach(item => {
+        const existing = productMap.get(item.menu_item_name) || { qty: 0, revenue: 0 };
+        productMap.set(item.menu_item_name, {
+          qty: existing.qty + item.quantity,
+          revenue: existing.revenue + (item.quantity * item.price)
+        });
+      });
+      
+      const sortedProducts = Array.from(productMap.entries())
+        .map(([name, stats]) => ({ name, ...stats }))
+        .sort((a, b) => b.revenue - a.revenue)
+        .slice(0, 5);
+      
+      setTopProducts(sortedProducts);
+
   };
 
   const refreshData = async () => {
@@ -247,18 +303,128 @@ export default function EnhancedReportsHub({ restaurantId, currency }: Props) {
       )}
 
       {plData && (
-        <Card className="p-6">
-          <h3 className="font-bold text-lg mb-6">ملخص قائمة الدخل</h3>
-          <div className="relative h-64">
-            <div className="absolute inset-0 flex items-end justify-around gap-4">
-              <Bar label="الإيرادات" value={plData.revenue.total} color="bg-emerald-500" max={plData.revenue.total * 1.5} />
-              <Bar label="تكلفة المبيعات" value={plData.cogs.total} color="bg-red-500" max={plData.revenue.total * 1.5} />
-              <Bar label="المصروفات" value={plData.operating_expenses.total} color="bg-amber-500" max={plData.revenue.total * 1.5} />
-              <Bar label="صافي الربح" value={Math.max(0, plData.net_profit)} color={plData.net_profit >= 0 ? 'bg-emerald-600' : 'bg-red-600'} max={plData.revenue.total * 1.5} />
-            </div>
+        <div className="space-y-6">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <Card className="p-6">
+              <h3 className="font-bold text-lg mb-6 flex items-center gap-2">
+                <Activity className="w-5 h-5 text-primary" />
+                ملخص قائمة الدخل
+              </h3>
+              <div className="relative h-64">
+                <div className="absolute inset-0 flex items-end justify-around gap-4">
+                  <Bar label="الإيرادات" value={plData.revenue.total} color="bg-emerald-500" max={plData.revenue.total * 1.2} />
+                  <Bar label="تكلفة المبيعات" value={plData.cogs.total} color="bg-orange-500" max={plData.revenue.total * 1.2} />
+                  <Bar label="المصروفات" value={plData.operating_expenses.total} color="bg-red-500" max={plData.revenue.total * 1.2} />
+                  <Bar label="صافي الربح" value={Math.max(0, plData.net_profit)} color={plData.net_profit >= 0 ? 'bg-blue-600' : 'bg-red-600'} max={plData.revenue.total * 1.2} />
+                </div>
+              </div>
+            </Card>
+
+            <Card className="p-6">
+              <h3 className="font-bold text-lg mb-6 flex items-center gap-2">
+                <PieChart className="w-5 h-5 text-orange-500" />
+                تحليل المصروفات التشغيلية
+              </h3>
+              <div className="h-64">
+                <ResponsiveContainer width="100%" height="100%">
+                  <RePieChart>
+                    <Pie
+                      data={[
+                        { name: 'الرواتب', value: plData.operating_expenses.salaries, color: '#3b82f6' },
+                        { name: 'الإيجار', value: plData.operating_expenses.rent, color: '#f59e0b' },
+                        { name: 'المرافق', value: plData.operating_expenses.utilities, color: '#10b981' },
+                        { name: 'التسويق', value: plData.operating_expenses.marketing, color: '#ef4444' },
+                        { name: 'الإهلاك', value: plData.operating_expenses.depreciation, color: '#8b5cf6' },
+                        { name: 'أخرى', value: plData.operating_expenses.other, color: '#6b7280' }
+                      ].filter(d => d.value > 0)}
+                      cx="50%"
+                      cy="50%"
+                      innerRadius={60}
+                      outerRadius={80}
+                      paddingAngle={5}
+                      dataKey="value"
+                    >
+                      {[
+                        { color: '#3b82f6' }, { color: '#f59e0b' }, { color: '#10b981' },
+                        { color: '#ef4444' }, { color: '#8b5cf6' }, { color: '#6b7280' }
+                      ].map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={entry.color} />
+                      ))}
+                    </Pie>
+                    <Tooltip formatter={(value: number) => value.toLocaleString()} />
+                  </RePieChart>
+                </ResponsiveContainer>
+              </div>
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-2 mt-4">
+                {[
+                  { name: 'الرواتب', color: 'bg-blue-500' },
+                  { name: 'الإيجار', color: 'bg-orange-500' },
+                  { name: 'المرافق', color: 'bg-emerald-500' },
+                  { name: 'التسويق', color: 'bg-red-500' },
+                  { name: 'الإهلاك', color: 'bg-purple-500' },
+                  { name: 'أخرى', color: 'bg-gray-500' }
+                ].map((item, idx) => (
+                  <div key={idx} className="flex items-center gap-2 text-[10px]">
+                    <div className={`w-2 h-2 rounded-full ${item.color}`} />
+                    <span className="truncate">{item.name}</span>
+                  </div>
+                ))}
+              </div>
+            </Card>
           </div>
-        </Card>
+
+          {cfData && (
+            <Card className="p-6">
+              <h3 className="font-bold text-lg mb-6 flex items-center gap-2">
+                <RefreshCw className="w-5 h-5 text-indigo-500" />
+                ملخص التدفقات النقدية (الأنشطة)
+              </h3>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div className="p-4 bg-emerald-500/5 rounded-2xl border border-emerald-500/10">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Zap className="w-4 h-4 text-emerald-500" />
+                    <span className="text-sm font-bold">التشغيلية</span>
+                  </div>
+                  <div className="text-xl font-black text-emerald-600">{cfData.operating.net_operating.toLocaleString()} {currency}</div>
+                  <p className="text-[10px] text-muted-foreground mt-1">صافي النقد من العمليات اليومية</p>
+                </div>
+
+                <div className="p-4 bg-blue-500/5 rounded-2xl border border-blue-500/10">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Landmark className="w-4 h-4 text-blue-500" />
+                    <span className="text-sm font-bold">الاستثمارية</span>
+                  </div>
+                  <div className="text-xl font-black text-blue-600">{cfData.investing.net_investing.toLocaleString()} {currency}</div>
+                  <p className="text-[10px] text-muted-foreground mt-1">شراء وبيع الأصول الثابتة</p>
+                </div>
+
+                <div className="p-4 bg-purple-500/5 rounded-2xl border border-purple-500/10">
+                  <div className="flex items-center gap-2 mb-2">
+                    <DollarSign className="w-4 h-4 text-purple-500" />
+                    <span className="text-sm font-bold">التمويلية</span>
+                  </div>
+                  <div className="text-xl font-black text-purple-600">{cfData.financing.net_financing.toLocaleString()} {currency}</div>
+                  <p className="text-[10px] text-muted-foreground mt-1">القروض ورأس المال</p>
+                </div>
+              </div>
+              <div className="mt-6 pt-6 border-t flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-muted-foreground">صافي التغير النقدي للفترة</p>
+                  <p className={`text-2xl font-black ${cfData.net_change >= 0 ? 'text-emerald-500' : 'text-red-500'}`}>
+                    {cfData.net_change.toLocaleString()} {currency}
+                  </p>
+                </div>
+                <div className="text-right">
+                  <p className="text-sm text-muted-foreground">الرصيد النقدي النهائي</p>
+                  <p className="text-2xl font-black text-primary">{cfData.closing_cash.toLocaleString()} {currency}</p>
+                </div>
+              </div>
+            </Card>
+          )}
+        </div>
       )}
+
+
     </div>
   );
 
@@ -324,40 +490,81 @@ export default function EnhancedReportsHub({ restaurantId, currency }: Props) {
   );
 
   const renderSalesAnalysis = () => (
-    <div className="space-y-4">
-      <Card className="p-6 text-center">
-        <TrendingUp className="w-16 h-16 text-muted-foreground/30 mx-auto mb-4" />
-        <h3 className="text-xl font-bold mb-2">تحليل المبيعات</h3>
-        <p className="text-muted-foreground">يعرض هذا القسم تحليلاً تفصيلياً للمبيعات حسب:</p>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-4 text-sm">
-          <div className="p-3 bg-muted/30 rounded-lg">الوقت (يوم/أسبوع/شهر)</div>
-          <div className="p-3 bg-muted/30 rounded-lg">المنتجات والأصناف</div>
-          <div className="p-3 bg-muted/30 rounded-lg">العملاء</div>
-          <div className="p-3 bg-muted/30 rounded-lg">فئات الأسعار</div>
-        </div>
-        <Button className="mt-6 gradient-bg" onClick={() => window.location.href = '/dashboard?tab=analytics'}>
-          الذهاب لتحليل المبيعات
-        </Button>
-      </Card>
+    <div className="space-y-6">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <Card className="p-6">
+          <h3 className="font-bold text-lg mb-4">أفضل المنتجات مبيعاً</h3>
+          <div className="space-y-4">
+            {topProducts.length > 0 ? topProducts.map((product, idx) => (
+              <div key={idx} className="flex items-center justify-between p-3 bg-secondary/50 rounded-xl">
+                <div className="flex items-center gap-3">
+                  <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center font-bold text-primary">
+                    {idx + 1}
+                  </div>
+                  <div>
+                    <p className="font-bold text-sm">{product.name}</p>
+                    <p className="text-xs text-muted-foreground">{product.qty} وحدة مباعة</p>
+                  </div>
+                </div>
+                <div className="text-right">
+                  <p className="font-bold text-emerald-600">{product.revenue.toLocaleString()} {currency}</p>
+                </div>
+              </div>
+            )) : (
+              <div className="text-center py-10 text-muted-foreground">لا توجد بيانات مبيعات للفترة المختارة</div>
+            )}
+          </div>
+        </Card>
+
+        <Card className="p-6">
+          <h3 className="font-bold text-lg mb-4">توزيع المبيعات</h3>
+          <div className="h-64 flex items-center justify-center">
+            <RePieChart width={300} height={250}>
+              <Pie
+                data={topProducts}
+                cx="50%"
+                cy="50%"
+                innerRadius={60}
+                outerRadius={80}
+                paddingAngle={5}
+                dataKey="revenue"
+              >
+                {topProducts.map((entry, index) => (
+                  <Cell key={`cell-${index}`} fill={['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6'][index % 5]} />
+                ))}
+              </Pie>
+              <Tooltip />
+            </RePieChart>
+          </div>
+        </Card>
+      </div>
     </div>
   );
 
+
   const renderInventoryAnalysis = () => (
-    <div className="space-y-4">
+    <div className="space-y-6">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <Card className="p-4 bg-blue-500/10 border-blue-500/20">
+          <p className="text-xs text-muted-foreground mb-1">قيمة المخزون الإجمالية</p>
+          <p className="text-2xl font-black text-blue-600">{bsData?.assets.current.inventory.toLocaleString() || 0} {currency}</p>
+        </Card>
+        <Card className="p-4 bg-emerald-500/10 border-emerald-500/20">
+          <p className="text-xs text-muted-foreground mb-1">معدل دوران المخزون</p>
+          <p className="text-2xl font-black text-emerald-600">{indicators?.efficiency.inventory_turnover.toFixed(2) || 0} مرة</p>
+        </Card>
+        <Card className="p-4 bg-amber-500/10 border-amber-500/20">
+          <p className="text-xs text-muted-foreground mb-1">أيام المخزون (DSI)</p>
+          <p className="text-2xl font-black text-amber-600">{indicators?.efficiency.days_inventory.toFixed(0) || 0} يوم</p>
+        </Card>
+      </div>
+      
       <Card className="p-6 text-center">
         <Boxes className="w-16 h-16 text-muted-foreground/30 mx-auto mb-4" />
         <h3 className="text-xl font-bold mb-2">تحليل المخزون والتكاليف</h3>
-        <p className="text-muted-foreground">يعرض هذا القسم:</p>
-        <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mt-4 text-sm">
-          <div className="p-3 bg-muted/30 rounded-lg">قيمة المخزون</div>
-          <div className="p-3 bg-muted/30 rounded-lg">معدل الدوران</div>
-          <div className="p-3 bg-muted/30 rounded-lg">تكلفة البضاعة المباعة</div>
-          <div className="p-3 bg-muted/30 rounded-lg">الأصناف الراكدة</div>
-          <div className="p-3 bg-muted/30 rounded-lg">نقطة إعادة الطلب</div>
-          <div className="p-3 bg-muted/30 rounded-lg">هامش الربح</div>
-        </div>
-        <Button className="mt-6 gradient-bg" onClick={() => window.location.href = '/dashboard?tab=inventory'}>
-          الذهاب لإدارة المخزون
+        <p className="text-muted-foreground">معدل التكلفة الإجمالي للفترة: {plData?.cogs.total.toLocaleString()} {currency}</p>
+        <Button className="mt-6 gradient-bg" onClick={() => onNavigate('inventory')}>
+          الذهاب لإدارة المخزون التفصيلية
         </Button>
       </Card>
     </div>
