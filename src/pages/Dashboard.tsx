@@ -816,7 +816,8 @@ export default function Dashboard() {
              const clientOrderId = `${restaurant!.id}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
              
              const cartItems = cart.map(c => ({
-               menu_item_id: c.item.id,
+               menu_item_id: (c.item as any).product_id ? null : c.item.id,
+               product_id: (c.item as any).product_id || null,
                menu_item_name: c.item.name,
                menu_item_image: c.item.image,
                quantity: c.qty,
@@ -849,7 +850,8 @@ export default function Dashboard() {
         const clientOrderId = `${restaurant!.id}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
         
         const cartItems = cart.map(c => ({
-          menu_item_id: c.item.id,
+          menu_item_id: (c.item as any).product_id ? null : c.item.id,
+          product_id: (c.item as any).product_id || null,
           menu_item_name: c.item.name,
           menu_item_image: c.item.image,
           quantity: c.qty,

@@ -241,6 +241,13 @@ import type { BusinessType } from './businessTypes';
 export async function syncPendingData(): Promise<{ synced: number; errors: number }> {
   let synced = 0, errors = 0;
 
+  // Session Validation: Prevent flood of RLS errors if token expired while offline
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session) {
+    console.warn("Offline sync aborted: No active session. User must re-authenticate.");
+    return { synced: 0, errors: 0 };
+  }
+
   const orders = await getPendingOrders();
   for (const po of orders) {
     const meta = await getSyncMeta(po.id);
@@ -290,12 +297,19 @@ export async function syncPendingData(): Promise<{ synced: number; errors: numbe
         unit_factor: item.unit_factor || 1,
         cost_price_snapshot: item.cost_price_snapshot || 0,
       }));
-      const { data: items } = await supabase.from('order_items').insert(itemsWithOrderId).select();
+      const { data: items, error: itemsError } = await supabase.from('order_items').insert(itemsWithOrderId).select();
+      
+      if (itemsError) {
+        // Rollback the order to prevent corrupted (empty) orders in the DB
+        await supabase.from('orders').delete().eq('id', order.id);
+        throw new Error(`فشل إدخال عناصر الطلب: ${itemsError.message}`);
+      }
       
       try {
-        const { data: rest } = await supabase.from('restaurants').select('business_type').eq('id', order.restaurant_id).single();
+        const { data: rest } = await supabase.from('restaurants').select('business_type, currency').eq('id', order.restaurant_id).single();
         const businessType = (rest?.business_type || 'restaurant') as BusinessType;
         
+        await journalService.ensureAccountingSetup(order.restaurant_id, rest?.currency || 'ج.م');
         await journalService.createSaleJournalEntry(
           order.restaurant_id,
           { ...order, items: (items || []) as OrderItem[] } as Order,
@@ -417,6 +431,9 @@ export async function syncPendingData(): Promise<{ synced: number; errors: numbe
 export async function forceSyncPendingData(): Promise<{ synced: number; errors: number }> {
   let synced = 0, errors = 0;
 
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session) return { synced: 0, errors: 0 };
+
   const orders = await getPendingOrders();
   for (const po of orders) {
     try {
@@ -449,12 +466,18 @@ export async function forceSyncPendingData(): Promise<{ synced: number; errors: 
         unit_factor: item.unit_factor || 1,
         cost_price_snapshot: item.cost_price_snapshot || 0,
       }));
-      await supabase.from('order_items').insert(itemsWithOrderId).select();
+      const { data: items, error: itemsError } = await supabase.from('order_items').insert(itemsWithOrderId).select();
+      
+      if (itemsError) {
+        await supabase.from('orders').delete().eq('id', order.id);
+        throw new Error(`فشل إدخال عناصر الطلب: ${itemsError.message}`);
+      }
       
       try {
-        const { data: rest } = await supabase.from('restaurants').select('business_type').eq('id', order.restaurant_id).single();
+        const { data: rest } = await supabase.from('restaurants').select('business_type, currency').eq('id', order.restaurant_id).single();
         const businessType = (rest?.business_type || 'restaurant') as BusinessType;
-        await journalService.createSaleJournalEntry(order.restaurant_id, order as Order, businessType, 0, 0);
+        await journalService.ensureAccountingSetup(order.restaurant_id, rest?.currency || 'ج.م');
+        await journalService.createSaleJournalEntry(order.restaurant_id, { ...order, items: (items || []) as OrderItem[] } as Order, businessType, 0, 0);
       } catch (accErr) {
         console.error("Accounting sync error:", accErr);
       }
