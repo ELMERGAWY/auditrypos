@@ -32,6 +32,7 @@ import {
 interface Props {
   restaurantId: string;
   currency: string;
+  onNavigate?: (tab: string) => void;
 }
 
 type ReportCategory = 'overview' | 'financial' | 'sales' | 'inventory' | 'customers' | 'kpi';
@@ -46,7 +47,7 @@ interface QuickStat {
 
 const COLORS = ['#3b82f6', '#f59e0b', '#10b981', '#ef4444', '#8b5cf6', '#6b7280'];
 
-export default function AuditryIntelligenceV3({ restaurantId, currency }: Props) {
+export default function AuditryIntelligenceV3({ restaurantId, currency, onNavigate }: Props) {
   const [inventoryStats, setInventoryStats] = useState<any>(null);
   const [expenseAnalysis, setExpenseAnalysis] = useState<any[]>([]);
   const [arAging, setArAging] = useState<any>(null);
@@ -349,28 +350,71 @@ export default function AuditryIntelligenceV3({ restaurantId, currency }: Props)
     </div>
   );
 
-  const renderFinancialReports = () => (
-    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-      {[
-        { title: 'قائمة الدخل', icon: TrendingUp, color: 'bg-emerald-500' },
-        { title: 'الميزانية العمومية', icon: Scale, color: 'bg-blue-500' },
-        { title: 'التدفقات النقدية', icon: Wallet, color: 'bg-purple-500' },
-        { title: 'ميزان المراجعة', icon: Layers, color: 'bg-amber-500' },
-        { title: 'دفتر الأستاذ', icon: FileText, color: 'bg-cyan-500' },
-        { title: 'الحسابات الختامية', icon: Calculator, color: 'bg-rose-500' },
-        { title: 'ملخص الضرائب', icon: CreditCard, color: 'bg-orange-500' },
-        { title: 'تقارير VAT', icon: Zap, color: 'bg-indigo-500' },
-      ].map((report, idx) => (
-        <Card key={idx} className="p-4 cursor-pointer hover:border-primary/30 transition-all group" onClick={() => toast.info(`جاري الانتقال لـ ${report.title}...`)}>
-          <div className={`w-10 h-10 rounded-xl ${report.color} flex items-center justify-center mb-3 group-hover:scale-110 transition-transform`}>
-            <report.icon className="w-5 h-5 text-white" />
-          </div>
-          <h3 className="font-bold text-sm mb-1">{report.title}</h3>
-          <p className="text-[10px] text-muted-foreground">عرض التفاصيل والتحليلات</p>
-        </Card>
-      ))}
-    </div>
-  );
+  const renderFinancialReports = () => {
+    const handleNavigation = (reportTitle: string) => {
+      let mainTab = 'financials';
+      let subTab = '';
+
+      switch (reportTitle) {
+        case 'قائمة الدخل':
+        case 'الحسابات الختامية':
+          subTab = 'trading';
+          break;
+        case 'الميزانية العمومية':
+          subTab = 'balance_sheet';
+          break;
+        case 'التدفقات النقدية':
+          subTab = 'cash_flow';
+          break;
+        case 'ميزان المراجعة':
+          subTab = 'trial_balance';
+          break;
+        case 'دفتر الأستاذ':
+          subTab = 'ledger';
+          break;
+        case 'ملخص الضرائب':
+        case 'تقارير VAT':
+          mainTab = 'reports'; // Or wherever tax reports belong
+          toast.info(`جاري العمل على ${reportTitle} قريباً`);
+          return;
+        default:
+          subTab = 'overview';
+      }
+
+      toast.success(`جاري الانتقال إلى ${reportTitle}...`);
+      sessionStorage.setItem('financial_active_tab', subTab);
+      if (onNavigate) {
+        onNavigate(mainTab);
+      }
+    };
+
+    return (
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+        {[
+          { title: 'قائمة الدخل', icon: TrendingUp, color: 'bg-emerald-500' },
+          { title: 'الميزانية العمومية', icon: Scale, color: 'bg-blue-500' },
+          { title: 'التدفقات النقدية', icon: Wallet, color: 'bg-purple-500' },
+          { title: 'ميزان المراجعة', icon: Layers, color: 'bg-amber-500' },
+          { title: 'دفتر الأستاذ', icon: FileText, color: 'bg-cyan-500' },
+          { title: 'الحسابات الختامية', icon: Calculator, color: 'bg-rose-500' },
+          { title: 'ملخص الضرائب', icon: CreditCard, color: 'bg-orange-500' },
+          { title: 'تقارير VAT', icon: Zap, color: 'bg-indigo-500' },
+        ].map((report, idx) => (
+          <Card 
+            key={idx} 
+            className="p-4 cursor-pointer hover:border-primary/30 transition-all group" 
+            onClick={() => handleNavigation(report.title)}
+          >
+            <div className={`w-10 h-10 rounded-xl ${report.color} flex items-center justify-center mb-3 group-hover:scale-110 transition-transform`}>
+              <report.icon className="w-5 h-5 text-white" />
+            </div>
+            <h3 className="font-bold text-sm mb-1">{report.title}</h3>
+            <p className="text-[10px] text-muted-foreground">عرض التفاصيل والتحليلات</p>
+          </Card>
+        ))}
+      </div>
+    );
+  };
 
   const renderSalesAnalysis = () => (
     <div className="space-y-6">

@@ -26,7 +26,14 @@ interface Props {
 }
 
 export function FinancialsTab({ restaurantId, currency }: Props) {
-  const [activeTab, setActiveTab] = useState<FinancialTab>('overview');
+  const [activeTab, setActiveTab] = useState<FinancialTab>(() => {
+    const saved = sessionStorage.getItem('financial_active_tab');
+    if (saved) {
+      sessionStorage.removeItem('financial_active_tab');
+      return saved as FinancialTab;
+    }
+    return 'overview';
+  });
   const [orders, setOrders] = useState<any[]>([]);
   const [orderItems, setOrderItems] = useState<any[]>([]);
   const [expenses, setExpenses] = useState<any[]>([]);

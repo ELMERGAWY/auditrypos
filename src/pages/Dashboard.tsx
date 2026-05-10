@@ -1398,12 +1398,12 @@ export default function Dashboard() {
             {activeTab === 'stats' && (
               <ModuleErrorBoundary moduleName="الإحصائيات">
                 <div className="p-4 h-full">
-                  <AdvancedReportsHub restaurantId={restaurant!.id} currency={currency} />
+                  <AdvancedReportsHub restaurantId={restaurant!.id} currency={currency} onNavigate={(t) => setActiveTab(t as any)} />
                 </div>
               </ModuleErrorBoundary>
             )}
             
-            {activeTab === 'analytics' && <AdvancedReportsHub restaurantId={restaurant!.id} currency={currency} />}
+            {activeTab === 'analytics' && <AdvancedReportsHub restaurantId={restaurant!.id} currency={currency} onNavigate={(t) => setActiveTab(t as any)} />}
             
             {activeTab === 'ai_assistant' && (
               <ModuleErrorBoundary moduleName="مساعد المحاسب (AI)">
