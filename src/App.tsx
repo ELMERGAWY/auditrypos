@@ -7,6 +7,7 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "@/lib/AuthContext";
 import { RefreshCcw } from "lucide-react";
 import { GlobalCommandPalette } from "@/components/GlobalCommandPalette";
+import { SystemUpdater } from "@/components/SystemUpdater";
 
 const Index = lazy(() => import("./pages/Index"));
 const Login = lazy(() => import("./pages/Login"));
@@ -53,6 +54,7 @@ const App = () => (
             </Routes>
           </Suspense>
           <GlobalCommandPalette />
+          <SystemUpdater />
         </BrowserRouter>
       </TooltipProvider>
     </AuthProvider>
