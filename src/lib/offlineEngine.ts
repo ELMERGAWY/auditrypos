@@ -1,8 +1,8 @@
 // Offline-First Engine: Cache data locally & sync when online
 
 const DB_NAME = 'smartpos_offline';
-const DB_VERSION = 2;
-const STORES = ['pendingOrders', 'pendingStatusUpdates', 'pendingTransactions', 'cachedData'] as const;
+const DB_VERSION = 3;
+const STORES = ['pendingOrders', 'pendingStatusUpdates', 'pendingTransactions', 'cachedData', 'syncMeta'] as const;
 
 function isIndexedDbAvailable() {
   return typeof window !== 'undefined' && typeof indexedDB !== 'undefined';
@@ -26,6 +26,68 @@ function openDB(): Promise<IDBDatabase> {
     req.onsuccess = () => resolve(req.result);
     req.onerror = () => reject(req.error);
   });
+}
+
+// ─── Sync Metadata ───
+export interface SyncMeta {
+  id: string;
+  retryCount: number;
+  lastAttempt: number;
+  lastError?: string;
+}
+
+export interface SyncStatus {
+  pendingOrders: number;
+  pendingUpdates: number;
+  pendingTransactions: number;
+  lastSync: number | null;
+  isSyncing: boolean;
+}
+
+async function getSyncMeta(id: string): Promise<SyncMeta | null> {
+  try {
+    const db = await openDB();
+    const tx = db.transaction('syncMeta', 'readonly');
+    const req = tx.objectStore('syncMeta').get(id);
+    return new Promise(res => { req.onsuccess = () => res(req.result ?? null); req.onerror = () => res(null); });
+  } catch { return null; }
+}
+
+async function updateSyncMeta(id: string, meta: Partial<SyncMeta> & { id: string }) {
+  try {
+    const db = await openDB();
+    const tx = db.transaction('syncMeta', 'readwrite');
+    const store = tx.objectStore('syncMeta');
+    const existing = await new Promise<SyncMeta | null>(res => {
+      const req = store.get(id);
+      req.onsuccess = () => res(req.result ?? null);
+      req.onerror = () => res(null);
+    });
+    store.put({ ...existing, ...meta });
+  } catch {}
+}
+
+async function removeSyncMeta(id: string) {
+  try {
+    const db = await openDB();
+    const tx = db.transaction('syncMeta', 'readwrite');
+    tx.objectStore('syncMeta').delete(id);
+  } catch {}
+}
+
+// Exponential backoff calculator
+function getBackoffDelay(retryCount: number): number {
+  const baseDelay = 1000;
+  const maxDelay = 60000;
+  const delay = Math.min(baseDelay * Math.pow(2, retryCount), maxDelay);
+  return delay + Math.random() * 1000;
+}
+
+// Check if should retry based on backoff
+function shouldRetry(meta: SyncMeta | null): boolean {
+  if (!meta) return true;
+  const delay = getBackoffDelay(meta.retryCount);
+  return Date.now() - meta.lastAttempt >= delay;
 }
 
 // ─── Pending Orders Queue ───
@@ -59,6 +121,7 @@ export async function removePendingOrder(id: string) {
   const db = await openDB();
   const tx = db.transaction('pendingOrders', 'readwrite');
   tx.objectStore('pendingOrders').delete(id);
+  await removeSyncMeta(id);
 }
 
 // ─── Pending Status Updates Queue ───
@@ -90,6 +153,7 @@ export async function removePendingStatusUpdate(id: string) {
   const db = await openDB();
   const tx = db.transaction('pendingStatusUpdates', 'readwrite');
   tx.objectStore('pendingStatusUpdates').delete(id);
+  await removeSyncMeta(id);
 }
 
 // ─── Pending Transactions Queue (General ERP) ───
@@ -115,7 +179,7 @@ export async function getPendingTransactions(): Promise<PendingTransaction[]> {
     const db = await openDB();
     const tx = db.transaction('pendingTransactions', 'readonly');
     const req = tx.objectStore('pendingTransactions').getAll();
-    return await new Promise((res) => { req.onsuccess = () => res(req.result); req.onerror = () => res([]); });
+    return new Promise((res) => { req.onsuccess = () => res(req.result); req.onerror = () => res([]); });
   } catch { return []; }
 }
 
@@ -124,6 +188,7 @@ export async function removePendingTransaction(id: string) {
     const db = await openDB();
     const tx = db.transaction('pendingTransactions', 'readwrite');
     tx.objectStore('pendingTransactions').delete(id);
+    await removeSyncMeta(id);
   } catch {}
 }
 
@@ -148,6 +213,25 @@ export async function getCachedData<T>(key: string): Promise<T | null> {
   } catch { return null; }
 }
 
+// Get current sync status
+export async function getSyncStatus(): Promise<SyncStatus> {
+  const [orders, updates, transactions] = await Promise.all([
+    getPendingOrders(),
+    getPendingStatusUpdates(),
+    getPendingTransactions()
+  ]);
+  
+  const lastSync = await getCachedData<number>('lastSyncTime');
+  
+  return {
+    pendingOrders: orders.length,
+    pendingUpdates: updates.length,
+    pendingTransactions: transactions.length,
+    lastSync: lastSync,
+    isSyncing: false
+  };
+}
+
 // ─── Sync Engine ───
 import { supabase } from '@/integrations/supabase/client';
 import { journalService } from './accounting/journalService';
@@ -157,22 +241,194 @@ import type { BusinessType } from './businessTypes';
 export async function syncPendingData(): Promise<{ synced: number; errors: number }> {
   let synced = 0, errors = 0;
 
-  // Sync pending orders
-  const pendingOrders = await getPendingOrders();
-  for (const po of pendingOrders) {
+  const orders = await getPendingOrders();
+  for (const po of orders) {
+    const meta = await getSyncMeta(po.id);
+    
+    if (!shouldRetry(meta)) {
+      continue;
+    }
+    
     try {
-      // Use client_order_id for deduplication
+      await updateSyncMeta(po.id, { id: po.id, retryCount: meta?.retryCount ?? 0, lastAttempt: Date.now() });
+      
       const clientOrderId = po.orderData.client_order_id || po.id;
       const orderPayload = { ...po.orderData, client_order_id: clientOrderId };
 
-      // Check if already synced (dedup)
       const { data: existing } = await supabase.from('orders')
         .select('id')
         .eq('client_order_id', clientOrderId)
         .limit(1);
 
       if (existing && existing.length > 0) {
-        // Already synced, just remove local copy
+        await removePendingOrder(po.id);
+        synced++;
+        continue;
+      }
+
+      const { data: order, error } = await supabase.from('orders').insert(orderPayload as any).select().single();
+      if (error || !order) { 
+        await updateSyncMeta(po.id, { 
+          id: po.id, 
+          retryCount: (meta?.retryCount ?? 0) + 1, 
+          lastAttempt: Date.now(),
+          lastError: error?.message || 'Insert failed'
+        });
+        errors++; 
+        continue; 
+      }
+      
+      const itemsWithOrderId = po.items.map(item => ({
+        order_id: order.id,
+        menu_item_name: item.menu_item_name as string,
+        menu_item_image: item.menu_item_image as string,
+        quantity: item.quantity as number,
+        price: item.price as number,
+        menu_item_id: item.menu_item_id || null,
+        product_id: item.product_id || null,
+        sold_unit: item.sold_unit || '',
+        unit_factor: item.unit_factor || 1,
+        cost_price_snapshot: item.cost_price_snapshot || 0,
+      }));
+      const { data: items } = await supabase.from('order_items').insert(itemsWithOrderId).select();
+      
+      try {
+        const { data: rest } = await supabase.from('restaurants').select('business_type').eq('id', order.restaurant_id).single();
+        const businessType = (rest?.business_type || 'restaurant') as BusinessType;
+        
+        await journalService.createSaleJournalEntry(
+          order.restaurant_id,
+          { ...order, items: (items || []) as OrderItem[] } as Order,
+          businessType,
+          0,
+          0
+        );
+      } catch (accErr) {
+        console.error("Accounting sync error:", accErr);
+      }
+
+      await removePendingOrder(po.id);
+      synced++;
+    } catch (e: any) {
+      await updateSyncMeta(po.id, { 
+        id: po.id, 
+        retryCount: (meta?.retryCount ?? 0) + 1, 
+        lastAttempt: Date.now(),
+        lastError: e.message || 'Unknown error'
+      });
+      errors++;
+    }
+  }
+
+  // Sync pending status updates
+  const pendingUpdates = await getPendingStatusUpdates();
+  for (const pu of pendingUpdates) {
+    const meta = await getSyncMeta(pu.id);
+    
+    if (!shouldRetry(meta)) {
+      continue;
+    }
+    
+    try {
+      await updateSyncMeta(pu.id, { id: pu.id, retryCount: meta?.retryCount ?? 0, lastAttempt: Date.now() });
+      
+      const { error } = await supabase.from('orders').update({ status: pu.status }).eq('id', pu.orderId);
+      if (!error) {
+        await removePendingStatusUpdate(pu.id);
+        synced++;
+      } else {
+        await updateSyncMeta(pu.id, { 
+          id: pu.id, 
+          retryCount: (meta?.retryCount ?? 0) + 1, 
+          lastAttempt: Date.now(),
+          lastError: error.message
+        });
+        errors++;
+      }
+    } catch (e: any) {
+      await updateSyncMeta(pu.id, { 
+        id: pu.id, 
+        retryCount: (meta?.retryCount ?? 0) + 1, 
+        lastAttempt: Date.now(),
+        lastError: e.message || 'Unknown error'
+      });
+      errors++;
+    }
+  }
+
+  // Sync pending ERP transactions
+  const pendingTxs = await getPendingTransactions();
+  for (const ptx of pendingTxs) {
+    const meta = await getSyncMeta(ptx.id);
+    
+    if (!shouldRetry(meta)) {
+      continue;
+    }
+    
+    try {
+      await updateSyncMeta(ptx.id, { id: ptx.id, retryCount: meta?.retryCount ?? 0, lastAttempt: Date.now() });
+      
+      let success = false;
+      switch (ptx.type) {
+        case 'expense':
+          const { error: expErr } = await supabase.from('expenses').insert(ptx.payload);
+          if (!expErr) success = true;
+          break;
+        case 'crm_log':
+          const { error: crmErr } = await supabase.from('crm_communication_logs').insert(ptx.payload);
+          if (!crmErr) success = true;
+          break;
+        case 'sales_order':
+          const { error: soErr } = await supabase.from('orders').insert(ptx.payload);
+          if (!soErr) success = true;
+          break;
+      }
+      if (success) {
+        await removePendingTransaction(ptx.id);
+        synced++;
+      } else {
+        await updateSyncMeta(ptx.id, { 
+          id: ptx.id, 
+          retryCount: (meta?.retryCount ?? 0) + 1, 
+          lastAttempt: Date.now(),
+          lastError: 'Insert failed'
+        });
+        errors++;
+      }
+    } catch (e: any) {
+      await updateSyncMeta(ptx.id, { 
+        id: ptx.id, 
+        retryCount: (meta?.retryCount ?? 0) + 1, 
+        lastAttempt: Date.now(),
+        lastError: e.message || 'Unknown error'
+      });
+      errors++;
+    }
+  }
+
+  if (synced > 0) {
+    await cacheData('lastSyncTime', Date.now());
+  }
+
+  return { synced, errors };
+}
+
+// Force sync - ignore backoff and retry all pending
+export async function forceSyncPendingData(): Promise<{ synced: number; errors: number }> {
+  let synced = 0, errors = 0;
+
+  const orders = await getPendingOrders();
+  for (const po of orders) {
+    try {
+      const clientOrderId = po.orderData.client_order_id || po.id;
+      const orderPayload = { ...po.orderData, client_order_id: clientOrderId };
+
+      const { data: existing } = await supabase.from('orders')
+        .select('id')
+        .eq('client_order_id', clientOrderId)
+        .limit(1);
+
+      if (existing && existing.length > 0) {
         await removePendingOrder(po.id);
         synced++;
         continue;
@@ -193,21 +449,12 @@ export async function syncPendingData(): Promise<{ synced: number; errors: numbe
         unit_factor: item.unit_factor || 1,
         cost_price_snapshot: item.cost_price_snapshot || 0,
       }));
-      const { data: items } = await supabase.from('order_items').insert(itemsWithOrderId).select();
+      await supabase.from('order_items').insert(itemsWithOrderId).select();
       
-      // CREATE ACCOUNTING JOURNAL ENTRY FOR SYNCED ORDER
       try {
-        // Fetch restaurant to get business type
         const { data: rest } = await supabase.from('restaurants').select('business_type').eq('id', order.restaurant_id).single();
         const businessType = (rest?.business_type || 'restaurant') as BusinessType;
-        
-        await journalService.createSaleJournalEntry(
-          order.restaurant_id,
-          { ...order, items: (items || []) as OrderItem[] } as Order,
-          businessType,
-          0, // COGS can be calculated if needed, using 0 for simple sync
-          0  // Tax can be extracted if needed
-        );
+        await journalService.createSaleJournalEntry(order.restaurant_id, order as Order, businessType, 0, 0);
       } catch (accErr) {
         console.error("Accounting sync error:", accErr);
       }
@@ -217,7 +464,7 @@ export async function syncPendingData(): Promise<{ synced: number; errors: numbe
     } catch { errors++; }
   }
 
-  // Sync pending status updates
+  // Force sync status updates
   const pendingUpdates = await getPendingStatusUpdates();
   for (const pu of pendingUpdates) {
     try {
@@ -229,7 +476,7 @@ export async function syncPendingData(): Promise<{ synced: number; errors: numbe
     } catch { errors++; }
   }
 
-  // Sync pending ERP transactions
+  // Force sync transactions
   const pendingTxs = await getPendingTransactions();
   for (const ptx of pendingTxs) {
     try {
@@ -253,6 +500,10 @@ export async function syncPendingData(): Promise<{ synced: number; errors: numbe
         synced++;
       } else { errors++; }
     } catch { errors++; }
+  }
+
+  if (synced > 0) {
+    await cacheData('lastSyncTime', Date.now());
   }
 
   return { synced, errors };

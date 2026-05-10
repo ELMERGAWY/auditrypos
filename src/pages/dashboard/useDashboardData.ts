@@ -27,7 +27,7 @@ export function useDashboardData() {
   const navigate = useNavigate();
   const { user: supabaseUser, lastKnownUser, signOut, loading: authLoading } = useAuth();
   const user = supabaseUser || lastKnownUser;
-  const isOnline = useOnlineStatus();
+  const { isOnline, wasOffline, justBack } = useOnlineStatus();
   const playOrderSound = useOrderNotificationSound();
   const playWaiterSound = useWaiterCallSound();
 
@@ -268,43 +268,68 @@ export function useDashboardData() {
   // Realtime: waiter calls + agent locations + new orders + notifications
   useEffect(() => {
     if (!restaurant || !isOnline) return;
-    const channel = supabase
-      .channel('realtime-dashboard')
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'waiter_calls', filter: `restaurant_id=eq.${restaurant.id}` },
-        (payload) => {
-          setWaiterCalls(prev => [payload.new as WaiterCall, ...prev]);
-          if (soundEnabled) playWaiterSound();
-          toast.info('🔔 استدعاء ويتر جديد!', { duration: 5000 });
-        }
-      )
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'orders', filter: `restaurant_id=eq.${restaurant.id}` },
-        async (payload) => {
-          const { data: items } = await supabase.from('order_items').select('*').eq('order_id', payload.new.id);
-          const newOrder = { ...payload.new, items: (items || []) as OrderItem[] } as unknown as Order;
-          setOrders(prev => [newOrder, ...prev]);
-          if (soundEnabled) playOrderSound();
-          toast.success(`🆕 طلب جديد #${(payload.new as any).order_number?.slice(-4)}`, { duration: 5000 });
-        }
-      )
-      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'delivery_agents', filter: `restaurant_id=eq.${restaurant.id}` },
-        (payload) => {
-          setAgents(prev => prev.map(a => a.id === payload.new.id ? payload.new as DeliveryAgent : a));
-        }
-      )
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'notifications', filter: `restaurant_id=eq.${restaurant.id}` },
-        (payload) => {
-          const n = payload.new as any;
-          if (n.target_type === 'owner') {
-            if (soundEnabled) playOrderSound();
-            toast.info(n.title, { description: n.body, duration: 6000 });
+    
+    const setupChannel = () => {
+      const channel = supabase
+        .channel('realtime-dashboard')
+        .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'waiter_calls', filter: `restaurant_id=eq.${restaurant.id}` },
+          (payload) => {
+            setWaiterCalls(prev => [payload.new as WaiterCall, ...prev]);
+            if (soundEnabled) playWaiterSound();
+            toast.info('🔔 استدعاء ويتر جديد!', { duration: 5000 });
           }
-        }
-      )
-      .subscribe();
+        )
+        .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'orders', filter: `restaurant_id=eq.${restaurant.id}` },
+          async (payload) => {
+            const { data: items } = await supabase.from('order_items').select('*').eq('order_id', payload.new.id);
+            const newOrder = { ...payload.new, items: (items || []) as OrderItem[] } as unknown as Order;
+            setOrders(prev => [newOrder, ...prev]);
+            if (soundEnabled) playOrderSound();
+            toast.success(`🆕 طلب جديد #${(payload.new as any).order_number?.slice(-4)}`, { duration: 5000 });
+          }
+        )
+        .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'delivery_agents', filter: `restaurant_id=eq.${restaurant.id}` },
+          (payload) => {
+            setAgents(prev => prev.map(a => a.id === payload.new.id ? payload.new as DeliveryAgent : a));
+          }
+        )
+        .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'notifications', filter: `restaurant_id=eq.${restaurant.id}` },
+          (payload) => {
+            const n = payload.new as any;
+            if (n.target_type === 'owner') {
+              if (soundEnabled) playOrderSound();
+              toast.info(n.title, { description: n.body, duration: 6000 });
+            }
+          }
+        )
+        .subscribe();
+      return channel;
+    };
+    
+    const channel = setupChannel();
+    
+    // Reconnect on network restore
+    if (justBack) {
+      toast.info('🔄 جاري إعادة الاتصال realtime...');
+      supabase.removeChannel(channel);
+      setupChannel();
+    }
+    
     return () => { supabase.removeChannel(channel); };
-  }, [restaurant, isOnline, soundEnabled, playOrderSound, playWaiterSound]);
+  }, [restaurant, isOnline, soundEnabled, playOrderSound, playWaiterSound, justBack]);
 
   const handleLogout = async () => { await signOut(); navigate('/'); };
+
+  // Auto-sync and reconnect realtime when network is restored
+  useEffect(() => {
+    if (justBack && user) {
+      toast.info('🔄 تم استعادة الاتصال - جاري المزامنة...');
+      syncPendingData().then(({ synced, errors }) => {
+        if (synced > 0) toast.success(`✅ تمت مزامنة ${synced} عمليات`);
+        if (errors > 0) toast.error(`⚠️ فشلت ${errors} عمليات`);
+      });
+    }
+  }, [justBack, user]);
 
   return {
     user, authLoading, isOnline, restaurant, menuItems, setMenuItems,

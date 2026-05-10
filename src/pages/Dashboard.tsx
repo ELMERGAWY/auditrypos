@@ -102,16 +102,32 @@ export default function Dashboard() {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [syncStatus, setSyncStatus] = useState<{ synced: number; errors: number; lastSync: Date | null }>({ synced: 0, errors: 0, lastSync: null });
   const [isSyncing, setIsSyncing] = useState(false);
+  const [pendingCount, setPendingCount] = useState(0);
+
+  useEffect(() => {
+    const updatePendingCount = async () => {
+      try {
+        const { getSyncStatus } = await import('@/lib/offlineEngine');
+        const status = await getSyncStatus();
+        setPendingCount(status.pendingOrders + status.pendingUpdates + status.pendingTransactions);
+      } catch {}
+    };
+    updatePendingCount();
+    const interval = setInterval(updatePendingCount, 10000);
+    return () => clearInterval(interval);
+  }, []);
 
   useEffect(() => {
     const handleSync = async () => {
       if (isOnline && !isSyncing) {
         setIsSyncing(true);
         try {
-          const { syncPendingData } = await import('@/lib/offlineEngine');
+          const { syncPendingData, getSyncStatus } = await import('@/lib/offlineEngine');
           const result = await syncPendingData();
           setSyncStatus({ ...result, lastSync: new Date() });
           if (result.synced > 0) toast.success(`تم مزامنة ${result.synced} عمليات بنجاح`);
+          const status = await getSyncStatus();
+          setPendingCount(status.pendingOrders + status.pendingUpdates + status.pendingTransactions);
         } catch (err) {
           console.error('Sync failed:', err);
         } finally {
@@ -119,9 +135,28 @@ export default function Dashboard() {
         }
       }
     };
-    const interval = setInterval(handleSync, 30000); // Sync every 30s
+    const interval = setInterval(handleSync, 30000);
     return () => clearInterval(interval);
   }, [isOnline, isSyncing]);
+
+  const handleForceSync = async () => {
+    if (!isOnline) { toast.error('لا يوجد اتصال بالإنترنت'); return; }
+    if (isSyncing) { toast.info('جاري المزامنة...'); return; }
+    setIsSyncing(true);
+    try {
+      const { forceSyncPendingData, getSyncStatus } = await import('@/lib/offlineEngine');
+      const result = await forceSyncPendingData();
+      setSyncStatus({ ...result, lastSync: new Date() });
+      if (result.synced > 0) toast.success(`تم مزامنة ${result.synced} عمليات`);
+      if (result.errors > 0) toast.error(`فشلت ${result.errors} عمليات`);
+      const status = await getSyncStatus();
+      setPendingCount(status.pendingOrders + status.pendingUpdates + status.pendingTransactions);
+    } catch (err) {
+      toast.error('فشلت المزامنة');
+    } finally {
+      setIsSyncing(false);
+    }
+  };
 
   // POS State
   const [cart, setCart] = useState<{ item: MenuItem; qty: number; qtyText: string; unitMode: string }[]>([]);
@@ -1017,6 +1052,10 @@ export default function Dashboard() {
         onUpgrade={() => navigate('/payment')}
         isCollapsed={sidebarCollapsed}
         onToggleCollapse={() => setSidebarCollapsed(!sidebarCollapsed)}
+        pendingCount={pendingCount}
+        isSyncing={isSyncing}
+        syncStatus={syncStatus}
+        onForceSync={handleForceSync}
       />
 
       <div className={cn(
