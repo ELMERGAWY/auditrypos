@@ -41,11 +41,12 @@ const Payment = () => {
     await supabase.from('license_keys').update({ used: true, used_by: restaurantId, used_at: new Date().toISOString() }).eq('id', keyData.id);
 
     // Activate restaurant
+    const duration = keyData.duration || keyData.duration_days;
     const endDate = new Date();
-    endDate.setDate(endDate.getDate() + keyData.duration_days);
+    endDate.setDate(endDate.getDate() + duration);
     await supabase.from('restaurants').update({ status: 'active', subscription_end: endDate.toISOString(), license_key: licenseKey.trim() }).eq('id', restaurantId);
 
-    toast.success(`تم التفعيل بنجاح لمدة ${keyData.duration_days} يوم`);
+    toast.success(`تم التفعيل بنجاح لمدة ${duration} يوم`);
     navigate('/dashboard');
   };
 
