@@ -53,7 +53,8 @@ export function SalesInvoices({ restaurantId, currency }: Props) {
         .select('*')
         .eq('restaurant_id', restaurantId)
         .eq('status', 'completed')
-        .order('created_at', { ascending: false });
+        .order('created_at', { ascending: false })
+        .limit(500);
 
       if (error) throw error;
       setInvoices(data || []);
@@ -91,7 +92,8 @@ export function SalesInvoices({ restaurantId, currency }: Props) {
 
       if (orderError) throw orderError;
 
-      // 2. Create Journal Entry
+      // 2. Ensure Accounting & Create Journal Entry
+      await journalService.ensureAccountingSetup(restaurantId, currency);
       await journalService.createSaleJournalEntry(restaurantId, {
         ...order,
         items: [], // Manual invoice might not have line items in this simplified version
