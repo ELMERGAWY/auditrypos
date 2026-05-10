@@ -184,7 +184,7 @@ export default function EnhancedReportsHub({ restaurantId, currency }: Props) {
         ))}
       </div>
 
-      {indicators ? (
+      {indicators && (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <Card className="p-6 bg-gradient-to-br from-emerald-500/10 to-transparent border-emerald-500/20">
             <h3 className="font-bold text-lg mb-4 flex items-center gap-2">
