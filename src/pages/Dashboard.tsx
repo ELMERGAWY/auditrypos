@@ -915,14 +915,22 @@ export default function Dashboard() {
     const order = orders.find(o => o.id === orderId);
     if (!order) return;
     
-    // First cancel it (triggers stock restore) if not already cancelled
+    // First cancel it (triggers stock restore via DB trigger trg_restore_inventory_for_cancelled_order)
     if (order.status !== 'cancelled') {
-      await supabase.from('orders').update({ status: 'cancelled' }).eq('id', orderId);
+      const { error: cancelError } = await supabase.from('orders').update({ status: 'cancelled' }).eq('id', orderId);
+      if (cancelError) {
+        toast.error('خطأ في إرجاع المخزون');
+        return;
+      }
+      // Wait a moment for the DB trigger to finish restocking before deleting the items
+      await new Promise(resolve => setTimeout(resolve, 500));
     }
-    // Delete items then order
+    
+    // Delete items then order (The BEFORE DELETE trigger won't double-restock because items are deleted first)
     await supabase.from('order_items').delete().eq('order_id', orderId);
     const { error } = await supabase.from('orders').delete().eq('id', orderId);
     if (error) { toast.error('خطأ في حذف الطلب'); return; }
+    
     setOrders(prev => prev.filter(o => o.id !== orderId));
     toast.success('تم حذف الطلب وإرجاع الكميات للمخزون');
   };
