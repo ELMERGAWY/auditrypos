@@ -39,7 +39,7 @@ const StaffTab = lazy(() => import('./dashboard/StaffTab').then(m => ({ default:
 const NotificationsTab = lazy(() => import('./dashboard/NotificationsTab').then(m => ({ default: m.NotificationsTab })));
 const FinancialsTab = lazy(() => import('./dashboard/FinancialsTab').then(m => ({ default: m.FinancialsTab })));
 const OverheadManager = lazy(() => import('./dashboard/OverheadManager').then(m => ({ default: m.OverheadManager })));
-const AdvancedReportsHub = lazy(() => import('./dashboard/AdvancedReportsHub').then(m => ({ default: m.AdvancedReportsHub })));
+const AdvancedReportsHub = lazy(() => import('./dashboard/EnhancedReportsHub').then(m => ({ default: m.default || m.EnhancedReportsHub }));
 const AIAccountantUnified = lazy(() => import('./dashboard/AIAccountantUnified').then(m => ({ default: m.default })));
 const TreasuryTab = lazy(() => import('./dashboard/TreasuryTab').then(m => ({ default: m.TreasuryTab })));
 const ChartOfAccountsTab = lazy(() => import('./dashboard/ChartOfAccountsTab').then(m => ({ default: m.ChartOfAccountsTab })));
