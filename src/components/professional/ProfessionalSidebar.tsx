@@ -8,7 +8,7 @@ import {
   CalendarClock, Package, Users, Truck, Wallet, Store,
   UsersRound, DollarSign, Lock, ChevronLeft, ChevronRight, ChevronDown,
   Sparkles, Crown, Zap, Moon, Sun, Volume2, VolumeX,
-  CreditCard, TrendingUp, Shield, HelpCircle, RotateCcw, FileText, Activity, Landmark, Network, Settings2, Construction, Building2, RefreshCw, AlertTriangle
+  CreditCard, TrendingUp, Shield, HelpCircle, RotateCcw, FileText, Activity, Landmark, Network, Settings2, Construction, Building2, RefreshCw, AlertTriangle, Heart, Gift
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -17,11 +17,12 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/comp
 import { getBusinessConfig, type BusinessType } from '@/lib/businessTypes';
 
 export type SidebarTab = 
-  | 'home' | 'pos' | 'orders' | 'menu' | 'delivery' | 'shifts' | 'stats' 
+  | 'home' | 'pos' | 'orders' | 'menu' | 'delivery' | 'shifts' | 'stats' | 'kds'
   | 'inventory' | 'customers' | 'suppliers' | 'expenses' | 'qr' 
   | 'waiter' | 'staff' | 'financials' | 'notifications' | 'settings' | 'overheads'
   | 'customer_accounts' | 'sales_returns' | 'supplier_accounts' | 'inventory_receipts'
-  | 'ai_assistant' | 'treasury' | 'users' | 'sales_invoices' | 'purchase_invoices' | 'sales_orders' | 'purchase_orders' | 'projects' | 'manual_journal' | 'chart_of_accounts' | 'accounting_mapping' | 'fixed_assets';
+  | 'ai_assistant' | 'treasury' | 'users' | 'sales_invoices' | 'purchase_invoices' | 'sales_orders' | 'purchase_orders' | 'projects' | 'manual_journal' | 'chart_of_accounts' | 'accounting_mapping' | 'fixed_assets'
+  | 'loyalty' | 'gift_cards' | 'branches';
 
 interface NavItem {
   id: SidebarTab;
@@ -133,6 +134,7 @@ export function ProfessionalSidebar({
   const ALL_NAV_ITEMS: Record<string, Partial<NavItem>> = {
     home: { label: 'لوحة التحكم', icon: TrendingUp, section: 'main' },
     pos: { label: 'نقطة البيع', icon: LayoutGrid, section: 'main', shortcut: 'F1' },
+    kds: { label: 'عرض المطبخ (KDS)', icon: ChefHat, section: 'main' },
     shifts: { label: 'الورديات', icon: CalendarClock, section: 'main' },
     delivery: { label: 'التوصيل', icon: Truck, section: 'main', badge: stats.deliveryOrders },
     qr: { label: 'QR Menu', icon: QrCode, section: 'main' },
@@ -143,6 +145,9 @@ export function ProfessionalSidebar({
     sales_invoices: { label: 'فواتير البيع', icon: Receipt, badge: stats.salesInvoicesCount, section: 'sales' },
     sales_returns: { label: 'مرتجع المبيعات', icon: RotateCcw, badge: stats.returnsCount, section: 'sales' },
     customers: { label: config.labels.customers, icon: Users, badge: stats.customersCount, section: 'sales' },
+    loyalty: { label: 'نقاط الولاء', icon: Heart, section: 'sales' },
+    gift_cards: { label: 'بطاقات الهدايا', icon: Gift, section: 'sales' },
+    branches: { label: 'الفروع', icon: Building2, section: 'sales' },
     crm: { label: 'Ventro CRM', icon: Sparkles, section: 'sales' },
     projects: { label: 'المشاريع والمقاولات', icon: FileText, section: 'sales' },
 

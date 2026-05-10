@@ -61,6 +61,11 @@ const PurchaseOrders = lazy(() => import('./dashboard/PurchaseOrders').then(m =>
 const PurchaseInvoices = lazy(() => import('./dashboard/PurchaseInvoices').then(m => ({ default: m.PurchaseInvoices })));
 const SalesInvoices = lazy(() => import('./dashboard/SalesInvoices').then(m => ({ default: m.SalesInvoices })));
 const FixedAssetsTab = lazy(() => import('./dashboard/FixedAssetsTab').then(m => ({ default: m.FixedAssetsTab })));
+const KitchenDisplay = lazy(() => import('./dashboard/KitchenDisplay').then(m => ({ default: m.default || m.KitchenDisplay })));
+const LoyaltyPoints = lazy(() => import('./dashboard/LoyaltyPoints').then(m => ({ default: m.default || m.LoyaltyPoints })));
+const GiftCards = lazy(() => import('./dashboard/GiftCards').then(m => ({ default: m.default || m.GiftCards })));
+const BranchManager = lazy(() => import('./dashboard/BranchManager').then(m => ({ default: m.default || m.BranchManager })));
+
 import { BUSINESS_TYPES, BUSINESS_TABS, getAddressPlaceholder, getCheckoutButtonLabel, getCustomerPlaceholder, getDefaultOrderType, getNotesPlaceholder, getPosSearchPlaceholder, isFoodSector, isInventoryDrivenBusiness, type BusinessType } from '@/lib/businessTypes';
 import { useAuth } from '@/lib/AuthContext';
 import { useDarkMode } from '@/lib/useDarkMode';
@@ -946,7 +951,7 @@ export default function Dashboard() {
   }, [restaurant?.id]);
   
   const baseAllowedTabs = BUSINESS_TABS[businessType] || BUSINESS_TABS.restaurant;
-  const allowedTabs = Array.from(new Set([...baseAllowedTabs, 'accounting', 'chart_of_accounts', 'accounting_mapping', 'treasury', 'manual_journal', 'financials']));
+  const allowedTabs = Array.from(new Set([...baseAllowedTabs, 'accounting', 'chart_of_accounts', 'accounting_mapping', 'treasury', 'manual_journal', 'financials', 'kds', 'loyalty', 'gift_cards', 'branches']));
 
   const allTabs: { id: DashboardTab; label: string; icon: any; badge?: number; locked?: boolean }[] = [
     { id: 'pos', label: 'نقطة البيع', icon: LayoutGrid },
@@ -1438,38 +1443,31 @@ export default function Dashboard() {
               </div>
             )}
             
-            {activeTab === 'waiter' && (
-              <div className="p-6 space-y-6">
-                 <h2 className="text-3xl font-black">طلبات الجرسون (Waiter Calls)</h2>
-                 {waiterCalls.length === 0 ? (
-                   <div className="py-20 text-center text-muted-foreground italic border-2 border-dashed rounded-3xl">لا توجد نداءات حالياً</div>
-                 ) : (
-                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                      {waiterCalls.map(call => (
-                        <Card key={call.id} className={`p-6 glass-card border-2 transition-all ${call.acknowledged ? 'opacity-50' : 'border-primary shadow-lg shadow-primary/10 animate-pulse'}`}>
-                           <div className="flex justify-between items-center mb-4">
-                              <div className="flex items-center gap-2">
-                                 <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold">#{call.table_number}</div>
-                                 <span className="font-bold">طاولة رقم {call.table_number}</span>
-                              </div>
-                              <Badge variant={call.acknowledged ? 'secondary' : 'default'} className={call.acknowledged ? '' : 'bg-primary'}>{call.acknowledged ? 'تمت الاستجابة' : 'نداء جديد'}</Badge>
-                           </div>
-                           <p className="text-sm text-muted-foreground mb-6">الوقت: {new Date(call.created_at).toLocaleTimeString('ar-EG')}</p>
-                           {!call.acknowledged && (
-                             <Button className="w-full gradient-bg border-0 text-white rounded-xl" onClick={async () => {
-                               await supabase.from('waiter_calls').update({ acknowledged: true }).eq('id', call.id);
-                               loadData();
-                               toast.success('تمت الاستجابة للطلب');
-                             }}>تأكيد الاستجابة</Button>
-                           )}
-                        </Card>
-                      ))}
-                   </div>
-                 )}
-              </div>
-            )}
+{activeTab === 'waiter' && (
+                <div className="p-6 space-y-6">
+                  <h2 className="text-3xl font-black">طلبات الجرسون (Waiter Calls)</h2>
+                  {waiterCalls.length === 0 ? (
+                    <div className="py-20 text-center text-muted-foreground italic border-2 border-dashed rounded-3xl">لا توجد نداءات حالياً</div>
+                  ) : (
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                       {waiterCalls.map(call => (
+                         <Card key={call.id} className={`p-6 glass-card border-2 transition-all ${call.acknowledged ? 'opacity-50' : 'border-primary shadow-lg shadow-primary/10 animate-pulse'}`}>
+                         </Card>
+                       ))}
+                    </div>
+                  )}
+                </div>
+              )}
 
-          </Suspense>
+              {activeTab === 'kds' && <KitchenDisplay />}
+
+              {activeTab === 'loyalty' && <LoyaltyPoints />}
+
+              {activeTab === 'gift_cards' && <GiftCards />}
+
+              {activeTab === 'branches' && <BranchManager />}
+
+            </Suspense>
           </Suspense>
           </div>
         </main>
