@@ -98,23 +98,36 @@ export function SupplierManager({ restaurantId, currency }: Props) {
     try {
       setLoading(true);
       
-      const { data, error } = await supabase
+      // Fetch suppliers
+      const { data: suppliersData, error: suppliersError } = await supabase
         .from('suppliers')
         .select(`
           id, name, phone, email, address, balance, credit_limit, tax_number, 
-          contact_person, payment_terms, created_at,
-          purchase_invoices(id, total_amount, tax_amount, net_amount, invoice_date, status),
-          supplier_transactions(id, amount, type, created_at)
+          contact_person, payment_terms, created_at
         `)
         .eq('restaurant_id', restaurantId)
         .order('name');
 
-      if (error) throw error;
+      if (suppliersError) throw suppliersError;
 
-      const formattedSuppliers: Supplier[] = (data || []).map((s: any) => {
-        const purchases = s.purchase_invoices?.reduce((sum: number, inv: any) => sum + Number(inv.net_amount || inv.total_amount), 0) || 0;
+      // Fetch purchase invoices separately to avoid relationship issues
+      const { data: invoicesData } = await supabase
+        .from('purchase_invoices')
+        .select('id, total_amount, tax_amount, net_amount, invoice_date, status, supplier_id')
+        .eq('restaurant_id', restaurantId);
+
+      // Fetch transactions separately
+      const { data: txData } = await supabase
+        .from('supplier_transactions')
+        .select('id, amount, type, created_at, supplier_id')
+        .eq('restaurant_id', restaurantId);
+
+      const formattedSuppliers: Supplier[] = (suppliersData || []).map((s: any) => {
+        const supplierInvoices = (invoicesData || []).filter(inv => inv.supplier_id === s.id);
+        const purchases = supplierInvoices.reduce((sum: number, inv: any) => sum + Number(inv.net_amount || inv.total_amount), 0) || 0;
         
-        const lastTx = s.supplier_transactions?.sort((a: any, b: any) => 
+        const supplierTx = (txData || []).filter(tx => tx.supplier_id === s.id);
+        const lastTx = supplierTx.sort((a: any, b: any) => 
           new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
         )[0];
 
