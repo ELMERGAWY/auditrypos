@@ -921,7 +921,7 @@ export default function Dashboard() {
     if (order.status !== 'cancelled') {
       const { error: cancelError } = await supabase.from('orders').update({ status: 'cancelled' }).eq('id', orderId);
       if (cancelError) {
-        toast.error('خطأ في إرجاع المخزون');
+        toast.error(`خطأ في إرجاع المخزون: ${cancelError.message}`);
         return;
       }
       // Wait a moment for the DB trigger to finish restocking before deleting the items
