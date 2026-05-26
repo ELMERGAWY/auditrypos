@@ -52,6 +52,7 @@ interface POSCartProps {
   setPaidAmount: (val: string) => void;
   remaining: number;
   checkout: (sendToPrep: boolean) => void;
+  previewInvoice: () => void;
   updateValue: (id: string, value: number) => void;
   removeFromCart: (id: string) => void;
   accountingAccounts: any[];
@@ -67,7 +68,7 @@ export function POSCart({
   orderNotes, setOrderNotes, discount, setDiscount, discountType, setDiscountType,
   currency, getUnitOptions, setCartItemUnit, updateQty, setCartItemQty,
   discountAmount, taxAmount, cartSubtotal, cartTotal, paymentMethod, setPaymentMethod,
-  paidAmount, setPaidAmount, remaining, checkout, updateValue, removeFromCart,
+  paidAmount, setPaidAmount, remaining, checkout, previewInvoice, updateValue, removeFromCart,
   accountingAccounts, selectedAccountId, setSelectedAccountId
 }: POSCartProps) {
   const { hasPermission } = usePermissions(restaurant?.id);
@@ -268,12 +269,15 @@ export function POSCart({
           </div>
         </div>
         <div className="grid grid-cols-3 gap-2">
+          <Button onClick={previewInvoice} variant="outline" className="h-10 text-[10px]" disabled={cart.length === 0}>
+            <Receipt className="w-3 h-3 ml-1" /> معاينة
+          </Button>
           {(isFoodSector(businessType) || businessType === 'wholesale') && (
             <Button onClick={() => checkout(true)} className="gradient-bg text-primary-foreground border-0 h-10 text-[10px]" disabled={cart.length === 0}>
               <Send className="w-3 h-3 ml-1" /> إرسال للتحضير
             </Button>
           )}
-          <Button onClick={() => checkout(false)} className={`bg-success text-success-foreground border-0 h-10 text-[10px] ${(isFoodSector(businessType) || businessType === 'wholesale') ? 'col-span-1' : 'col-span-2'}`} disabled={cart.length === 0}>
+          <Button onClick={() => checkout(false)} className="bg-success text-success-foreground border-0 h-10 text-[10px]" disabled={cart.length === 0}>
             <Receipt className="w-3 h-3 ml-1" /> بيع مباشر
           </Button>
           <Button onClick={holdCurrentInvoice} variant="outline" className="h-10 text-[10px]" disabled={cart.length === 0}>

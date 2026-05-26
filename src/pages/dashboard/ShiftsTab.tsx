@@ -8,6 +8,7 @@ import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { DollarSign, Clock, TrendingUp, Receipt, AlertCircle, CheckCircle, Users } from 'lucide-react';
 import type { Shift, Restaurant } from './types';
+import { journalService } from '@/lib/accounting/journalService';
 
 interface StaffMember {
   id: string;
@@ -33,6 +34,8 @@ export function ShiftsTab({ restaurant, currentShift, setCurrentShift, profileNa
   const [pastShifts, setPastShifts] = useState<Shift[]>([]);
   const [loadedHistory, setLoadedHistory] = useState(false);
   const [isOpening, setIsOpening] = useState(false);
+  const [isClosing, setIsClosing] = useState(false);
+  const [postingSummary, setPostingSummary] = useState<{ posted: number; skipped: number } | null>(null);
   const [staff, setStaff] = useState<StaffMember[]>([]);
   const [selectedCashier, setSelectedCashier] = useState('');
 
@@ -76,6 +79,56 @@ export function ShiftsTab({ restaurant, currentShift, setCurrentShift, profileNa
     toast.success(`تم فتح الشفت بنجاح — الكاشير: ${cashierName} ✅`);
   };
 
+  const postShiftOrders = async () => {
+    if (!currentShift) return { posted: 0, skipped: 0 };
+
+    const closeTime = new Date().toISOString();
+    const { data: shiftOrders, error: ordersError } = await supabase
+      .from('orders')
+      .select('*')
+      .eq('restaurant_id', restaurant.id)
+      .gte('created_at', currentShift.opened_at)
+      .lte('created_at', closeTime)
+      .neq('status', 'cancelled');
+
+    if (ordersError) throw ordersError;
+    const ordersToCheck = (shiftOrders || []) as any[];
+    const unpostedOrders = ordersToCheck.filter(o => !o.journal_entry_id);
+    if (unpostedOrders.length === 0) return { posted: 0, skipped: ordersToCheck.length };
+
+    const { data: items, error: itemsError } = await supabase
+      .from('order_items')
+      .select('*')
+      .in('order_id', unpostedOrders.map(o => o.id));
+
+    if (itemsError) throw itemsError;
+    const allItems = items || [];
+    let posted = 0;
+
+    for (const order of unpostedOrders) {
+      const orderItems = allItems.filter((item: any) => item.order_id === order.id);
+      const entry = await journalService.createSaleJournalEntry(
+        restaurant.id,
+        { ...order, items: orderItems },
+        restaurant.business_type || 'restaurant',
+        0,
+        0
+      );
+
+      if (!entry?.id) throw new Error(`فشل ترحيل الفاتورة ${order.order_number}`);
+
+      const { error: updateError } = await supabase
+        .from('orders')
+        .update({ journal_entry_id: entry.id })
+        .eq('id', order.id);
+
+      if (updateError) throw updateError;
+      posted += 1;
+    }
+
+    return { posted, skipped: ordersToCheck.length - posted };
+  };
+
   const handleCloseShift = async () => {
     if (!currentShift) return;
     const { error } = await supabase.from('shifts').update({
@@ -92,6 +145,35 @@ export function ShiftsTab({ restaurant, currentShift, setCurrentShift, profileNa
     setShiftNotes('');
     setLoadedHistory(false);
     toast.success('تم إغلاق الشفت وحفظ التقرير ✅');
+  };
+
+  const handleCloseShiftWithPosting = async () => {
+    if (!currentShift) return;
+    setIsClosing(true);
+    try {
+      const summary = await postShiftOrders();
+      setPostingSummary(summary);
+
+      const { error } = await supabase.from('shifts').update({
+        status: 'closed',
+        closed_at: new Date().toISOString(),
+        closing_balance: Number(closingBalance) || 0,
+        total_sales: todayRevenue,
+        total_orders: todayOrdersCount,
+        notes: shiftNotes,
+      }).eq('id', currentShift.id);
+
+      if (error) throw error;
+      setCurrentShift(null);
+      setClosingBalance('');
+      setShiftNotes('');
+      setLoadedHistory(false);
+      toast.success(`تم إغلاق الشيفت وترحيل ${summary.posted} فاتورة محاسبيا`);
+    } catch (error: any) {
+      toast.error(error?.message || 'فشل إغلاق الشيفت أو ترحيل الفواتير محاسبيا');
+    } finally {
+      setIsClosing(false);
+    }
   };
 
   const shiftDuration = currentShift
@@ -162,9 +244,14 @@ export function ShiftsTab({ restaurant, currentShift, setCurrentShift, profileNa
                   : `⚠️ عجز: ${(Number(closingBalance) - currentShift.opening_balance - todayRevenue).toFixed(2)} ${currency}`}
               </div>
             )}
-            <Button onClick={handleCloseShift} variant="destructive" className="w-full">
+            <Button onClick={handleCloseShiftWithPosting} variant="destructive" className="w-full" disabled={isClosing}>
               إغلاق الشفت وحفظ التقرير
             </Button>
+            {postingSummary && (
+              <p className="text-xs text-muted-foreground text-center">
+                تم ترحيل {postingSummary.posted} فاتورة، وتخطي {postingSummary.skipped} فاتورة مرحلة مسبقا.
+              </p>
+            )}
           </div>
         </div>
       ) : (

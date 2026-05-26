@@ -56,11 +56,9 @@ class CheckoutIntegration {
     try {
       // 0. Ensure accounting accounts exist (Self-healing) — non-blocking
       if (context.isOnline) {
-        try {
-          await journalService.ensureAccountingSetup(context.restaurantId, context.currency);
-        } catch (e) {
-          console.warn('[checkout] ensureAccountingSetup failed (continuing):', e);
-        }
+        void journalService
+          .ensureAccountingSetup(context.restaurantId, context.currency)
+          .catch((e) => console.warn('[checkout] ensureAccountingSetup failed (continuing):', e));
       }
 
       const isDelivery = orderData.orderType === 'delivery';
@@ -143,14 +141,12 @@ class CheckoutIntegration {
         restaurant_id: context.restaurantId,
         order_number: orderNum,
         total: finalTotal,
-        total_cost: cogs, // Added for accurate profit tracking
         discount: discountAmount,
         status: isDirectSell ? 'completed' as const : 'pending' as const,
         table_number: orderData.tableNumber || null,
         order_type: orderData.orderType,
         customer_name: orderData.customerName || '',
         customer_phone: orderData.customerPhone || '',
-        customer_id: customerId,
         delivery_address: orderData.deliveryAddress || '',
         delivery_agent_id: orderData.deliveryAgentId || null,
         payment_method: orderData.paymentMethod,

@@ -33,19 +33,28 @@ export function CustomerSearch({ restaurantId, value, onChange, placeholder }: P
     return () => document.removeEventListener('mousedown', handler);
   }, []);
 
-  const handleSearch = async (query: string) => {
-    onChange(query);
-    if (query.length < 1) { setSuggestions([]); setShowSuggestions(false); return; }
-    
-    const { data } = await supabase.from('customers')
-      .select('id, name, phone, balance, customer_type')
-      .eq('restaurant_id', restaurantId)
-      .or(`name.ilike.%${query}%,phone.ilike.%${query}%`)
-      .limit(8);
-    
-    setSuggestions((data || []) as Customer[]);
-    setShowSuggestions(true);
-  };
+  useEffect(() => {
+    const query = value.trim();
+    if (query.length < 2) {
+      setSuggestions([]);
+      setShowSuggestions(false);
+      return;
+    }
+
+    const timer = window.setTimeout(async () => {
+      const safeQuery = query.replace(/[%,]/g, '');
+      const { data } = await supabase.from('customers')
+        .select('id, name, phone, balance, customer_type')
+        .eq('restaurant_id', restaurantId)
+        .or(`name.ilike.%${safeQuery}%,phone.ilike.%${safeQuery}%`)
+        .limit(8);
+      
+      setSuggestions((data || []) as Customer[]);
+      setShowSuggestions(true);
+    }, 250);
+
+    return () => window.clearTimeout(timer);
+  }, [restaurantId, value]);
 
   const selectCustomer = (c: Customer) => {
     onChange(c.name);
@@ -57,8 +66,8 @@ export function CustomerSearch({ restaurantId, value, onChange, placeholder }: P
       <Users className="w-3.5 h-3.5 absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground z-10" />
       <Input
         value={value}
-        onChange={e => handleSearch(e.target.value)}
-        onFocus={() => value.length >= 1 && suggestions.length > 0 && setShowSuggestions(true)}
+        onChange={e => onChange(e.target.value)}
+        onFocus={() => value.length >= 2 && suggestions.length > 0 && setShowSuggestions(true)}
         placeholder={placeholder || 'بحث عن عميل...'}
         className="pr-8 h-9 text-xs"
       />

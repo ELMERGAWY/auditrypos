@@ -401,6 +401,48 @@ export default function Dashboard() {
     toast.success('تم حذف الصنف من السلة');
   };
 
+  const buildCurrentReceipt = (): Order => ({
+    id: `preview-${Date.now()}`,
+    order_number: 'PREVIEW',
+    total: cartTotal,
+    status: 'preview',
+    created_at: new Date().toISOString(),
+    synced: true,
+    table_number: tableNumber ? Number(tableNumber) : null,
+    discount: discountAmount,
+    notes: orderNotes,
+    customer_name: customerName,
+    customer_phone: customerPhone,
+    order_type: orderType,
+    delivery_agent_id: selectedDeliveryAgent || null,
+    delivery_address: deliveryAddress,
+    delivery_lat: null,
+    delivery_lng: null,
+    tracking_token: null,
+    items: cart.map(c => {
+      const unitFactor = getUnitOptions(c.item).find(u => u.label === c.unitMode)?.factor || 1;
+      return {
+        menu_item_id: isInventoryDrivenBusiness(businessType) ? null : c.item.id,
+        product_id: isInventoryDrivenBusiness(businessType) ? (c.item.product_id || c.item.id) : null,
+        menu_item_name: c.item.name,
+        menu_item_image: c.item.image,
+        quantity: c.qty,
+        price: c.item.price * unitFactor,
+      };
+    }),
+    paid_amount: paidNum,
+    payment_method: paymentMethod,
+  } as Order);
+
+  const previewInvoice = () => {
+    if (cart.length === 0) {
+      toast.error('السلة فارغة');
+      return;
+    }
+    setLastReceipt(buildCurrentReceipt());
+    setShowReceipt(true);
+  };
+
   const clearCart = () => {
     setCart([]); setTableNumber(''); setCustomerName(''); setCustomerPhone('');
     setOrderNotes(''); setDiscount(''); setDeliveryAddress(''); setSelectedDeliveryAgent('');
@@ -620,6 +662,38 @@ export default function Dashboard() {
       customer_id: null,
       destination_account_id: selectedAccountId, // Pass the selected treasury/bank account
     };
+
+    if (isOnline) {
+      const { destination_account_id, ...insertOrderData } = orderData as any;
+      const { data: order, error: orderError } = await supabase
+        .from('orders')
+        .insert(insertOrderData)
+        .select()
+        .single();
+
+      if (orderError || !order) throw orderError || new Error('فشل إنشاء الطلب');
+
+      const { error: itemsError } = await supabase
+        .from('order_items')
+        .insert(cartItems.map(item => ({ ...item, order_id: order.id })));
+
+      if (itemsError) throw itemsError;
+
+      const newOrder = {
+        ...order,
+        items: cartItems.map(item => ({ ...item, order_id: order.id })),
+        paid_amount: paidNum,
+        payment_method: paymentMethod,
+      } as unknown as Order;
+
+      setOrders(prev => [newOrder, ...prev]);
+      setLastReceipt(newOrder);
+      setShowReceipt(true);
+      if (activeInvoiceId) setInvoiceTabs(prev => prev.filter(t => t.id !== activeInvoiceId));
+      toast.success(`تم إنشاء الطلب #${order.order_number?.slice(-4)} بنجاح`);
+      clearCart();
+      return;
+    }
 
     // Use accounting-integrated checkout if online
     if (isOnline) {
@@ -937,6 +1011,26 @@ export default function Dashboard() {
     toast.success('تم حذف الطلب وإرجاع الكميات للمخزون');
   };
 
+  const openOrderReceipt = async (order: Order) => {
+    let receiptOrder = order;
+    if (!order.items || order.items.length === 0) {
+      const { data, error } = await supabase
+        .from('order_items')
+        .select('*')
+        .eq('order_id', order.id);
+
+      if (error) {
+        toast.error('تعذر تحميل تفاصيل الفاتورة');
+        return;
+      }
+      receiptOrder = { ...order, items: (data || []) as OrderItem[] };
+      setOrders(prev => prev.map(o => o.id === order.id ? receiptOrder : o));
+    }
+
+    setLastReceipt(receiptOrder);
+    setShowReceipt(true);
+  };
+
   const handleAssignAgent = async (orderId: string, agentId: string) => {
     await supabase.from('orders').update({ delivery_agent_id: agentId }).eq('id', orderId);
     await supabase.from('delivery_agents').update({ status: 'busy' }).eq('id', agentId);
@@ -961,7 +1055,16 @@ export default function Dashboard() {
   }, [restaurant?.id]);
   
   const baseAllowedTabs = BUSINESS_TABS[businessType] || BUSINESS_TABS.restaurant;
-  const allowedTabs = Array.from(new Set([...baseAllowedTabs, 'accounting', 'chart_of_accounts', 'accounting_mapping', 'treasury', 'manual_journal', 'financials', 'kds', 'loyalty', 'gift_cards', 'branches']));
+  const availableTabs = new Set([...baseAllowedTabs, 'home', 'pos', 'orders', 'menu', 'inventory', 'treasury', 'shifts', 'accounting', 'chart_of_accounts', 'accounting_mapping', 'manual_journal', 'financials', 'kds', 'loyalty', 'gift_cards', 'branches']);
+  const preferredTabOrder = [
+    'home', 'pos', 'orders', 'menu', 'inventory', 'treasury', 'shifts',
+    'kds', 'delivery', 'qr', 'waiter',
+    'customers', 'sales_orders', 'sales_invoices', 'sales_returns', 'loyalty', 'gift_cards', 'branches',
+    'purchase_orders', 'purchase_invoices', 'suppliers',
+    'expenses', 'financials', 'chart_of_accounts', 'accounting_mapping', 'manual_journal',
+    'staff', 'notifications', 'settings'
+  ];
+  const allowedTabs = preferredTabOrder.filter(tab => availableTabs.has(tab));
 
   const allTabs: { id: DashboardTab; label: string; icon: any; badge?: number; locked?: boolean }[] = [
     { id: 'pos', label: 'نقطة البيع', icon: LayoutGrid },
@@ -1140,7 +1243,28 @@ export default function Dashboard() {
             
             {/* ===================== POS TAB ===================== */}
             {activeTab === 'pos' && (
-            <div className="flex flex-col lg:flex-row h-full">
+            <div className="h-full flex flex-col">
+              <div className="flex gap-2 overflow-x-auto pb-3 mb-3 border-b border-border/50">
+                {[
+                  { id: 'pos', label: 'البيع', icon: LayoutGrid },
+                  { id: 'orders', label: 'الطلبات', icon: Receipt },
+                  { id: 'menu', label: 'المنتجات', icon: Store },
+                  { id: 'inventory', label: 'المخزون', icon: Package },
+                  { id: 'treasury', label: 'الخزينة', icon: Wallet },
+                  { id: 'shifts', label: 'الشيفتات', icon: CalendarClock },
+                ].map(action => (
+                  <Button
+                    key={action.id}
+                    variant={action.id === 'pos' ? 'default' : 'outline'}
+                    className={action.id === 'pos' ? 'gradient-bg border-0 text-white' : ''}
+                    onClick={() => setActiveTab(action.id as SidebarTab)}
+                  >
+                    <action.icon className="w-4 h-4 ml-1" />
+                    {action.label}
+                  </Button>
+                ))}
+              </div>
+            <div className="flex flex-col lg:flex-row flex-1 min-h-0">
               <POSGrid
                 currency={currency}
                 todayRevenue={todayRevenue}
@@ -1203,12 +1327,14 @@ export default function Dashboard() {
                 setPaidAmount={setPaidAmount}
                 remaining={remaining}
                 checkout={checkout}
+                previewInvoice={previewInvoice}
                 updateValue={updateValue}
                 removeFromCart={removeFromCart}
                 accountingAccounts={accountingAccounts}
                 selectedAccountId={selectedAccountId}
                 setSelectedAccountId={setSelectedAccountId}
               />
+            </div>
             </div>
           )}
 
@@ -1259,7 +1385,10 @@ export default function Dashboard() {
                           <div className="flex items-center justify-between pt-4 border-t border-border/50">
                             <span className="font-black text-xl text-primary">{order.total} <span className="text-[10px] text-muted-foreground font-normal">{currency}</span></span>
                             <div className="flex gap-2">
-                               <Button size="sm" variant="ghost" className="h-8 w-8 p-0" onClick={() => { setLastReceipt(order); setShowReceipt(true); }} title="طباعة الفاتورة">
+                               <Button size="sm" variant="outline" className="h-8 px-2 text-[10px]" onClick={() => openOrderReceipt(order)} title="تفاصيل الطلب">
+                                 تفاصيل
+                               </Button>
+                               <Button size="sm" variant="ghost" className="h-8 w-8 p-0" onClick={() => openOrderReceipt(order)} title="طباعة الفاتورة">
                                  <Printer className="w-4 h-4" />
                                </Button>
                                
@@ -1482,6 +1611,13 @@ export default function Dashboard() {
           </div>
         </main>
       </div>
+      {showReceipt && lastReceipt && restaurant && (
+        <div className="fixed inset-0 z-[200] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4" onClick={() => setShowReceipt(false)}>
+          <div className="w-full max-w-md rounded-xl bg-card border border-border p-4 shadow-2xl" onClick={e => e.stopPropagation()}>
+            <ReceiptModalWrapper order={lastReceipt} restaurant={restaurant} onClose={() => setShowReceipt(false)} />
+          </div>
+        </div>
+      )}
     </div>
     </DashboardErrorBoundary>
   );
