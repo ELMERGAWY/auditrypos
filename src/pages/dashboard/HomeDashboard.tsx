@@ -1,5 +1,5 @@
 // @ts-nocheck
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
 import {
   TrendingUp, TrendingDown, Users, Store, DollarSign,
@@ -124,6 +124,7 @@ export function HomeDashboard({ restaurantId, currency, onNavigate, userId }: Ho
   const [salesChartData, setSalesChartData] = useState<any[]>([]);
   const [categoryData, setCategoryData] = useState<any[]>([]);
   const [recentActivity, setRecentActivity] = useState<any[]>([]);
+  const hasLoadedOnce = useRef(false);
 
   useEffect(() => {
     loadDashboardData();
@@ -131,9 +132,22 @@ export function HomeDashboard({ restaurantId, currency, onNavigate, userId }: Ho
 
   const loadDashboardData = async () => {
     try {
-      setLoading(true);
-      const today = new Date().toISOString().split('T')[0];
-      const monthStart = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0];
+      if (!hasLoadedOnce.current) setLoading(true);
+      const now = new Date();
+      const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      const todayEnd = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999);
+      const yesterdayStart = new Date(todayStart);
+      yesterdayStart.setDate(yesterdayStart.getDate() - 1);
+      const yesterdayEnd = new Date(todayStart.getTime() - 1);
+      const monthStartDate = new Date(now.getFullYear(), now.getMonth(), 1);
+      const weekStartDate = new Date(todayStart);
+      weekStartDate.setDate(weekStartDate.getDate() - 6);
+      const today = todayStart.toISOString();
+      const todayTo = todayEnd.toISOString();
+      const yesterday = yesterdayStart.toISOString();
+      const yesterdayTo = yesterdayEnd.toISOString();
+      const monthStart = monthStartDate.toISOString();
+      const weekStart = weekStartDate.toISOString();
       
       // Parallel data fetching
       const [
@@ -152,11 +166,11 @@ export function HomeDashboard({ restaurantId, currency, onNavigate, userId }: Ho
         topProductsRes
       ] = await Promise.all([
         // Today's orders
-        supabase.from('orders').select('total').eq('restaurant_id', restaurantId).gte('created_at', today),
+        supabase.from('orders').select('total, total_cost, status, created_at').eq('restaurant_id', restaurantId).gte('created_at', today).lte('created_at', todayTo).neq('status', 'cancelled'),
         // Month orders
-        supabase.from('orders').select('total').eq('restaurant_id', restaurantId).gte('created_at', monthStart),
+        supabase.from('orders').select('total, total_cost, status, created_at').eq('restaurant_id', restaurantId).gte('created_at', monthStart).lte('created_at', todayTo).neq('status', 'cancelled'),
         // Yesterday for comparison
-        supabase.from('orders').select('total').eq('restaurant_id', restaurantId).gte('created_at', new Date(Date.now() - 86400000).toISOString().split('T')[0]).lt('created_at', today),
+        supabase.from('orders').select('total, total_cost, status, created_at').eq('restaurant_id', restaurantId).gte('created_at', yesterday).lte('created_at', yesterdayTo).neq('status', 'cancelled'),
         // Total customers
         supabase.from('customers').select('*', { count: 'exact' }).eq('restaurant_id', restaurantId),
         // New customers today
@@ -172,33 +186,34 @@ export function HomeDashboard({ restaurantId, currency, onNavigate, userId }: Ho
         // Inventory value
         supabase.from('products').select('quantity, price').eq('restaurant_id', restaurantId),
         // Pending/processing orders
-        supabase.from('orders').select('status').eq('restaurant_id', restaurantId).in('status', ['pending', 'processing', 'ready']),
+        supabase.from('orders').select('status').eq('restaurant_id', restaurantId).in('status', ['pending', 'preparing', 'processing', 'ready']),
         // AI suggestions
         supabase.from('ai_journal_suggestions').select('*', { count: 'exact' }).eq('restaurant_id', restaurantId).eq('status', 'pending'),
         // Top products this week
-        supabase.from('order_items').select('product_name, quantity, unit_price, orders!inner(created_at)').eq('orders.restaurant_id', restaurantId).gte('orders.created_at', new Date(Date.now() - 7 * 86400000).toISOString().split('T')[0]).limit(50)
+        supabase.from('order_items').select('menu_item_name, quantity, price, orders!inner(created_at, restaurant_id, status)').eq('orders.restaurant_id', restaurantId).neq('orders.status', 'cancelled').gte('orders.created_at', weekStart).limit(100)
       ]);
 
-      // === ACCURATE numbers from journal entries ===
+      // Accounting reports are useful for profit/balance sheet, but POS sales must
+      // come from operational orders because journal posting can be deferred.
       const engine = createFinancialReporting(restaurantId);
-      const monthStartDate = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0];
-      const yesterday = new Date(Date.now() - 86400000).toISOString().split('T')[0];
 
       const [plToday, plYest, plMonth, bs] = await Promise.all([
-        engine.generateProfitLoss(today, today),
-        engine.generateProfitLoss(yesterday, yesterday),
-        engine.generateProfitLoss(monthStartDate, today),
-        engine.generateBalanceSheet(today),
+        engine.generateProfitLoss(todayStart.toISOString().split('T')[0], todayStart.toISOString().split('T')[0]),
+        engine.generateProfitLoss(yesterdayStart.toISOString().split('T')[0], yesterdayStart.toISOString().split('T')[0]),
+        engine.generateProfitLoss(monthStartDate.toISOString().split('T')[0], todayStart.toISOString().split('T')[0]),
+        engine.generateBalanceSheet(todayStart.toISOString().split('T')[0]),
       ]);
 
-      const todaySales = plToday.revenue.total || (todayOrdersRes.data?.reduce((s, o) => s + (o.total || 0), 0) || 0);
+      const sumOrders = (rows: any[] = []) => rows.reduce((s, o) => s + Number(o.total || 0), 0);
+      const sumCost = (rows: any[] = []) => rows.reduce((s, o) => s + Number(o.total_cost || 0), 0);
+      const todaySales = sumOrders(todayOrdersRes.data || []);
       const todayOrdersCount = todayOrdersRes.data?.length || 0;
-      const monthSales = plMonth.revenue.total || (monthOrdersRes.data?.reduce((s, o) => s + (o.total || 0), 0) || 0);
-      const yesterdaySales = plYest.revenue.total;
+      const monthSales = sumOrders(monthOrdersRes.data || []);
+      const yesterdaySales = sumOrders(yesterdayOrdersRes.data || []);
       const salesChange = yesterdaySales > 0 ? ((todaySales - yesterdaySales) / yesterdaySales) * 100 : 0;
 
-      const todayProfit = plToday.net_profit;
-      const monthProfit = plMonth.net_profit;
+      const todayProfit = plToday.net_profit || (todaySales - sumCost(todayOrdersRes.data || []));
+      const monthProfit = plMonth.net_profit || (monthSales - sumCost(monthOrdersRes.data || []));
       const profitMargin = monthSales > 0 ? (monthProfit / monthSales) * 100 : 0;
       const yProfit = plYest.net_profit;
       const profitChange = yProfit !== 0 ? ((todayProfit - yProfit) / Math.abs(yProfit)) * 100 : 0;
@@ -209,7 +224,7 @@ export function HomeDashboard({ restaurantId, currency, onNavigate, userId }: Ho
       // Order statuses
       const orderStatuses = pendingOrdersRes.data || [];
       const pendingCount = orderStatuses.filter((o: any) => o.status === 'pending').length;
-      const processingCount = orderStatuses.filter((o: any) => o.status === 'processing' || o.status === 'ready').length;
+      const processingCount = orderStatuses.filter((o: any) => o.status === 'processing' || o.status === 'preparing' || o.status === 'ready').length;
       
       // Payables
       const pendingPayables = bs.liabilities.current.payables || (payablesRes.data?.reduce((sum, s) => sum + (s.balance || 0), 0) || 0);
@@ -238,31 +253,31 @@ export function HomeDashboard({ restaurantId, currency, onNavigate, userId }: Ho
         pendingAISuggestions: aiSuggestionsRes.count || 0
       });
 
-      // Real per-day chart from journal (last 7 days)
+      // Real per-day chart from operational orders.
       const chartData: any[] = [];
-      const dayPromises: Promise<any>[] = [];
-      const dayNames: string[] = [];
+      const weeklyOrders = monthOrdersRes.data?.filter((order: any) => new Date(order.created_at) >= weekStartDate) || [];
       for (let i = 6; i >= 0; i--) {
         const d = new Date();
         d.setDate(d.getDate() - i);
-        const ds = d.toISOString().split('T')[0];
-        dayNames.push(d.toLocaleDateString('ar-EG', { weekday: 'short' }));
-        dayPromises.push(engine.generateProfitLoss(ds, ds));
-      }
-      const dayPLs = await Promise.all(dayPromises);
-      dayPLs.forEach((pl, i) => {
-        chartData.push({
-          name: dayNames[i],
-          sales: Math.round(pl.revenue.total),
-          profit: Math.round(pl.net_profit),
+        const dayStart = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+        const dayEnd = new Date(d.getFullYear(), d.getMonth(), d.getDate(), 23, 59, 59, 999);
+        const dayOrders = weeklyOrders.filter((order: any) => {
+          const created = new Date(order.created_at);
+          return created >= dayStart && created <= dayEnd;
         });
-      });
+        const sales = sumOrders(dayOrders);
+        chartData.push({
+          name: d.toLocaleDateString('ar-EG', { weekday: 'short' }),
+          sales: Math.round(sales),
+          profit: Math.round(sales - sumCost(dayOrders)),
+        });
+      }
       setSalesChartData(chartData);
 
       // Category split from real P&L
       setCategoryData([
-        { name: 'الإيرادات', value: plMonth.revenue.total, color: '#10b981' },
-        { name: 'تكلفة المبيعات', value: plMonth.cogs.total, color: '#f59e0b' },
+        { name: 'الإيرادات', value: monthSales, color: '#10b981' },
+        { name: 'تكلفة المبيعات', value: sumCost(monthOrdersRes.data || []) || plMonth.cogs.total, color: '#f59e0b' },
         { name: 'المصروفات', value: plMonth.operating_expenses.total, color: '#ef4444' },
         { name: 'صافي الربح', value: Math.max(0, plMonth.net_profit), color: '#3b82f6' }
       ]);
@@ -287,6 +302,7 @@ export function HomeDashboard({ restaurantId, currency, onNavigate, userId }: Ho
       console.error('Dashboard load error:', error);
       toast.error('حدث خطأ في تحميل البيانات');
     } finally {
+      hasLoadedOnce.current = true;
       setLoading(false);
     }
   };

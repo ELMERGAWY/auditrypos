@@ -155,7 +155,8 @@ export default function Dashboard() {
         batchSize,
         maxOrders: batchSize,
       });
-      setPendingPostingCount(summary.pending || await countUnpostedOrders(restaurant.id));
+      const nextPending = summary.pending || await countUnpostedOrders(restaurant.id);
+      setPendingPostingCount(prev => prev === nextPending ? prev : nextPending);
       if (reason === 'logout' && summary.posted > 0) {
         toast.success(`تم ترحيل ${summary.posted} فاتورة قبل الخروج`);
       }
@@ -171,7 +172,8 @@ export default function Dashboard() {
     const refreshPostingStatus = async () => {
       try {
         const { countUnpostedOrders } = await import('@/lib/accounting/deferredPosting');
-        setPendingPostingCount(await countUnpostedOrders(restaurant.id));
+        const nextPending = await countUnpostedOrders(restaurant.id);
+        setPendingPostingCount(prev => prev === nextPending ? prev : nextPending);
       } catch {}
     };
 

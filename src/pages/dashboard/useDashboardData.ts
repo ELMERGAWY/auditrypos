@@ -283,7 +283,7 @@ export function useDashboardData() {
           async (payload) => {
             const { data: items } = await supabase.from('order_items').select('*').eq('order_id', payload.new.id);
             const newOrder = { ...payload.new, items: (items || []) as OrderItem[] } as unknown as Order;
-            setOrders(prev => [newOrder, ...prev]);
+            setOrders(prev => prev.some(order => order.id === newOrder.id) ? prev : [newOrder, ...prev]);
             if (soundEnabled) playOrderSound();
             toast.success(`🆕 طلب جديد #${(payload.new as any).order_number?.slice(-4)}`, { duration: 5000 });
           }
