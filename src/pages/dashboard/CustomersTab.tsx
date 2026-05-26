@@ -117,7 +117,7 @@ export function CustomersTab({ restaurantId, currency }: Props) {
 <head><meta charset="UTF-8"><title>سند قبض</title>
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
-  body { font-family: 'Segoe UI', 'Arial', 'Tahoma', sans-serif; font-size: 12px; padding: 10px; max-width: 300px; margin: 0 auto; }
+  body { font-family: 'Courier New', monospace; font-size: 12px; padding: 10px; max-width: 300px; margin: 0 auto; }
   .center { text-align: center; }
   .bold { font-weight: bold; }
   .title { font-size: 18px; font-weight: bold; margin: 8px 0; border: 2px solid #000; padding: 4px; }
