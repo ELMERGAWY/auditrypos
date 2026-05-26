@@ -307,6 +307,27 @@ export function HomeDashboard({ restaurantId, currency, onNavigate, userId }: Ho
     }
   };
 
+  // Auto-refresh dashboard data every 30 seconds
+  useEffect(() => {
+    const interval = setInterval(() => {
+      loadDashboardData();
+    }, 30000);
+    return () => clearInterval(interval);
+  }, []);
+
+  // Real‑time updates via Supabase channel
+  useEffect(() => {
+    const channel = supabase.channel('public:orders')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, payload => {
+        // Reload data when any order changes (insert, update, delete)
+        loadDashboardData();
+      })
+      .subscribe();
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [restaurantId]);
+
   const formatCurrency = (amount: number) => {
     return amount.toLocaleString('ar-EG') + ' ' + currency;
   };
