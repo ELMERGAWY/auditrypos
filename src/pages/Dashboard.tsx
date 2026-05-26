@@ -1055,7 +1055,8 @@ export default function Dashboard() {
   }, [restaurant?.id]);
   
   const baseAllowedTabs = BUSINESS_TABS[businessType] || BUSINESS_TABS.restaurant;
-  const availableTabs = new Set([...baseAllowedTabs, 'home', 'pos', 'orders', 'menu', 'inventory', 'treasury', 'shifts', 'accounting', 'chart_of_accounts', 'accounting_mapping', 'manual_journal', 'financials', 'kds', 'loyalty', 'gift_cards', 'branches']);
+  const foodOnlyTabs = isFoodSector(businessType) ? ['kds'] : [];
+  const availableTabs = new Set([...baseAllowedTabs, 'home', 'pos', 'orders', 'menu', 'inventory', 'treasury', 'shifts', 'accounting', 'chart_of_accounts', 'accounting_mapping', 'manual_journal', 'financials', ...foodOnlyTabs, 'loyalty', 'gift_cards', 'branches']);
   const preferredTabOrder = [
     'home', 'pos', 'orders', 'menu', 'inventory', 'treasury', 'shifts',
     'kds', 'delivery', 'qr', 'waiter',
@@ -1176,17 +1177,14 @@ export default function Dashboard() {
         onForceSync={handleForceSync}
       />
 
-      <div className={cn(
-        "transition-all duration-500 min-h-screen",
-        sidebarCollapsed ? "mr-24" : "mr-80"
-      )}>
-        <main className="p-10">
-          <div className="max-w-[1800px] mx-auto glass-card p-12 min-h-[calc(100vh-80px)] shadow-2xl border-white/20 relative overflow-hidden">
+      <div className="transition-all duration-500 min-h-screen pt-24">
+        <main className="p-4 lg:p-6">
+          <div className="max-w-[1900px] mx-auto glass-card p-4 lg:p-6 min-h-[calc(100vh-120px)] shadow-2xl border-white/20 relative overflow-hidden">
             
             {/* Header & Date Range Filter */}
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-12 border-b border-border/50 pb-8">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-4 border-b border-border/50 pb-4">
               <div>
-                <h1 className="text-4xl font-black mb-2 flex items-center gap-3">
+                <h1 className="text-2xl lg:text-3xl font-black mb-1 flex items-center gap-3">
                   {activeTab === 'home' ? 'لوحة التحكم الرئيسية' : (allTabs.find(t => t.id === activeTab)?.label || 'إدارة النظام')}
                   <Badge variant="outline" className="text-xs font-medium">نظام Edara الموحد</Badge>
                 </h1>

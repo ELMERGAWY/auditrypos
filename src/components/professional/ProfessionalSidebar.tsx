@@ -1,27 +1,24 @@
-
-import { useState } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { useMemo, useState } from 'react';
 import { cn } from '@/lib/utils';
-import { 
-  LayoutGrid, ShoppingCart, QrCode, Bell, Settings, LogOut,
-  Receipt, Wifi, WifiOff, X, Check, BarChart3, ChefHat,
-  CalendarClock, Package, Users, Truck, Wallet, Store,
-  UsersRound, DollarSign, Lock, ChevronLeft, ChevronRight, ChevronDown,
-  Sparkles, Crown, Zap, Moon, Sun, Volume2, VolumeX,
-  CreditCard, TrendingUp, Shield, HelpCircle, RotateCcw, FileText, Activity, Landmark, Network, Settings2, Construction, Building2, RefreshCw, AlertTriangle, Heart, Gift
+import {
+  AlertTriangle, BarChart3, Bell, Building2, CalendarClock, ChefHat,
+  ChevronDown, CreditCard, DollarSign, FileText, Gift, Heart, Landmark,
+  LayoutGrid, LogOut, Moon, Network, Package, QrCode, Receipt, RefreshCw,
+  RotateCcw, Settings, Settings2, Shield, ShoppingCart, Sparkles, Sun,
+  Truck, Users, UsersRound, Volume2, VolumeX, Wallet, Wifi, WifiOff
 } from 'lucide-react';
-import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { ScrollArea } from '@/components/ui/scroll-area';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { getBusinessConfig, type BusinessType } from '@/lib/businessTypes';
 
-export type SidebarTab = 
+export type SidebarTab =
   | 'home' | 'pos' | 'orders' | 'menu' | 'delivery' | 'shifts' | 'stats' | 'kds'
-  | 'inventory' | 'customers' | 'suppliers' | 'expenses' | 'qr' 
+  | 'inventory' | 'customers' | 'suppliers' | 'expenses' | 'qr'
   | 'waiter' | 'staff' | 'financials' | 'notifications' | 'settings' | 'overheads'
   | 'customer_accounts' | 'sales_returns' | 'supplier_accounts' | 'inventory_receipts'
-  | 'ai_assistant' | 'treasury' | 'users' | 'sales_invoices' | 'purchase_invoices' | 'sales_orders' | 'purchase_orders' | 'projects' | 'manual_journal' | 'chart_of_accounts' | 'accounting_mapping' | 'fixed_assets'
+  | 'ai_assistant' | 'treasury' | 'users' | 'sales_invoices' | 'purchase_invoices'
+  | 'sales_orders' | 'purchase_orders' | 'projects' | 'manual_journal'
+  | 'chart_of_accounts' | 'accounting_mapping' | 'fixed_assets'
   | 'loyalty' | 'gift_cards' | 'branches';
 
 interface NavItem {
@@ -30,8 +27,7 @@ interface NavItem {
   icon: React.ElementType;
   badge?: number;
   locked?: boolean;
-  section?: string;
-  shortcut?: string;
+  section: string;
 }
 
 interface ProfessionalSidebarProps {
@@ -83,14 +79,14 @@ interface ProfessionalSidebarProps {
   onForceSync?: () => void;
 }
 
-const SECTIONS = {
-  main: 'لوحة التحكم والبيع (POS)',
-  sales: 'المبيعات والعملاء (CRM)',
-  purchases: 'المشتريات والموردين',
-  inventory: 'المخزون والإنتاج',
-  accounting: 'المالية والخزينة',
-  analytics: 'التقارير والذكاء الاصطناعي',
-  system: 'إدارة النظام'
+const SECTIONS: Record<string, { label: string; icon: React.ElementType }> = {
+  main: { label: 'مركز التشغيل', icon: LayoutGrid },
+  sales: { label: 'المبيعات والعملاء', icon: Receipt },
+  purchases: { label: 'المشتريات', icon: ShoppingCart },
+  inventory: { label: 'المخزون والمنتجات', icon: Package },
+  accounting: { label: 'الخزينة والمحاسبة', icon: Landmark },
+  analytics: { label: 'التقارير والذكاء', icon: BarChart3 },
+  system: { label: 'إدارة النظام', icon: Settings },
 };
 
 export function ProfessionalSidebar({
@@ -108,487 +104,290 @@ export function ProfessionalSidebar({
   onToggleDark,
   onLogout,
   onUpgrade,
-  isCollapsed = false,
-  onToggleCollapse,
   tabs,
   pendingCount = 0,
   isSyncing = false,
-  syncStatus,
   onForceSync
 }: ProfessionalSidebarProps) {
   const config = getBusinessConfig(businessType);
-  const [hoveredItem, setHoveredItem] = useState<string | null>(null);
-  const [expandedSections, setExpandedSections] = useState<string[]>(['main', 'sales', 'inventory', 'accounting']);
-  
-  const toggleSection = (section: string) => {
-    setExpandedSections(prev => 
-      prev.includes(section) ? prev.filter(s => s !== section) : [...prev, section]
-    );
-  };
-  
-  const isSuspended = restaurant.status === 'suspended' || 
+  const [openSection, setOpenSection] = useState<string | null>(null);
+  const isSuspended = restaurant.status === 'suspended' ||
     (restaurant.subscription_end && new Date(restaurant.subscription_end) < new Date());
-
   const lockedTabs: SidebarTab[] = isTrial ? ['orders', 'delivery', 'shifts', 'stats'] : [];
 
-  const ALL_NAV_ITEMS: Record<string, Partial<NavItem>> = {
-    home: { label: 'لوحة التحكم', icon: TrendingUp, section: 'main' },
-    pos: { label: 'نقطة البيع', icon: LayoutGrid, section: 'main', shortcut: 'F1' },
-    kds: { label: 'عرض المطبخ (KDS)', icon: ChefHat, section: 'main' },
-    shifts: { label: 'الورديات', icon: CalendarClock, section: 'main' },
-    delivery: { label: 'التوصيل', icon: Truck, section: 'main', badge: stats.deliveryOrders },
+  const allNavItems: Record<string, Partial<NavItem>> = {
+    home: { label: 'لوحة التحكم', icon: BarChart3, section: 'main' },
+    pos: { label: 'نقطة البيع', icon: LayoutGrid, section: 'main' },
+    orders: { label: config.labels.orders, icon: Receipt, badge: stats.pendingOrders, section: 'main' },
+    menu: { label: config.labels.menu, icon: config.category === 'food' ? ChefHat : Package, section: 'main' },
+    inventory: { label: 'المخزون', icon: Package, section: 'main' },
+    treasury: { label: 'الخزينة', icon: Wallet, section: 'main' },
+    shifts: { label: 'الشيفتات', icon: CalendarClock, section: 'main' },
+    kds: { label: 'عرض المطبخ', icon: ChefHat, section: 'main' },
+    delivery: { label: 'التوصيل', icon: Truck, badge: stats.deliveryOrders, section: 'main' },
     qr: { label: 'QR Menu', icon: QrCode, section: 'main' },
     waiter: { label: 'طلبات الجرسون', icon: Bell, badge: stats.unackCalls, section: 'main' },
 
-    orders: { label: config.labels.orders, icon: Receipt, badge: stats.pendingOrders, section: 'sales' },
+    customers: { label: config.labels.customers, icon: Users, badge: stats.customersCount, section: 'sales' },
     sales_orders: { label: 'أوامر البيع', icon: FileText, section: 'sales' },
     sales_invoices: { label: 'فواتير البيع', icon: Receipt, badge: stats.salesInvoicesCount, section: 'sales' },
     sales_returns: { label: 'مرتجع المبيعات', icon: RotateCcw, badge: stats.returnsCount, section: 'sales' },
-    customers: { label: config.labels.customers, icon: Users, badge: stats.customersCount, section: 'sales' },
     loyalty: { label: 'نقاط الولاء', icon: Heart, section: 'sales' },
     gift_cards: { label: 'بطاقات الهدايا', icon: Gift, section: 'sales' },
     branches: { label: 'الفروع', icon: Building2, section: 'sales' },
-    crm: { label: 'Ventro CRM', icon: Sparkles, section: 'sales' },
-    projects: { label: 'المشاريع والمقاولات', icon: FileText, section: 'sales' },
+    projects: { label: 'المشاريع', icon: FileText, section: 'sales' },
 
     purchase_orders: { label: 'أوامر الشراء', icon: ShoppingCart, section: 'purchases' },
     purchase_invoices: { label: 'فواتير المشتريات', icon: DollarSign, badge: stats.purchaseInvoicesCount, section: 'purchases' },
     suppliers: { label: 'الموردين', icon: UsersRound, badge: stats.suppliersCount, section: 'purchases' },
-
-    menu: { 
-      label: config.labels.menu, 
-      icon: config.category === 'food' ? ChefHat : Package, 
-      section: 'inventory' 
-    },
-    inventory: { label: 'جرد المخزون', icon: Package, section: 'inventory' },
     inventory_receipts: { label: 'استلام المخزون', icon: FileText, badge: stats.inventoryReceiptsCount, section: 'inventory' },
-    overheads: { label: 'التكاليف الثابتة', icon: Activity, section: 'inventory' },
+    overheads: { label: 'التكاليف الثابتة', icon: BarChart3, section: 'inventory' },
 
     chart_of_accounts: { label: 'شجرة الحسابات', icon: Network, section: 'accounting' },
     accounting_mapping: { label: 'التوجيه المحاسبي', icon: Settings2, section: 'accounting' },
-    treasury: { label: 'الخزينة والبنوك', icon: Landmark, section: 'accounting' },
     financials: { label: 'التقارير المالية', icon: Wallet, section: 'accounting' },
     expenses: { label: 'المصروفات', icon: DollarSign, badge: stats.expensesCount, section: 'accounting' },
-    manual_journal: { label: 'قيود اليومية اليدوية', icon: FileText, section: 'accounting' },
+    manual_journal: { label: 'قيود اليومية', icon: FileText, section: 'accounting' },
     customer_accounts: { label: 'حسابات العملاء', icon: CreditCard, section: 'accounting' },
     supplier_accounts: { label: 'حسابات الموردين', icon: Wallet, section: 'accounting' },
     fixed_assets: { label: 'الأصول الثابتة', icon: Building2, section: 'accounting' },
 
-    stats: { label: 'الإحصائيات الشاملة', icon: BarChart3, section: 'analytics' },
-    ai_assistant: { label: 'مساعد المحاسب (AI)', icon: Sparkles, section: 'analytics' },
-
-    staff: { label: 'إدارة الموظفين', icon: Users, section: 'system' },
-    users: { label: 'إدارة الصلاحيات', icon: Shield, section: 'system' },
+    stats: { label: 'الإحصائيات', icon: BarChart3, section: 'analytics' },
+    ai_assistant: { label: 'مساعد المحاسب', icon: Sparkles, section: 'analytics' },
+    staff: { label: 'الموظفين', icon: Users, section: 'system' },
+    users: { label: 'الصلاحيات', icon: Shield, section: 'system' },
     notifications: { label: 'التنبيهات', icon: Bell, section: 'system' },
-    settings: { label: 'إعدادات النظام', icon: Settings, section: 'system' }
+    settings: { label: 'الإعدادات', icon: Settings, section: 'system' },
   };
 
-  const displayTabs = tabs || config.tabs;
-  const navItems: NavItem[] = displayTabs
-    .map(tabId => {
-      const item = ALL_NAV_ITEMS[tabId];
-      if (!item) return null;
-      return {
-        id: tabId as SidebarTab,
-        label: item.label!,
-        icon: item.icon!,
-        section: item.section || 'main',
-        badge: item.badge,
-        shortcut: item.shortcut,
-        locked: lockedTabs.includes(tabId as SidebarTab)
-      };
-    })
-    .filter(Boolean) as NavItem[];
+  const navItems = useMemo(() => {
+    const displayTabs = tabs || config.tabs;
+    return displayTabs
+      .map(tabId => {
+        const item = allNavItems[tabId];
+        if (!item) return null;
+        return {
+          id: tabId,
+          label: item.label!,
+          icon: item.icon!,
+          badge: item.badge,
+          section: item.section || 'main',
+          locked: lockedTabs.includes(tabId as SidebarTab),
+        } as NavItem;
+      })
+      .filter(Boolean) as NavItem[];
+  }, [tabs, config.tabs, stats.pendingOrders, stats.deliveryOrders, stats.unackCalls, stats.customersCount, stats.suppliersCount, stats.inventoryReceiptsCount]);
 
   const groupedItems = navItems.reduce((acc, item) => {
-    const section = item.section || 'main';
-    if (!acc[section]) acc[section] = [];
-    acc[section].push(item);
+    if (!acc[item.section]) acc[item.section] = [];
+    acc[item.section].push(item);
     return acc;
   }, {} as Record<string, NavItem[]>);
 
-  const handleTabClick = (tabId: SidebarTab) => {
-    const item = navItems.find(i => i.id === tabId);
-    if (item?.locked) {
+  const activeItem = navItems.find(item => item.id === activeTab);
+  const mainQuickItems = (groupedItems.main || []).slice(0, 6);
+
+  const handleTabClick = (item: NavItem) => {
+    if (item.locked) {
       onUpgrade?.();
       return;
     }
-    onTabChange(tabId);
+    onTabChange(item.id);
+    setOpenSection(null);
   };
 
   return (
     <TooltipProvider delayDuration={0}>
-      <motion.aside
-        initial={false}
-        animate={{ 
-          width: isCollapsed ? 80 : 280,
-          right: 16,
-          top: 16,
-          bottom: 16,
-        }}
-        transition={{ duration: 0.3, ease: [0.4, 0, 0.2, 1] }}
-        className={cn(
-          "h-[calc(100vh-32px)] flex flex-col shrink-0 glass-card !rounded-[2.5rem] !border-white/20",
-          "fixed z-50 overflow-hidden"
-        )}
-      >
-        {/* Collapse Toggle */}
-        <button
-          onClick={onToggleCollapse}
-          className="absolute -left-3 top-20 z-50 w-6 h-6 rounded-full bg-primary text-primary-foreground flex items-center justify-center shadow-lg hover:scale-110 transition-transform"
-        >
-          {isCollapsed ? <ChevronLeft className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
-        </button>
-
-        {/* Header */}
-        <div className="p-4 border-b border-border/50">
+      <header className="fixed top-3 left-3 right-3 z-50" dir="rtl">
+        <div className="glass-card !rounded-2xl !border-white/20 px-3 py-2 shadow-2xl">
           <div className="flex items-center gap-3">
-            <motion.div 
-              whileHover={{ scale: 1.05 }}
-              className={cn(
-                "w-12 h-12 rounded-xl flex items-center justify-center text-2xl shrink-0",
-                "bg-gradient-to-br shadow-lg"
-              )}
-              style={{ 
-                background: config.theme.gradient,
-                boxShadow: `0 4px 20px -4px hsl(${config.theme.primary})`
-              }}
+            <button
+              onClick={() => onTabChange('home')}
+              className="flex items-center gap-3 min-w-0 rounded-xl px-2 py-1.5 hover:bg-muted/40"
             >
-              {restaurant.logo_url ? (
-                <img src={restaurant.logo_url} alt="" className="w-8 h-8 object-contain" />
-              ) : (
-                <span>{config.icon}</span>
-              )}
-            </motion.div>
-            
-            <AnimatePresence mode="wait">
-              {!isCollapsed && (
-                <motion.div
-                  initial={{ opacity: 0, x: -10 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  exit={{ opacity: 0, x: -10 }}
-                  className="min-w-0 flex-1"
-                >
-                  <h2 className="font-display font-bold text-sm truncate text-foreground">
-                    {restaurant.name}
-                  </h2>
-                  <p className="text-xs text-muted-foreground truncate flex items-center gap-1">
-                    <span>{config.label}</span>
-                    {isSuspended && (
-                      <Badge variant="destructive" className="text-[8px] px-1 py-0">موقوف</Badge>
-                    )}
-                  </p>
-                </motion.div>
-              )}
-            </AnimatePresence>
-          </div>
-
-          {/* Financial Mini-Stats */}
-          {!isCollapsed && stats.totalSales !== undefined && (
-            <div className="px-4 py-3 bg-primary/5 border-b border-border/50">
-              <div className="grid grid-cols-2 gap-2">
-                <div className="bg-background/50 rounded-lg p-2 border border-border/50">
-                  <p className="text-[10px] text-muted-foreground mb-1 font-bold">المبيعات</p>
-                  <p className="text-xs font-black text-primary truncate">
-                    {(stats.totalSales || 0).toLocaleString()} <span className="text-[8px] font-medium">{stats.currency}</span>
-                  </p>
-                </div>
-                <div className={cn(
-                  "rounded-lg p-2 border border-border/50",
-                  (stats.totalProfit || 0) >= 0 ? "bg-green-500/5 border-green-500/10" : "bg-red-500/5 border-red-500/10"
-                )}>
-                  <p className="text-[10px] text-muted-foreground mb-1 font-bold">الأرباح</p>
-                  <p className={cn(
-                    "text-xs font-black truncate",
-                    (stats.totalProfit || 0) >= 0 ? "text-green-500" : "text-red-500"
-                  )}>
-                    {(stats.totalProfit || 0).toLocaleString()} <span className="text-[8px] font-medium">{stats.currency}</span>
-                  </p>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Trial Banner */}
-          <AnimatePresence>
-            {!isCollapsed && isTrial && !isSuspended && (
-              <motion.div
-                initial={{ opacity: 0, height: 0 }}
-                animate={{ opacity: 1, height: 'auto' }}
-                exit={{ opacity: 0, height: 0 }}
-                className="mt-3 p-3 rounded-lg bg-gradient-to-r from-amber-500/10 to-orange-500/10 border border-amber-500/20"
+              <div
+                className="w-10 h-10 rounded-xl flex items-center justify-center text-xl shrink-0 shadow-lg"
+                style={{ background: config.theme.gradient }}
               >
-                <div className="flex items-center gap-2">
-                  <Sparkles className="w-4 h-4 text-amber-500" />
-                  <span className="text-xs font-medium text-amber-700 dark:text-amber-400">فترة تجريبية</span>
-                </div>
-                <p className="text-[10px] text-muted-foreground mt-1">
-                  متبقي {trialDaysLeft} يوم
+                {restaurant.logo_url ? (
+                  <img src={restaurant.logo_url} alt="" className="w-7 h-7 object-contain" />
+                ) : (
+                  <span>{config.icon}</span>
+                )}
+              </div>
+              <div className="hidden sm:block text-right min-w-0">
+                <p className="font-bold text-sm truncate max-w-44">{restaurant.name}</p>
+                <p className="text-[11px] text-muted-foreground truncate">
+                  {activeItem?.label || config.label}
+                  {isSuspended && <Badge variant="destructive" className="mr-2 text-[9px]">موقوف</Badge>}
                 </p>
-                <button 
-                  onClick={onUpgrade}
-                  className="text-[10px] text-primary font-medium mt-1 hover:underline flex items-center gap-1"
-                >
-                  <Crown className="w-3 h-3" />
-                  ترقية الآن
-                </button>
-              </motion.div>
-            )}
-          </AnimatePresence>
-        </div>
+              </div>
+            </button>
 
-        {/* Navigation */}
-        <ScrollArea className="flex-1 px-3 py-4">
-          {Object.entries(groupedItems).map(([section, items]) => {
-            const isExpanded = isCollapsed || expandedSections.includes(section);
-            return (
-            <div key={section} className="mb-2">
-              {!isCollapsed && (
-                <button 
-                  onClick={() => toggleSection(section)}
-                  className="w-full flex items-center justify-between px-3 py-2 text-[10px] font-bold text-muted-foreground uppercase tracking-wider hover:text-foreground transition-colors group"
-                >
-                  <span>{SECTIONS[section as keyof typeof SECTIONS]}</span>
-                  <ChevronDown className={cn("w-3 h-3 transition-transform duration-200", isExpanded ? "rotate-180" : "rotate-0", "group-hover:text-primary")} />
-                </button>
-              )}
-              
-              <AnimatePresence initial={false}>
-                {isExpanded && (
-                  <motion.div
-                    initial={isCollapsed ? false : { height: 0, opacity: 0 }}
-                    animate={{ height: 'auto', opacity: 1 }}
-                    exit={isCollapsed ? undefined : { height: 0, opacity: 0 }}
-                    className="space-y-1 overflow-hidden"
+            <nav className="hidden lg:flex items-center gap-1 flex-1 min-w-0">
+              {mainQuickItems.map(item => {
+                const Icon = item.icon;
+                const isActive = activeTab === item.id;
+                return (
+                  <button
+                    key={item.id}
+                    onClick={() => handleTabClick(item)}
+                    className={cn(
+                      'relative flex items-center gap-2 h-10 px-3 rounded-xl text-sm font-bold transition-all',
+                      isActive ? 'gradient-bg text-white shadow-lg shadow-primary/20' : 'hover:bg-muted/60 text-muted-foreground hover:text-foreground'
+                    )}
                   >
-                    {items.map((item) => {
-                  const isActive = activeTab === item.id;
-                  const isLocked = item.locked;
-                  const Icon = item.icon;
-                  
+                    <Icon className="w-4 h-4" />
+                    <span>{item.label}</span>
+                    {!!item.badge && item.badge > 0 && (
+                      <Badge variant="destructive" className="h-5 min-w-5 px-1 text-[10px]">{item.badge}</Badge>
+                    )}
+                  </button>
+                );
+              })}
+
+              {Object.entries(groupedItems)
+                .filter(([section]) => section !== 'main')
+                .map(([section, items]) => {
+                  const SectionIcon = SECTIONS[section]?.icon || Settings;
+                  const hasActive = items.some(item => item.id === activeTab);
                   return (
-                    <Tooltip key={item.id}>
-                      <TooltipTrigger asChild>
-                        <motion.button
-                          onClick={() => handleTabClick(item.id)}
-                          onHoverStart={() => setHoveredItem(item.id)}
-                          onHoverEnd={() => setHoveredItem(null)}
-                          whileHover={{ x: isCollapsed ? 0 : 2 }}
-                          whileTap={{ scale: 0.98 }}
-                          className={cn(
-                            "w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-all duration-200",
-                            "relative overflow-hidden group",
-                            isActive 
-                              ? "text-primary font-medium"
-                              : "text-muted-foreground hover:text-foreground hover:bg-muted/50",
-                            isLocked && "opacity-50 cursor-not-allowed"
-                          )}
-                        >
-                          {/* Active Indicator */}
-                          {isActive && (
-                            <motion.div
-                              layoutId="activeIndicator"
-                              className="absolute right-0 top-1/2 -translate-y-1/2 w-1 h-6 rounded-l-full"
-                              style={{ background: `hsl(${config.theme.primary})` }}
-                              transition={{ type: "spring", stiffness: 300, damping: 30 }}
-                            />
-                          )}
-                          
-                          {/* Icon */}
-                          <div className={cn(
-                            "relative flex items-center justify-center w-9 h-9 rounded-lg transition-colors shrink-0",
-                            isActive 
-                              ? "bg-primary/10"
-                              : "bg-muted/50 group-hover:bg-muted"
-                          )}>
-                            <Icon className={cn(
-                              "w-4 h-4 transition-colors",
-                              isActive && "text-primary"
-                            )} />
-                            
-                            {/* Badge on Icon */}
-                            {item.badge && item.badge > 0 && (
-                              <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-destructive text-destructive-foreground text-[9px] font-bold flex items-center justify-center">
-                                {item.badge > 9 ? '9+' : item.badge}
-                              </span>
-                            )}
+                    <div
+                      key={section}
+                      className="relative"
+                      onMouseEnter={() => setOpenSection(section)}
+                      onMouseLeave={() => setOpenSection(null)}
+                    >
+                      <button
+                        onClick={() => setOpenSection(openSection === section ? null : section)}
+                        className={cn(
+                          'flex items-center gap-2 h-10 px-3 rounded-xl text-sm font-bold transition-all',
+                          hasActive ? 'bg-primary/10 text-primary' : 'hover:bg-muted/60 text-muted-foreground hover:text-foreground'
+                        )}
+                      >
+                        <SectionIcon className="w-4 h-4" />
+                        <span>{SECTIONS[section]?.label || section}</span>
+                        <ChevronDown className={cn('w-3 h-3 transition-transform', openSection === section && 'rotate-180')} />
+                      </button>
+
+                      {openSection === section && (
+                        <div className="absolute right-0 top-full pt-2 w-72">
+                          <div className="rounded-2xl border border-border/70 bg-card/95 backdrop-blur-xl shadow-2xl p-2">
+                            {items.map(item => {
+                              const Icon = item.icon;
+                              const isActive = activeTab === item.id;
+                              return (
+                                <button
+                                  key={item.id}
+                                  onClick={() => handleTabClick(item)}
+                                  className={cn(
+                                    'w-full flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm transition-all text-right',
+                                    isActive ? 'bg-primary/10 text-primary font-bold' : 'hover:bg-muted/70'
+                                  )}
+                                >
+                                  <span className="w-9 h-9 rounded-lg bg-muted/60 flex items-center justify-center shrink-0">
+                                    <Icon className="w-4 h-4" />
+                                  </span>
+                                  <span className="flex-1">{item.label}</span>
+                                  {!!item.badge && item.badge > 0 && (
+                                    <Badge variant="destructive" className="h-5 min-w-5 px-1 text-[10px]">{item.badge}</Badge>
+                                  )}
+                                </button>
+                              );
+                            })}
                           </div>
-                          
-                          {/* Label */}
-                          <AnimatePresence mode="wait">
-                            {!isCollapsed && (
-                              <motion.span
-                                initial={{ opacity: 0, x: -10 }}
-                                animate={{ opacity: 1, x: 0 }}
-                                exit={{ opacity: 0, x: -10 }}
-                                className="flex-1 text-right"
-                              >
-                                {item.label}
-                              </motion.span>
-                            )}
-                          </AnimatePresence>
-                          
-                          {/* Locked Icon */}
-                          {!isCollapsed && isLocked && (
-                            <Lock className="w-3 h-3 text-muted-foreground" />
-                          )}
-                          
-                          {/* Shortcut */}
-                          {!isCollapsed && item.shortcut && !isActive && (
-                            <kbd className="hidden lg:inline-block px-1.5 py-0.5 text-[10px] font-mono bg-muted rounded">
-                              {item.shortcut}
-                            </kbd>
-                          )}
-                        </motion.button>
-                      </TooltipTrigger>
-                      
-                      {isCollapsed && (
-                        <TooltipContent side="left" className="flex items-center gap-2">
-                          <span>{item.label}</span>
-                          {item.badge && item.badge > 0 && (
-                            <Badge variant="destructive" className="h-4 text-[9px]">
-                              {item.badge}
-                            </Badge>
-                          )}
-                          {isLocked && <Lock className="w-3 h-3" />}
-                        </TooltipContent>
+                        </div>
                       )}
-                    </Tooltip>
+                    </div>
                   );
                 })}
-                  </motion.div>
-                )}
-              </AnimatePresence>
-            </div>
-          )})}
-        </ScrollArea>
+            </nav>
 
-        {/* Footer */}
-        <div className="p-3 border-t border-border/50 space-y-2">
-          {/* Online Status & Sync Indicator */}
-          <div className={cn(
-            "flex flex-col gap-1 px-3 py-2 rounded-lg text-xs",
-            stats.isOnline ? "bg-emerald-500/10 text-emerald-600" : "bg-destructive/10 text-destructive"
-          )}>
-            <div className="flex items-center gap-2">
-              {stats.isOnline ? (
-                <>
-                  <Wifi className="w-3.5 h-3.5" />
-                  {!isCollapsed && <span>متصل</span>}
-                </>
-              ) : (
-                <>
-                  <WifiOff className="w-3.5 h-3.5" />
-                  {!isCollapsed && <span>غير متصل</span>}
-                </>
+            <div className="lg:hidden relative flex-1">
+              <button
+                onClick={() => setOpenSection(openSection === 'mobile' ? null : 'mobile')}
+                className="w-full flex items-center justify-between gap-2 h-10 px-3 rounded-xl bg-muted/50 text-sm font-bold"
+              >
+                <span>{activeItem?.label || 'القائمة'}</span>
+                <ChevronDown className={cn('w-4 h-4 transition-transform', openSection === 'mobile' && 'rotate-180')} />
+              </button>
+              {openSection === 'mobile' && (
+                <div className="absolute right-0 left-0 top-full pt-2">
+                  <div className="max-h-[70vh] overflow-auto rounded-2xl border border-border/70 bg-card/95 backdrop-blur-xl shadow-2xl p-2">
+                    {Object.entries(groupedItems).map(([section, items]) => (
+                      <div key={section} className="mb-2">
+                        <p className="px-3 py-1 text-[11px] font-bold text-muted-foreground">{SECTIONS[section]?.label || section}</p>
+                        {items.map(item => {
+                          const Icon = item.icon;
+                          return (
+                            <button key={item.id} onClick={() => handleTabClick(item)} className="w-full flex items-center gap-3 rounded-xl px-3 py-2 text-sm hover:bg-muted/70">
+                              <Icon className="w-4 h-4" />
+                              <span className="flex-1 text-right">{item.label}</span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    ))}
+                  </div>
+                </div>
               )}
             </div>
-            {pendingCount > 0 && (
-              <div className="flex items-center gap-1 text-amber-600">
-                <AlertTriangle className="w-3 h-3" />
-                {!isCollapsed && <span>{pendingCount} معلقة</span>}
+
+            <div className="flex items-center gap-1 shrink-0">
+              <div className={cn('hidden xl:flex items-center gap-2 rounded-xl px-3 h-10 text-xs font-bold', stats.isOnline ? 'bg-emerald-500/10 text-emerald-600' : 'bg-destructive/10 text-destructive')}>
+                {stats.isOnline ? <Wifi className="w-4 h-4" /> : <WifiOff className="w-4 h-4" />}
+                <span>{stats.isOnline ? 'متصل' : 'غير متصل'}</span>
+                {pendingCount > 0 && <span className="text-amber-600">({pendingCount})</span>}
               </div>
-            )}
-            {isSyncing && (
-              <div className="flex items-center gap-1 text-blue-600">
-                <RefreshCw className="w-3 h-3 animate-spin" />
-                {!isCollapsed && <span>جاري المزامنة...</span>}
-              </div>
-            )}
-            {onForceSync && stats.isOnline && (
-              <button
-                onClick={onForceSync}
-                disabled={isSyncing}
-                className="mt-1 flex items-center justify-center gap-1 px-2 py-1 rounded bg-primary/10 text-primary hover:bg-primary/20 text-[10px]"
-              >
-                <RotateCcw className={cn("w-3 h-3", isSyncing && "animate-spin")} />
-                {!isCollapsed && <span>مزامنة</span>}
-              </button>
-            )}
+
+              {onForceSync && (
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <button onClick={onForceSync} disabled={isSyncing} className="w-10 h-10 rounded-xl hover:bg-muted/60 flex items-center justify-center">
+                      <RefreshCw className={cn('w-4 h-4', isSyncing && 'animate-spin')} />
+                    </button>
+                  </TooltipTrigger>
+                  <TooltipContent>مزامنة</TooltipContent>
+                </Tooltip>
+              )}
+
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button onClick={onToggleSound} className="w-10 h-10 rounded-xl hover:bg-muted/60 flex items-center justify-center">
+                    {soundEnabled ? <Volume2 className="w-4 h-4 text-emerald-500" /> : <VolumeX className="w-4 h-4 text-muted-foreground" />}
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent>الصوت</TooltipContent>
+              </Tooltip>
+
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button onClick={onToggleDark} className="w-10 h-10 rounded-xl hover:bg-muted/60 flex items-center justify-center">
+                    {isDark ? <Sun className="w-4 h-4 text-amber-500" /> : <Moon className="w-4 h-4 text-indigo-500" />}
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent>المظهر</TooltipContent>
+              </Tooltip>
+
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button onClick={onLogout} className="w-10 h-10 rounded-xl hover:bg-destructive/10 text-destructive flex items-center justify-center">
+                    <LogOut className="w-4 h-4" />
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent>تسجيل الخروج</TooltipContent>
+              </Tooltip>
+            </div>
           </div>
 
-          {/* Quick Toggles */}
-          <div className="flex items-center gap-1">
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <button
-                  onClick={onToggleSound}
-                  className={cn(
-                    "flex-1 flex items-center justify-center gap-2 px-2 py-2 rounded-lg text-xs transition-colors",
-                    "hover:bg-muted"
-                  )}
-                >
-                  {soundEnabled ? (
-                    <Volume2 className="w-4 h-4 text-emerald-500" />
-                  ) : (
-                    <VolumeX className="w-4 h-4 text-muted-foreground" />
-                  )}
-                  {!isCollapsed && (
-                    <span className={soundEnabled ? "text-emerald-600" : "text-muted-foreground"}>
-                      {soundEnabled ? 'الصوت مفعل' : 'صامت'}
-                    </span>
-                  )}
-                </button>
-              </TooltipTrigger>
-              <TooltipContent>تبديل الصوت</TooltipContent>
-            </Tooltip>
-
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <button
-                  onClick={onToggleDark}
-                  className={cn(
-                    "flex-1 flex items-center justify-center gap-2 px-2 py-2 rounded-lg text-xs transition-colors",
-                    "hover:bg-muted"
-                  )}
-                >
-                  {isDark ? (
-                    <Sun className="w-4 h-4 text-amber-500" />
-                  ) : (
-                    <Moon className="w-4 h-4 text-indigo-500" />
-                  )}
-                  {!isCollapsed && (
-                    <span>{isDark ? 'وضع فاتح' : 'وضع داكن'}</span>
-                  )}
-                </button>
-              </TooltipTrigger>
-              <TooltipContent>تبديل المظهر</TooltipContent>
-            </Tooltip>
-          </div>
-
-          {/* Logout */}
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <button
-                onClick={onLogout}
-                className="w-full flex items-center gap-2 px-3 py-2.5 rounded-lg text-xs text-destructive hover:bg-destructive/10 transition-colors"
-              >
-                <LogOut className="w-4 h-4" />
-                {!isCollapsed && <span>تسجيل الخروج</span>}
-              </button>
-            </TooltipTrigger>
-            <TooltipContent>تسجيل الخروج</TooltipContent>
-          </Tooltip>
-
-          {/* User Info */}
-          {!isCollapsed && (
-            <div className="pt-2 border-t border-border/30">
-              <div className="flex items-center gap-2 px-2">
-                <div className="w-7 h-7 rounded-full bg-muted flex items-center justify-center">
-                  <span className="text-xs font-medium">
-                    {user.full_name?.[0] || user.email?.[0] || 'U'}
-                  </span>
-                </div>
-                <div className="min-w-0 flex-1">
-                  <p className="text-[10px] font-medium truncate">
-                    {user.full_name || user.email}
-                  </p>
-                </div>
-              </div>
+          {isTrial && (
+            <div className="mt-2 rounded-xl bg-amber-500/10 border border-amber-500/20 px-3 py-1.5 text-[11px] text-amber-700 dark:text-amber-300 flex items-center justify-between">
+              <span>فترة تجريبية، متبقي {trialDaysLeft} يوم</span>
+              <button onClick={onUpgrade} className="font-bold hover:underline">ترقية الآن</button>
             </div>
           )}
         </div>
-      </motion.aside>
+      </header>
     </TooltipProvider>
   );
 }
