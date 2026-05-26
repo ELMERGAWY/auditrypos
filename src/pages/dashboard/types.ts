@@ -47,6 +47,7 @@ export interface Order {
   delivery_agent_id: string | null;
   delivery_address: string;
   customer_phone: string;
+  customer_ref?: string; // قابل للتعديل يدويًا
   delivery_lat: number | null;
   delivery_lng: number | null;
   tracking_token: string | null;
@@ -73,21 +74,23 @@ export interface Restaurant {
   inventory_system?: string;
 }
 
-export interface HeldInvoice {
-  id: string;
-  label: string;
-  cart: { item: MenuItem; qty: number; qtyText?: string; unitMode?: string }[];
-  tableNumber: string;
-  customerName: string;
-  notes: string;
-  discount: string;
-  discountType: 'percent' | 'fixed';
-  orderType: OrderType;
-  deliveryAddress: string;
-  customerPhone: string;
-  deliveryAgentId: string;
-  timestamp: number;
-}
+  export interface HeldInvoice {
+    id: string;
+    label: string;
+    cart: { item: MenuItem; qty: number; qtyText?: string; unitMode?: string }[];
+    tableNumber: string;
+    customerName: string;
+    notes: string;
+    discount: string;
+    discountType: 'percent' | 'fixed';
+    orderType: OrderType;
+    deliveryAddress?: string;
+    customerPhone?: string;
+    deliveryAgentId: string;
+    timestamp: number;
+    paymentMethod?: string;
+    selectedAccountId?: string;
+  }
 
 export interface DeliveryAgent {
   id: string;

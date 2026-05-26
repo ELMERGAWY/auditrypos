@@ -567,7 +567,7 @@ export default function Dashboard() {
   const holdCurrentInvoice = () => {
     if (cart.length === 0) { toast.error('السلة فارغة'); return; }
     const newTab: HeldInvoice = {
-      id: crypto.randomUUID(),
+      id: activeInvoiceId || crypto.randomUUID(),
       label: activeInvoiceId
         ? (invoiceTabs.find(t => t.id === activeInvoiceId)?.label || `فاتورة ${invoiceTabs.length + 1}`)
         : `فاتورة ${invoiceTabs.length + 1}`,
@@ -575,6 +575,8 @@ export default function Dashboard() {
       discount, discountType, orderType, deliveryAddress, customerPhone,
       deliveryAgentId: selectedDeliveryAgent,
       timestamp: Date.now(),
+      paymentMethod,
+      selectedAccountId: selectedAccountId || undefined
     };
 
     if (activeInvoiceId) {
@@ -588,7 +590,7 @@ export default function Dashboard() {
 
   const recallInvoice = (tab: HeldInvoice) => {
     // Save current cart as another tab if not empty
-    if (cart.length > 0) holdCurrentInvoice();
+    if (cart.length > 0 && !activeInvoiceId) holdCurrentInvoice();
     setCart(tab.cart.map(c => ({ ...c, qtyText: c.qtyText || String(c.qty), unitMode: c.unitMode || 'قطعة' })));
     setTableNumber(tab.tableNumber);
     setCustomerName(tab.customerName);
@@ -599,6 +601,8 @@ export default function Dashboard() {
     setOrderType(tab.orderType || 'dine_in');
     setDeliveryAddress(tab.deliveryAddress || '');
     setSelectedDeliveryAgent(tab.deliveryAgentId || '');
+    setPaymentMethod(tab.paymentMethod || 'cash');
+    setSelectedAccountId(tab.selectedAccountId || null);
     setActiveInvoiceId(tab.id);
     setShowInvoiceTabs(false);
     toast.success(`تم استعادة ${tab.label}`);
@@ -1420,6 +1424,18 @@ export default function Dashboard() {
                 selectedAccountId={selectedAccountId}
                 setSelectedAccountId={setSelectedAccountId}
               />
+              <Suspense fallback={null}>
+                <InvoiceTabs
+                  show={showInvoiceTabs}
+                  onClose={() => setShowInvoiceTabs(false)}
+                  invoiceTabs={invoiceTabs}
+                  activeInvoiceId={activeInvoiceId}
+                  recallInvoice={recallInvoice}
+                  deleteInvoiceTab={deleteInvoiceTab}
+                  clearCart={clearCart}
+                  currency={currency}
+                />
+              </Suspense>
             </div>
             </div>
           )}

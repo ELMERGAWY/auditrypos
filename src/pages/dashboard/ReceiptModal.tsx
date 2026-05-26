@@ -1,13 +1,16 @@
-import { useRef } from 'react';
+import { useRef, useState } from 'react';
 import { Printer } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import type { Order, Restaurant } from './types';
 import { ORDER_TYPE_CONFIG } from './types';
+import { supabase } from '@/integrations/supabase/client';
+import { toast } from 'sonner';
 
 interface ReceiptProps {
   order: Order;
   restaurant: Restaurant;
   onClose: () => void;
+  onComplete?: () => void;
 }
 
 const PAYMENT_LABELS: Record<string, string> = {
@@ -96,6 +99,9 @@ function ReceiptContent({ order, restaurant }: { order: Order; restaurant: Resta
       {order.delivery_address && (
         <div className="row"><span className="info-label">العنوان / {order.delivery_address}</span></div>
       )}
+      {order.customer_ref && (
+        <div className="row"><span className="info-label">مرجع العميل / <span className="bold">{order.customer_ref}</span></span></div>
+      )}
 
       {/* Items Section - Using divs instead of table for better thermal printer support */}
       <div className="items-section">
@@ -181,7 +187,7 @@ function ReceiptContent({ order, restaurant }: { order: Order; restaurant: Resta
   );
 }
 
-export function ReceiptModalWrapper({ order, restaurant, onClose }: ReceiptProps) {
+export function ReceiptModalWrapper({ order, restaurant, onClose, onComplete }: ReceiptProps) {
   const ref = useRef<HTMLDivElement>(null);
 
   const printReceipt = () => {
@@ -266,11 +272,14 @@ export function ReceiptModalWrapper({ order, restaurant, onClose }: ReceiptProps
           <Printer className="w-4 h-4 ml-1" /> طباعة حرارية
         </Button>
         <Button variant="outline" onClick={onClose} className="flex-1">إغلاق</Button>
+        {onComplete && (
+          <Button onClick={onComplete} className="flex-1 gradient-bg text-primary-foreground border-0">إتمام الطلب</Button>
+        )}
       </div>
     </div>
   );
 }
 
-export function ReceiptModal({ order, restaurant, onClose }: ReceiptProps) {
-  return <ReceiptModalWrapper order={order} restaurant={restaurant} onClose={onClose} />;
+export function ReceiptModal({ order, restaurant, onClose, onComplete }: ReceiptProps) {
+  return <ReceiptModalWrapper order={order} restaurant={restaurant} onClose={onClose} onComplete={onComplete} />;
 }
