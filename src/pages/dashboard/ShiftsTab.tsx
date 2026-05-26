@@ -9,6 +9,7 @@ import { Badge } from '@/components/ui/badge';
 import { DollarSign, Clock, TrendingUp, Receipt, AlertCircle, CheckCircle, Users } from 'lucide-react';
 import type { Shift, Restaurant } from './types';
 import { journalService } from '@/lib/accounting/journalService';
+import { postUnpostedOrders } from '@/lib/accounting/deferredPosting';
 
 interface StaffMember {
   id: string;
@@ -150,25 +151,43 @@ export function ShiftsTab({ restaurant, currentShift, setCurrentShift, profileNa
   const handleCloseShiftWithPosting = async () => {
     if (!currentShift) return;
     setIsClosing(true);
+    const shiftToClose = currentShift;
+    const closeTime = new Date().toISOString();
     try {
-      const summary = await postShiftOrders();
-      setPostingSummary(summary);
 
       const { error } = await supabase.from('shifts').update({
         status: 'closed',
-        closed_at: new Date().toISOString(),
+        closed_at: closeTime,
         closing_balance: Number(closingBalance) || 0,
         total_sales: todayRevenue,
         total_orders: todayOrdersCount,
         notes: shiftNotes,
-      }).eq('id', currentShift.id);
+      }).eq('id', shiftToClose.id);
 
       if (error) throw error;
       setCurrentShift(null);
       setClosingBalance('');
       setShiftNotes('');
       setLoadedHistory(false);
-      toast.success(`تم إغلاق الشيفت وترحيل ${summary.posted} فاتورة محاسبيا`);
+      toast.success('تم إغلاق الشيفت وحفظ التقرير. الترحيل المحاسبي سيكتمل في الخلفية.');
+
+      void postUnpostedOrders({
+        restaurantId: restaurant.id,
+        businessType: restaurant.business_type || 'restaurant',
+        from: shiftToClose.opened_at,
+        to: closeTime,
+        batchSize: 25,
+        maxOrders: 25,
+      })
+        .then(summary => {
+          setPostingSummary(summary);
+          if (summary.posted > 0) toast.success(`تم ترحيل ${summary.posted} فاتورة محاسبياً`);
+          if (summary.failed > 0) toast.warning(`تبقى ${summary.failed} فاتورة تحتاج إعادة محاولة ترحيل`);
+        })
+        .catch(error => {
+          console.warn('[shift] background posting failed:', error);
+          toast.error('تعذر إكمال الترحيل المحاسبي في الخلفية');
+        });
     } catch (error: any) {
       toast.error(error?.message || 'فشل إغلاق الشيفت أو ترحيل الفواتير محاسبيا');
     } finally {

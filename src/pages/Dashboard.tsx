@@ -108,6 +108,7 @@ export default function Dashboard() {
   const [syncStatus, setSyncStatus] = useState<{ synced: number; errors: number; lastSync: Date | null }>({ synced: 0, errors: 0, lastSync: null });
   const [isSyncing, setIsSyncing] = useState(false);
   const [pendingCount, setPendingCount] = useState(0);
+  const [pendingPostingCount, setPendingPostingCount] = useState(0);
 
   useEffect(() => {
     const updatePendingCount = async () => {
@@ -143,6 +144,90 @@ export default function Dashboard() {
     const interval = setInterval(handleSync, 30000);
     return () => clearInterval(interval);
   }, [isOnline, isSyncing]);
+
+  const runDeferredPosting = useCallback(async (reason: 'auto' | 'checkout' | 'hide' | 'logout' = 'auto', batchSize = 8) => {
+    if (!restaurant?.id || !isOnline) return;
+    try {
+      const { postUnpostedOrders, countUnpostedOrders } = await import('@/lib/accounting/deferredPosting');
+      const summary = await postUnpostedOrders({
+        restaurantId: restaurant.id,
+        businessType,
+        batchSize,
+        maxOrders: batchSize,
+      });
+      setPendingPostingCount(summary.pending || await countUnpostedOrders(restaurant.id));
+      if (reason === 'logout' && summary.posted > 0) {
+        toast.success(`تم ترحيل ${summary.posted} فاتورة قبل الخروج`);
+      }
+    } catch (error) {
+      console.warn('[dashboard] deferred posting failed:', error);
+      if (reason === 'logout') toast.error('تعذر إنهاء الترحيل المحاسبي قبل الخروج');
+    }
+  }, [businessType, isOnline, restaurant?.id]);
+
+  useEffect(() => {
+    if (!restaurant?.id || !isOnline) return;
+
+    const refreshPostingStatus = async () => {
+      try {
+        const { countUnpostedOrders } = await import('@/lib/accounting/deferredPosting');
+        setPendingPostingCount(await countUnpostedOrders(restaurant.id));
+      } catch {}
+    };
+
+    const firstRun = window.setTimeout(() => {
+      void runDeferredPosting('auto', 6);
+    }, 6000);
+    const postingInterval = window.setInterval(() => {
+      void runDeferredPosting('auto', 10);
+    }, 90000);
+    const countInterval = window.setInterval(refreshPostingStatus, 20000);
+
+    void refreshPostingStatus();
+
+    return () => {
+      window.clearTimeout(firstRun);
+      window.clearInterval(postingInterval);
+      window.clearInterval(countInterval);
+    };
+  }, [isOnline, restaurant?.id, runDeferredPosting]);
+
+  useEffect(() => {
+    const handleBeforeUnload = (event: BeforeUnloadEvent) => {
+      if (!currentShift && pendingPostingCount === 0) return;
+      event.preventDefault();
+      event.returnValue = 'يوجد شيفت مفتوح أو فواتير لم تترحل محاسبياً. من فضلك أغلق الشيفت أو انتظر اكتمال الترحيل قبل إغلاق النظام.';
+      return event.returnValue;
+    };
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'hidden') {
+        void runDeferredPosting('hide', 3);
+      }
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [currentShift, pendingPostingCount, runDeferredPosting]);
+
+  const handleSafeLogout = useCallback(async () => {
+    if (currentShift || pendingPostingCount > 0) {
+      const proceed = window.confirm(
+        `يوجد ${currentShift ? 'شيفت مفتوح' : ''}${currentShift && pendingPostingCount > 0 ? ' و' : ''}${pendingPostingCount > 0 ? `${pendingPostingCount} فاتورة لم تترحل محاسبياً` : ''}. هل تريد محاولة الترحيل ثم الخروج؟`
+      );
+      if (!proceed) {
+        toast.info('من فضلك أغلق الشيفت أو انتظر اكتمال الترحيل قبل الخروج');
+        return;
+      }
+      await runDeferredPosting('logout', 25);
+    }
+    handleLogout();
+  }, [currentShift, handleLogout, pendingPostingCount, runDeferredPosting]);
 
   const handleForceSync = async () => {
     if (!isOnline) { toast.error('لا يوجد اتصال بالإنترنت'); return; }
@@ -691,6 +776,7 @@ export default function Dashboard() {
       setShowReceipt(true);
       if (activeInvoiceId) setInvoiceTabs(prev => prev.filter(t => t.id !== activeInvoiceId));
       toast.success(`تم إنشاء الطلب #${order.order_number?.slice(-4)} بنجاح`);
+      void runDeferredPosting('checkout', 3);
       clearCart();
       return;
     }
@@ -1167,7 +1253,7 @@ export default function Dashboard() {
         onToggleSound={() => setSoundEnabled(!soundEnabled)}
         isDark={isDark}
         onToggleDark={toggleDarkMode}
-        onLogout={handleLogout}
+        onLogout={handleSafeLogout}
         onUpgrade={() => navigate('/payment')}
         isCollapsed={sidebarCollapsed}
         onToggleCollapse={() => setSidebarCollapsed(!sidebarCollapsed)}
