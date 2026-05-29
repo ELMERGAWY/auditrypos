@@ -103,6 +103,7 @@ export default function Dashboard() {
   const trialDaysLeft = restaurant?.subscription_end ? Math.max(0, Math.ceil((new Date(restaurant.subscription_end).getTime() - new Date().getTime()) / (1000 * 3600 * 24))) : 0;
   const lockedTabs = restaurant?.locked_tabs || [];
 
+  const [lastPosTab, setLastPosTab] = useState<SidebarTab>('pos');
   const [activeTab, setActiveTab] = useState<SidebarTab>('home');
   const [activeSubView, setActiveSubView] = useState<'stock' | 'bom'>('stock');
   const [syncStatus, setSyncStatus] = useState<{ synced: number; errors: number; lastSync: Date | null }>({ synced: 0, errors: 0, lastSync: null });
@@ -1210,6 +1211,12 @@ export default function Dashboard() {
       toast.error('هذه الميزة متاحة بعد الترقية للنسخة المدفوعة');
       return;
     }
+    
+    // Save current POS tab state if moving away
+    if (activeTab === 'pos' || activeTab === 'orders' || activeTab === 'menu' || activeTab === 'inventory' || activeTab === 'treasury' || activeTab === 'shifts') {
+      setLastPosTab(activeTab);
+    }
+    
     setActiveTab(tabId);
   };
 
@@ -1299,12 +1306,26 @@ export default function Dashboard() {
             
             {/* Header & Date Range Filter */}
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-4 border-b border-border/50 pb-4">
-              <div>
-                <h1 className="text-2xl lg:text-3xl font-black mb-1 flex items-center gap-3">
-                  {activeTab === 'home' ? 'لوحة التحكم الرئيسية' : (allTabs.find(t => t.id === activeTab)?.label || 'إدارة النظام')}
-                  <Badge variant="outline" className="text-xs font-medium">نظام auditry لتسهيل الاعمال</Badge>
-                </h1>
-                <p className="text-muted-foreground font-medium">متابعة الأداء والعمليات المالية والتشغيلية</p>
+              <div className="flex items-center gap-4">
+                {/* Back Button for POS Sub-tabs */}
+                {(activeTab === 'orders' || activeTab === 'menu' || activeTab === 'inventory' || activeTab === 'treasury' || activeTab === 'shifts') && (
+                  <Button 
+                    variant="ghost" 
+                    size="sm" 
+                    onClick={() => setActiveTab(lastPosTab)}
+                    className="h-10 w-10 rounded-xl hover:bg-primary/10 text-primary"
+                    title="الرجوع لنقطة البيع"
+                  >
+                    <ArrowRightLeft className="w-5 h-5" />
+                  </Button>
+                )}
+                <div>
+                  <h1 className="text-2xl lg:text-3xl font-black mb-1 flex items-center gap-3">
+                    {activeTab === 'home' ? 'لوحة التحكم الرئيسية' : (allTabs.find(t => t.id === activeTab)?.label || 'إدارة النظام')}
+                    <Badge variant="outline" className="text-xs font-medium">نظام auditry لتسهيل الاعمال</Badge>
+                  </h1>
+                  <p className="text-muted-foreground font-medium">متابعة الأداء والعمليات المالية والتشغيلية</p>
+                </div>
               </div>
 
               <div className="flex items-center gap-3 bg-secondary/30 p-2 rounded-2xl border border-border/50 shadow-inner">
@@ -1371,8 +1392,8 @@ export default function Dashboard() {
                 ].map(action => (
                   <Button
                     key={action.id}
-                    variant={action.id === 'pos' ? 'default' : 'outline'}
-                    className={action.id === 'pos' ? 'gradient-bg border-0 text-white' : ''}
+                    variant={activeTab === action.id ? 'default' : 'outline'}
+                    className={activeTab === action.id ? 'gradient-bg border-0 text-white' : ''}
                     onClick={() => setActiveTab(action.id as SidebarTab)}
                   >
                     <action.icon className="w-4 h-4 ml-1" />

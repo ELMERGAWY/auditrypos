@@ -159,12 +159,10 @@ export const POSCart = memo(function POSCart({
             onChange={setCustomerName}
             placeholder={getCustomerPlaceholder(businessType)}
           />
-          {(orderType === 'delivery' || orderType === 'takeaway') && (
-            <div className="relative">
-              <Phone className="w-3.5 h-3.5 absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
-              <Input value={customerPhone} onChange={e => setCustomerPhone(e.target.value)} placeholder="رقم الهاتف" className="pr-8 h-9 text-xs" />
-            </div>
-          )}
+          <div className="relative">
+            <Phone className="w-3.5 h-3.5 absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
+            <Input value={customerPhone} onChange={e => setCustomerPhone(e.target.value)} placeholder="رقم الهاتف" className="pr-8 h-9 text-xs" />
+          </div>
         </div>
         <div className="relative">
           <Hash className="w-3.5 h-3.5 absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
