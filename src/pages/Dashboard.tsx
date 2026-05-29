@@ -254,6 +254,7 @@ export default function Dashboard() {
   const [tableNumber, setTableNumber] = useState('');
   const [customerName, setCustomerName] = useState('');
   const [customerPhone, setCustomerPhone] = useState('');
+  const [customerRef, setCustomerRef] = useState('');
   const [orderNotes, setOrderNotes] = useState('');
   const [discount, setDiscount] = useState('');
   const [discountType, setDiscountType] = useState<'percent' | 'fixed'>('percent');
@@ -430,6 +431,16 @@ export default function Dashboard() {
   const topItems = [...itemSales.entries()].sort((a, b) => b[1] - a[1]).slice(0, 5);
   const filteredOrders = orderFilter === 'all' ? orders : orders.filter(o => o.status === orderFilter);
 
+
+  const selectCustomerFromSearch = (name: string, phone?: string) => {
+    setCustomerName(name);
+    if (phone) setCustomerPhone(phone);
+    // Generate/Set reference number automatically if not set
+    if (!customerRef) {
+      const ref = `REF-${Date.now().toString().slice(-6)}`;
+      setCustomerRef(ref);
+    }
+  };
 
   // Cart actions
   const addToCart = (item: MenuItem) => {
@@ -806,6 +817,7 @@ export default function Dashboard() {
           })),
           customerName,
           customerPhone,
+          customerRef,
           tableNumber: tableNumber ? Number(tableNumber) : undefined,
           orderType: orderType as any,
           deliveryAddress,
@@ -1151,12 +1163,12 @@ export default function Dashboard() {
     ...baseAllowedTabs, 
     'home', 'pos', 'orders', 'menu', 'inventory', 'treasury', 'shifts', 
     'accounting', 'chart_of_accounts', 'accounting_mapping', 'manual_journal', 'financials', 
-    ...foodOnlyTabs, 
     'loyalty', 'gift_cards', 'branches', 'projects', 'crm', 'overheads', 'fixed_assets'
   ]);
   const preferredTabOrder = [
     'home', 'pos', 'orders', 'menu', 'inventory', 'treasury', 'shifts',
-    'kds', 'delivery', 'qr', 'waiter',
+    ...(isFoodSector(businessType) ? ['kds'] : []),
+    'delivery', 'qr', 'waiter',
     'customers', 'sales_orders', 'sales_invoices', 'sales_returns', 'loyalty', 'gift_cards', 'branches',
     'purchase_orders', 'purchase_invoices', 'suppliers',
     'expenses', 'financials', 'chart_of_accounts', 'accounting_mapping', 'manual_journal',
@@ -1169,6 +1181,7 @@ export default function Dashboard() {
     { id: 'home', label: 'لوحة التحكم', icon: BarChart3 },
     { id: 'pos', label: 'نقطة البيع', icon: LayoutGrid },
     { id: 'orders', label: config.labels.orders, icon: Receipt, badge: pendingOrders.length, locked: lockedTabs.includes('orders') },
+    { id: 'kds', label: 'عرض المطبخ (KDS)', icon: ChefHat },
     { id: 'menu', label: config.labels.menu, icon: isFoodSector(businessType) ? ChefHat : Package },
     { id: 'inventory', label: config.labels.inventory, icon: Package },
     { id: 'projects', label: 'المشاريع والمستخلصات', icon: FileText },
@@ -1396,9 +1409,11 @@ export default function Dashboard() {
                 setTableNumber={setTableNumber}
                 restaurant={restaurant}
                 customerName={customerName}
-                setCustomerName={setCustomerName}
+                setCustomerName={selectCustomerFromSearch}
                 customerPhone={customerPhone}
                 setCustomerPhone={setCustomerPhone}
+                customerRef={customerRef}
+                setCustomerRef={setCustomerRef}
                 deliveryAddress={deliveryAddress}
                 setDeliveryAddress={setDeliveryAddress}
                 agents={agents}

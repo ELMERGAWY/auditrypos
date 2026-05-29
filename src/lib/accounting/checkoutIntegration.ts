@@ -41,6 +41,7 @@ class CheckoutIntegration {
       cart: Array<OrderItem & { unitFactor?: number; unitMode?: string }>;
       customerName?: string;
       customerPhone?: string;
+      customerRef?: string;
       tableNumber?: number;
       orderType: 'dine_in' | 'takeaway' | 'delivery' | 'pickup';
       deliveryAddress?: string;
@@ -145,8 +146,9 @@ class CheckoutIntegration {
         status: isDirectSell ? 'completed' as const : 'pending' as const,
         table_number: orderData.tableNumber || null,
         order_type: orderData.orderType,
-        customer_name: orderData.customerName || '',
-        customer_phone: orderData.customerPhone || '',
+        customer_name: orderData.customerName || 'عميل نقدي',
+        customer_phone: orderData.customerPhone || null,
+        customer_reference: orderData.customerRef || null,
         delivery_address: orderData.deliveryAddress || '',
         delivery_agent_id: orderData.deliveryAgentId || null,
         payment_method: orderData.paymentMethod,
@@ -385,15 +387,25 @@ class CheckoutIntegration {
     phone?: string
   ): Promise<string | null> {
     try {
-      // Try to find existing customer
-      const { data: existing } = await supabase
+      const query = supabase
         .from('customers')
         .select('id')
-        .eq('restaurant_id', restaurantId)
-        .ilike('name', name)
-        .limit(1);
+        .eq('restaurant_id', restaurantId);
+      
+      if (phone) {
+        // If phone is provided, match by phone AND name to be safe
+        query.or(`phone.eq.${phone},name.ilike.${name}`);
+      } else {
+        query.ilike('name', name);
+      }
+
+      const { data: existing } = await query.limit(1);
 
       if (existing && existing.length > 0) {
+        // If customer exists, update phone if it was missing
+        if (phone) {
+          await supabase.from('customers').update({ phone }).eq('id', existing[0].id).is('phone', null);
+        }
         return existing[0].id;
       }
 
@@ -404,6 +416,8 @@ class CheckoutIntegration {
           restaurant_id: restaurantId,
           name,
           phone: phone || null,
+          customer_type: 'regular',
+          balance: 0
         })
         .select()
         .single();

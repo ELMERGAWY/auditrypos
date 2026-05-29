@@ -14,7 +14,7 @@ interface Customer {
 interface Props {
   restaurantId: string;
   value: string;
-  onChange: (name: string) => void;
+  onChange: (name: string, phone?: string) => void;
   placeholder?: string;
 }
 
@@ -57,7 +57,7 @@ export function CustomerSearch({ restaurantId, value, onChange, placeholder }: P
   }, [restaurantId, value]);
 
   const selectCustomer = (c: Customer) => {
-    onChange(c.name);
+    onChange(c.name, c.phone);
     setShowSuggestions(false);
   };
 

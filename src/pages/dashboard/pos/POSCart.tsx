@@ -52,6 +52,8 @@ interface POSCartProps {
   paidAmount: string;
   setPaidAmount: (val: string) => void;
   remaining: number;
+  customerRef: string;
+  setCustomerRef: (val: string) => void;
   checkout: (sendToPrep: boolean) => void;
   previewInvoice: () => void;
   updateValue: (id: string, value: number) => void;
@@ -69,7 +71,7 @@ export const POSCart = memo(function POSCart({
   orderNotes, setOrderNotes, discount, setDiscount, discountType, setDiscountType,
   currency, getUnitOptions, setCartItemUnit, updateQty, setCartItemQty,
   discountAmount, taxAmount, cartSubtotal, cartTotal, paymentMethod, setPaymentMethod,
-  paidAmount, setPaidAmount, remaining, checkout, previewInvoice, updateValue, removeFromCart,
+  paidAmount, setPaidAmount, remaining, customerRef, setCustomerRef, checkout, previewInvoice, updateValue, removeFromCart,
   accountingAccounts, selectedAccountId, setSelectedAccountId
 }: POSCartProps) {
   const { hasPermission } = usePermissions(restaurant?.id);
@@ -163,6 +165,10 @@ export const POSCart = memo(function POSCart({
               <Input value={customerPhone} onChange={e => setCustomerPhone(e.target.value)} placeholder="رقم الهاتف" className="pr-8 h-9 text-xs" />
             </div>
           )}
+        </div>
+        <div className="relative">
+          <Hash className="w-3.5 h-3.5 absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
+          <Input value={customerRef} onChange={e => setCustomerRef(e.target.value)} placeholder="الرقم المرجعي (تلقائي/يدوي)" className="pr-8 h-9 text-xs" />
         </div>
         {orderType === 'delivery' && (
           <>
