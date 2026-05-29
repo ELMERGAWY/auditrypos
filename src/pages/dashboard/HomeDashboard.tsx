@@ -489,7 +489,7 @@ export function HomeDashboard({ restaurantId, currency, onNavigate, userId }: Ho
           change={stats.profitChange}
           icon={TrendingUp}
           color="bg-blue-500"
-          subtitle={`هامش ${stats.profitMargin.toFixed(1)}%`}
+          subtitle={`هامش ${stats.profitMargin.toFixed(2)}%`}
         />
         <StatCard
           title="العملاء النشطين"

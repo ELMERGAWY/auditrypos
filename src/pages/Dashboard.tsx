@@ -428,7 +428,7 @@ export default function Dashboard() {
   const todayOrdersList = orders.filter(o => new Date(o.created_at).toDateString() === new Date().toDateString());
   const todayRevenue = todayOrdersList.filter(o => o.status !== 'cancelled').reduce((sum, o) => sum + Number(o.total || 0), 0);
   const todayOrders = todayOrdersList.length;
-  const avgOrderValue = todayOrders > 0 ? todayRevenue / todayOrders : 0;
+  const avgOrderValue = todayOrders > 0 ? Number((todayRevenue / todayOrders).toFixed(2)) : 0;
 
   const itemSales = new Map<string, number>();
   orders.filter(o => o.status !== 'cancelled').forEach(o => o.items.forEach(i => itemSales.set(i.menu_item_name, (itemSales.get(i.menu_item_name) || 0) + i.quantity)));
@@ -768,41 +768,8 @@ export default function Dashboard() {
       destination_account_id: selectedAccountId, // Pass the selected treasury/bank account
     };
 
-    if (isOnline) {
-      const { destination_account_id, ...insertOrderData } = orderData as any;
-      const { data: order, error: orderError } = await supabase
-        .from('orders')
-        .insert(insertOrderData)
-        .select()
-        .single();
-
-      if (orderError || !order) throw orderError || new Error('فشل إنشاء الطلب');
-
-      const { error: itemsError } = await supabase
-        .from('order_items')
-        .insert(cartItems.map(item => ({ ...item, order_id: order.id })));
-
-      if (itemsError) throw itemsError;
-
-      const newOrder = {
-        ...order,
-        items: cartItems.map(item => ({ ...item, order_id: order.id })),
-        paid_amount: paidNum,
-        payment_method: paymentMethod,
-      } as unknown as Order;
-
-      setOrders(prev => [newOrder, ...prev]);
-      setLastReceipt(newOrder);
-      setShowReceipt(true);
-      if (activeInvoiceId) setInvoiceTabs(prev => prev.filter(t => t.id !== activeInvoiceId));
-      toast.success(`تم إنشاء الطلب #${order.order_number?.slice(-4)} بنجاح`);
-      void runDeferredPosting('checkout', 3);
-      clearCart();
-      return;
-    }
-
-    // Use accounting-integrated checkout if online
-    if (isOnline) {
+    try {
+      // Use accounting-integrated checkout if online
       const result = await checkoutIntegration.processCheckout(
         {
           restaurantId: restaurant!.id,
@@ -838,14 +805,10 @@ export default function Dashboard() {
       if (result.success && result.order) {
         const newOrder = {
           ...result.order,
-          items: cart.map(i => ({
-            menu_item_name: i.item.name,
-            quantity: i.qty,
-            price: i.item.price
-          })),
+          items: cartItems.map(item => ({ ...item, order_id: result.order!.id })),
           paid_amount: paidNum,
           payment_method: paymentMethod,
-        } as Order;
+        } as unknown as Order;
 
         setOrders(prev => [newOrder, ...prev]);
         setLastReceipt(newOrder);
@@ -855,14 +818,40 @@ export default function Dashboard() {
         let successMsg = `✅ تم إنشاء الطلب #${result.order.order_number?.slice(-4)}`;
         if (result.journalEntryId) successMsg += ` 📊 (قيد: ${result.journalEntryId.slice(-4)})`;
         toast.success(successMsg);
+        
+        // Background tasks
+        void runDeferredPosting('checkout', 3);
         clearCart();
         return;
       } else if (!result.isNetworkError) {
         throw new Error(result.error);
       }
+    } catch (error: any) {
+      console.error('Checkout error:', error);
+      if (error.message?.includes('fetch') || error.message?.includes('Network')) {
+        // Fallback to offline if network error
+        await queueOrderOffline(
+          {
+            restaurant_id: restaurant!.id,
+            order_number: orderNum,
+            total: cartTotal,
+            status: sendToPrep ? 'pending' : 'completed',
+            client_order_id: clientOrderId,
+            customer_name: customerName,
+            customer_phone: customerPhone,
+            order_type: orderType,
+            payment_method: paymentMethod,
+            paid_amount: paidNum,
+          } as any, 
+          cartItems, 
+          orderNum
+        );
+        return;
+      }
+      throw error;
     }
 
-    // Fallback to offline if offline or network error
+    // Fallback to offline if result was not success but was network error
     await queueOrderOffline(orderData as any, cartItems, orderNum);
     return;
   }

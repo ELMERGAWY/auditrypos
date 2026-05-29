@@ -159,17 +159,17 @@ export function OverheadManager({ restaurantId, currency }: Props) {
           <div className="bg-primary/5 rounded-lg p-3 text-center">
             <Home className="w-5 h-5 mx-auto mb-1 text-primary" />
             <p className="text-xs text-muted-foreground">متوسط الإيجار</p>
-            <p className="font-bold">{calculateMonthlyAverage().toFixed(0)} {currency}</p>
+            <p className="font-bold">{calculateMonthlyAverage().toFixed(2)} {currency}</p>
           </div>
           <div className="bg-yellow-500/10 rounded-lg p-3 text-center">
             <Zap className="w-5 h-5 mx-auto mb-1 text-yellow-600" />
             <p className="text-xs text-muted-foreground">متوسط الكهرباء</p>
-            <p className="font-bold">{calculateMonthlyAverage().toFixed(0)} {currency}</p>
+            <p className="font-bold">{calculateMonthlyAverage().toFixed(2)} {currency}</p>
           </div>
           <div className="bg-blue-500/10 rounded-lg p-3 text-center">
             <Users className="w-5 h-5 mx-auto mb-1 text-blue-600" />
             <p className="text-xs text-muted-foreground">متوسط الأجور</p>
-            <p className="font-bold">{calculateMonthlyAverage().toFixed(0)} {currency}</p>
+            <p className="font-bold">{calculateMonthlyAverage().toFixed(2)} {currency}</p>
           </div>
           <div className="bg-purple-500/10 rounded-lg p-3 text-center">
             <FileText className="w-5 h-5 mx-auto mb-1 text-purple-600" />

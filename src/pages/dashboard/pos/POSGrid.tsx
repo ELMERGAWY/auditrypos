@@ -37,9 +37,9 @@ export const POSGrid = memo(function POSGrid({
       {/* Quick Stats */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
         {[
-          { label: 'إيرادات اليوم', value: `${todayRevenue} ${currency}`, icon: TrendingUp, color: 'text-primary', bg: 'bg-primary/10' },
+          { label: 'إيرادات اليوم', value: `${Number(todayRevenue).toFixed(2)} ${currency}`, icon: TrendingUp, color: 'text-primary', bg: 'bg-primary/10' },
           { label: 'طلبات اليوم', value: String(todayOrders.length), icon: Receipt, color: 'text-accent', bg: 'bg-accent/10' },
-          { label: 'متوسط الطلب', value: `${avgOrderValue} ${currency}`, icon: DollarSign, color: 'text-success', bg: 'bg-success/10' },
+          { label: 'متوسط الطلب', value: `${Number(avgOrderValue).toFixed(2)} ${currency}`, icon: DollarSign, color: 'text-success', bg: 'bg-success/10' },
           { label: 'طلبات نشطة', value: String(pendingOrders.length), icon: Timer, color: 'text-warning', bg: 'bg-warning/10' },
         ].map(s => (
           <div key={s.label} className="glass-card p-3 flex items-center gap-3 transition-transform hover:scale-[1.02]">

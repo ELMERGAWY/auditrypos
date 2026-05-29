@@ -155,6 +155,7 @@ class CheckoutIntegration {
         paid_amount: paidAmount,
         notes: orderData.notes || '',
         client_order_id: clientOrderId,
+        customer_id: customerId,
       };
 
       const { data: order, error: orderError } = await supabase

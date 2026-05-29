@@ -199,10 +199,11 @@ export const ProfessionalSidebar = memo(function ProfessionalSidebar({
     <TooltipProvider delayDuration={0}>
       <header className="fixed top-3 left-3 right-3 z-50" dir="rtl">
         <div className="glass-card !rounded-2xl !border-white/20 px-3 py-2 shadow-2xl">
-          <div className="flex items-center gap-3">
+          <div className="flex items-center justify-between gap-2 lg:gap-4">
+            {/* Logo & Restaurant Name */}
             <button
               onClick={() => onTabChange('home')}
-              className="flex items-center gap-3 min-w-0 rounded-xl px-2 py-1.5 hover:bg-muted/40"
+              className="flex items-center gap-2 sm:gap-3 shrink-0 rounded-xl px-2 py-1.5 hover:bg-muted/40 transition-colors"
             >
               <div
                 className="w-10 h-10 rounded-xl flex items-center justify-center text-xl shrink-0 shadow-lg"
@@ -214,8 +215,8 @@ export const ProfessionalSidebar = memo(function ProfessionalSidebar({
                   <span>{config.icon}</span>
                 )}
               </div>
-              <div className="hidden sm:block text-right min-w-0">
-                <p className="font-bold text-sm truncate max-w-44">{restaurant.name}</p>
+              <div className="hidden md:block text-right min-w-0">
+                <p className="font-bold text-sm truncate max-w-[120px] lg:max-w-[200px]">{restaurant.name}</p>
                 <p className="text-[11px] text-muted-foreground truncate">
                   {activeItem?.label || config.label}
                   {isSuspended && <Badge variant="destructive" className="mr-2 text-[9px]">موقوف</Badge>}
@@ -223,7 +224,8 @@ export const ProfessionalSidebar = memo(function ProfessionalSidebar({
               </div>
             </button>
 
-            <nav className="hidden lg:flex items-center gap-1 flex-1 min-w-0">
+            {/* Desktop Navigation */}
+            <nav className="hidden xl:flex items-center gap-1 overflow-x-auto scrollbar-hide flex-1 justify-center px-2">
               {mainQuickItems.map(item => {
                 const Icon = item.icon;
                 const isActive = activeTab === item.id;
@@ -232,14 +234,14 @@ export const ProfessionalSidebar = memo(function ProfessionalSidebar({
                     key={item.id}
                     onClick={() => handleTabClick(item)}
                     className={cn(
-                      'relative flex items-center gap-2 h-10 px-3 rounded-xl text-sm font-bold transition-all',
+                      'relative flex items-center gap-2 h-10 px-3 rounded-xl text-xs lg:text-sm font-bold transition-all whitespace-nowrap',
                       isActive ? 'gradient-bg text-white shadow-lg shadow-primary/20' : 'hover:bg-muted/60 text-muted-foreground hover:text-foreground'
                     )}
                   >
                     <Icon className="w-4 h-4" />
-                    <span>{item.label}</span>
+                    <span className="hidden lg:inline">{item.label}</span>
                     {!!item.badge && item.badge > 0 && (
-                      <Badge variant="destructive" className="h-5 min-w-5 px-1 text-[10px]">{item.badge}</Badge>
+                      <Badge variant="destructive" className="h-4 min-w-4 px-1 text-[9px]">{item.badge}</Badge>
                     )}
                   </button>
                 );
@@ -260,12 +262,12 @@ export const ProfessionalSidebar = memo(function ProfessionalSidebar({
                       <button
                         onClick={() => setOpenSection(openSection === section ? null : section)}
                         className={cn(
-                          'flex items-center gap-2 h-10 px-3 rounded-xl text-sm font-bold transition-all',
+                          'flex items-center gap-2 h-10 px-3 rounded-xl text-xs lg:text-sm font-bold transition-all whitespace-nowrap',
                           hasActive ? 'bg-primary/10 text-primary' : 'hover:bg-muted/60 text-muted-foreground hover:text-foreground'
                         )}
                       >
                         <SectionIcon className="w-4 h-4" />
-                        <span>{SECTIONS[section]?.label || section}</span>
+                        <span className="hidden lg:inline">{SECTIONS[section]?.label || section}</span>
                         <ChevronDown className={cn('w-3 h-3 transition-transform', openSection === section && 'rotate-180')} />
                       </button>
 
@@ -302,24 +304,26 @@ export const ProfessionalSidebar = memo(function ProfessionalSidebar({
                 })}
             </nav>
 
-            <div className="lg:hidden relative flex-1">
-              <button
-                onClick={() => setOpenSection(openSection === 'mobile' ? null : 'mobile')}
-                className="w-full flex items-center justify-between gap-2 h-10 px-3 rounded-xl bg-muted/50 text-sm font-bold"
+            {/* Tablet/Small Desktop Dropdown */}
+            <div className="hidden lg:flex xl:hidden flex-1 justify-center px-4">
+               <button
+                onClick={() => setOpenSection(openSection === 'tablet' ? null : 'tablet')}
+                className="flex items-center justify-between gap-4 h-10 px-6 rounded-xl bg-muted/50 text-sm font-bold min-w-[200px]"
               >
                 <span>{activeItem?.label || 'القائمة'}</span>
-                <ChevronDown className={cn('w-4 h-4 transition-transform', openSection === 'mobile' && 'rotate-180')} />
+                <ChevronDown className={cn('w-4 h-4 transition-transform', openSection === 'tablet' && 'rotate-180')} />
               </button>
-              {openSection === 'mobile' && (
-                <div className="absolute right-0 left-0 top-full pt-2">
-                  <div className="max-h-[70vh] overflow-auto rounded-2xl border border-border/70 bg-card/95 backdrop-blur-xl shadow-2xl p-2">
+              {openSection === 'tablet' && (
+                <div className="absolute right-1/2 translate-x-1/2 top-full pt-2 w-[500px] max-w-[90vw]">
+                  <div className="max-h-[70vh] overflow-auto rounded-2xl border border-border/70 bg-card/95 backdrop-blur-xl shadow-2xl p-4 grid grid-cols-2 gap-4">
                     {Object.entries(groupedItems).map(([section, items]) => (
-                      <div key={section} className="mb-2">
-                        <p className="px-3 py-1 text-[11px] font-bold text-muted-foreground">{SECTIONS[section]?.label || section}</p>
+                      <div key={section} className="space-y-1">
+                        <p className="px-3 py-1 text-[11px] font-bold text-muted-foreground uppercase tracking-wider">{SECTIONS[section]?.label || section}</p>
                         {items.map(item => {
                           const Icon = item.icon;
+                          const isActive = activeTab === item.id;
                           return (
-                            <button key={item.id} onClick={() => handleTabClick(item)} className="w-full flex items-center gap-3 rounded-xl px-3 py-2 text-sm hover:bg-muted/70">
+                            <button key={item.id} onClick={() => handleTabClick(item)} className={cn("w-full flex items-center gap-3 rounded-xl px-3 py-2 text-sm transition-all", isActive ? "bg-primary/10 text-primary" : "hover:bg-muted/70")}>
                               <Icon className="w-4 h-4" />
                               <span className="flex-1 text-right">{item.label}</span>
                             </button>
@@ -332,17 +336,50 @@ export const ProfessionalSidebar = memo(function ProfessionalSidebar({
               )}
             </div>
 
+            {/* Mobile Dropdown */}
+            <div className="lg:hidden relative flex-1">
+              <button
+                onClick={() => setOpenSection(openSection === 'mobile' ? null : 'mobile')}
+                className="w-full flex items-center justify-between gap-2 h-10 px-3 rounded-xl bg-muted/50 text-sm font-bold"
+              >
+                <span className="truncate">{activeItem?.label || 'القائمة'}</span>
+                <ChevronDown className={cn('w-4 h-4 transition-transform', openSection === 'mobile' && 'rotate-180')} />
+              </button>
+              {openSection === 'mobile' && (
+                <div className="absolute right-0 left-0 top-full pt-2">
+                  <div className="max-h-[70vh] overflow-auto rounded-2xl border border-border/70 bg-card/95 backdrop-blur-xl shadow-2xl p-2">
+                    {Object.entries(groupedItems).map(([section, items]) => (
+                      <div key={section} className="mb-2">
+                        <p className="px-3 py-1 text-[11px] font-bold text-muted-foreground">{SECTIONS[section]?.label || section}</p>
+                        {items.map(item => {
+                          const Icon = item.icon;
+                          const isActive = activeTab === item.id;
+                          return (
+                            <button key={item.id} onClick={() => handleTabClick(item)} className={cn("w-full flex items-center gap-3 rounded-xl px-3 py-2 text-sm text-right", isActive ? "bg-primary/10 text-primary" : "hover:bg-muted/70")}>
+                              <Icon className="w-4 h-4" />
+                              <span className="flex-1 text-right">{item.label}</span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Right Tools */}
             <div className="flex items-center gap-1 shrink-0">
-              <div className={cn('hidden xl:flex items-center gap-2 rounded-xl px-3 h-10 text-xs font-bold', stats.isOnline ? 'bg-emerald-500/10 text-emerald-600' : 'bg-destructive/10 text-destructive')}>
-                {stats.isOnline ? <Wifi className="w-4 h-4" /> : <WifiOff className="w-4 h-4" />}
-                <span>{stats.isOnline ? 'متصل' : 'غير متصل'}</span>
+              <div className={cn('hidden sm:flex items-center gap-2 rounded-xl px-2 lg:px-3 h-10 text-[10px] lg:text-xs font-bold', stats.isOnline ? 'bg-emerald-500/10 text-emerald-600' : 'bg-destructive/10 text-destructive')}>
+                {stats.isOnline ? <Wifi className="w-3 h-3 lg:w-4 lg:h-4" /> : <WifiOff className="w-3 h-3 lg:w-4 lg:h-4" />}
+                <span className="hidden md:inline">{stats.isOnline ? 'متصل' : 'غير متصل'}</span>
                 {pendingCount > 0 && <span className="text-amber-600">({pendingCount})</span>}
               </div>
 
               {onForceSync && (
                 <Tooltip>
                   <TooltipTrigger asChild>
-                    <button onClick={onForceSync} disabled={isSyncing} className="w-10 h-10 rounded-xl hover:bg-muted/60 flex items-center justify-center">
+                    <button onClick={onForceSync} disabled={isSyncing} className="w-8 h-8 lg:w-10 lg:h-10 rounded-xl hover:bg-muted/60 flex items-center justify-center transition-colors">
                       <RefreshCw className={cn('w-4 h-4', isSyncing && 'animate-spin')} />
                     </button>
                   </TooltipTrigger>
@@ -352,7 +389,7 @@ export const ProfessionalSidebar = memo(function ProfessionalSidebar({
 
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <button onClick={onToggleSound} className="w-10 h-10 rounded-xl hover:bg-muted/60 flex items-center justify-center">
+                  <button onClick={onToggleSound} className="w-8 h-8 lg:w-10 lg:h-10 rounded-xl hover:bg-muted/60 flex items-center justify-center transition-colors">
                     {soundEnabled ? <Volume2 className="w-4 h-4 text-emerald-500" /> : <VolumeX className="w-4 h-4 text-muted-foreground" />}
                   </button>
                 </TooltipTrigger>
@@ -361,7 +398,7 @@ export const ProfessionalSidebar = memo(function ProfessionalSidebar({
 
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <button onClick={onToggleDark} className="w-10 h-10 rounded-xl hover:bg-muted/60 flex items-center justify-center">
+                  <button onClick={onToggleDark} className="w-8 h-8 lg:w-10 lg:h-10 rounded-xl hover:bg-muted/60 flex items-center justify-center transition-colors">
                     {isDark ? <Sun className="w-4 h-4 text-amber-500" /> : <Moon className="w-4 h-4 text-indigo-500" />}
                   </button>
                 </TooltipTrigger>
@@ -370,7 +407,7 @@ export const ProfessionalSidebar = memo(function ProfessionalSidebar({
 
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <button onClick={onLogout} className="w-10 h-10 rounded-xl hover:bg-destructive/10 text-destructive flex items-center justify-center">
+                  <button onClick={onLogout} className="w-8 h-8 lg:w-10 lg:h-10 rounded-xl hover:bg-destructive/10 text-destructive flex items-center justify-center transition-colors">
                     <LogOut className="w-4 h-4" />
                   </button>
                 </TooltipTrigger>
