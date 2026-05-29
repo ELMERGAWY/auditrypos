@@ -1158,6 +1158,7 @@ export default function Dashboard() {
   }, [restaurant?.id]);
   
   const baseAllowedTabs = BUSINESS_TABS[businessType] || BUSINESS_TABS.restaurant;
+  const isFoodOrService = isFoodSector(businessType) || businessType === 'services';
   const foodOnlyTabs = isFoodSector(businessType) ? ['kds'] : [];
   const availableTabs = new Set([
     ...baseAllowedTabs, 
@@ -1214,7 +1215,7 @@ export default function Dashboard() {
     <div className="min-h-screen bg-background flex items-center justify-center">
       <div className="text-center">
         <div className="w-12 h-12 rounded-xl gradient-bg flex items-center justify-center mx-auto mb-4 animate-pulse">
-          <ChefHat className="w-6 h-6 text-primary-foreground" />
+          <LayoutGrid className="w-6 h-6 text-primary-foreground" />
         </div>
         <p className="text-muted-foreground">جاري التحميل...</p>
       </div>
@@ -1231,7 +1232,7 @@ export default function Dashboard() {
   if (!restaurant) return (
     <div className="min-h-screen bg-background flex items-center justify-center p-4">
       <div className="glass-card p-8 max-w-md text-center">
-        <ChefHat className="w-12 h-12 text-primary mx-auto mb-4" />
+        <LayoutGrid className="w-12 h-12 text-primary mx-auto mb-4" />
         <h2 className="font-display text-xl font-bold mb-2">لا يوجد نشاط مسجّل</h2>
         <p className="text-muted-foreground mb-4">أنشئ مشروعك الأول للبدء</p>
         
@@ -1299,7 +1300,7 @@ export default function Dashboard() {
               <div>
                 <h1 className="text-2xl lg:text-3xl font-black mb-1 flex items-center gap-3">
                   {activeTab === 'home' ? 'لوحة التحكم الرئيسية' : (allTabs.find(t => t.id === activeTab)?.label || 'إدارة النظام')}
-                  <Badge variant="outline" className="text-xs font-medium">نظام Edara الموحد</Badge>
+                  <Badge variant="outline" className="text-xs font-medium">نظام auditry لتسهيل الاعمال</Badge>
                 </h1>
                 <p className="text-muted-foreground font-medium">متابعة الأداء والعمليات المالية والتشغيلية</p>
               </div>
