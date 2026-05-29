@@ -1,6 +1,6 @@
 // @ts-nocheck
 import React, { memo } from 'react';
-import { TrendingUp, Receipt, DollarSign, Timer } from 'lucide-react';
+import { TrendingUp, Receipt, DollarSign, Timer, Plus } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { TableGrid } from '../TableGrid';
 import { getPosSearchPlaceholder, isFoodSector, isInventoryDrivenBusiness } from '@/lib/businessTypes';
