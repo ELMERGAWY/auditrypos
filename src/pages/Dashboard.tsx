@@ -441,8 +441,8 @@ export default function Dashboard() {
     if (phone) setCustomerPhone(phone);
     // Generate/Set reference number automatically if not set
     if (!customerRef) {
-      const ref = `REF-${Date.now().toString().slice(-6)}`;
-      setCustomerRef(ref);
+      const refNum = 250 + (counts.orders || 0) + invoiceTabs.length;
+      setCustomerRef(String(refNum));
     }
   };
 

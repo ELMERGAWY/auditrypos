@@ -94,13 +94,17 @@ function ReceiptContent({ order, restaurant }: { order: Order; restaurant: Resta
         <div className="row"><span className="info-label">إسم العميل / <span className="bold">{order.customer_name}</span></span></div>
       )}
       {order.customer_phone && (
-        <div className="row"><span className="info-label">التليفون / <span dir="ltr">{order.customer_phone}</span></span></div>
+        <div className="row">
+          <span className="info-label">التليفون / <span dir="ltr">{order.customer_phone}</span></span>
+        </div>
+      )}
+      {order.customer_ref && (
+        <div className="row">
+          <span className="info-label">مرجع العميل / <span className="bold">{order.customer_ref}</span></span>
+        </div>
       )}
       {order.delivery_address && (
         <div className="row"><span className="info-label">العنوان / {order.delivery_address}</span></div>
-      )}
-      {order.customer_ref && (
-        <div className="row"><span className="info-label">مرجع العميل / <span className="bold">{order.customer_ref}</span></span></div>
       )}
 
       {/* Items Section - Using divs instead of table for better thermal printer support */}
