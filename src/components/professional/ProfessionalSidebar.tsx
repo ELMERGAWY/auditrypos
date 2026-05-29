@@ -5,10 +5,21 @@ import {
   ChevronDown, CreditCard, DollarSign, FileText, Gift, Heart, Landmark,
   LayoutGrid, LogOut, Moon, Network, Package, QrCode, Receipt, RefreshCw,
   RotateCcw, Settings, Settings2, Shield, ShoppingCart, Sparkles, Sun,
-  Truck, Users, UsersRound, Volume2, VolumeX, Wallet, Wifi, WifiOff
+  Truck, Users, UsersRound, Volume2, VolumeX, Wallet, Wifi, WifiOff,
+  Menu, Search, X, ChevronRight
 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { 
+  Sheet, 
+  SheetContent, 
+  SheetHeader, 
+  SheetTitle, 
+  SheetTrigger,
+  SheetClose
+} from '@/components/ui/sheet';
+import { Input } from '@/components/ui/input';
+import { ScrollArea } from '@/components/ui/scroll-area';
 import { getBusinessConfig, type BusinessType } from '@/lib/businessTypes';
 
 export type SidebarTab =
@@ -109,7 +120,9 @@ export const ProfessionalSidebar = memo(function ProfessionalSidebar({
   onForceSync
 }: ProfessionalSidebarProps) {
   const config = getBusinessConfig(businessType);
-  const [openSection, setOpenSection] = useState<string | null>(null);
+  const [isOpen, setIsOpen] = useState(false);
+  const [navSearch, setNavSearch] = useState('');
+
   const isSuspended = restaurant.status === 'suspended' ||
     (restaurant.subscription_end && new Date(restaurant.subscription_end) < new Date());
   const lockedTabs: SidebarTab[] = isTrial ? ['orders', 'delivery', 'shifts', 'stats'] : [];
@@ -177,14 +190,18 @@ export const ProfessionalSidebar = memo(function ProfessionalSidebar({
       .filter(Boolean) as NavItem[];
   }, [tabs, config.tabs, stats.pendingOrders, stats.deliveryOrders, stats.unackCalls, stats.customersCount, stats.suppliersCount, stats.inventoryReceiptsCount]);
 
-  const groupedItems = navItems.reduce((acc, item) => {
+  const filteredItems = useMemo(() => {
+    if (!navSearch.trim()) return navItems;
+    return navItems.filter(item => 
+      item.label.toLowerCase().includes(navSearch.toLowerCase())
+    );
+  }, [navItems, navSearch]);
+
+  const groupedItems = filteredItems.reduce((acc, item) => {
     if (!acc[item.section]) acc[item.section] = [];
     acc[item.section].push(item);
     return acc;
   }, {} as Record<string, NavItem[]>);
-
-  const activeItem = navItems.find(item => item.id === activeTab);
-  const mainQuickItems = (groupedItems.main || []).slice(0, 6);
 
   const handleTabClick = (item: NavItem) => {
     if (item.locked) {
@@ -192,204 +209,159 @@ export const ProfessionalSidebar = memo(function ProfessionalSidebar({
       return;
     }
     onTabChange(item.id);
-    setOpenSection(null);
+    setIsOpen(false);
   };
 
   return (
     <TooltipProvider delayDuration={0}>
-      <header className="fixed top-3 left-3 right-3 z-50" dir="rtl">
-        <div className="glass-card !rounded-2xl !border-white/20 px-3 py-2 shadow-2xl">
-          <div className="flex items-center justify-between gap-2 lg:gap-4">
-            {/* Logo & Restaurant Name */}
-            <button
-              onClick={() => onTabChange('home')}
-              className="flex items-center gap-2 sm:gap-3 shrink-0 rounded-xl px-2 py-1.5 hover:bg-muted/40 transition-colors"
-            >
-              <div
-                className="w-10 h-10 rounded-xl flex items-center justify-center text-xl shrink-0 shadow-lg"
-                style={{ background: config.theme.gradient }}
-              >
+      <header className="fixed top-0 left-0 right-0 z-50 p-3" dir="rtl">
+        <div className="glass-card !rounded-2xl !border-white/20 px-4 py-3 shadow-2xl flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <Sheet open={isOpen} onOpenChange={setIsOpen}>
+              <SheetTrigger asChild>
+                <button className="w-10 h-10 rounded-xl bg-primary/10 text-primary flex items-center justify-center hover:bg-primary/20 transition-colors">
+                  <Menu className="w-5 h-5" />
+                </button>
+              </SheetTrigger>
+              <SheetContent side="right" className="p-0 w-80 border-l border-white/20 glass-card !rounded-none">
+                <div className="h-full flex flex-col">
+                  <SheetHeader className="p-6 border-b border-border/50">
+                    <SheetTitle className="text-right flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-xl gradient-bg flex items-center justify-center text-white shadow-lg">
+                        {restaurant.logo_url ? (
+                          <img src={restaurant.logo_url} alt="" className="w-6 h-6 object-contain" />
+                        ) : (
+                          <span>{config.icon}</span>
+                        )}
+                      </div>
+                      <div className="text-right">
+                        <p className="font-bold text-sm truncate">{restaurant.name}</p>
+                        <p className="text-[10px] text-muted-foreground">نظام auditry المحاسبي</p>
+                      </div>
+                    </SheetTitle>
+                  </SheetHeader>
+
+                  <div className="p-4">
+                    <div className="relative">
+                      <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                      <Input 
+                        placeholder="ابحث عن صفحة..." 
+                        className="pr-10 h-10 bg-muted/40 border-none rounded-xl text-sm"
+                        value={navSearch}
+                        onChange={e => setNavSearch(e.target.value)}
+                      />
+                    </div>
+                  </div>
+
+                  <ScrollArea className="flex-1 px-2">
+                    <div className="space-y-6 pb-10">
+                      {Object.entries(SECTIONS).map(([key, section]) => {
+                        const items = groupedItems[key];
+                        if (!items || items.length === 0) return null;
+                        
+                        return (
+                          <div key={key} className="space-y-2">
+                            <div className="px-4 flex items-center gap-2 text-[10px] font-black text-muted-foreground uppercase tracking-widest">
+                              <section.icon className="w-3 h-3" />
+                              {section.label}
+                            </div>
+                            <div className="space-y-1">
+                              {items.map(item => {
+                                const Icon = item.icon;
+                                const isActive = activeTab === item.id;
+                                return (
+                                  <button
+                                    key={item.id}
+                                    onClick={() => handleTabClick(item)}
+                                    className={cn(
+                                      "w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm transition-all group relative",
+                                      isActive 
+                                        ? "bg-primary/10 text-primary font-bold" 
+                                        : "text-muted-foreground hover:bg-muted/60 hover:text-foreground"
+                                    )}
+                                  >
+                                    <Icon className={cn("w-4 h-4 transition-transform group-hover:scale-110", isActive && "text-primary")} />
+                                    <span className="flex-1 text-right">{item.label}</span>
+                                    {!!item.badge && item.badge > 0 && (
+                                      <Badge variant="destructive" className="h-5 min-w-5 px-1 text-[10px] shadow-sm">
+                                        {item.badge}
+                                      </Badge>
+                                    )}
+                                    {isActive && (
+                                      <motion.div 
+                                        layoutId="active-pill"
+                                        className="absolute right-0 w-1 h-6 bg-primary rounded-l-full"
+                                      />
+                                    )}
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </ScrollArea>
+
+                  <div className="p-4 border-t border-border/50 bg-muted/20">
+                    <div className="flex items-center gap-3 p-3 rounded-2xl bg-background/50 border border-border/50">
+                      <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold">
+                        {user?.full_name?.charAt(0) || 'U'}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-bold truncate">{user?.full_name}</p>
+                        <p className="text-[10px] text-muted-foreground truncate">{user?.email}</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </SheetContent>
+            </Sheet>
+
+            <div className="flex items-center gap-3">
+              <div className="hidden sm:flex w-10 h-10 rounded-xl gradient-bg items-center justify-center text-white shadow-lg">
                 {restaurant.logo_url ? (
-                  <img src={restaurant.logo_url} alt="" className="w-7 h-7 object-contain" />
+                  <img src={restaurant.logo_url} alt="" className="w-6 h-6 object-contain" />
                 ) : (
                   <span>{config.icon}</span>
                 )}
               </div>
-              <div className="hidden md:block text-right min-w-0">
-                <p className="font-bold text-sm truncate max-w-[120px] lg:max-w-[200px]">{restaurant.name}</p>
-                <p className="text-[11px] text-muted-foreground truncate">
-                  {activeItem?.label || config.label}
-                  {isSuspended && <Badge variant="destructive" className="mr-2 text-[9px]">موقوف</Badge>}
-                </p>
-              </div>
-            </button>
-
-            {/* Desktop Navigation */}
-            <nav className="hidden xl:flex items-center gap-1 overflow-x-auto scrollbar-hide flex-1 justify-center px-2">
-              {mainQuickItems.map(item => {
-                const Icon = item.icon;
-                const isActive = activeTab === item.id;
-                return (
-                  <button
-                    key={item.id}
-                    onClick={() => handleTabClick(item)}
-                    className={cn(
-                      'relative flex items-center gap-2 h-10 px-3 rounded-xl text-xs lg:text-sm font-bold transition-all whitespace-nowrap',
-                      isActive ? 'gradient-bg text-white shadow-lg shadow-primary/20' : 'hover:bg-muted/60 text-muted-foreground hover:text-foreground'
-                    )}
-                  >
-                    <Icon className="w-4 h-4" />
-                    <span className="hidden lg:inline">{item.label}</span>
-                    {!!item.badge && item.badge > 0 && (
-                      <Badge variant="destructive" className="h-4 min-w-4 px-1 text-[9px]">{item.badge}</Badge>
-                    )}
-                  </button>
-                );
-              })}
-
-              {Object.entries(groupedItems)
-                .filter(([section]) => section !== 'main')
-                .map(([section, items]) => {
-                  const SectionIcon = SECTIONS[section]?.icon || Settings;
-                  const hasActive = items.some(item => item.id === activeTab);
-                  return (
-                    <div
-                      key={section}
-                      className="relative"
-                      onMouseEnter={() => setOpenSection(section)}
-                      onMouseLeave={() => setOpenSection(null)}
-                    >
-                      <button
-                        onClick={() => setOpenSection(openSection === section ? null : section)}
-                        className={cn(
-                          'flex items-center gap-2 h-10 px-3 rounded-xl text-xs lg:text-sm font-bold transition-all whitespace-nowrap',
-                          hasActive ? 'bg-primary/10 text-primary' : 'hover:bg-muted/60 text-muted-foreground hover:text-foreground'
-                        )}
-                      >
-                        <SectionIcon className="w-4 h-4" />
-                        <span className="hidden lg:inline">{SECTIONS[section]?.label || section}</span>
-                        <ChevronDown className={cn('w-3 h-3 transition-transform', openSection === section && 'rotate-180')} />
-                      </button>
-
-                      {openSection === section && (
-                        <div className="absolute right-0 top-full pt-2 w-72">
-                          <div className="rounded-2xl border border-border/70 bg-card/95 backdrop-blur-xl shadow-2xl p-2">
-                            {items.map(item => {
-                              const Icon = item.icon;
-                              const isActive = activeTab === item.id;
-                              return (
-                                <button
-                                  key={item.id}
-                                  onClick={() => handleTabClick(item)}
-                                  className={cn(
-                                    'w-full flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm transition-all text-right',
-                                    isActive ? 'bg-primary/10 text-primary font-bold' : 'hover:bg-muted/70'
-                                  )}
-                                >
-                                  <span className="w-9 h-9 rounded-lg bg-muted/60 flex items-center justify-center shrink-0">
-                                    <Icon className="w-4 h-4" />
-                                  </span>
-                                  <span className="flex-1">{item.label}</span>
-                                  {!!item.badge && item.badge > 0 && (
-                                    <Badge variant="destructive" className="h-5 min-w-5 px-1 text-[10px]">{item.badge}</Badge>
-                                  )}
-                                </button>
-                              );
-                            })}
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
-            </nav>
-
-            {/* Tablet/Small Desktop Dropdown */}
-            <div className="hidden lg:flex xl:hidden flex-1 justify-center px-4">
-               <button
-                onClick={() => setOpenSection(openSection === 'tablet' ? null : 'tablet')}
-                className="flex items-center justify-between gap-4 h-10 px-6 rounded-xl bg-muted/50 text-sm font-bold min-w-[200px]"
-              >
-                <span>{activeItem?.label || 'القائمة'}</span>
-                <ChevronDown className={cn('w-4 h-4 transition-transform', openSection === 'tablet' && 'rotate-180')} />
-              </button>
-              {openSection === 'tablet' && (
-                <div className="absolute right-1/2 translate-x-1/2 top-full pt-2 w-[500px] max-w-[90vw]">
-                  <div className="max-h-[70vh] overflow-auto rounded-2xl border border-border/70 bg-card/95 backdrop-blur-xl shadow-2xl p-4 grid grid-cols-2 gap-4">
-                    {Object.entries(groupedItems).map(([section, items]) => (
-                      <div key={section} className="space-y-1">
-                        <p className="px-3 py-1 text-[11px] font-bold text-muted-foreground uppercase tracking-wider">{SECTIONS[section]?.label || section}</p>
-                        {items.map(item => {
-                          const Icon = item.icon;
-                          const isActive = activeTab === item.id;
-                          return (
-                            <button key={item.id} onClick={() => handleTabClick(item)} className={cn("w-full flex items-center gap-3 rounded-xl px-3 py-2 text-sm transition-all", isActive ? "bg-primary/10 text-primary" : "hover:bg-muted/70")}>
-                              <Icon className="w-4 h-4" />
-                              <span className="flex-1 text-right">{item.label}</span>
-                            </button>
-                          );
-                        })}
-                      </div>
-                    ))}
-                  </div>
+              <div>
+                <h2 className="font-black text-sm lg:text-base leading-none mb-1">{restaurant.name}</h2>
+                <div className="flex items-center gap-2">
+                  <Badge variant="outline" className="text-[9px] font-bold py-0 h-4 border-primary/30 text-primary">
+                    {allNavItems[activeTab]?.label || 'النظام'}
+                  </Badge>
+                  {stats.isOnline ? (
+                    <span className="flex items-center gap-1 text-[9px] font-bold text-emerald-500">
+                      <Wifi className="w-2.5 h-2.5" /> متصل
+                    </span>
+                  ) : (
+                    <span className="flex items-center gap-1 text-[9px] font-bold text-destructive">
+                      <WifiOff className="w-2.5 h-2.5" /> غير متصل
+                    </span>
+                  )}
                 </div>
-              )}
-            </div>
-
-            {/* Mobile Dropdown */}
-            <div className="lg:hidden relative flex-1">
-              <button
-                onClick={() => setOpenSection(openSection === 'mobile' ? null : 'mobile')}
-                className="w-full flex items-center justify-between gap-2 h-10 px-3 rounded-xl bg-muted/50 text-sm font-bold"
-              >
-                <span className="truncate">{activeItem?.label || 'القائمة'}</span>
-                <ChevronDown className={cn('w-4 h-4 transition-transform', openSection === 'mobile' && 'rotate-180')} />
-              </button>
-              {openSection === 'mobile' && (
-                <div className="absolute right-0 left-0 top-full pt-2">
-                  <div className="max-h-[70vh] overflow-auto rounded-2xl border border-border/70 bg-card/95 backdrop-blur-xl shadow-2xl p-2">
-                    {Object.entries(groupedItems).map(([section, items]) => (
-                      <div key={section} className="mb-2">
-                        <p className="px-3 py-1 text-[11px] font-bold text-muted-foreground">{SECTIONS[section]?.label || section}</p>
-                        {items.map(item => {
-                          const Icon = item.icon;
-                          const isActive = activeTab === item.id;
-                          return (
-                            <button key={item.id} onClick={() => handleTabClick(item)} className={cn("w-full flex items-center gap-3 rounded-xl px-3 py-2 text-sm text-right", isActive ? "bg-primary/10 text-primary" : "hover:bg-muted/70")}>
-                              <Icon className="w-4 h-4" />
-                              <span className="flex-1 text-right">{item.label}</span>
-                            </button>
-                          );
-                        })}
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
-
-            {/* Right Tools */}
-            <div className="flex items-center gap-1 shrink-0">
-              <div className={cn('hidden sm:flex items-center gap-2 rounded-xl px-2 lg:px-3 h-10 text-[10px] lg:text-xs font-bold', stats.isOnline ? 'bg-emerald-500/10 text-emerald-600' : 'bg-destructive/10 text-destructive')}>
-                {stats.isOnline ? <Wifi className="w-3 h-3 lg:w-4 lg:h-4" /> : <WifiOff className="w-3 h-3 lg:w-4 lg:h-4" />}
-                <span className="hidden md:inline">{stats.isOnline ? 'متصل' : 'غير متصل'}</span>
-                {pendingCount > 0 && <span className="text-amber-600">({pendingCount})</span>}
               </div>
+            </div>
+          </div>
 
-              {onForceSync && (
+          <div className="flex items-center gap-1 lg:gap-2">
+            <div className="hidden md:flex items-center gap-1 mr-2 px-3 py-1.5 bg-muted/40 rounded-xl border border-border/50">
+               {onForceSync && (
                 <Tooltip>
                   <TooltipTrigger asChild>
-                    <button onClick={onForceSync} disabled={isSyncing} className="w-8 h-8 lg:w-10 lg:h-10 rounded-xl hover:bg-muted/60 flex items-center justify-center transition-colors">
-                      <RefreshCw className={cn('w-4 h-4', isSyncing && 'animate-spin')} />
+                    <button onClick={onForceSync} disabled={isSyncing} className="w-8 h-8 rounded-lg hover:bg-background flex items-center justify-center transition-all">
+                      <RefreshCw className={cn('w-4 h-4 text-muted-foreground', isSyncing && 'animate-spin')} />
                     </button>
                   </TooltipTrigger>
-                  <TooltipContent>مزامنة</TooltipContent>
+                  <TooltipContent>مزامنة البيانات</TooltipContent>
                 </Tooltip>
               )}
-
+              
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <button onClick={onToggleSound} className="w-8 h-8 lg:w-10 lg:h-10 rounded-xl hover:bg-muted/60 flex items-center justify-center transition-colors">
+                  <button onClick={onToggleSound} className="w-8 h-8 rounded-lg hover:bg-background flex items-center justify-center transition-all">
                     {soundEnabled ? <Volume2 className="w-4 h-4 text-emerald-500" /> : <VolumeX className="w-4 h-4 text-muted-foreground" />}
                   </button>
                 </TooltipTrigger>
@@ -398,31 +370,37 @@ export const ProfessionalSidebar = memo(function ProfessionalSidebar({
 
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <button onClick={onToggleDark} className="w-8 h-8 lg:w-10 lg:h-10 rounded-xl hover:bg-muted/60 flex items-center justify-center transition-colors">
+                  <button onClick={onToggleDark} className="w-8 h-8 rounded-lg hover:bg-background flex items-center justify-center transition-all">
                     {isDark ? <Sun className="w-4 h-4 text-amber-500" /> : <Moon className="w-4 h-4 text-indigo-500" />}
                   </button>
                 </TooltipTrigger>
                 <TooltipContent>المظهر</TooltipContent>
               </Tooltip>
-
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <button onClick={onLogout} className="w-8 h-8 lg:w-10 lg:h-10 rounded-xl hover:bg-destructive/10 text-destructive flex items-center justify-center transition-colors">
-                    <LogOut className="w-4 h-4" />
-                  </button>
-                </TooltipTrigger>
-                <TooltipContent>تسجيل الخروج</TooltipContent>
-              </Tooltip>
             </div>
+
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button 
+                  onClick={onLogout} 
+                  className="w-10 h-10 rounded-xl bg-destructive/10 text-destructive flex items-center justify-center hover:bg-destructive hover:text-white transition-all shadow-sm"
+                >
+                  <LogOut className="w-5 h-5" />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent>تسجيل الخروج</TooltipContent>
+            </Tooltip>
           </div>
-
-          {isTrial && (
-            <div className="mt-2 rounded-xl bg-amber-500/10 border border-amber-500/20 px-3 py-1.5 text-[11px] text-amber-700 dark:text-amber-300 flex items-center justify-between">
-              <span>فترة تجريبية، متبقي {trialDaysLeft} يوم</span>
-              <button onClick={onUpgrade} className="font-bold hover:underline">ترقية الآن</button>
-            </div>
-          )}
         </div>
+
+        {isTrial && (
+          <div className="mt-2 mx-auto max-w-lg rounded-xl bg-amber-500/10 border border-amber-500/20 px-4 py-2 text-[11px] text-amber-700 dark:text-amber-300 flex items-center justify-between shadow-sm backdrop-blur-md">
+            <div className="flex items-center gap-2">
+              <AlertTriangle className="w-3.5 h-3.5" />
+              <span>فترة تجريبية، متبقي <strong>{trialDaysLeft}</strong> يوم</span>
+            </div>
+            <button onClick={onUpgrade} className="font-black hover:underline bg-amber-500 text-white px-2 py-1 rounded-lg">ترقية الآن</button>
+          </div>
+        )}
       </header>
     </TooltipProvider>
   );
