@@ -10,7 +10,8 @@ import {
   Clock, TrendingUp, UtensilsCrossed, AlertCircle, CheckCircle,
   Timer, StickyNote, DollarSign, Truck, CalendarClock, MapPin, Phone, Lock, CreditCard,
   Volume2, VolumeX, Package, Wallet, Store, UsersRound, Camera, Sun, Moon, Send,
-  FileText, RotateCcw, Heart, Landmark, RefreshCcw, Filter, Construction, ArrowRightLeft, Network, Settings2
+  FileText, RotateCcw, Heart, Landmark, RefreshCcw, Filter, Construction, ArrowRightLeft, Network, Settings2,
+  Scale, Shield, Building2
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -293,7 +294,9 @@ export default function Dashboard() {
     returns: 0,
     inventoryReceipts: 0,
     customers: 0,
-    suppliers: 0
+    suppliers: 0,
+    totalSales: 0,
+    totalProfit: 0
   });
 
   const fetchCounts = useCallback(async () => {
