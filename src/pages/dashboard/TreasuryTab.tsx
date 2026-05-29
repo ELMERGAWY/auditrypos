@@ -255,7 +255,7 @@ export function TreasuryTab({ restaurantId, currency }: TreasuryTabProps) {
             {cashAccounts.map(acc => (
               <div key={acc.id} className="flex justify-between items-center p-2 rounded-lg hover:bg-white/5 transition-colors">
                 <span className="text-sm font-bold">{acc.name}</span>
-                <span className="font-mono text-xs">{(acc.current_balance || 0).toLocaleString()} {currency}</span>
+                <span className="font-mono text-xs">{(acc.current_balance || 0).toLocaleString('ar-EG', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} {currency}</span>
               </div>
             ))}
           </div>
@@ -284,7 +284,7 @@ export function TreasuryTab({ restaurantId, currency }: TreasuryTabProps) {
                   <span className="text-sm font-bold">{bank.bank_name}</span>
                   <span className="text-[10px] text-muted-foreground">{bank.account_name}</span>
                 </div>
-                <span className="font-mono text-xs">{(bank.current_balance || 0).toLocaleString()} {currency}</span>
+                <span className="font-mono text-xs">{(bank.current_balance || 0).toLocaleString('ar-EG', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} {currency}</span>
               </div>
             ))}
           </div>

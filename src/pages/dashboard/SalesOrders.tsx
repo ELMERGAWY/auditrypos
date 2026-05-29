@@ -197,7 +197,7 @@ export function SalesOrders({ restaurantId, currency }: Props) {
                     <td className="px-6 py-4 font-mono font-bold text-xs">{order.order_number}</td>
                     <td className="px-6 py-4">{new Date(order.order_date).toLocaleDateString('ar-EG')}</td>
                     <td className="px-6 py-4 font-bold">{order.customer_name || 'عميل نقدي'}</td>
-                    <td className="px-6 py-4 font-bold text-primary">{(order.total_amount || 0).toLocaleString()} {currency}</td>
+                    <td className="px-6 py-4 font-bold text-primary">{(order.total_amount || 0).toLocaleString('ar-EG', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} {currency}</td>
                     <td className="px-6 py-4">
                       <Badge variant="secondary" className="font-medium">
                         {order.status === 'draft' ? 'مسودة' : order.status === 'confirmed' ? 'مؤكد' : order.status === 'delivered' ? 'تم التسليم' : 'ملغي'}
@@ -258,7 +258,7 @@ export function SalesOrders({ restaurantId, currency }: Props) {
                       }
                     }}
                   >
-                    <Plus className="w-3 h-3" /> {item.name} ({item.price} {currency})
+                    <Plus className="w-3 h-3" /> {item.name} ({Number(item.price).toFixed(2)} {currency})
                   </Button>
                 ))}
               </div>
@@ -270,12 +270,12 @@ export function SalesOrders({ restaurantId, currency }: Props) {
                 {selectedItems.map(item => (
                   <div key={item.id} className="flex justify-between items-center text-sm">
                     <span>{item.name} x {item.quantity}</span>
-                    <span className="font-bold">{(item.price * item.quantity).toLocaleString()} {currency}</span>
+                    <span className="font-bold">{(item.price * item.quantity).toLocaleString('ar-EG', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} {currency}</span>
                   </div>
                 ))}
                 <div className="border-t pt-2 mt-2 flex justify-between font-black text-primary">
                   <span>الإجمالي</span>
-                  <span>{selectedItems.reduce((sum, i) => sum + (i.price * i.quantity), 0).toLocaleString()} {currency}</span>
+                  <span>{selectedItems.reduce((sum, i) => sum + (i.price * i.quantity), 0).toLocaleString('ar-EG', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} {currency}</span>
                 </div>
               </div>
             )}

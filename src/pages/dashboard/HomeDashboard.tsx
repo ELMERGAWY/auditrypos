@@ -329,7 +329,7 @@ export function HomeDashboard({ restaurantId, currency, onNavigate, userId }: Ho
   }, [restaurantId]);
 
   const formatCurrency = (amount: number) => {
-    return amount.toLocaleString('ar-EG') + ' ' + currency;
+    return Number(amount).toLocaleString('ar-EG', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' ' + currency;
   };
 
   const QuickActionCard = ({ 

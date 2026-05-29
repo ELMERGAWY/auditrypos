@@ -239,9 +239,9 @@ export function InventoryTab({ restaurantId, currency, businessType }: Props) {
       <div className="grid grid-cols-2 md:grid-cols-6 gap-3">
         {[
           { label: 'إجمالي المنتجات', value: products.length, icon: Package, color: 'text-primary', bg: 'bg-primary/10' },
-          { label: 'قيمة المخزون (بيع)', value: `${totalValue.toLocaleString()} ${currency}`, icon: BarChart3, color: 'text-success', bg: 'bg-success/10' },
-          { label: 'تكلفة المخزون', value: `${totalCost.toLocaleString()} ${currency}`, icon: BarChart3, color: 'text-accent', bg: 'bg-accent/10' },
-          { label: 'ربح المخزون المتوقع', value: `${totalProfit.toLocaleString()} ${currency}`, icon: TrendingUp, color: totalProfit >= 0 ? 'text-success' : 'text-destructive', bg: totalProfit >= 0 ? 'bg-success/10' : 'bg-destructive/10' },
+          { label: 'قيمة المخزون (بيع)', value: `${totalValue.toLocaleString('ar-EG', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${currency}`, icon: BarChart3, color: 'text-success', bg: 'bg-success/10' },
+          { label: 'تكلفة المخزون', value: `${totalCost.toLocaleString('ar-EG', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${currency}`, icon: BarChart3, color: 'text-accent', bg: 'bg-accent/10' },
+          { label: 'ربح المخزون المتوقع', value: `${totalProfit.toLocaleString('ar-EG', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${currency}`, icon: TrendingUp, color: totalProfit >= 0 ? 'text-success' : 'text-destructive', bg: totalProfit >= 0 ? 'bg-success/10' : 'bg-destructive/10' },
           { label: 'مخزون منخفض', value: lowStock.length, icon: AlertTriangle, color: 'text-warning', bg: 'bg-warning/10' },
           { label: 'نفد المخزون', value: outOfStock.length, icon: AlertTriangle, color: 'text-destructive', bg: 'bg-destructive/10' },
         ].map(s => (
@@ -572,9 +572,9 @@ export function InventoryTab({ restaurantId, currency, businessType }: Props) {
                 </div>
                 <div className="flex items-center gap-3 text-xs text-muted-foreground mt-1">
                   <span>{p.category}</span>
-                  <span className="text-primary font-bold">{p.price} {currency}</span>
-                  <span>تكلفة: {p.cost_price} {currency}</span>
-                  <span className={profit >= 0 ? 'text-success' : 'text-destructive'}>ربح: {profit} {currency}</span>
+                  <span className="text-primary font-bold">{Number(p.price).toFixed(2)} {currency}</span>
+                  <span>تكلفة: {Number(p.cost_price).toFixed(2)} {currency}</span>
+                  <span className={profit >= 0 ? 'text-success' : 'text-destructive'}>ربح: {Number(profit).toFixed(2)} {currency}</span>
                   <span>الكمية: <strong className={isLow ? 'text-warning' : ''}>{p.quantity}</strong> {p.unit}</span>
                 </div>
               </div>

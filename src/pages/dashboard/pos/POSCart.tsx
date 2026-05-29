@@ -199,7 +199,7 @@ export const POSCart = memo(function POSCart({
               <p className="text-sm font-medium truncate">{c.item.name}</p>
               <div className="flex items-center gap-1">
                 <span className="text-[10px] text-muted-foreground">السعر:</span>
-                <span className="text-[10px] font-bold text-primary">{c.item.price} {currency}</span>
+                <span className="text-[10px] font-bold text-primary">{Number(c.item.price).toFixed(2)} {currency}</span>
               </div>
             </div>
             <div className="flex flex-col gap-1 items-end">

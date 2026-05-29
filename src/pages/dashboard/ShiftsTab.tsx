@@ -226,11 +226,11 @@ export function ShiftsTab({ restaurant, currentShift, setCurrentShift, profileNa
             </div>
             <div className="bg-secondary/50 rounded-lg p-3 text-center">
               <p className="text-xs text-muted-foreground">رصيد الافتتاح</p>
-              <p className="font-bold text-sm text-primary">{currentShift.opening_balance} {currency}</p>
+              <p className="font-bold text-sm text-primary">{Number(currentShift.opening_balance).toFixed(2)} {currency}</p>
             </div>
             <div className="bg-secondary/50 rounded-lg p-3 text-center">
               <p className="text-xs text-muted-foreground">مبيعات اليوم</p>
-              <p className="font-bold text-sm text-success">{todayRevenue} {currency}</p>
+              <p className="font-bold text-sm text-success">{Number(todayRevenue).toFixed(2)} {currency}</p>
             </div>
             <div className="bg-secondary/50 rounded-lg p-3 text-center">
               <p className="text-xs text-muted-foreground">طلبات اليوم</p>
@@ -325,9 +325,9 @@ export function ShiftsTab({ restaurant, currentShift, setCurrentShift, profileNa
                   <span className="text-xs text-muted-foreground">{new Date(shift.opened_at).toLocaleDateString('ar-EG')}</span>
                 </div>
                 <div className="grid grid-cols-3 gap-2 text-xs">
-                  <div><span className="text-muted-foreground">افتتاح: </span><span className="font-bold">{shift.opening_balance} {currency}</span></div>
-                  <div><span className="text-muted-foreground">مبيعات: </span><span className="font-bold text-success">{shift.total_sales} {currency}</span></div>
-                  <div><span className="text-muted-foreground">إغلاق: </span><span className="font-bold">{shift.closing_balance} {currency}</span></div>
+                  <div><span className="text-muted-foreground">افتتاح: </span><span className="font-bold">{Number(shift.opening_balance).toFixed(2)} {currency}</span></div>
+                  <div><span className="text-muted-foreground">مبيعات: </span><span className="font-bold text-success">{Number(shift.total_sales).toFixed(2)} {currency}</span></div>
+                  <div><span className="text-muted-foreground">إغلاق: </span><span className="font-bold">{Number(shift.closing_balance).toFixed(2)} {currency}</span></div>
                 </div>
                 {shift.notes && <p className="text-xs text-muted-foreground mt-1">📝 {shift.notes}</p>}
                 {shift.closed_at && (

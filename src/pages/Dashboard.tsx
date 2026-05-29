@@ -1534,7 +1534,7 @@ export default function Dashboard() {
                             ))}
                           </div>
                           <div className="flex items-center justify-between pt-4 border-t border-border/50">
-                            <span className="font-black text-xl text-primary">{order.total} <span className="text-[10px] text-muted-foreground font-normal">{currency}</span></span>
+                            <span className="font-black text-xl text-primary">{Number(order.total).toFixed(2)} <span className="text-[10px] text-muted-foreground font-normal">{currency}</span></span>
                             <div className="flex gap-2">
                                <Button size="sm" variant="outline" className="h-8 px-2 text-[10px]" onClick={() => openOrderReceipt(order)} title="تفاصيل الطلب">
                                  تفاصيل

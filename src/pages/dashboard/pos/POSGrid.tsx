@@ -114,7 +114,7 @@ export const POSGrid = memo(function POSGrid({
             </div>
             <p className="font-bold text-sm truncate mb-1 group-hover:text-primary transition-colors">{item.name}</p>
             <div className="flex items-center justify-between mt-auto">
-              <p className="text-primary font-bold text-sm">{item.price} <span className="text-[10px] font-normal opacity-70">{currency}</span></p>
+              <p className="text-primary font-bold text-sm">{Number(item.price).toFixed(2)} <span className="text-[10px] font-normal opacity-70">{currency}</span></p>
               <div className="w-6 h-6 rounded-full bg-primary/10 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
                 <Plus className="w-3 h-3 text-primary" />
               </div>

@@ -470,7 +470,7 @@ export function MenuTab({
               <div className="flex-1 min-w-0">
                 <p className="font-medium text-sm">{item.name}</p>
                 <p className="text-xs text-muted-foreground">{item.category}</p>
-                <p className="text-sm text-primary font-bold">{item.price} {restaurant.currency || 'ج.م'}</p>
+                <p className="text-sm text-primary font-bold">{Number(item.price).toFixed(2)} {restaurant.currency || 'ج.م'}</p>
               </div>
               <Badge className={item.available ? 'status-active' : 'status-suspended'}>{item.available ? 'متاح' : 'غير متاح'}</Badge>
             </div>
