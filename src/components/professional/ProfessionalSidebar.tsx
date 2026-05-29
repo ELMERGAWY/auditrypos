@@ -1,4 +1,5 @@
 import { useMemo, useState, memo } from 'react';
+import { motion } from 'framer-motion';
 import { cn } from '@/lib/utils';
 import {
   AlertTriangle, BarChart3, Bell, Building2, CalendarClock, ChefHat,
