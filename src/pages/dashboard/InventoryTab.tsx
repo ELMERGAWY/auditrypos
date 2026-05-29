@@ -8,6 +8,8 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 
+import { hasFeature, type BusinessType } from '@/lib/businessTypes';
+
 interface Product {
   id: string;
   name: string;
@@ -38,9 +40,10 @@ interface StockMovement {
 interface Props {
   restaurantId: string;
   currency: string;
+  businessType: BusinessType;
 }
 
-export function InventoryTab({ restaurantId, currency }: Props) {
+export function InventoryTab({ restaurantId, currency, businessType }: Props) {
   const [products, setProducts] = useState<Product[]>([]);
   const [search, setSearch] = useState('');
   const [showForm, setShowForm] = useState(false);
@@ -58,13 +61,20 @@ export function InventoryTab({ restaurantId, currency }: Props) {
   const [form, setForm] = useState({
     name: '', barcode: '', sku: '', category: 'عام', price: '', cost_price: '',
     quantity: '', min_quantity: '5', unit: 'قطعة', image: '📦', expiry_date: '',
-    secondary_unit: '', unit_conversion_factor: '',
+    secondary_unit: '', unit_conversion_factor: '', batch_number: '',
   });
   const [filterCategory, setFilterCategory] = useState('all');
+  const [projects, setProjects] = useState<any[]>([]);
+  const [selectedProjectId, setSelectedProjectId] = useState<string>('');
 
   const load = async () => {
     const { data } = await supabase.from('products').select('*').eq('restaurant_id', restaurantId).order('created_at', { ascending: false });
     setProducts((data || []) as Product[]);
+    
+    if (businessType === 'contracting' || hasFeature(businessType, 'projects')) {
+      const { data: projData } = await supabase.from('projects').select('id, name').eq('restaurant_id', restaurantId);
+      setProjects(projData || []);
+    }
   };
 
   useEffect(() => { load(); }, [restaurantId]);
@@ -93,6 +103,7 @@ export function InventoryTab({ restaurantId, currency }: Props) {
       expiry_date: form.expiry_date || null,
       secondary_unit: form.secondary_unit || '',
       unit_conversion_factor: Number(form.unit_conversion_factor) || 1,
+      batch_number: form.batch_number || '',
     };
     if (editingProduct) {
       await supabase.from('products').update(data).eq('id', editingProduct.id);
@@ -116,11 +127,54 @@ export function InventoryTab({ restaurantId, currency }: Props) {
     if (!showMovement || !movementQty) return;
     const qty = Number(movementQty);
     const newQty = movementType === 'in' ? showMovement.quantity + qty : Math.max(0, showMovement.quantity - qty);
+    
+    // Update product quantity
     await supabase.from('products').update({ quantity: newQty }).eq('id', showMovement.id);
-    await supabase.from('stock_movements').insert({
-      product_id: showMovement.id, restaurant_id: restaurantId,
-      type: movementType, quantity: qty, reason: movementReason,
-    });
+    
+    // Log movement
+     const { data: moveData } = await supabase.from('stock_movements').insert({
+       product_id: showMovement.id, 
+       restaurant_id: restaurantId,
+       type: movementType, 
+       quantity: qty, 
+       reason: movementReason,
+       project_id: selectedProjectId || null,
+     }).select().single();
+
+     // Advanced Accounting: Auto-post Journal Entry if enabled
+     if (hasFeature(businessType, 'advanced_accounting')) {
+       const { journalService } = await import('@/lib/accounting/journalService');
+       const totalCost = qty * showMovement.cost_price;
+       
+       if (movementType === 'out' && totalCost > 0) {
+         // Post wastage/adjustment or project expense
+         const project = projects.find(p => p.id === selectedProjectId);
+         const description = selectedProjectId 
+           ? `صرف خامات لمشروع: ${project?.name} - الصنف: ${showMovement.name}`
+           : `تسوية مخزون (صادر) - ${showMovement.name}: ${movementReason}`;
+
+         await journalService.createJournalEntry(restaurantId, {
+           entry_date: new Date(),
+           description,
+           source: 'inventory',
+           lines: [
+             { 
+               account_id: selectedProjectId ? (await journalService.getAccountByCode(restaurantId, '4900'))?.id : (await journalService.getAccountByCode(restaurantId, '5200'))?.id, 
+               debit: totalCost, 
+               credit: 0, 
+               description 
+             },
+             { 
+               account_id: (await journalService.getAccountByCode(restaurantId, '1300'))?.id, 
+               debit: 0, 
+               credit: totalCost, 
+               description: 'تخفيض المخزون' 
+             }
+           ]
+         });
+       }
+     }
+
     toast.success(movementType === 'in' ? 'تم إضافة الكمية' : 'تم صرف الكمية');
     setShowMovement(null); setMovementQty(''); setMovementReason('');
     load();
@@ -145,7 +199,7 @@ export function InventoryTab({ restaurantId, currency }: Props) {
 
   const resetForm = () => {
     setShowForm(false); setEditingProduct(null); setPricingMode('fixed'); setMarkupValue('');
-    setForm({ name: '', barcode: '', sku: '', category: 'عام', price: '', cost_price: '', quantity: '', min_quantity: '5', unit: 'قطعة', image: '📦', expiry_date: '', secondary_unit: '', unit_conversion_factor: '' });
+    setForm({ name: '', barcode: '', sku: '', category: 'عام', price: '', cost_price: '', quantity: '', min_quantity: '5', unit: 'قطعة', image: '📦', expiry_date: '', secondary_unit: '', unit_conversion_factor: '', batch_number: '' });
   };
 
   const calcSellingPrice = (costStr: string) => {
@@ -164,6 +218,7 @@ export function InventoryTab({ restaurantId, currency }: Props) {
       expiry_date: p.expiry_date ? p.expiry_date.split('T')[0] : '',
       secondary_unit: p.secondary_unit || '',
       unit_conversion_factor: String(p.unit_conversion_factor || 1),
+      batch_number: (p as any).batch_number || '',
     });
     setShowForm(true);
   };
@@ -411,6 +466,21 @@ export function InventoryTab({ restaurantId, currency }: Props) {
                 <Input placeholder="سعر البيع" type="number" value={form.price} onChange={e => setForm(f => ({ ...f, price: e.target.value }))} disabled={pricingMode !== 'fixed'} />
                 <Input placeholder="الكمية" type="number" value={form.quantity} onChange={e => setForm(f => ({ ...f, quantity: e.target.value }))} step="0.01" />
                 <Input placeholder="الحد الأدنى" type="number" value={form.min_quantity} onChange={e => setForm(f => ({ ...f, min_quantity: e.target.value }))} />
+                
+                {/* Advanced Tracking for Pharmacy/Food */}
+                {(hasFeature(businessType, 'batches') || hasFeature(businessType, 'expiry_tracking')) && (
+                  <div className="col-span-2 p-3 bg-secondary/30 rounded-lg space-y-3">
+                    <p className="text-xs font-bold flex items-center gap-1"><AlertTriangle className="w-3 h-3 text-warning" /> تتبع متقدم (صيدلية / أغذية)</p>
+                    <div className="grid grid-cols-2 gap-3">
+                      <Input placeholder="رقم التشغيلة (Batch #)" value={form.batch_number || ''} onChange={e => setForm(f => ({ ...f, batch_number: e.target.value }))} />
+                      <div className="space-y-1">
+                        <label className="text-[10px] text-muted-foreground">تاريخ الصلاحية</label>
+                        <Input type="date" value={form.expiry_date} onChange={e => setForm(f => ({ ...f, expiry_date: e.target.value }))} />
+                      </div>
+                    </div>
+                  </div>
+                )}
+
                 <Input placeholder="الفئة" value={form.category} onChange={e => setForm(f => ({ ...f, category: e.target.value }))} />
                 <Input placeholder="الوحدة (مثال: كيلو، قطعة، علبة)" value={form.unit} onChange={e => setForm(f => ({ ...f, unit: e.target.value }))} />
                 {/* Secondary Unit */}
@@ -458,6 +528,22 @@ export function InventoryTab({ restaurantId, currency }: Props) {
                 </button>
               </div>
               <Input placeholder="الكمية" type="number" step="0.01" value={movementQty} onChange={e => setMovementQty(e.target.value)} />
+              
+              {/* Project Selection for Contracting */}
+              {(businessType === 'contracting' || hasFeature(businessType, 'projects')) && movementType === 'out' && (
+                <div className="space-y-1">
+                  <label className="text-[10px] text-muted-foreground">ربط الحركة بمشروع (اختياري)</label>
+                  <select 
+                    value={selectedProjectId} 
+                    onChange={e => setSelectedProjectId(e.target.value)}
+                    className="w-full h-9 rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                  >
+                    <option value="">-- اختر المشروع --</option>
+                    {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                  </select>
+                </div>
+              )}
+
               <Input placeholder="السبب (اختياري)" value={movementReason} onChange={e => setMovementReason(e.target.value)} />
               <Button onClick={handleMovement} className="w-full gradient-bg text-primary-foreground border-0">تأكيد الحركة</Button>
             </motion.div>

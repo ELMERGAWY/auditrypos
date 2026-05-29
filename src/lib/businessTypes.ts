@@ -171,11 +171,11 @@ export const BUSINESS_TYPES: Record<BusinessType, BusinessTypeConfig> = {
       { id: 'delivery', label: 'توصيل', icon: '🛵', color: '#22c55e', requiresTable: false, requiresAddress: true, requiresPhone: true }
     ],
     
-    features: ['tables', 'kitchen_display', 'waiter_calls', 'qr_menu', 'reservations', 'delivery', 'inventory', 'multi_unit', 'recipes', 'modifiers'],
+    features: ['tables', 'kitchen_display', 'waiter_calls', 'qr_menu', 'reservations', 'delivery', 'inventory', 'multi_unit', 'recipes', 'modifiers', 'production', 'advanced_accounting'],
     
     labels: {
-      menu: 'القائمة',
-      item: 'صنف',
+      menu: 'القائمة والوصفات',
+      item: 'صنف / وجبة',
       items: 'أصناف',
       order: 'طلب',
       orders: 'طلبات',
@@ -482,11 +482,11 @@ export const BUSINESS_TYPES: Record<BusinessType, BusinessTypeConfig> = {
       { id: 'delivery', label: 'توصيل', icon: '🛵', color: '#22c55e', requiresTable: false, requiresAddress: true, requiresPhone: true }
     ],
     
-    features: ['barcode', 'prescriptions', 'insurance', 'expiry_tracking', 'inventory', 'multi_unit'],
+    features: ['barcode', 'prescriptions', 'insurance', 'expiry_tracking', 'inventory', 'multi_unit', 'batches', 'multi_warehouse', 'advanced_accounting'],
     
     labels: {
-      menu: 'الأدوية',
-      item: 'دواء',
+      menu: 'الأدوية والمخزون الطبي',
+      item: 'دواء / منتج',
       items: 'أدوية',
       order: 'طلب',
       orders: 'طلبات',
@@ -1185,23 +1185,23 @@ export const BUSINESS_TYPES: Record<BusinessType, BusinessTypeConfig> = {
     orderTypes: [
       { id: 'pickup', label: 'مشروع جديد', icon: '🏗️', color: '#c2410c', requiresTable: false, requiresAddress: true, requiresPhone: true }
     ],
-    features: ['inventory', 'multi_unit', 'recipes', 'customers'],
+    features: ['inventory', 'multi_unit', 'recipes', 'customers', 'projects', 'overheads', 'advanced_accounting', 'crm'],
     labels: {
-      menu: 'بنود الأعمال',
-      item: 'بند',
+      menu: 'بنود الأعمال والخامات',
+      item: 'بند / خامة',
       items: 'بنود',
-      order: 'مستخلص',
+      order: 'مستخلص / عقد',
       orders: 'المستخلصات',
-      customer: 'العميل',
+      customer: 'المالك / الجهة',
       customers: 'العملاء',
-      inventory: 'خامات الإنشاء',
+      inventory: 'المخازن والمواقع',
       category: 'نوع العمل',
       checkout: 'إصدار مستخلص',
       receipt: 'مستخلص أعمال',
       table: 'موقع',
       tables: 'المواقع',
-      section: 'عنبر',
-      branch: 'شركة'
+      section: 'مشروع',
+      branch: 'فرع'
     },
     placeholders: {
       search: '🔍 بحث عن مشروع أو بند...',

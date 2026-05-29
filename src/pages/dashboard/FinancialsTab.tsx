@@ -4,7 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { 
   BarChart3, TrendingUp, TrendingDown, DollarSign, 
   FileText, Wallet, BookOpen, Scale, PieChart, 
-  ShoppingBag, Calendar, ArrowRightLeft, ShieldCheck
+  ShoppingBag, Calendar, ArrowRightLeft, ShieldCheck, Building2
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -18,14 +18,17 @@ import { BalanceSheet } from './BalanceSheet';
 import { TradingAccount } from './TradingAccount';
 import { cn } from '@/lib/utils';
 
-type FinancialTab = 'overview' | 'ledger' | 'trial_balance' | 'cash_flow' | 'equity' | 'balance_sheet' | 'trading';
+import { hasFeature, type BusinessType } from '@/lib/businessTypes';
+
+type FinancialTab = 'overview' | 'ledger' | 'trial_balance' | 'cash_flow' | 'equity' | 'balance_sheet' | 'trading' | 'projects';
 
 interface Props {
   restaurantId: string;
   currency: string;
+  businessType: BusinessType;
 }
 
-export function FinancialsTab({ restaurantId, currency }: Props) {
+export function FinancialsTab({ restaurantId, currency, businessType }: Props) {
   const [activeTab, setActiveTab] = useState<FinancialTab>(() => {
     const saved = sessionStorage.getItem('financial_active_tab');
     if (saved) {
@@ -39,22 +42,33 @@ export function FinancialsTab({ restaurantId, currency }: Props) {
   const [expenses, setExpenses] = useState<any[]>([]);
   const [products, setProducts] = useState<any[]>([]);
   const [customers, setCustomers] = useState<any[]>([]);
+  const [projectStats, setProjectStats] = useState<any[]>([]);
   const [period, setPeriod] = useState<'today' | 'week' | 'month' | 'all'>('month');
   const [loaded, setLoaded] = useState(false);
 
   const load = async () => {
-    const [ordersRes, orderItemsRes, expensesRes, productsRes, customersRes] = await Promise.all([
+    const [ordersRes, orderItemsRes, expensesRes, productsRes, customersRes, projectsRes] = await Promise.all([
       supabase.from('orders').select('id, total, status, created_at, paid_amount, discount, payment_method').eq('restaurant_id', restaurantId),
       supabase.from('order_items').select('order_id, quantity, price, cost_price_snapshot, unit_factor').order('order_id'),
-      supabase.from('expenses').select('amount, category, date').eq('restaurant_id', restaurantId),
+      supabase.from('expenses').select('amount, category, date, project_id').eq('restaurant_id', restaurantId),
       supabase.from('products').select('price, cost_price, quantity').eq('restaurant_id', restaurantId),
       supabase.from('customers').select('balance').eq('restaurant_id', restaurantId),
+      hasFeature(businessType, 'projects') ? supabase.from('projects').select('id, name, total_budget').eq('restaurant_id', restaurantId) : Promise.resolve({ data: [] }),
     ]);
     setOrders(ordersRes.data || []);
     setOrderItems(orderItemsRes.data || []);
     setExpenses(expensesRes.data || []);
     setProducts(productsRes.data || []);
     setCustomers(customersRes.data || []);
+    
+    if (projectsRes.data) {
+      const stats = projectsRes.data.map(p => {
+        const pExpenses = (expensesRes.data || []).filter(e => e.project_id === p.id);
+        const actualCost = pExpenses.reduce((sum, e) => sum + Number(e.amount), 0);
+        return { ...p, actualCost };
+      });
+      setProjectStats(stats);
+    }
     setLoaded(true);
   };
 
@@ -71,6 +85,7 @@ export function FinancialsTab({ restaurantId, currency }: Props) {
 
   const tabs = [
     { id: 'overview' as FinancialTab, label: 'نظرة عامة', icon: PieChart },
+    ...(hasFeature(businessType, 'projects') ? [{ id: 'projects' as FinancialTab, label: 'تحليل المشاريع', icon: Building2 }] : []),
     { id: 'trading' as FinancialTab, label: 'المتاجرة والتكلفة', icon: ShoppingBag },
     { id: 'balance_sheet' as FinancialTab, label: 'المركز المالي', icon: Scale },
     { id: 'ledger' as FinancialTab, label: 'حساب الاستاذ', icon: BookOpen },
@@ -244,6 +259,45 @@ export function FinancialsTab({ restaurantId, currency }: Props) {
         {activeTab === 'cash_flow' && <CashFlowStatement restaurantId={restaurantId} currency={currency} />}
         {activeTab === 'equity' && <EquityStatement restaurantId={restaurantId} currency={currency} />}
         {activeTab === 'trading' && <TradingAccount restaurantId={restaurantId} currency={currency} />}
+        
+        {activeTab === 'projects' && (
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {projectStats.map(p => (
+                <div key={p.id} className="glass-card p-6 border-t-4 border-t-indigo-500">
+                  <h3 className="font-bold text-lg mb-2">{p.name}</h3>
+                  <div className="space-y-4">
+                    <div>
+                      <div className="flex justify-between text-xs mb-1">
+                        <span className="text-muted-foreground">استهلاك الموازنة</span>
+                        <span className="font-bold">{(p.actualCost / (p.total_budget || 1) * 100).toFixed(1)}%</span>
+                      </div>
+                      <div className="h-2 w-full bg-secondary rounded-full overflow-hidden">
+                        <div className="h-full gradient-bg" style={{ width: `${Math.min(100, (p.actualCost / (p.total_budget || 1) * 100))}%` }} />
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="bg-secondary/30 p-2 rounded-lg text-center">
+                        <p className="text-[10px] text-muted-foreground">المصروف الفعلي</p>
+                        <p className="text-sm font-black text-rose-500">{p.actualCost.toLocaleString()} {currency}</p>
+                      </div>
+                      <div className="bg-secondary/30 p-2 rounded-lg text-center">
+                        <p className="text-[10px] text-muted-foreground">الموازنة</p>
+                        <p className="text-sm font-black">{Number(p.total_budget || 0).toLocaleString()} {currency}</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+            {projectStats.length === 0 && (
+              <div className="text-center py-20 text-muted-foreground">
+                <Building2 className="w-16 h-16 mx-auto mb-4 opacity-20" />
+                <p>لا توجد بيانات مشاريع للتحليل حالياً</p>
+              </div>
+            )}
+          </motion.div>
+        )}
       </AnimatePresence>
     </div>
   );

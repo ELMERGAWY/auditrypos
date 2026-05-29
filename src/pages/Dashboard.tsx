@@ -1147,31 +1147,42 @@ export default function Dashboard() {
   
   const baseAllowedTabs = BUSINESS_TABS[businessType] || BUSINESS_TABS.restaurant;
   const foodOnlyTabs = isFoodSector(businessType) ? ['kds'] : [];
-  const availableTabs = new Set([...baseAllowedTabs, 'home', 'pos', 'orders', 'menu', 'inventory', 'treasury', 'shifts', 'accounting', 'chart_of_accounts', 'accounting_mapping', 'manual_journal', 'financials', ...foodOnlyTabs, 'loyalty', 'gift_cards', 'branches']);
+  const availableTabs = new Set([
+    ...baseAllowedTabs, 
+    'home', 'pos', 'orders', 'menu', 'inventory', 'treasury', 'shifts', 
+    'accounting', 'chart_of_accounts', 'accounting_mapping', 'manual_journal', 'financials', 
+    ...foodOnlyTabs, 
+    'loyalty', 'gift_cards', 'branches', 'projects', 'crm', 'overheads', 'fixed_assets'
+  ]);
   const preferredTabOrder = [
     'home', 'pos', 'orders', 'menu', 'inventory', 'treasury', 'shifts',
     'kds', 'delivery', 'qr', 'waiter',
     'customers', 'sales_orders', 'sales_invoices', 'sales_returns', 'loyalty', 'gift_cards', 'branches',
     'purchase_orders', 'purchase_invoices', 'suppliers',
     'expenses', 'financials', 'chart_of_accounts', 'accounting_mapping', 'manual_journal',
+    'projects', 'crm', 'overheads', 'fixed_assets',
     'staff', 'notifications', 'settings'
   ];
   const allowedTabs = preferredTabOrder.filter(tab => availableTabs.has(tab));
 
   const allTabs: { id: DashboardTab; label: string; icon: any; badge?: number; locked?: boolean }[] = [
+    { id: 'home', label: 'لوحة التحكم', icon: BarChart3 },
     { id: 'pos', label: 'نقطة البيع', icon: LayoutGrid },
-    { id: 'orders', label: 'أوامر البيع (Sales Orders)', icon: FileText, badge: pendingOrders.length, locked: lockedTabs.includes('orders') },
-    { id: 'invoices', label: 'فواتير البيع (Invoices)', icon: Receipt },
-    { id: 'returns', label: 'المرتفعات (Credit Notes)', icon: RotateCcw },
-    { id: 'inventory', label: 'المخزون والتكاليف', icon: Package },
-    { id: 'projects', label: 'المشاريع والمستخلصات', icon: Construction },
-    { id: 'crm', label: 'إدارة العملاء CRM', icon: Heart },
-    { id: 'accounting', label: 'المحاسبة والمالية', icon: Landmark },
+    { id: 'orders', label: config.labels.orders, icon: Receipt, badge: pendingOrders.length, locked: lockedTabs.includes('orders') },
+    { id: 'menu', label: config.labels.menu, icon: isFoodSector(businessType) ? ChefHat : Package },
+    { id: 'inventory', label: config.labels.inventory, icon: Package },
+    { id: 'projects', label: 'المشاريع والمستخلصات', icon: FileText },
+    { id: 'crm', label: 'إدارة العملاء CRM', icon: Users },
+    { id: 'delivery', label: 'التوصيل', icon: Truck, badge: deliveryOrders.length },
+    { id: 'treasury', label: 'الخزينة والبنوك', icon: Landmark },
+    { id: 'shifts', label: 'الشيفتات', icon: CalendarClock },
+    { id: 'financials', label: 'التقارير المالية', icon: DollarSign },
     { id: 'chart_of_accounts', label: 'شجرة الحسابات', icon: Network },
     { id: 'accounting_mapping', label: 'التوجيه المحاسبي', icon: Settings2 },
-    { id: 'treasury', label: 'الخزينة والبنوك', icon: Wallet },
-    { id: 'manual_journal', label: 'قيود اليومية اليدوية', icon: ArrowRightLeft },
-    { id: 'analytics', label: 'التقارير المخصصة', icon: BarChart3 },
+    { id: 'manual_journal', label: 'قيود اليومية', icon: ArrowRightLeft },
+    { id: 'fixed_assets', label: 'الأصول الثابتة', icon: Building2 },
+    { id: 'overheads', label: 'التكاليف الثابتة', icon: Scale },
+    { id: 'staff', label: 'الموظفين والرواتب', icon: Users },
     { id: 'settings', label: 'الإعدادات', icon: Settings },
   ];
 
@@ -1551,7 +1562,7 @@ export default function Dashboard() {
                     <Button variant={activeSubView === 'bom' ? 'default' : 'ghost'} size="sm" onClick={() => setActiveSubView('bom')} className={activeSubView === 'bom' ? 'gradient-bg text-white shadow-md' : 'text-muted-foreground'}>تكاليف الـ BOM</Button>
                   </div>
                 </header>
-                {activeSubView === 'stock' ? <InventoryTab restaurantId={restaurant!.id} currency={currency} /> : <BOMManager restaurantId={restaurant!.id} currency={currency} />}
+                {activeSubView === 'stock' ? <InventoryTab restaurantId={restaurant!.id} currency={currency} businessType={businessType} /> : <BOMManager restaurantId={restaurant!.id} currency={currency} />}
               </div>
               </ModuleErrorBoundary>
             )}
@@ -1563,7 +1574,7 @@ export default function Dashboard() {
             {activeTab === 'sales_orders' && <SalesOrders restaurantId={restaurant!.id} currency={currency} />}
             {activeTab === 'sales_invoices' && <SalesInvoices restaurantId={restaurant!.id} currency={currency} />}
             {activeTab === 'treasury' && <TreasuryTab restaurantId={restaurant!.id} currency={currency} />}
-            {activeTab === 'users' && <StaffTab restaurantId={restaurant!.id} />}
+            {activeTab === 'users' && <StaffTab restaurantId={restaurant!.id} currency={currency} />}
             {activeTab === 'crm' && <AuditryCRM restaurantId={restaurant!.id} currency={currency} />}
             
             {activeTab === 'customers' && <CustomerManager restaurantId={restaurant!.id} currency={currency} />}
@@ -1579,7 +1590,7 @@ export default function Dashboard() {
             )}
             {activeTab === 'financials' && (
               <ModuleErrorBoundary moduleName="التقارير المالية">
-                <FinancialsTab restaurantId={restaurant!.id} currency={currency} />
+                <FinancialsTab restaurantId={restaurant!.id} currency={currency} businessType={businessType} />
               </ModuleErrorBoundary>
             )}
             {activeTab === 'projects' && (

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Users, Plus, Edit2, Trash2, Shield, Eye, EyeOff, X } from 'lucide-react';
+import { Users, Plus, Edit2, Trash2, Shield, Eye, EyeOff, X, DollarSign } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
@@ -14,6 +14,8 @@ interface StaffMember {
   phone: string;
   pin: string;
   is_active: boolean;
+  base_salary?: number;
+  payment_cycle?: 'monthly' | 'weekly' | 'daily';
   created_at: string;
 }
 
@@ -22,18 +24,26 @@ const STAFF_ROLES: Record<string, { label: string; icon: string; color: string }
   cashier: { label: 'كاشير', icon: '💰', color: 'bg-green-500/20 text-green-400 border-green-500/30' },
   waiter: { label: 'ويتر', icon: '🍽️', color: 'bg-orange-500/20 text-orange-400 border-orange-500/30' },
   stock_keeper: { label: 'أمين مخزن', icon: '📦', color: 'bg-purple-500/20 text-purple-400 border-purple-500/30' },
+  accountant: { label: 'محاسب', icon: '📊', color: 'bg-indigo-500/20 text-indigo-400 border-indigo-500/30' },
+  chef: { label: 'شيف', icon: '👨‍🍳', color: 'bg-red-500/20 text-red-400 border-red-500/30' },
 };
 
 interface Props {
   restaurantId: string;
+  currency: string;
 }
 
-export function StaffTab({ restaurantId }: Props) {
+export function StaffTab({ restaurantId, currency }: Props) {
   const [staff, setStaff] = useState<StaffMember[]>([]);
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState<StaffMember | null>(null);
-  const [form, setForm] = useState({ name: '', role: 'cashier', phone: '', pin: '0000' });
+  const [form, setForm] = useState({ 
+    name: '', role: 'cashier', phone: '', pin: '0000',
+    base_salary: '', payment_cycle: 'monthly' as 'monthly' | 'weekly' | 'daily'
+  });
   const [showPin, setShowPin] = useState<string | null>(null);
+  const [showPayroll, setShowPayroll] = useState<StaffMember | null>(null);
+  const [payrollAmount, setPayrollAmount] = useState('');
 
   const load = async () => {
     const { data } = await (supabase.from as any)('restaurant_staff').select('*').eq('restaurant_id', restaurantId).order('created_at', { ascending: false });
@@ -44,7 +54,15 @@ export function StaffTab({ restaurantId }: Props) {
 
   const handleSave = async () => {
     if (!form.name.trim()) { toast.error('أدخل اسم الموظف'); return; }
-    const payload = { restaurant_id: restaurantId, name: form.name, role: form.role, phone: form.phone, pin: form.pin };
+    const payload = { 
+      restaurant_id: restaurantId, 
+      name: form.name, 
+      role: form.role, 
+      phone: form.phone, 
+      pin: form.pin,
+      base_salary: Number(form.base_salary) || 0,
+      payment_cycle: form.payment_cycle
+    };
     if (editing) {
       const { error } = await (supabase.from as any)('restaurant_staff').update(payload).eq('id', editing.id);
       if (error) { toast.error('خطأ في تحديث الموظف: ' + error.message); return; }
@@ -70,12 +88,52 @@ export function StaffTab({ restaurantId }: Props) {
     load();
   };
 
-  const resetForm = () => { setShowForm(false); setEditing(null); setForm({ name: '', role: 'cashier', phone: '', pin: '0000' }); };
+  const resetForm = () => { 
+    setShowForm(false); 
+    setEditing(null); 
+    setForm({ 
+      name: '', role: 'cashier', phone: '', pin: '0000', 
+      base_salary: '', payment_cycle: 'monthly' 
+    }); 
+  };
 
   const startEdit = (s: StaffMember) => {
     setEditing(s);
-    setForm({ name: s.name, role: s.role, phone: s.phone, pin: s.pin });
+    setForm({ 
+      name: s.name, role: s.role, phone: s.phone, pin: s.pin,
+      base_salary: String(s.base_salary || ''),
+      payment_cycle: s.payment_cycle || 'monthly'
+    });
     setShowForm(true);
+  };
+
+  const handlePayroll = async () => {
+    if (!showPayroll || !payrollAmount) return;
+    const amount = Number(payrollAmount);
+    if (amount <= 0) return;
+
+    const { journalService } = await import('@/lib/accounting/journalService');
+    
+    // Create Journal Entry for Salary Expense
+    const description = `صرف راتب الموظف: ${showPayroll.name}`;
+    const { error } = await journalService.createJournalEntry(restaurantId, {
+      entry_date: new Date(),
+      description,
+      source: 'hr',
+      lines: [
+        { account_id: (await journalService.getAccountByCode(restaurantId, '5100'))?.id, debit: amount, credit: 0, description }, // Salary Expense
+        { account_id: (await journalService.getAccountByCode(restaurantId, '1100'))?.id, debit: 0, credit: amount, description: 'صرف من الخزينة' } // Treasury
+      ]
+    });
+
+    if (error) {
+      toast.error('خطأ في معالجة الراتب محاسبياً: ' + error.message);
+      return;
+    }
+
+    toast.success(`تم صرف ${amount} ${currency} للموظف ${showPayroll.name} وتسجيلها محاسبياً`);
+    setShowPayroll(null);
+    setPayrollAmount('');
   };
 
   const activeStaff = staff.filter(s => s.is_active);
@@ -143,6 +201,22 @@ export function StaffTab({ restaurantId }: Props) {
                 </div>
               </div>
 
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <label className="text-xs text-muted-foreground">الراتب الأساسي</label>
+                  <Input type="number" value={form.base_salary} onChange={e => setForm(f => ({ ...f, base_salary: e.target.value }))} placeholder="0.00" />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-xs text-muted-foreground">دورة الصرف</label>
+                  <select value={form.payment_cycle} onChange={e => setForm(f => ({ ...f, payment_cycle: e.target.value as any }))}
+                    className="w-full h-9 rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
+                    <option value="monthly">شهري</option>
+                    <option value="weekly">أسبوعي</option>
+                    <option value="daily">يومي</option>
+                  </select>
+                </div>
+              </div>
+
               <Input placeholder="رقم الهاتف" value={form.phone} onChange={e => setForm(f => ({ ...f, phone: e.target.value }))} />
               
               <div>
@@ -155,6 +229,30 @@ export function StaffTab({ restaurantId }: Props) {
                   {editing ? 'حفظ التعديلات' : 'إضافة'}
                 </Button>
                 <Button variant="outline" onClick={resetForm} className="flex-1">إلغاء</Button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Payroll Modal */}
+      <AnimatePresence>
+        {showPayroll && (
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 bg-background/80 backdrop-blur-sm flex items-center justify-center p-4" onClick={() => setShowPayroll(null)}>
+            <motion.div initial={{ scale: 0.9 }} animate={{ scale: 1 }} exit={{ scale: 0.9 }}
+              className="glass-card p-6 max-w-sm w-full space-y-4" onClick={e => e.stopPropagation()}>
+              <h3 className="font-display font-bold text-lg flex items-center gap-2">
+                <DollarSign className="w-5 h-5 text-primary" />
+                صرف راتب: {showPayroll.name}
+              </h3>
+              <div className="space-y-2">
+                <label className="text-xs text-muted-foreground">المبلغ المراد صرفه ({currency})</label>
+                <Input type="number" value={payrollAmount} onChange={e => setPayrollAmount(e.target.value)} />
+              </div>
+              <div className="flex gap-2 pt-2">
+                <Button onClick={handlePayroll} className="flex-1 gradient-bg text-primary-foreground border-0">تأكيد الصرف</Button>
+                <Button variant="outline" onClick={() => setShowPayroll(null)} className="flex-1">إلغاء</Button>
               </div>
             </motion.div>
           </motion.div>
@@ -185,6 +283,16 @@ export function StaffTab({ restaurantId }: Props) {
                   </button>
                   <span>{new Date(s.created_at).toLocaleDateString('ar-EG')}</span>
                 </div>
+                {s.base_salary && (
+                  <div className="mt-2 flex items-center gap-2">
+                    <Badge variant="secondary" className="text-[10px] bg-primary/5 text-primary">
+                      الراتب: {s.base_salary} {currency} / {s.payment_cycle === 'monthly' ? 'شهر' : s.payment_cycle === 'weekly' ? 'أسبوع' : 'يوم'}
+                    </Badge>
+                    <Button size="xs" variant="outline" className="h-6 text-[10px]" onClick={() => { setShowPayroll(s); setPayrollAmount(String(s.base_salary)); }}>
+                      صرف راتب
+                    </Button>
+                  </div>
+                )}
               </div>
               <div className="flex gap-1">
                 <Button size="sm" variant="ghost" onClick={() => handleToggle(s)}>
