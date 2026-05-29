@@ -1347,12 +1347,14 @@ export default function Dashboard() {
           <Suspense fallback={<div className="h-full flex items-center justify-center p-12"><RefreshCcw className="w-10 h-10 animate-spin text-primary" /></div>}>
             {/* ===================== HOME DASHBOARD ===================== */}
             {activeTab === 'home' && (
-              <HomeDashboard 
-                restaurantId={restaurant!.id} 
-                currency={currency}
-                userId={user?.id || ''}
-                onNavigate={(tab) => setActiveTab(tab as SidebarTab)}
-              />
+              <ModuleErrorBoundary moduleName="لوحة التحكم">
+                <HomeDashboard 
+                  restaurantId={restaurant!.id} 
+                  currency={currency}
+                  userId={user?.id || ''}
+                  onNavigate={(tab) => setActiveTab(tab as SidebarTab)}
+                />
+              </ModuleErrorBoundary>
             )}
             
             {/* ===================== POS TAB ===================== */}
@@ -1726,13 +1728,14 @@ export default function Dashboard() {
                 </div>
               )}
 
-              {activeTab === 'kds' && <KitchenDisplay />}
-
-              {activeTab === 'loyalty' && <LoyaltyPoints />}
-
-              {activeTab === 'gift_cards' && <GiftCards />}
-
-              {activeTab === 'branches' && <BranchManager />}
+              {activeTab === 'kds' && (
+              <ModuleErrorBoundary moduleName="عرض المطبخ">
+                <KitchenDisplay restaurantId={restaurant!.id} />
+              </ModuleErrorBoundary>
+            )}
+            {activeTab === 'loyalty' && <LoyaltyPoints restaurantId={restaurant!.id} />}
+            {activeTab === 'gift_cards' && <GiftCards restaurantId={restaurant!.id} />}
+            {activeTab === 'branches' && <BranchManager restaurantId={restaurant!.id} />}
 
             </Suspense>
           </Suspense>
