@@ -1158,7 +1158,6 @@ export default function Dashboard() {
   }, [restaurant?.id]);
   
   const baseAllowedTabs = BUSINESS_TABS[businessType] || BUSINESS_TABS.restaurant;
-  const isFoodOrService = isFoodSector(businessType) || businessType === 'services';
   const foodOnlyTabs = isFoodSector(businessType) ? ['kds'] : [];
   const availableTabs = new Set([
     ...baseAllowedTabs, 
