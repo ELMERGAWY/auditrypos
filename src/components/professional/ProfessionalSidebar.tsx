@@ -70,8 +70,6 @@ interface ProfessionalSidebarProps {
   onToggleDark: () => void;
   onLogout: () => void;
   onUpgrade?: () => void;
-  isCollapsed?: boolean;
-  onToggleCollapse?: () => void;
   tabs?: SidebarTab[];
   pendingCount?: number;
   isSyncing?: boolean;
@@ -107,6 +105,7 @@ export const ProfessionalSidebar = memo(function ProfessionalSidebar({
   tabs,
   pendingCount = 0,
   isSyncing = false,
+  syncStatus,
   onForceSync
 }: ProfessionalSidebarProps) {
   const config = getBusinessConfig(businessType);
@@ -129,7 +128,6 @@ export const ProfessionalSidebar = memo(function ProfessionalSidebar({
     waiter: { label: 'طلبات الجرسون', icon: Bell, badge: stats.unackCalls, section: 'main' },
 
     customers: { label: config.labels.customers, icon: Users, badge: stats.customersCount, section: 'sales' },
-    sales_orders: { label: 'أوامر البيع', icon: FileText, section: 'sales' },
     sales_orders: { label: 'أوامر البيع', icon: FileText, section: 'sales' },
     sales_invoices: { label: 'فواتير البيع', icon: Receipt, badge: stats.salesInvoicesCount, section: 'sales' },
     sales_returns: { label: 'مرتجع المبيعات', icon: RotateCcw, badge: stats.returnsCount, section: 'sales' },

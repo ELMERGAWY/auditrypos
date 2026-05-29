@@ -104,7 +104,6 @@ export default function Dashboard() {
 
   const [activeTab, setActiveTab] = useState<SidebarTab>('home');
   const [activeSubView, setActiveSubView] = useState<'stock' | 'bom'>('stock');
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [syncStatus, setSyncStatus] = useState<{ synced: number; errors: number; lastSync: Date | null }>({ synced: 0, errors: 0, lastSync: null });
   const [isSyncing, setIsSyncing] = useState(false);
   const [pendingCount, setPendingCount] = useState(0);
@@ -1261,8 +1260,6 @@ export default function Dashboard() {
         onToggleDark={toggleDarkMode}
         onLogout={handleSafeLogout}
         onUpgrade={() => navigate('/payment')}
-        isCollapsed={sidebarCollapsed}
-        onToggleCollapse={() => setSidebarCollapsed(!sidebarCollapsed)}
         pendingCount={pendingCount}
         isSyncing={isSyncing}
         syncStatus={syncStatus}
