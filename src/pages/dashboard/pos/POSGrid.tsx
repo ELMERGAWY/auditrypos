@@ -1,4 +1,5 @@
 // @ts-nocheck
+import React, { memo } from 'react';
 import { TrendingUp, Receipt, DollarSign, Timer } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { TableGrid } from '../TableGrid';
@@ -25,14 +26,14 @@ interface POSGridProps {
   addToCart: (item: MenuItem) => void;
 }
 
-export function POSGrid({
+export const POSGrid = memo(function POSGrid({
   currency, todayRevenue, todayOrders, avgOrderValue, pendingOrders,
   businessType, orderType, orders, tableNumber, setTableNumber,
   categories, selectedCategory, setSelectedCategory,
   searchQuery, setSearchQuery, filteredItems, addToCart
 }: POSGridProps) {
   return (
-    <div className="flex-1 p-4 overflow-auto">
+    <div className="flex-1 p-4 overflow-auto scrollbar-hide">
       {/* Quick Stats */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
         {[
@@ -41,7 +42,7 @@ export function POSGrid({
           { label: 'متوسط الطلب', value: `${avgOrderValue} ${currency}`, icon: DollarSign, color: 'text-success', bg: 'bg-success/10' },
           { label: 'طلبات نشطة', value: String(pendingOrders.length), icon: Timer, color: 'text-warning', bg: 'bg-warning/10' },
         ].map(s => (
-          <div key={s.label} className="glass-card p-3 flex items-center gap-3">
+          <div key={s.label} className="glass-card p-3 flex items-center gap-3 transition-transform hover:scale-[1.02]">
             <div className={`w-10 h-10 rounded-lg ${s.bg} flex items-center justify-center`}>
               <s.icon className={`w-5 h-5 ${s.color}`} />
             </div>
@@ -66,28 +67,61 @@ export function POSGrid({
       )}
 
       {/* Categories */}
-      <div className="flex gap-2 mb-4 overflow-x-auto pb-2">
-        <button onClick={() => setSelectedCategory('all')} className={`px-4 py-2 rounded-lg text-sm whitespace-nowrap transition-colors ${selectedCategory === 'all' ? 'gradient-bg text-primary-foreground' : 'bg-secondary text-secondary-foreground'}`}>الكل</button>
+      <div className="flex gap-2 mb-4 overflow-x-auto pb-2 scrollbar-hide">
+        <button 
+          onClick={() => setSelectedCategory('all')} 
+          className={`px-4 py-2 rounded-lg text-sm whitespace-nowrap transition-all duration-200 ${selectedCategory === 'all' ? 'gradient-bg text-primary-foreground shadow-lg scale-105' : 'bg-secondary text-secondary-foreground hover:bg-secondary/80'}`}
+        >
+          الكل
+        </button>
         {categories.map(cat => (
-          <button key={cat} onClick={() => setSelectedCategory(cat)} className={`px-4 py-2 rounded-lg text-sm whitespace-nowrap transition-colors ${selectedCategory === cat ? 'gradient-bg text-primary-foreground' : 'bg-secondary text-secondary-foreground'}`}>{cat}</button>
+          <button 
+            key={cat} 
+            onClick={() => setSelectedCategory(cat)} 
+            className={`px-4 py-2 rounded-lg text-sm whitespace-nowrap transition-all duration-200 ${selectedCategory === cat ? 'gradient-bg text-primary-foreground shadow-lg scale-105' : 'bg-secondary text-secondary-foreground hover:bg-secondary/80'}`}
+          >
+            {cat}
+          </button>
         ))}
       </div>
-      <Input placeholder={getPosSearchPlaceholder(businessType)} value={searchQuery} onChange={e => setSearchQuery(e.target.value)} className="mb-4" />
+      
+      <div className="relative mb-4">
+        <Input 
+          placeholder={getPosSearchPlaceholder(businessType)} 
+          value={searchQuery} 
+          onChange={e => setSearchQuery(e.target.value)} 
+          className="pr-10 h-11 transition-all focus:ring-2 focus:ring-primary/20"
+        />
+        <div className="absolute inset-y-0 right-3 flex items-center pointer-events-none text-muted-foreground">
+          <Receipt className="w-5 h-5" />
+        </div>
+      </div>
 
-      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
         {filteredItems.map(item => (
-          <button key={item.id} onClick={() => addToCart(item)} className="pos-grid-item text-right relative active:scale-95">
+          <button 
+            key={item.id} 
+            onClick={() => addToCart(item)} 
+            className="pos-grid-item group text-right relative active:scale-95 transition-all duration-200 hover:shadow-xl border border-transparent hover:border-primary/20"
+          >
             {item.stock_quantity !== undefined && isInventoryDrivenBusiness(businessType) && (
-              <div className={`absolute top-2 left-2 text-[10px] font-bold px-1.5 py-0.5 rounded-md ${item.stock_quantity <= 0 ? 'bg-destructive/10 text-destructive' : 'bg-secondary text-secondary-foreground'}`}>
+              <div className={`absolute top-2 left-2 z-10 text-[10px] font-bold px-1.5 py-0.5 rounded-md ${item.stock_quantity <= 0 ? 'bg-destructive text-destructive-foreground' : 'bg-primary/90 text-primary-foreground'}`}>
                 {item.stock_quantity} {item.stock_quantity <= 0 ? 'نفذ' : 'متبقي'}
               </div>
             )}
-            <div className="text-3xl mb-2">{item.image}</div>
-            <p className="font-medium text-sm truncate">{item.name}</p>
-            <p className="text-primary font-bold text-sm">{item.price} {currency}</p>
+            <div className="text-4xl mb-3 transform group-hover:scale-110 transition-transform duration-200 drop-shadow-md">
+              {item.image || '📦'}
+            </div>
+            <p className="font-bold text-sm truncate mb-1 group-hover:text-primary transition-colors">{item.name}</p>
+            <div className="flex items-center justify-between mt-auto">
+              <p className="text-primary font-bold text-sm">{item.price} <span className="text-[10px] font-normal opacity-70">{currency}</span></p>
+              <div className="w-6 h-6 rounded-full bg-primary/10 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                <Plus className="w-3 h-3 text-primary" />
+              </div>
+            </div>
           </button>
         ))}
       </div>
     </div>
   );
-}
+});

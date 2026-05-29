@@ -1,4 +1,5 @@
 // @ts-nocheck
+import React, { memo } from 'react';
 import { motion } from 'framer-motion';
 import { ShoppingCart, Pause, Play, Trash2, Hash, Phone, MapPin, StickyNote, Percent, DollarSign, Send, Receipt, Minus, Plus, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -60,7 +61,7 @@ interface POSCartProps {
   setSelectedAccountId: (id: string) => void;
 }
 
-export function POSCart({
+export const POSCart = memo(function POSCart({
   activeInvoiceId, invoiceTabs, cart, holdCurrentInvoice, setShowInvoiceTabs, clearCart,
   businessType, orderType, setOrderType, tableNumber, setTableNumber,
   restaurant, customerName, setCustomerName, customerPhone, setCustomerPhone,
@@ -73,27 +74,52 @@ export function POSCart({
 }: POSCartProps) {
   const { hasPermission } = usePermissions(restaurant?.id);
   return (
-    <div className="w-full lg:w-96 bg-card border-r border-border flex flex-col h-full">
+    <div className="w-full lg:w-96 bg-card border-r border-border flex flex-col h-full shadow-2xl">
       {/* Cart Header */}
-      <div className="p-4 border-b border-border">
-        <div className="flex items-center justify-between mb-2">
-          <h3 className="font-display font-bold flex items-center gap-2">
-            <ShoppingCart className="w-5 h-5 text-primary" />
+      <div className="p-4 border-b border-border bg-gradient-to-b from-secondary/20 to-transparent">
+        <div className="flex items-center justify-between mb-3">
+          <h3 className="font-display font-bold flex items-center gap-2 text-primary">
+            <ShoppingCart className="w-5 h-5" />
             {activeInvoiceId ? invoiceTabs.find(t => t.id === activeInvoiceId)?.label || 'فاتورة' : 'فاتورة جديدة'}
-            {cart.length > 0 && <Badge variant="secondary">{cart.length}</Badge>}
+            {cart.length > 0 && (
+              <Badge variant="secondary" className="animate-in zoom-in">
+                {cart.length}
+              </Badge>
+            )}
           </h3>
           <div className="flex gap-1">
-            <Button size="sm" variant="ghost" onClick={holdCurrentInvoice} title="تعليق الفاتورة" disabled={cart.length === 0}>
+            <Button 
+              size="sm" 
+              variant="ghost" 
+              onClick={holdCurrentInvoice} 
+              title="تعليق الفاتورة" 
+              disabled={cart.length === 0}
+              className="hover:bg-warning/10 hover:text-warning"
+            >
               <Pause className="w-4 h-4" />
             </Button>
-            <Button size="sm" variant="ghost" onClick={() => setShowInvoiceTabs(true)} className="relative" title="الفواتير المعلّقة">
+            <Button 
+              size="sm" 
+              variant="ghost" 
+              onClick={() => setShowInvoiceTabs(true)} 
+              className="relative hover:bg-primary/10 hover:text-primary" 
+              title="الفواتير المعلّقة"
+            >
               <Play className="w-4 h-4" />
               {invoiceTabs.length > 0 && (
-                <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full gradient-bg text-primary-foreground text-[10px] flex items-center justify-center">{invoiceTabs.length}</span>
+                <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full gradient-bg text-primary-foreground text-[10px] flex items-center justify-center animate-bounce">
+                  {invoiceTabs.length}
+                </span>
               )}
             </Button>
             {cart.length > 0 && hasPermission('pos.void_order') && (
-              <Button size="sm" variant="ghost" onClick={clearCart} className="text-destructive" title="مسح السلة">
+              <Button 
+                size="sm" 
+                variant="ghost" 
+                onClick={clearCart} 
+                className="text-destructive hover:bg-destructive/10" 
+                title="مسح السلة"
+              >
                 <Trash2 className="w-4 h-4" />
               </Button>
             )}
@@ -287,4 +313,4 @@ export function POSCart({
       </div>
     </div>
   );
-}
+});

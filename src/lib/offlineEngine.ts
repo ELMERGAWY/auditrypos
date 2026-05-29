@@ -238,6 +238,14 @@ import { journalService } from './accounting/journalService';
 import type { Order, OrderItem } from '@/pages/dashboard/types';
 import type { BusinessType } from './businessTypes';
 
+// Add network listener for automatic sync
+if (typeof window !== 'undefined') {
+  window.addEventListener('online', () => {
+    console.log('System back online. Triggering background sync...');
+    syncPendingData();
+  });
+}
+
 export async function syncPendingData(): Promise<{ synced: number; errors: number }> {
   let synced = 0, errors = 0;
 

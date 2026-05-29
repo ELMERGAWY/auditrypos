@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useState, memo } from 'react';
 import { cn } from '@/lib/utils';
 import {
   AlertTriangle, BarChart3, Bell, Building2, CalendarClock, ChefHat,
@@ -89,7 +89,7 @@ const SECTIONS: Record<string, { label: string; icon: React.ElementType }> = {
   system: { label: 'إدارة النظام', icon: Settings },
 };
 
-export function ProfessionalSidebar({
+export const ProfessionalSidebar = memo(function ProfessionalSidebar({
   businessType,
   activeTab,
   onTabChange,
@@ -129,6 +129,7 @@ export function ProfessionalSidebar({
     waiter: { label: 'طلبات الجرسون', icon: Bell, badge: stats.unackCalls, section: 'main' },
 
     customers: { label: config.labels.customers, icon: Users, badge: stats.customersCount, section: 'sales' },
+    sales_orders: { label: 'أوامر البيع', icon: FileText, section: 'sales' },
     sales_orders: { label: 'أوامر البيع', icon: FileText, section: 'sales' },
     sales_invoices: { label: 'فواتير البيع', icon: Receipt, badge: stats.salesInvoicesCount, section: 'sales' },
     sales_returns: { label: 'مرتجع المبيعات', icon: RotateCcw, badge: stats.returnsCount, section: 'sales' },
@@ -390,6 +391,4 @@ export function ProfessionalSidebar({
       </header>
     </TooltipProvider>
   );
-}
-
-export default ProfessionalSidebar;
+});

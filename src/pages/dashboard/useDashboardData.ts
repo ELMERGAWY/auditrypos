@@ -123,39 +123,30 @@ export function useDashboardData() {
     }
 
     if (!rest) {
-      // CRITICAL: Do NOT wipe an already-loaded restaurant (from cache or previous load).
-      // A transient RLS/network glitch on refresh must not throw the user back to the
-      // "choose business" screen. Only set null if we have never successfully loaded one.
       setRestaurant(prev => {
-        if (prev) {
-          console.warn('[Dashboard] restaurants query returned empty but a restaurant is already loaded — keeping existing one to avoid logout-style redirect.');
-          return prev;
-        }
+        if (prev) return prev;
         return null;
       });
       setDataLoaded(true);
       return;
     }
-    setRestaurant(rest as unknown as Restaurant);
     
-    // Store business_id in localStorage for persistence across refreshes
+    // Set restaurant immediately to unlock UI
+    setRestaurant(rest as unknown as Restaurant);
     localStorage.setItem('current_business_id', rest.id);
     localStorage.setItem('current_business_name', rest.name);
 
     const suspended = rest.status === 'suspended' || (rest.subscription_end && new Date(rest.subscription_end) < new Date());
-
     const businessType = (rest.business_type || 'restaurant') as BusinessType;
     const usesProductsCatalog = isInventoryDrivenBusiness(businessType);
 
-    // Ensure accounting is setup
-    journalService.ensureAccountingSetup(rest.id, rest.currency || 'ج.م');
-
+    // Parallel fetch all other resources with optimized queries
     const [itemsRes, ordersRes, callsRes, agentsRes, shiftRes, taxesRes] = await Promise.all([
       usesProductsCatalog
-        ? supabase.from('products').select('*').eq('restaurant_id', rest.id).order('sort_order')
+        ? supabase.from('products').select('id,name,price,category,image,available,restaurant_id,sort_order,barcode,sku,unit,quantity').eq('restaurant_id', rest.id).order('sort_order')
         : supabase.from('menu_items').select('*').eq('restaurant_id', rest.id).order('sort_order'),
-      supabase.from('orders').select('*').eq('restaurant_id', rest.id).order('created_at', { ascending: false }).limit(200),
-      supabase.from('waiter_calls').select('*').eq('restaurant_id', rest.id).order('created_at', { ascending: false }),
+      supabase.from('orders').select('*').eq('restaurant_id', rest.id).order('created_at', { ascending: false }).limit(100),
+      supabase.from('waiter_calls').select('*').eq('restaurant_id', rest.id).eq('acknowledged', false).order('created_at', { ascending: false }),
       supabase.from('delivery_agents').select('*').eq('restaurant_id', rest.id),
       supabase.from('shifts').select('*').eq('restaurant_id', rest.id).eq('status', 'open').maybeSingle(),
       supabase.from('tax_rates').select('*').eq('restaurant_id', rest.id).eq('is_active', true)
