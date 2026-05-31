@@ -157,26 +157,41 @@ export function CustomerManager({ restaurantId, currency }: Props) {
       // Add orders as debits
       orders?.forEach((order: any) => {
         if (order.status !== 'cancelled') {
-          const amount = Number(order.total);
-          runningBalance += amount;
+          const totalAmount = Number(order.total);
+          const paidAmount = Number(order.paid_amount || 0);
+          
+          // The order is a debit for the total amount
           statement.push({
             id: order.id,
             date: order.created_at,
             type: 'invoice',
             reference: order.order_number,
             description: 'فاتورة مبيعات',
-            debit: amount,
+            debit: totalAmount,
             credit: 0,
-            balance: runningBalance,
+            balance: 0, // Will be recalculated
             items: order.order_items
           });
+
+          // If there was a payment at the time of invoice, it's a credit
+          if (paidAmount > 0) {
+            statement.push({
+              id: `${order.id}-payment`,
+              date: order.created_at,
+              type: 'payment',
+              reference: order.order_number,
+              description: 'سداد دفعة مقدمة (الفاتورة)',
+              debit: 0,
+              credit: paidAmount,
+              balance: 0 // Will be recalculated
+            });
+          }
         }
       });
 
-      // Add payments as credits
+      // Add payments from customer_transactions as credits
       payments?.forEach((payment: any) => {
         const amount = Number(payment.amount);
-        runningBalance -= amount;
         statement.push({
           id: payment.id,
           date: payment.created_at,
@@ -185,7 +200,7 @@ export function CustomerManager({ restaurantId, currency }: Props) {
           description: payment.description || 'سداد',
           debit: 0,
           credit: amount,
-          balance: runningBalance
+          balance: 0 // Will be recalculated
         });
       });
 

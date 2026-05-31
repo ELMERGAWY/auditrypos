@@ -158,7 +158,7 @@ export default function Dashboard() {
     return matchesCategory && matchesSearch && item.available;
   }), [menuItems, selectedCategory, searchQuery]);
 
-  const todayOrdersList = useMemo(() => orders.filter(o => new Date(o.created_at).toDateString() === new Date().toDateString()), [orders]);
+  const todayOrdersList = useMemo(() => (orders || []).filter(o => new Date(o.created_at).toDateString() === new Date().toDateString()), [orders]);
   const todayRevenue = useMemo(() => todayOrdersList.filter(o => o.status !== 'cancelled').reduce((sum, o) => sum + Number(o.total || 0), 0), [todayOrdersList]);
   const avgOrderValue = useMemo(() => todayOrdersList.length > 0 ? Number((todayRevenue / todayOrdersList.length).toFixed(2)) : 0, [todayRevenue, todayOrdersList.length]);
 
@@ -192,7 +192,7 @@ export default function Dashboard() {
     try {
       const { error } = await supabase.from('orders').delete().eq('id', id);
       if (error) throw error;
-      setOrders(prev => prev.filter(o => o.id !== id));
+      setOrders(prev => (prev || []).filter(o => o.id !== id));
       toast.success('تم حذف الطلب بنجاح');
     } catch (e) {
       toast.error('فشل حذف الطلب');

@@ -183,21 +183,36 @@ export function SupplierManager({ restaurantId, currency }: Props) {
       let runningBalance = 0;
       const statement: SupplierTransaction[] = [];
 
-      // Add receipts as debits
+      // Add receipts as debits (What we owe)
       receipts?.forEach((receipt: any) => {
-        const amount = Number(receipt.net_amount || receipt.total_amount);
-        runningBalance += amount;
+        const totalAmount = Number(receipt.net_amount || receipt.total_amount);
+        const paidAmount = Number(receipt.paid_amount || 0);
+
         statement.push({
           id: receipt.id,
           date: receipt.receipt_date,
           type: 'purchase',
           reference: receipt.receipt_number,
           description: 'فاتورة مشتريات / استلام',
-          debit: amount,
+          debit: totalAmount,
           credit: 0,
-          balance: runningBalance,
+          balance: 0, // Will be recalculated
           items: receipt.inventory_receipt_items
         });
+
+        // If paid during receipt, add payment record as credit
+        if (paidAmount > 0) {
+          statement.push({
+            id: `${receipt.id}-payment`,
+            date: receipt.receipt_date,
+            type: 'payment',
+            reference: receipt.receipt_number,
+            description: 'سداد دفعة مقدمة (المشتريات)',
+            debit: 0,
+            credit: paidAmount,
+            balance: 0 // Will be recalculated
+          });
+        }
       });
 
       // Get purchase returns
@@ -211,7 +226,6 @@ export function SupplierManager({ restaurantId, currency }: Props) {
       // Add purchase returns as credits
       returnsData?.forEach((ret: any) => {
         const amount = Number(ret.total_amount);
-        runningBalance -= amount;
         statement.push({
           id: ret.id,
           date: ret.return_date,
@@ -220,14 +234,13 @@ export function SupplierManager({ restaurantId, currency }: Props) {
           description: 'مردود مشتريات',
           debit: 0,
           credit: amount,
-          balance: runningBalance
+          balance: 0 // Will be recalculated
         });
       });
 
       // Add payments as credits
       payments?.forEach((payment: any) => {
         const amount = Number(payment.amount);
-        runningBalance -= amount;
         statement.push({
           id: payment.id,
           date: payment.created_at,
@@ -236,7 +249,7 @@ export function SupplierManager({ restaurantId, currency }: Props) {
           description: payment.description || 'سداد',
           debit: 0,
           credit: amount,
-          balance: runningBalance
+          balance: 0 // Will be recalculated
         });
       });
 
