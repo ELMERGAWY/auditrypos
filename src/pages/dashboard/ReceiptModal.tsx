@@ -65,8 +65,9 @@ const THERMAL_STYLES = `
 function ReceiptContent({ order, restaurant }: { order: Order; restaurant: Restaurant }) {
   const currency = restaurant.currency || 'ج.م';
   const orderTypeInfo = ORDER_TYPE_CONFIG[order.order_type as keyof typeof ORDER_TYPE_CONFIG];
-  const subtotal = order.items.reduce((s, i) => s + i.price * i.quantity, 0);
-  const itemCount = order.items.reduce((s, i) => s + i.quantity, 0);
+  const items = Array.isArray(order.items) ? order.items : [];
+  const subtotal = items.reduce((s, i) => s + (Number(i.price) || 0) * (Number(i.quantity) || 0), 0);
+  const itemCount = items.reduce((s, i) => s + (Number(i.quantity) || 0), 0);
   const paidAmount = Number((order as any).paid_amount) || 0;
   const paymentMethod = (order as any).payment_method || 'cash';
   const remaining = Math.max(0, Number(order.total) - paidAmount);
@@ -209,6 +210,7 @@ export function ReceiptModalWrapper({ order, restaurant, onClose, onComplete }: 
     }
 
     // Kitchen/Warehouse Copy (Items only)
+    const kitchenItems = Array.isArray(order.items) ? order.items : [];
     const kitchenCopy = `
       <div class="receipt">
         <div class="center">
@@ -218,7 +220,7 @@ export function ReceiptModalWrapper({ order, restaurant, onClose, onComplete }: 
         </div>
         <hr class="divider" />
         <div class="items-section">
-          ${order.items.map(item => `
+          ${kitchenItems.map(item => `
             <div class="item-row">
               <span class="item-name" style="font-size: 16px; font-weight: bold;">${item.menu_item_name}</span>
               <span class="item-qty" style="font-size: 16px; font-weight: bold;">x ${item.quantity}</span>

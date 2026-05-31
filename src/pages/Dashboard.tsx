@@ -136,30 +136,32 @@ export default function Dashboard() {
   }, []);
 
   const cartSubtotal = useMemo(() => (cart || []).reduce((s, c) => {
+    if (!c || !c.item) return s;
     const units = getUnitOptions(c.item);
-    const unitFactor = units.find(u => u.label === c.unitMode)?.factor || 1;
-    return s + (c.item.price * unitFactor * c.qty);
+    const unitFactor = units.find(u => u && u.label === c.unitMode)?.factor || 1;
+    return s + ((Number(c.item.price) || 0) * unitFactor * (Number(c.qty) || 0));
   }, 0), [cart, getUnitOptions]);
   
   const discountAmount = useMemo(() => discountType === 'percent' ? (cartSubtotal * Number(discount || 0)) / 100 : Number(discount || 0), [cartSubtotal, discount, discountType]);
   const taxableAmount = useMemo(() => Math.max(0, cartSubtotal - discountAmount), [cartSubtotal, discountAmount]);
-  const totalTax = useMemo(() => (taxes || []).reduce((sum, tax) => (!tax.is_included_in_price ? sum + (taxableAmount * (tax.rate / 100)) : sum), 0), [taxes, taxableAmount]);
+  const totalTax = useMemo(() => (taxes || []).reduce((sum, tax) => (tax && !tax.is_included_in_price ? sum + (taxableAmount * (Number(tax.rate || 0) / 100)) : sum), 0), [taxes, taxableAmount]);
   const cartTotal = useMemo(() => taxableAmount + totalTax, [taxableAmount, totalTax]);
   const paidNum = useMemo(() => Number(paidAmount || 0), [paidAmount]);
   const remaining = useMemo(() => Math.max(0, cartTotal - paidNum), [cartTotal, paidNum]);
 
-  const pendingOrders = (orders || []).filter(o => o.status === 'pending' || o.status === 'preparing');
-  const deliveryOrders = (orders || []).filter(o => (o.order_type === 'delivery' || o.delivery_agent_id) && o.status !== 'completed' && o.status !== 'cancelled');
-  const filteredOrders = useMemo(() => orderFilter === 'all' ? (orders || []) : (orders || []).filter(o => o.status === orderFilter), [orders, orderFilter]);
-  const categories = useMemo(() => ['all', ...new Set((menuItems || []).map(item => item.category))], [menuItems]);
+  const pendingOrders = (orders || []).filter(o => o && (o.status === 'pending' || o.status === 'preparing'));
+  const deliveryOrders = (orders || []).filter(o => o && (o.order_type === 'delivery' || o.delivery_agent_id) && o.status !== 'completed' && o.status !== 'cancelled');
+  const filteredOrders = useMemo(() => orderFilter === 'all' ? (orders || []).filter(o => !!o) : (orders || []).filter(o => o && o.status === orderFilter), [orders, orderFilter]);
+  const categories = useMemo(() => ['all', ...new Set((menuItems || []).filter(i => i && i.category).map(item => item.category))], [menuItems]);
   const filteredItems = useMemo(() => (menuItems || []).filter(item => {
+    if (!item) return false;
     const matchesCategory = selectedCategory === 'all' || item.category === selectedCategory;
     const matchesSearch = item.name.toLowerCase().includes(searchQuery.toLowerCase()) || (item.barcode && item.barcode.includes(searchQuery));
     return matchesCategory && matchesSearch && item.available;
   }), [menuItems, selectedCategory, searchQuery]);
 
-  const todayOrdersList = useMemo(() => Array.isArray(orders) ? orders.filter(o => new Date(o.created_at).toDateString() === new Date().toDateString()) : [], [orders]);
-  const todayRevenue = useMemo(() => todayOrdersList.length > 0 ? todayOrdersList.filter(o => o.status !== 'cancelled').reduce((sum, o) => sum + Number(o.total || 0), 0) : 0, [todayOrdersList]);
+  const todayOrdersList = useMemo(() => Array.isArray(orders) ? orders.filter(o => o && o.created_at && new Date(o.created_at).toDateString() === new Date().toDateString()) : [], [orders]);
+  const todayRevenue = useMemo(() => todayOrdersList.length > 0 ? todayOrdersList.filter(o => o && o.status !== 'cancelled').reduce((sum, o) => sum + Number(o.total || 0), 0) : 0, [todayOrdersList]);
   const avgOrderValue = useMemo(() => todayOrdersList.length > 0 ? Number((todayRevenue / todayOrdersList.length).toFixed(2)) : 0, [todayRevenue, todayOrdersList.length]);
 
   // Handlers
@@ -208,8 +210,20 @@ export default function Dashboard() {
         { cart: cart.map(c => ({ ...c.item, quantity: c.qty, unitMode: c.unitMode, unitFactor: getUnitOptions(c.item).find(u => u.label === c.unitMode)?.factor || 1 })), customerName, customerPhone, customerRef, orderType: orderType as any, deliveryAddress, deliveryAgentId: selectedDeliveryAgent, paymentMethod: paymentMethod as any, paidAmount: paidNum, discount: discountAmount, discountType: discountType === 'percent' ? 'percentage' : 'fixed', notes: orderNotes, destinationAccountId: selectedAccountId }
       );
       if (result.success && result.order) {
-        setOrders(prev => [result.order as Order, ...prev]);
-        setLastReceipt(result.order as Order);
+        const completeOrder = {
+          ...result.order,
+          items: cart.map(c => {
+            const units = getUnitOptions(c.item);
+            const factor = units.find(u => u.label === c.unitMode)?.factor || 1;
+            return {
+              menu_item_name: c.item.name,
+              quantity: c.qty,
+              price: Number(c.item.price) * factor
+            };
+          })
+        };
+        setOrders(prev => [completeOrder as Order, ...(Array.isArray(prev) ? prev : [])]);
+        setLastReceipt(completeOrder as Order);
         setShowReceipt(true);
         toast.success(`✅ تم إنشاء الطلب #${result.order.order_number?.slice(-4)}`);
         clearCart();
