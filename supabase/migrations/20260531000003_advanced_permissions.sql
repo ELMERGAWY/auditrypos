@@ -53,16 +53,24 @@ INSERT INTO public.permissions (code, name_ar, module) VALUES
 ('system.audit', 'سجل التدقيق والرقابة', 'settings')
 ON CONFLICT (code) DO UPDATE SET name_ar = EXCLUDED.name_ar, module = EXCLUDED.module;
 
--- 2. Create Custom Roles Table (Optional enhancement)
+-- 2. Create Custom Roles Table
 CREATE TABLE IF NOT EXISTS public.restaurant_custom_roles (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     restaurant_id UUID REFERENCES public.restaurants(id) ON DELETE CASCADE,
     name_ar VARCHAR(100) NOT NULL,
-    base_role VARCHAR(50), -- Reference to hardcoded roles if needed
+    base_role VARCHAR(50),
     description TEXT,
     created_at TIMESTAMPTZ DEFAULT NOW(),
     UNIQUE(restaurant_id, name_ar)
 );
+
+-- 3. Ensure role_permissions table is compatible with restaurant_id
+DO $$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='role_permissions' AND column_name='restaurant_id') THEN
+        ALTER TABLE public.role_permissions ADD COLUMN restaurant_id UUID REFERENCES public.restaurants(id) ON DELETE CASCADE;
+    END IF;
+END $$;
 
 -- Enable RLS for custom roles
 ALTER TABLE public.restaurant_custom_roles ENABLE ROW LEVEL SECURITY;

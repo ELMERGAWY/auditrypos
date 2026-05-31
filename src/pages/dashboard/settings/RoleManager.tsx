@@ -1,11 +1,12 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Shield, ShieldAlert, ShieldCheck, Check, X, AlertCircle, 
   UserCheck, Eye, Warehouse, Building, Plus, Trash2, Edit2,
-  Lock, Settings, ShoppingCart, Package, DollarSign, Users, PieChart
+  Lock, Settings, ShoppingCart, Package, DollarSign, Users, PieChart,
+  RefreshCcw
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -49,18 +50,14 @@ const MODULE_LABELS: Record<string, string> = {
   settings: 'إعدادات النظام',
 };
 
-const getPermissionStatus = (role: string, permissionCode: string, rolePermissions: RolePermission[]) => {
-  const rp = rolePermissions.find(p => p.role === role && p.permission_code === permissionCode);
-  if (rp) return rp.is_allowed;
-  
-  // Default Fallbacks for standard roles
-  if (role === 'manager' || role === 'branch_manager') return true;
-  if (role === 'auditor' && (permissionCode.startsWith('finance.') || permissionCode.startsWith('inventory.'))) return true;
-  if (role === 'cashier' && permissionCode.startsWith('pos.')) return true;
-  if (role === 'accountant' && (permissionCode.startsWith('finance.') || permissionCode.startsWith('inventory.'))) return true;
-  
-  return false;
-};
+const STANDARD_ROLES = [
+  { id: 'manager', name: 'مدير عام', icon: ShieldCheck },
+  { id: 'branch_manager', name: 'مدير فرع', icon: Building },
+  { id: 'accountant', name: 'محاسب', icon: UserCheck },
+  { id: 'auditor', name: 'مراجع مالي', icon: Eye },
+  { id: 'store_manager', name: 'مدير مخزن', icon: Warehouse },
+  { id: 'cashier', name: 'كاشير', icon: Shield },
+];
 
 export function RoleManager({ companyId }: { companyId: string }) {
   const [permissions, setPermissions] = useState<Permission[]>([]);
@@ -71,43 +68,56 @@ export function RoleManager({ companyId }: { companyId: string }) {
   const [showAddRole, setShowAddRole] = useState(false);
   const [newRoleForm, setNewRoleForm] = useState({ name: '', desc: '' });
 
-  const standardRoles = [
-    { id: 'manager', name: 'مدير عام', icon: ShieldCheck },
-    { id: 'branch_manager', name: 'مدير فرع', icon: Building },
-    { id: 'accountant', name: 'محاسب', icon: UserCheck },
-    { id: 'auditor', name: 'مراجع مالي', icon: Eye },
-    { id: 'store_manager', name: 'مدير مخزن', icon: Warehouse },
-    { id: 'cashier', name: 'كاشير', icon: Shield },
-  ];
+  const allRoles = useMemo(() => [
+    ...STANDARD_ROLES, 
+    ...customRoles.map(r => ({ id: r.name_ar, name: r.name_ar, icon: UserCheck }))
+  ], [customRoles]);
 
-  const allRoles = [...standardRoles, ...customRoles.map(r => ({ id: r.name_ar, name: r.name_ar, icon: UserCheck }))];
-
-  const modules = Array.from(new Set(permissions.map(p => p.module)));
-
-  useEffect(() => {
-    loadData();
-  }, [companyId]);
+  const modules = useMemo(() => 
+    Array.from(new Set(permissions.map(p => p.module))).filter(Boolean)
+  , [permissions]);
 
   const loadData = async () => {
-    setLoading(true);
     try {
+      setLoading(true);
+      // Get company_id from restaurant if needed, but for now we assume companyId passed is the right identifier
+      // We try both restaurant_id and company_id queries to be safe if schema differs
       const [permRes, rolePermRes, customRolesRes] = await Promise.all([
         supabase.from('permissions').select('*'),
-        supabase.from('role_permissions').select('*').eq('company_id', companyId),
+        supabase.from('role_permissions').select('*').or(`company_id.eq.${companyId},restaurant_id.eq.${companyId}`),
         supabase.from('restaurant_custom_roles').select('*').eq('restaurant_id', companyId)
       ]);
 
-      if (permRes.error) throw permRes.error;
+      if (permRes.error) console.error('Permissions Load Error:', permRes.error);
+      if (rolePermRes.error) console.error('Role Permissions Load Error:', rolePermRes.error);
+      if (customRolesRes.error) console.error('Custom Roles Load Error:', customRolesRes.error);
       
       setPermissions(permRes.data || []);
       setRolePermissions(rolePermRes.data || []);
       setCustomRoles(customRolesRes.data || []);
     } catch (error: any) {
-      console.error(error);
+      console.error('Fatal Load Error:', error);
       toast.error('خطأ في تحميل الصلاحيات');
     } finally {
       setLoading(false);
     }
+  };
+
+  useEffect(() => {
+    if (companyId) loadData();
+  }, [companyId]);
+
+  const getPermissionStatus = (role: string, permissionCode: string) => {
+    const rp = rolePermissions.find(p => p.role === role && p.permission_code === permissionCode);
+    if (rp) return rp.is_allowed;
+    
+    // Default Fallbacks for standard roles
+    if (role === 'manager' || role === 'branch_manager') return true;
+    if (role === 'auditor' && (permissionCode.startsWith('finance.') || permissionCode.startsWith('inventory.'))) return true;
+    if (role === 'cashier' && permissionCode.startsWith('pos.')) return true;
+    if (role === 'accountant' && (permissionCode.startsWith('finance.') || permissionCode.startsWith('inventory.'))) return true;
+    
+    return false;
   };
 
   const handleAddRole = async () => {
@@ -154,6 +164,7 @@ export function RoleManager({ companyId }: { companyId: string }) {
           .from('role_permissions')
           .insert({
             company_id: companyId,
+            restaurant_id: companyId, // Adding restaurant_id for compatibility
             role,
             permission_code: permissionCode,
             is_allowed: !currentAllowed
@@ -173,7 +184,7 @@ export function RoleManager({ companyId }: { companyId: string }) {
 
   if (loading) return (
     <div className="p-20 text-center flex flex-col items-center justify-center space-y-4">
-      <div className="w-10 h-10 border-4 border-primary border-t-transparent rounded-full animate-spin"></div>
+      <RefreshCcw className="w-10 h-10 animate-spin text-primary opacity-50" />
       <p className="text-muted-foreground text-sm font-bold">جاري تحميل مصفوفة الصلاحيات...</p>
     </div>
   );
@@ -210,7 +221,7 @@ export function RoleManager({ companyId }: { companyId: string }) {
               <role.icon className={`w-5 h-5 ${selectedRole === role.id ? 'text-primary-foreground' : 'text-primary'}`} />
               <div className="flex-1">
                 <p className="font-bold text-sm">{role.name}</p>
-                {standardRoles.find(sr => sr.id === role.id) ? (
+                {STANDARD_ROLES.find(sr => sr.id === role.id) ? (
                   <p className={`text-[10px] ${selectedRole === role.id ? 'opacity-80' : 'text-muted-foreground'}`}>دور نظامي</p>
                 ) : (
                   <p className={`text-[10px] ${selectedRole === role.id ? 'opacity-80' : 'text-primary font-bold'}`}>دور مخصص</p>
@@ -229,7 +240,7 @@ export function RoleManager({ companyId }: { companyId: string }) {
                 <h3 className="font-display font-bold text-lg">صلاحيات {selectedRoleInfo?.name}</h3>
               </div>
               <Badge variant="outline" className="bg-primary/5 text-primary border-primary/10 px-3 py-1">
-                {permissions.filter(p => getPermissionStatus(selectedRole, p.code, rolePermissions)).length} / {permissions.length} صلاحية مفعلة
+                {permissions.filter(p => getPermissionStatus(selectedRole, p.code)).length} / {permissions.length} صلاحية مفعلة
               </Badge>
             </div>
 
@@ -243,7 +254,7 @@ export function RoleManager({ companyId }: { companyId: string }) {
                   
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                     {permissions.filter(p => p.module === mod).map(perm => {
-                      const isAllowed = getPermissionStatus(selectedRole, perm.code, rolePermissions);
+                      const isAllowed = getPermissionStatus(selectedRole, perm.code);
                       return (
                         <div key={perm.code} 
                           onClick={() => togglePermission(selectedRole, perm.code, isAllowed)}
@@ -261,6 +272,13 @@ export function RoleManager({ companyId }: { companyId: string }) {
                   </div>
                 </div>
               ))}
+              {modules.length === 0 && (
+                <div className="text-center py-20 opacity-50">
+                  <RefreshCcw className="w-10 h-10 mx-auto mb-3" />
+                  <p>لم يتم العثور على صلاحيات مسجلة في قاعدة البيانات</p>
+                  <Button variant="outline" size="sm" className="mt-4" onClick={loadData}>إعادة المحاولة</Button>
+                </div>
+              )}
             </div>
           </div>
 
