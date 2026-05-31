@@ -210,7 +210,7 @@ export function CustomerManager({ restaurantId, currency }: Props) {
       // Recalculate running balance in correct order
       let balance = 0;
       statement.forEach(tx => {
-        balance += tx.debit - tx.credit;
+        balance += Number(tx.debit || 0) - Number(tx.credit || 0);
         tx.balance = balance;
       });
 

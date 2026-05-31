@@ -259,7 +259,7 @@ export function SupplierManager({ restaurantId, currency }: Props) {
       // Recalculate running balance
       let balance = 0;
       statement.forEach(tx => {
-        balance += tx.debit - tx.credit;
+        balance += Number(tx.debit || 0) - Number(tx.credit || 0);
         tx.balance = balance;
       });
 

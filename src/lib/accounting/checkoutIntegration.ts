@@ -155,7 +155,7 @@ class CheckoutIntegration {
         table_number: orderData.tableNumber || null,
         order_type: orderData.orderType,
         customer_name: orderData.customerName || 'عميل نقدي',
-        customer_phone: orderData.customerPhone || null,
+        customer_phone: orderData.customerPhone || '',
         delivery_address: orderData.deliveryAddress || '',
         delivery_agent_id: orderData.deliveryAgentId || null,
         payment_method: orderData.paymentMethod,
