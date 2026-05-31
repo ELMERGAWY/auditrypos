@@ -26,7 +26,7 @@ import { ProfessionalSidebar, type SidebarTab } from '@/components/professional/
 import { ModuleErrorBoundary } from '@/components/professional/ModuleErrorBoundary';
 import { DashboardErrorBoundary } from '@/components/professional/DashboardErrorBoundary';
 
-// Lazy loaded components
+// Lazy loaded components for performance
 const DeliveryTab = lazy(() => import('./dashboard/DeliveryTab').then(m => ({ default: m.DeliveryTab })));
 const ShiftsTab = lazy(() => import('./dashboard/ShiftsTab').then(m => ({ default: m.ShiftsTab })));
 const MenuTab = lazy(() => import('./dashboard/MenuTab').then(m => ({ default: m.MenuTab })));
@@ -85,8 +85,15 @@ export default function Dashboard() {
     user, authLoading, isOnline, restaurant, menuItems, setMenuItems,
     orders, setOrders, waiterCalls, setWaiterCalls, agents, setAgents,
     currentShift, setCurrentShift, profileName, dataLoaded, loadData, handleLogout,
-    soundEnabled, setSoundEnabled, taxes
+    soundEnabled, setSoundEnabled, taxes, isSuspended
   } = useDashboardData();
+
+  // Basic State
+  const [activeTab, setActiveTab] = useState<SidebarTab>('home');
+  const [activeSubView, setActiveSubView] = useState<'stock' | 'bom'>('stock');
+  const [orderFilter, setOrderFilter] = useState<'all' | OrderStatus>('all');
+  const [dateRange, setDateRange] = useState({ from: startOfMonth(new Date()), to: endOfDay(new Date()) });
+  const [counts, setCounts] = useState({ orders: 0, salesInvoices: 0, purchaseInvoices: 0, expenses: 0, returns: 0, inventoryReceipts: 0, customers: 0, suppliers: 0, totalSales: 0, totalProfit: 0 });
 
   // POS State
   const [cart, setCart] = useState<{ item: MenuItem; qty: number; qtyText: string; unitMode: string }[]>([]);
@@ -113,15 +120,11 @@ export default function Dashboard() {
   const [showReceipt, setShowReceipt] = useState(false);
   const [isProcessingCheckout, setIsProcessingCheckout] = useState(false);
 
-  const [activeTab, setActiveTab] = useState<SidebarTab>('home');
-  const [activeSubView, setActiveSubView] = useState<'stock' | 'bom'>('stock');
-  const [orderFilter, setOrderFilter] = useState<'all' | OrderStatus>('all');
-
+  // Derived
   const businessType = (restaurant?.business_type || 'restaurant') as BusinessType;
   const currency = restaurant?.currency || 'ج.م';
   const config = BUSINESS_TYPES[businessType] || BUSINESS_TYPES.other;
 
-  // Derived State
   const getUnitOptions = useCallback((item: MenuItem) => {
     const product = (item as any);
     const baseUnit = product.unit || 'قطعة';
@@ -137,7 +140,7 @@ export default function Dashboard() {
     const unitFactor = units.find(u => u.label === c.unitMode)?.factor || 1;
     return s + (c.item.price * unitFactor * c.qty);
   }, 0), [cart, getUnitOptions]);
-
+  
   const discountAmount = useMemo(() => discountType === 'percent' ? (cartSubtotal * Number(discount || 0)) / 100 : Number(discount || 0), [cartSubtotal, discount, discountType]);
   const taxableAmount = useMemo(() => Math.max(0, cartSubtotal - discountAmount), [cartSubtotal, discountAmount]);
   const totalTax = useMemo(() => taxes.reduce((sum, tax) => (!tax.is_included_in_price ? sum + (taxableAmount * (tax.rate / 100)) : sum), 0), [taxes, taxableAmount]);
@@ -145,6 +148,9 @@ export default function Dashboard() {
   const paidNum = useMemo(() => Number(paidAmount || 0), [paidAmount]);
   const remaining = useMemo(() => Math.max(0, cartTotal - paidNum), [cartTotal, paidNum]);
 
+  const pendingOrders = orders.filter(o => o.status === 'pending' || o.status === 'preparing');
+  const deliveryOrders = orders.filter(o => (o.order_type === 'delivery' || o.delivery_agent_id) && o.status !== 'completed' && o.status !== 'cancelled');
+  const filteredOrders = useMemo(() => orderFilter === 'all' ? orders : orders.filter(o => o.status === orderFilter), [orders, orderFilter]);
   const categories = useMemo(() => ['all', ...new Set(menuItems.map(item => item.category))], [menuItems]);
   const filteredItems = useMemo(() => menuItems.filter(item => {
     const matchesCategory = selectedCategory === 'all' || item.category === selectedCategory;
@@ -155,9 +161,6 @@ export default function Dashboard() {
   const todayOrdersList = useMemo(() => orders.filter(o => new Date(o.created_at).toDateString() === new Date().toDateString()), [orders]);
   const todayRevenue = useMemo(() => todayOrdersList.filter(o => o.status !== 'cancelled').reduce((sum, o) => sum + Number(o.total || 0), 0), [todayOrdersList]);
   const avgOrderValue = useMemo(() => todayOrdersList.length > 0 ? Number((todayRevenue / todayOrdersList.length).toFixed(2)) : 0, [todayRevenue, todayOrdersList.length]);
-  const pendingOrders = useMemo(() => orders.filter(o => o.status === 'pending' || o.status === 'preparing'), [orders]);
-  const deliveryOrders = useMemo(() => orders.filter(o => (o.order_type === 'delivery' || o.delivery_agent_id) && o.status !== 'completed' && o.status !== 'cancelled'), [orders]);
-  const filteredOrders = useMemo(() => orderFilter === 'all' ? orders : orders.filter(o => o.status === orderFilter), [orders, orderFilter]);
 
   // Handlers
   const selectCustomerFromSearch = useCallback((name: string, phone?: string, address?: string) => {
@@ -216,16 +219,23 @@ export default function Dashboard() {
     toast.success('تم تعليق الفاتورة');
   }, [cart, activeInvoiceId, invoiceTabs, tableNumber, customerName, orderNotes, discount, discountType, orderType, deliveryAddress, customerPhone, selectedDeliveryAgent, paymentMethod, selectedAccountId, clearCart]);
 
-  // Memoized Content
+  // Performance Optimization: Memoize the active tab content
   const activeTabContent = useMemo(() => {
     if (!restaurant) return null;
+    const commonProps = { restaurantId: restaurant.id, currency };
+
     return (
-      <Suspense fallback={<div className="h-full flex flex-col items-center justify-center p-20 space-y-4"><RefreshCcw className="w-12 h-12 animate-spin text-primary opacity-20" /><p className="text-sm font-bold text-muted-foreground animate-pulse">جاري تحميل الوحدة...</p></div>}>
-        {activeTab === 'home' && <HomeDashboard restaurantId={restaurant.id} currency={currency} userId={user?.id || ''} onNavigate={setActiveTab} />}
+      <Suspense fallback={
+        <div className="h-full flex flex-col items-center justify-center p-20 space-y-4">
+          <RefreshCcw className="w-12 h-12 animate-spin text-primary opacity-20" />
+          <p className="text-sm font-bold text-muted-foreground animate-pulse">جاري تحميل الوحدة...</p>
+        </div>
+      }>
+        {activeTab === 'home' && <HomeDashboard {...commonProps} userId={user?.id || ''} onNavigate={setActiveTab} />}
         {activeTab === 'pos' && (
           <div className="flex flex-col lg:flex-row h-full gap-4 overflow-hidden">
             <POSGrid restaurant={restaurant} currency={currency} categories={categories} selectedCategory={selectedCategory} setSelectedCategory={setSelectedCategory} searchQuery={searchQuery} setSearchQuery={setSearchQuery} filteredItems={filteredItems} addToCart={addToCart} businessType={businessType} todayRevenue={todayRevenue} todayOrders={todayOrdersList} avgOrderValue={avgOrderValue} pendingOrders={pendingOrders} orderType={orderType} orders={orders} tableNumber={tableNumber} setTableNumber={setTableNumber} />
-            <POSCart activeInvoiceId={activeInvoiceId} invoiceTabs={invoiceTabs} cart={cart} holdCurrentInvoice={holdCurrentInvoice} setShowInvoiceTabs={setShowInvoiceTabs} clearCart={clearCart} businessType={businessType} orderType={orderType} setOrderType={setOrderType} tableNumber={tableNumber} setTableNumber={setTableNumber} restaurant={restaurant} customerName={customerName} setCustomerName={selectCustomerFromSearch} customerPhone={customerPhone} setCustomerPhone={setCustomerPhone} customerRef={customerRef} setCustomerRef={setCustomerRef} deliveryAddress={deliveryAddress} setDeliveryAddress={setDeliveryAddress} agents={agents} selectedDeliveryAgent={selectedDeliveryAgent} setSelectedDeliveryAgent={setSelectedDeliveryAgent} orderNotes={orderNotes} setOrderNotes={setOrderNotes} discount={discount} setDiscount={setDiscount} discountType={discountType} setDiscountType={setDiscountType} currency={currency} getUnitOptions={getUnitOptions} setCartItemUnit={(id, label) => setCart(prev => prev.map(c => c.item.id === id ? { ...c, unitMode: label } : c))} updateQty={updateQty} setCartItemQty={(id, val) => setCart(prev => prev.map(c => c.item.id === id ? { ...c, qtyText: val, qty: parseFloat(val) || 0 } : c))} discountAmount={discountAmount} taxAmount={totalTax} cartSubtotal={cartSubtotal} cartTotal={cartTotal} paymentMethod={paymentMethod} setPaymentMethod={setPaymentMethod} paidAmount={paidAmount} setPaidAmount={setPaidAmount} remaining={remaining} checkout={performCheckout} previewInvoice={() => { setLastReceipt({ total: cartTotal, items: cart.map(c => ({ menu_item_name: c.item.name, quantity: c.qty, price: c.item.price })) } as any); setShowReceipt(true); }} updateValue={(id, val) => setCart(prev => prev.map(c => c.item.id === id ? { ...c, qty: val / c.item.price, qtyText: String(val / c.item.price) } : c))} removeFromCart={(id) => setCart(prev => prev.filter(c => c.item.id !== id))} accountingAccounts={accountingAccounts} selectedAccountId={selectedAccountId} setSelectedAccountId={setSelectedAccountId} />
+            <POSCart activeInvoiceId={activeInvoiceId} invoiceTabs={invoiceTabs} cart={cart} holdCurrentInvoice={holdCurrentInvoice} setShowInvoiceTabs={setShowInvoiceTabs} clearCart={clearCart} businessType={businessType} orderType={orderType} setOrderType={setOrderType} tableNumber={tableNumber} setTableNumber={setTableNumber} restaurant={restaurant} customerName={customerName} setCustomerName={selectCustomerFromSearch} customerPhone={customerPhone} setCustomerPhone={setCustomerPhone} customerRef={customerRef} setCustomerRef={setCustomerRef} deliveryAddress={deliveryAddress} setDeliveryAddress={setDeliveryAddress} agents={agents} selectedDeliveryAgent={selectedDeliveryAgent} setSelectedDeliveryAgent={setSelectedDeliveryAgent} orderNotes={orderNotes} setOrderNotes={setOrderNotes} discount={discount} setDiscount={setDiscount} discountType={discountType} setDiscountType={setDiscountType} currency={currency} getUnitOptions={getUnitOptions} updateQty={updateQty} discountAmount={discountAmount} taxAmount={totalTax} cartSubtotal={cartSubtotal} cartTotal={cartTotal} paymentMethod={paymentMethod} setPaymentMethod={setPaymentMethod} paidAmount={paidAmount} setPaidAmount={setPaidAmount} remaining={remaining} checkout={performCheckout} previewInvoice={() => { setLastReceipt({ total: cartTotal, items: cart.map(c => ({ menu_item_name: c.item.name, quantity: c.qty, price: c.item.price })) } as any); setShowReceipt(true); }} removeFromCart={(id) => setCart(prev => prev.filter(c => c.item.id !== id))} accountingAccounts={accountingAccounts} selectedAccountId={selectedAccountId} setSelectedAccountId={setSelectedAccountId} isProcessing={isProcessingCheckout} />
           </div>
         )}
         {activeTab === 'orders' && (
@@ -234,20 +244,55 @@ export default function Dashboard() {
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">{filteredOrders.map(o => <Card key={o.id} className="p-4"><div className="flex justify-between font-bold mb-2"><span>#{o.order_number.slice(-4)}</span><Badge>{o.status}</Badge></div><div className="text-xl font-black text-primary">{o.total} {currency}</div><Button className="w-full mt-4" variant="outline" size="sm" onClick={() => { setLastReceipt(o); setShowReceipt(true); }}>تفاصيل</Button></Card>)}</div>
           </div>
         )}
-        {activeTab === 'crm' && <AuditryCRM restaurantId={restaurant.id} currency={currency} />}
-        {activeTab === 'analytics' && <AdvancedReportsHub restaurantId={restaurant.id} currency={currency} onNavigate={setActiveTab} />}
-        {activeTab === 'delivery' && <DeliveryTab restaurantId={restaurant.id} agents={agents} setAgents={setAgents} deliveryOrders={deliveryOrders} onAssignAgent={(oid, aid) => supabase.from('orders').update({ delivery_agent_id: aid }).eq('id', oid).then(loadData)} />}
+        
+        {/* Management Tabs */}
         {activeTab === 'menu' && <MenuTab restaurant={restaurant} menuItems={menuItems} setMenuItems={setMenuItems} loadData={loadData} />}
-        {activeTab === 'inventory' && <InventoryTab restaurantId={restaurant.id} currency={currency} businessType={businessType} />}
-        {activeTab === 'treasury' && <TreasuryTab restaurantId={restaurant.id} currency={currency} />}
+        {activeTab === 'inventory' && <InventoryTab {...commonProps} businessType={businessType} />}
+        {activeTab === 'customers' && <CustomerManager {...commonProps} />}
+        {activeTab === 'suppliers' && <SupplierManager {...commonProps} />}
+        {activeTab === 'expenses' && <ExpensesTab {...commonProps} />}
+        {activeTab === 'delivery' && <DeliveryTab {...commonProps} agents={agents} setAgents={setAgents} deliveryOrders={deliveryOrders} onAssignAgent={(oid, aid) => supabase.from('orders').update({ delivery_agent_id: aid }).eq('id', oid).then(loadData)} />}
         {activeTab === 'shifts' && <ShiftsTab restaurant={restaurant} currentShift={currentShift} setCurrentShift={setCurrentShift} profileName={profileName} userId={user!.id} />}
-        {activeTab === 'staff' && <StaffTab restaurantId={restaurant.id} currency={currency} />}
+        
+        {/* Accounting Tabs */}
+        {activeTab === 'treasury' && <TreasuryTab {...commonProps} />}
+        {activeTab === 'financials' && <FinancialsTab {...commonProps} businessType={businessType} />}
+        {activeTab === 'chart_of_accounts' && <ChartOfAccountsTab {...commonProps} />}
+        {activeTab === 'accounting_mapping' && <AccountingMappingTab {...commonProps} />}
+        {activeTab === 'manual_journal' && <ManualJournalTab {...commonProps} />}
+        {activeTab === 'customer_accounts' && <CustomersTab {...commonProps} />}
+        {activeTab === 'supplier_accounts' && <SuppliersTab {...commonProps} />}
+        {activeTab === 'fixed_assets' && <FixedAssetsTab {...commonProps} />}
+        
+        {/* Advanced Tabs */}
+        {activeTab === 'crm' && <AuditryCRM {...commonProps} />}
+        {activeTab === 'analytics' && <AdvancedReportsHub {...commonProps} onNavigate={setActiveTab} />}
+        {activeTab === 'ai_assistant' && <AIAccountantUnified {...commonProps} />}
+        {activeTab === 'loyalty' && <LoyaltyPoints {...commonProps} />}
+        {activeTab === 'gift_cards' && <GiftCards {...commonProps} />}
+        {activeTab === 'branches' && <BranchManager {...commonProps} />}
+        
+        {/* System Tabs */}
+        {activeTab === 'staff' && <StaffTab {...commonProps} />}
         {activeTab === 'settings' && <SettingsTab restaurant={restaurant} businessType={businessType} profileName={profileName} user={user} agents={agents} isSuspended={isSuspended} isSuperAdmin={isSuperAdmin} loadData={loadData} />}
+        {activeTab === 'notifications' && <NotificationsTab {...commonProps} />}
+        {activeTab === 'qr' && (
+          <div className="p-10 flex flex-col items-center justify-center space-y-8 h-full">
+            <div className="p-8 bg-white rounded-3xl shadow-2xl scale-110">
+              <QRCodeSVG value={`${window.location.origin}/menu/${restaurant.id}`} size={250} level="H" />
+            </div>
+            <div className="text-center space-y-4">
+              <h3 className="text-3xl font-black">كود المنيو الذكي (QR Menu)</h3>
+              <p className="text-muted-foreground max-w-md">وجه الكاميرا لمسح الكود واستعراض المنيو.</p>
+              <Button className="gradient-bg border-0 text-white rounded-xl px-8" onClick={() => window.open(`${window.location.origin}/menu/${restaurant.id}`, '_blank')}>معاينة القائمة</Button>
+            </div>
+          </div>
+        )}
       </Suspense>
     );
   }, [activeTab, restaurant, currency, businessType, cart, orders, orderFilter, agents, currentShift, menuItems, taxes, selectedAccountId, customerName, customerPhone, customerRef, deliveryAddress, selectedDeliveryAgent, orderNotes, discount, discountType, paidAmount, isProcessingCheckout, categories, filteredItems, accountingAccounts, cartSubtotal, cartTotal, remaining, filteredOrders, holdCurrentInvoice, clearCart, selectCustomerFromSearch, updateQty, getUnitOptions, todayRevenue, todayOrdersList, avgOrderValue, pendingOrders, deliveryOrders]);
 
-  // Initial Effects
+  // Effects
   useEffect(() => {
     if (!restaurant?.id) return;
     const fetchAccountingAccounts = async () => {
@@ -263,20 +308,22 @@ export default function Dashboard() {
 
   return (
     <DashboardErrorBoundary>
-      <div className="min-h-screen bg-background flex" dir="rtl">
-        <ProfessionalSidebar businessType={businessType} activeTab={activeTab} onTabChange={setActiveTab} restaurant={restaurant} user={{ email: user?.email, full_name: profileName }} stats={{ pendingOrders: pendingOrders.length, deliveryOrders: deliveryOrders.length, todayRevenue, isOnline, currency }} onLogout={handleLogout} />
-        <main className="flex-1 flex flex-col h-screen overflow-hidden">
-          <header className="h-16 border-b flex items-center justify-between px-6 bg-card/50 backdrop-blur-md">
-             <div className="flex items-center gap-4">
-                <h1 className="text-xl font-black text-primary">auditry - {restaurant.name}</h1>
-                {isOnline ? <Badge className="bg-emerald-500/10 text-emerald-600 border-0"><Wifi className="w-3 h-3 ml-1" /> متصل</Badge> : <Badge variant="destructive"><WifiOff className="w-3 h-3 ml-1" /> أوفلاين</Badge>}
-             </div>
-             <div className="flex items-center gap-2">
-                <Button variant="ghost" size="icon" onClick={toggleDarkMode}>{isDark ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}</Button>
-                <Button variant="ghost" size="icon" onClick={() => loadData()}><RefreshCw className="w-5 h-5" /></Button>
-             </div>
-          </header>
-          <div className="flex-1 overflow-hidden p-4">
+      <div className="min-h-screen bg-background flex flex-col" dir="rtl">
+        <ProfessionalSidebar 
+          businessType={businessType} 
+          activeTab={activeTab} 
+          onTabChange={setActiveTab} 
+          restaurant={restaurant} 
+          user={{ email: user?.email, full_name: profileName }} 
+          stats={{ pendingOrders: pendingOrders.length, deliveryOrders: deliveryOrders.length, todayRevenue, isOnline, currency }} 
+          onLogout={handleLogout}
+          soundEnabled={soundEnabled}
+          onToggleSound={() => setSoundEnabled(!soundEnabled)}
+          isDark={isDark}
+          onToggleDark={toggleDarkMode}
+        />
+        <main className="flex-1 pt-16 h-[100dvh] overflow-hidden">
+          <div className="h-full overflow-auto custom-scrollbar p-2 sm:p-4">
             {activeTabContent}
           </div>
         </main>

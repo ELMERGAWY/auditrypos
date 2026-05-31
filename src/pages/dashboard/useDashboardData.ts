@@ -41,6 +41,7 @@ export function useDashboardData() {
   const [profileName, setProfileName] = useState('');
   const [dataLoaded, setDataLoaded] = useState(false);
   const [soundEnabled, setSoundEnabled] = useState(true);
+  const [isSuspended, setIsSuspended] = useState(false);
 
   // Load cached data first for instant display
   const loadCachedData = useCallback(async (userId: string) => {
@@ -52,6 +53,7 @@ export function useDashboardData() {
       agents: DeliveryAgent[];
       currentShift: Shift | null;
       profileName: string;
+      isSuspended: boolean;
     }>(CACHE_KEY_PREFIX + userId);
 
     if (cached) {
@@ -68,6 +70,7 @@ export function useDashboardData() {
       if ((cached as any).taxes?.length) setTaxes((cached as any).taxes);
       if (cached.currentShift) setCurrentShift(cached.currentShift);
       if (cached.profileName) setProfileName(cached.profileName);
+      if (cached.isSuspended !== undefined) setIsSuspended(cached.isSuspended);
       setDataLoaded(true);
       return true;
     }
@@ -137,6 +140,7 @@ export function useDashboardData() {
     localStorage.setItem('current_business_name', rest.name);
 
     const suspended = rest.status === 'suspended' || (rest.subscription_end && new Date(rest.subscription_end) < new Date());
+    setIsSuspended(!!suspended);
     const businessType = (rest.business_type || 'restaurant') as BusinessType;
     const usesProductsCatalog = isInventoryDrivenBusiness(businessType);
 
@@ -326,6 +330,6 @@ export function useDashboardData() {
     user, authLoading, isOnline, restaurant, menuItems, setMenuItems,
     orders, setOrders, waiterCalls, setWaiterCalls, agents, setAgents, taxes,
     currentShift, setCurrentShift, profileName, dataLoaded, loadData, handleLogout,
-    soundEnabled, setSoundEnabled,
+    soundEnabled, setSoundEnabled, isSuspended
   };
 }

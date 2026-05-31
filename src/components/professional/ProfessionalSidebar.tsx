@@ -1,26 +1,24 @@
-import { useMemo, useState, memo } from 'react';
+import { useMemo, memo } from 'react';
 import { motion } from 'framer-motion';
 import { cn } from '@/lib/utils';
 import {
-  AlertTriangle, BarChart3, Bell, Building2, CalendarClock, ChefHat,
-  ChevronDown, CreditCard, DollarSign, FileText, Gift, Heart, Landmark,
+  BarChart3, Bell, Building2, CalendarClock, ChefHat,
+  CreditCard, DollarSign, FileText, Gift, Heart, Landmark,
   LayoutGrid, LogOut, Moon, Network, Package, QrCode, Receipt, RefreshCw,
   RotateCcw, Settings, Settings2, Shield, ShoppingCart, Sparkles, Sun,
   Truck, Users, UsersRound, Volume2, VolumeX, Wallet, Wifi, WifiOff,
-  Menu, Search, X, ChevronRight
+  Search, User, ChevronDown
 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { 
-  Sheet, 
-  SheetContent, 
-  SheetHeader, 
-  SheetTitle, 
-  SheetTrigger,
-  SheetClose
-} from '@/components/ui/sheet';
-import { Input } from '@/components/ui/input';
-import { ScrollArea } from '@/components/ui/scroll-area';
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { getBusinessConfig, type BusinessType } from '@/lib/businessTypes';
 
 export type SidebarTab =
@@ -90,13 +88,13 @@ interface ProfessionalSidebarProps {
 }
 
 const SECTIONS: Record<string, { label: string; icon: React.ElementType }> = {
-  main: { label: 'مركز التشغيل', icon: LayoutGrid },
-  sales: { label: 'المبيعات والعملاء', icon: Receipt },
-  purchases: { label: 'المشتريات', icon: ShoppingCart },
-  inventory: { label: 'المخزون والمنتجات', icon: Package },
-  accounting: { label: 'الخزينة والمحاسبة', icon: Landmark },
+  main: { label: 'الرئيسية', icon: LayoutGrid },
+  sales: { label: 'المبيعات والعملاء', icon: Users },
+  purchases: { label: 'المشتريات والموردين', icon: ShoppingCart },
+  inventory: { label: 'المخازن', icon: Package },
+  accounting: { label: 'المحاسبة والمالية', icon: Landmark },
   analytics: { label: 'التقارير والذكاء', icon: BarChart3 },
-  system: { label: 'إدارة النظام', icon: Settings },
+  system: { label: 'النظام والإعدادات', icon: Settings },
 };
 
 export const ProfessionalSidebar = memo(function ProfessionalSidebar({
@@ -121,58 +119,54 @@ export const ProfessionalSidebar = memo(function ProfessionalSidebar({
   onForceSync
 }: ProfessionalSidebarProps) {
   const config = getBusinessConfig(businessType);
-  const [isOpen, setIsOpen] = useState(false);
-  const [navSearch, setNavSearch] = useState('');
-
-  const isSuspended = restaurant.status === 'suspended' ||
-    (restaurant.subscription_end && new Date(restaurant.subscription_end) < new Date());
-  const lockedTabs: SidebarTab[] = isTrial ? ['orders', 'delivery', 'shifts', 'stats'] : [];
 
   const allNavItems: Record<string, Partial<NavItem>> = {
-    home: { label: 'لوحة التحكم', icon: BarChart3, section: 'main' },
-    pos: { label: 'نقطة البيع', icon: LayoutGrid, section: 'main' },
+    home: { label: 'الرئيسية', icon: LayoutGrid, section: 'main' },
+    pos: { label: 'نقطة البيع', icon: ShoppingCart, section: 'main' },
     orders: { label: config.labels.orders, icon: Receipt, badge: stats.pendingOrders, section: 'main' },
     menu: { label: config.labels.menu, icon: config.category === 'food' ? ChefHat : Package, section: 'main' },
-    inventory: { label: 'المخزون', icon: Package, section: 'main' },
-    treasury: { label: 'الخزينة', icon: Wallet, section: 'main' },
-    shifts: { label: 'الشيفتات', icon: CalendarClock, section: 'main' },
-    kds: { label: 'عرض المطبخ', icon: ChefHat, section: 'main' },
-    delivery: { label: 'التوصيل', icon: Truck, badge: stats.deliveryOrders, section: 'main' },
-    qr: { label: 'QR Menu', icon: QrCode, section: 'main' },
-    waiter: { label: 'طلبات الجرسون', icon: Bell, badge: stats.unackCalls, section: 'main' },
-
-    customers: { label: config.labels.customers, icon: Users, badge: stats.customersCount, section: 'sales' },
-    crm: { label: 'إدارة العلاقات CRM', icon: Heart, section: 'sales' },
+    
+    customers: { label: 'إدارة العملاء', icon: Users, badge: stats.customersCount, section: 'sales' },
+    customer_accounts: { label: 'حسابات العملاء', icon: CreditCard, section: 'sales' },
+    crm: { label: 'CRM', icon: Heart, section: 'sales' },
     sales_orders: { label: 'أوامر البيع', icon: FileText, section: 'sales' },
     sales_invoices: { label: 'فواتير البيع', icon: Receipt, badge: stats.salesInvoicesCount, section: 'sales' },
-    sales_returns: { label: 'مرتجع المبيعات', icon: RotateCcw, badge: stats.returnsCount, section: 'sales' },
-    loyalty: { label: 'نقاط الولاء', icon: Heart, section: 'sales' },
-    gift_cards: { label: 'بطاقات الهدايا', icon: Gift, section: 'sales' },
-    branches: { label: 'الفروع', icon: Building2, section: 'sales' },
-    projects: { label: 'المشاريع', icon: FileText, section: 'sales' },
-
-    purchase_orders: { label: 'أوامر الشراء', icon: ShoppingCart, section: 'purchases' },
-    purchase_invoices: { label: 'فواتير المشتريات', icon: DollarSign, badge: stats.purchaseInvoicesCount, section: 'purchases' },
-    suppliers: { label: 'الموردين', icon: UsersRound, badge: stats.suppliersCount, section: 'purchases' },
-    inventory_receipts: { label: 'استلام المخزون', icon: FileText, badge: stats.inventoryReceiptsCount, section: 'inventory' },
-    overheads: { label: 'التكاليف الثابتة', icon: BarChart3, section: 'inventory' },
-
-    chart_of_accounts: { label: 'شجرة الحسابات', icon: Network, section: 'accounting' },
-    accounting_mapping: { label: 'التوجيه المحاسبي', icon: Settings2, section: 'accounting' },
-    financials: { label: 'التقارير المالية', icon: Wallet, section: 'accounting' },
+    sales_returns: { label: 'مرتجعات مبيعات', icon: RotateCcw, badge: stats.returnsCount, section: 'sales' },
+    
+    suppliers: { label: 'إدارة الموردين', icon: UsersRound, badge: stats.suppliersCount, section: 'purchases' },
+    supplier_accounts: { label: 'حسابات الموردين', icon: Wallet, section: 'purchases' },
+    purchase_orders: { label: 'أوامر شراء', icon: ShoppingCart, section: 'purchases' },
+    purchase_invoices: { label: 'فواتير شراء', icon: DollarSign, badge: stats.purchaseInvoicesCount, section: 'purchases' },
+    
+    inventory: { label: 'المخزون', icon: Package, section: 'inventory' },
+    inventory_receipts: { label: 'استلام بضاعة', icon: FileText, badge: stats.inventoryReceiptsCount, section: 'inventory' },
+    overheads: { label: 'التكاليف', icon: BarChart3, section: 'inventory' },
+    
+    financials: { label: 'القوائم المالية', icon: Wallet, section: 'accounting' },
+    treasury: { label: 'الخزينة والبنك', icon: Wallet, section: 'accounting' },
     expenses: { label: 'المصروفات', icon: DollarSign, badge: stats.expensesCount, section: 'accounting' },
+    chart_of_accounts: { label: 'دليل الحسابات', icon: Network, section: 'accounting' },
     manual_journal: { label: 'قيود اليومية', icon: FileText, section: 'accounting' },
-    customer_accounts: { label: 'حسابات العملاء', icon: CreditCard, section: 'accounting' },
-    supplier_accounts: { label: 'حسابات الموردين', icon: Wallet, section: 'accounting' },
     fixed_assets: { label: 'الأصول الثابتة', icon: Building2, section: 'accounting' },
+    accounting_mapping: { label: 'توجيه المحاسبة', icon: Settings2, section: 'accounting' },
 
-    stats: { label: 'الإحصائيات', icon: BarChart3, section: 'analytics' },
-    analytics: { label: 'التقارير المتقدمة', icon: BarChart3, section: 'analytics' },
-    ai_assistant: { label: 'مساعد المحاسب', icon: Sparkles, section: 'analytics' },
+    analytics: { label: 'التقارير', icon: BarChart3, section: 'analytics' },
+    stats: { label: 'إحصائيات', icon: BarChart3, section: 'analytics' },
+    ai_assistant: { label: 'الذكاء الاصطناعي', icon: Sparkles, section: 'analytics' },
+    
     staff: { label: 'الموظفين', icon: Users, section: 'system' },
     users: { label: 'الصلاحيات', icon: Shield, section: 'system' },
+    settings: { label: 'إعدادات النظام', icon: Settings, section: 'system' },
     notifications: { label: 'التنبيهات', icon: Bell, section: 'system' },
-    settings: { label: 'الإعدادات', icon: Settings, section: 'system' },
+    
+    delivery: { label: 'التوصيل', icon: Truck, badge: stats.deliveryOrders, section: 'main' },
+    shifts: { label: 'الشيفتات', icon: CalendarClock, section: 'main' },
+    kds: { label: 'المطبخ', icon: ChefHat, section: 'main' },
+    qr: { label: 'QR Menu', icon: QrCode, section: 'main' },
+    waiter: { label: 'الجرسون', icon: Bell, badge: stats.unackCalls, section: 'main' },
+    loyalty: { label: 'الولاء', icon: Heart, section: 'sales' },
+    gift_cards: { label: 'الهدايا', icon: Gift, section: 'sales' },
+    branches: { label: 'الفروع', icon: Building2, section: 'sales' },
   };
 
   const navItems = useMemo(() => {
@@ -187,223 +181,144 @@ export const ProfessionalSidebar = memo(function ProfessionalSidebar({
           icon: item.icon!,
           badge: item.badge,
           section: item.section || 'main',
-          locked: lockedTabs.includes(tabId as SidebarTab),
         } as NavItem;
       })
       .filter(Boolean) as NavItem[];
-  }, [tabs, config.tabs, stats.pendingOrders, stats.deliveryOrders, stats.unackCalls, stats.customersCount, stats.suppliersCount, stats.inventoryReceiptsCount]);
+  }, [tabs, config.tabs, stats]);
 
-  const filteredItems = useMemo(() => {
-    if (!navSearch.trim()) return navItems;
-    return navItems.filter(item => 
-      item.label.toLowerCase().includes(navSearch.toLowerCase())
-    );
-  }, [navItems, navSearch]);
-
-  const groupedItems = filteredItems.reduce((acc, item) => {
+  const groupedItems = navItems.reduce((acc, item) => {
     if (!acc[item.section]) acc[item.section] = [];
     acc[item.section].push(item);
     return acc;
   }, {} as Record<string, NavItem[]>);
 
-  const handleTabClick = (item: NavItem) => {
-    if (item.locked) {
-      onUpgrade?.();
-      return;
-    }
-    onTabChange(item.id);
-    setIsOpen(false);
-  };
-
   return (
     <TooltipProvider delayDuration={0}>
-      <header className="fixed top-0 left-0 right-0 z-50 p-3" dir="rtl">
-        <div className="glass-card !rounded-2xl !border-white/20 px-4 py-3 shadow-2xl flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <Sheet open={isOpen} onOpenChange={setIsOpen}>
-              <SheetTrigger asChild>
-                <button className="w-10 h-10 rounded-xl bg-primary/10 text-primary flex items-center justify-center hover:bg-primary/20 transition-colors">
-                  <Menu className="w-5 h-5" />
-                </button>
-              </SheetTrigger>
-              <SheetContent side="right" className="p-0 w-80 border-l border-white/20 glass-card !rounded-none">
-                <div className="h-full flex flex-col">
-                  <SheetHeader className="p-6 border-b border-border/50">
-                    <SheetTitle className="text-right flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-xl gradient-bg flex items-center justify-center text-white shadow-lg">
-                        {restaurant.logo_url ? (
-                          <img src={restaurant.logo_url} alt="" className="w-6 h-6 object-contain" />
-                        ) : (
-                          <span>{config.icon}</span>
-                        )}
-                      </div>
-                      <div className="text-right">
-                        <p className="font-bold text-sm truncate">{restaurant.name}</p>
-                        <p className="text-[10px] text-muted-foreground">نظام auditry المحاسبي</p>
-                      </div>
-                    </SheetTitle>
-                  </SheetHeader>
-
-                  <div className="p-4">
-                    <div className="relative">
-                      <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                      <Input 
-                        placeholder="ابحث عن صفحة..." 
-                        className="pr-10 h-10 bg-muted/40 border-none rounded-xl text-sm"
-                        value={navSearch}
-                        onChange={e => setNavSearch(e.target.value)}
-                      />
-                    </div>
-                  </div>
-
-                  <ScrollArea className="flex-1 px-2">
-                    <div className="space-y-6 pb-10">
-                      {Object.entries(SECTIONS).map(([key, section]) => {
-                        const items = groupedItems[key];
-                        if (!items || items.length === 0) return null;
-                        
-                        return (
-                          <div key={key} className="space-y-2">
-                            <div className="px-4 flex items-center gap-2 text-[10px] font-black text-muted-foreground uppercase tracking-widest">
-                              <section.icon className="w-3 h-3" />
-                              {section.label}
-                            </div>
-                            <div className="space-y-1">
-                              {items.map(item => {
-                                const Icon = item.icon;
-                                const isActive = activeTab === item.id;
-                                return (
-                                  <button
-                                    key={item.id}
-                                    onClick={() => handleTabClick(item)}
-                                    className={cn(
-                                      "w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm transition-all group relative",
-                                      isActive 
-                                        ? "bg-primary/10 text-primary font-bold" 
-                                        : "text-muted-foreground hover:bg-muted/60 hover:text-foreground"
-                                    )}
-                                  >
-                                    <Icon className={cn("w-4 h-4 transition-transform group-hover:scale-110", isActive && "text-primary")} />
-                                    <span className="flex-1 text-right">{item.label}</span>
-                                    {!!item.badge && item.badge > 0 && (
-                                      <Badge variant="destructive" className="h-5 min-w-5 px-1 text-[10px] shadow-sm">
-                                        {item.badge}
-                                      </Badge>
-                                    )}
-                                    {isActive && (
-                                      <motion.div 
-                                        layoutId="active-pill"
-                                        className="absolute right-0 w-1 h-6 bg-primary rounded-l-full"
-                                      />
-                                    )}
-                                  </button>
-                                );
-                              })}
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </ScrollArea>
-
-                  <div className="p-4 border-t border-border/50 bg-muted/20">
-                    <div className="flex items-center gap-3 p-3 rounded-2xl bg-background/50 border border-border/50">
-                      <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold">
-                        {user?.full_name?.charAt(0) || 'U'}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-bold truncate">{user?.full_name}</p>
-                        <p className="text-[10px] text-muted-foreground truncate">{user?.email}</p>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </SheetContent>
-            </Sheet>
-
-            <div className="flex items-center gap-3">
-              <div className="hidden sm:flex w-10 h-10 rounded-xl gradient-bg items-center justify-center text-white shadow-lg">
-                {restaurant.logo_url ? (
-                  <img src={restaurant.logo_url} alt="" className="w-6 h-6 object-contain" />
+      <header className="fixed top-0 left-0 right-0 z-50 bg-background/80 backdrop-blur-xl border-b border-border shadow-sm h-16" dir="rtl">
+        <div className="container mx-auto h-full flex items-center justify-between px-4 gap-4">
+          {/* Logo & Restaurant Info */}
+          <div className="flex items-center gap-3 shrink-0">
+            <div className="w-10 h-10 rounded-xl gradient-bg flex items-center justify-center text-white shadow-lg">
+              {restaurant.logo_url ? (
+                <img src={restaurant.logo_url} alt="" className="w-6 h-6 object-contain" />
+              ) : (
+                <span>{config.icon}</span>
+              )}
+            </div>
+            <div className="hidden sm:block">
+              <h2 className="font-black text-sm leading-none mb-1 truncate max-w-[120px]">{restaurant.name}</h2>
+              <div className="flex items-center gap-2">
+                {stats.isOnline ? (
+                  <span className="flex items-center gap-1 text-[9px] font-bold text-emerald-500">
+                    <Wifi className="w-2.5 h-2.5" /> متصل
+                  </span>
                 ) : (
-                  <span>{config.icon}</span>
+                  <span className="flex items-center gap-1 text-[9px] font-bold text-destructive">
+                    <WifiOff className="w-2.5 h-2.5" /> أوفلاين
+                  </span>
                 )}
               </div>
-              <div>
-                <h2 className="font-black text-sm lg:text-base leading-none mb-1">{restaurant.name}</h2>
-                <div className="flex items-center gap-2">
-                  <Badge variant="outline" className="text-[9px] font-bold py-0 h-4 border-primary/30 text-primary">
-                    {allNavItems[activeTab]?.label || 'النظام'}
-                  </Badge>
-                  {stats.isOnline ? (
-                    <span className="flex items-center gap-1 text-[9px] font-bold text-emerald-500">
-                      <Wifi className="w-2.5 h-2.5" /> متصل
-                    </span>
-                  ) : (
-                    <span className="flex items-center gap-1 text-[9px] font-bold text-destructive">
-                      <WifiOff className="w-2.5 h-2.5" /> غير متصل
-                    </span>
-                  )}
-                </div>
-              </div>
             </div>
           </div>
 
-          <div className="flex items-center gap-1 lg:gap-2">
-            <div className="hidden md:flex items-center gap-1 mr-2 px-3 py-1.5 bg-muted/40 rounded-xl border border-border/50">
-               {onForceSync && (
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <button onClick={onForceSync} disabled={isSyncing} className="w-8 h-8 rounded-lg hover:bg-background flex items-center justify-center transition-all">
-                      <RefreshCw className={cn('w-4 h-4 text-muted-foreground', isSyncing && 'animate-spin')} />
-                    </button>
-                  </TooltipTrigger>
-                  <TooltipContent>مزامنة البيانات</TooltipContent>
-                </Tooltip>
-              )}
+          {/* Main Navigation - Horizontal Scroll on Mobile */}
+          <nav className="flex-1 flex items-center justify-center gap-1 overflow-x-auto no-scrollbar py-2">
+            {Object.entries(SECTIONS).map(([key, section]) => {
+              const items = groupedItems[key];
+              if (!items || items.length === 0) return null;
               
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <button onClick={onToggleSound} className="w-8 h-8 rounded-lg hover:bg-background flex items-center justify-center transition-all">
-                    {soundEnabled ? <Volume2 className="w-4 h-4 text-emerald-500" /> : <VolumeX className="w-4 h-4 text-muted-foreground" />}
-                  </button>
-                </TooltipTrigger>
-                <TooltipContent>الصوت</TooltipContent>
-              </Tooltip>
+              const isSectionActive = items.some(i => i.id === activeTab);
 
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <button onClick={onToggleDark} className="w-8 h-8 rounded-lg hover:bg-background flex items-center justify-center transition-all">
-                    {isDark ? <Sun className="w-4 h-4 text-amber-500" /> : <Moon className="w-4 h-4 text-indigo-500" />}
-                  </button>
-                </TooltipTrigger>
-                <TooltipContent>المظهر</TooltipContent>
-              </Tooltip>
+              return (
+                <DropdownMenu key={key}>
+                  <DropdownMenuTrigger asChild>
+                    <button className={cn(
+                      "flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-bold transition-all whitespace-nowrap",
+                      isSectionActive 
+                        ? "bg-primary text-primary-foreground shadow-md scale-105" 
+                        : "text-muted-foreground hover:bg-muted hover:text-foreground"
+                    )}>
+                      <section.icon className="w-4 h-4" />
+                      <span className="hidden lg:inline">{section.label}</span>
+                      <ChevronDown className={cn("w-3 h-3 opacity-50 transition-transform", isSectionActive && "rotate-180")} />
+                    </button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="center" className="w-56 glass-card !rounded-2xl border-white/20 p-2 shadow-2xl">
+                    {items.map(item => {
+                      const Icon = item.icon;
+                      const isActive = activeTab === item.id;
+                      return (
+                        <DropdownMenuItem
+                          key={item.id}
+                          onClick={() => onTabChange(item.id)}
+                          className={cn(
+                            "flex items-center gap-3 p-3 rounded-xl cursor-pointer transition-colors",
+                            isActive ? "bg-primary/10 text-primary font-bold" : "text-muted-foreground hover:bg-muted"
+                          )}
+                        >
+                          <Icon className="w-4 h-4" />
+                          <span className="flex-1 text-right">{item.label}</span>
+                          {!!item.badge && item.badge > 0 && (
+                            <Badge variant="destructive" className="h-5 min-w-5 px-1 text-[10px] flex items-center justify-center">
+                              {item.badge}
+                            </Badge>
+                          )}
+                        </DropdownMenuItem>
+                      );
+                    })}
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              );
+            })}
+          </nav>
+
+          {/* Action Buttons & User Profile */}
+          <div className="flex items-center gap-2 shrink-0">
+            <div className="hidden lg:flex items-center gap-1 bg-muted/40 rounded-xl border border-border/50 p-1">
+              <button onClick={onToggleSound} className="w-8 h-8 rounded-lg hover:bg-background flex items-center justify-center transition-all">
+                {soundEnabled ? <Volume2 className="w-4 h-4 text-emerald-500" /> : <VolumeX className="w-4 h-4 text-muted-foreground" />}
+              </button>
+              <button onClick={onToggleDark} className="w-8 h-8 rounded-lg hover:bg-background flex items-center justify-center transition-all">
+                {isDark ? <Sun className="w-4 h-4 text-amber-500" /> : <Moon className="w-4 h-4 text-indigo-500" />}
+              </button>
             </div>
 
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <button 
-                  onClick={onLogout} 
-                  className="w-10 h-10 rounded-xl bg-destructive/10 text-destructive flex items-center justify-center hover:bg-destructive hover:text-white transition-all shadow-sm"
-                >
-                  <LogOut className="w-5 h-5" />
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button className="flex items-center gap-2 p-1.5 rounded-xl hover:bg-muted transition-all border border-transparent hover:border-border">
+                  <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center text-primary font-bold text-xs shadow-inner">
+                    {user?.full_name?.charAt(0) || <User className="w-4 h-4" />}
+                  </div>
+                  <ChevronDown className="w-3 h-3 text-muted-foreground hidden sm:block" />
                 </button>
-              </TooltipTrigger>
-              <TooltipContent>تسجيل الخروج</TooltipContent>
-            </Tooltip>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-64 glass-card !rounded-2xl border-white/20 p-2">
+                <DropdownMenuLabel className="p-3">
+                  <div className="flex flex-col gap-1">
+                    <p className="text-sm font-black">{user?.full_name}</p>
+                    <p className="text-[10px] text-muted-foreground font-medium">{user?.email}</p>
+                  </div>
+                </DropdownMenuLabel>
+                <DropdownMenuSeparator className="bg-white/10" />
+                <DropdownMenuItem onClick={() => onTabChange('settings')} className="flex items-center gap-3 p-3 rounded-xl cursor-pointer">
+                  <Settings className="w-4 h-4" />
+                  <span>الإعدادات الشخصية</span>
+                </DropdownMenuItem>
+                {onForceSync && (
+                  <DropdownMenuItem onClick={onForceSync} disabled={isSyncing} className="flex items-center gap-3 p-3 rounded-xl cursor-pointer">
+                    <RefreshCw className={cn("w-4 h-4", isSyncing && "animate-spin")} />
+                    <span>مزامنة البيانات</span>
+                  </DropdownMenuItem>
+                )}
+                <DropdownMenuSeparator className="bg-white/10" />
+                <DropdownMenuItem onClick={onLogout} className="flex items-center gap-3 p-3 rounded-xl cursor-pointer text-destructive focus:text-destructive">
+                  <LogOut className="w-4 h-4" />
+                  <span>تسجيل الخروج</span>
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
         </div>
-
-        {isTrial && (
-          <div className="mt-2 mx-auto max-w-lg rounded-xl bg-amber-500/10 border border-amber-500/20 px-4 py-2 text-[11px] text-amber-700 dark:text-amber-300 flex items-center justify-between shadow-sm backdrop-blur-md">
-            <div className="flex items-center gap-2">
-              <AlertTriangle className="w-3.5 h-3.5" />
-              <span>فترة تجريبية، متبقي <strong>{trialDaysLeft}</strong> يوم</span>
-            </div>
-            <button onClick={onUpgrade} className="font-black hover:underline bg-amber-500 text-white px-2 py-1 rounded-lg">ترقية الآن</button>
-          </div>
-        )}
       </header>
     </TooltipProvider>
   );
