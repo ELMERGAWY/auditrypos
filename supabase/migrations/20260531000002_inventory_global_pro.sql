@@ -73,6 +73,10 @@ BEGIN
     IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='inventory_transfer_items' AND column_name='restaurant_id') THEN
         ALTER TABLE public.inventory_transfer_items ADD COLUMN restaurant_id UUID REFERENCES public.restaurants(id) ON DELETE CASCADE;
     END IF;
+    -- Add warehouse_id to inventory_receipts
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='inventory_receipts' AND column_name='warehouse_id') THEN
+        ALTER TABLE public.inventory_receipts ADD COLUMN warehouse_id UUID REFERENCES public.warehouses(id) ON DELETE SET NULL;
+    END IF;
 END $$;
 
 -- Owner Policies

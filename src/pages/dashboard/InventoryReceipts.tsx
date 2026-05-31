@@ -20,6 +20,7 @@ interface InventoryReceipt {
   receipt_date: string;
   supplier_name: string | null;
   supplier_id: string | null;
+  warehouse_id: string | null;
   total_amount: number;
   discount_amount: number;
   tax_amount: number;
@@ -29,6 +30,11 @@ interface InventoryReceipt {
   notes: string | null;
   items_count: number;
   created_at: string;
+}
+
+interface Warehouse {
+  id: string;
+  name: string;
 }
 
 interface ReceiptItem {
@@ -74,7 +80,9 @@ export function InventoryReceiptsManager({ restaurantId, currency }: Props) {
   // New receipt form state
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
+  const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
   const [selectedSupplier, setSelectedSupplier] = useState<string>('');
+  const [selectedWarehouse, setSelectedWarehouse] = useState<string>('');
   const [receiptDate, setReceiptDate] = useState<string>(new Date().toISOString().split('T')[0]);
   const [receiptNotes, setReceiptNotes] = useState('');
   const [receiptItemsData, setReceiptItemsData] = useState<Array<{
@@ -98,6 +106,7 @@ export function InventoryReceiptsManager({ restaurantId, currency }: Props) {
         .select(`
           id, receipt_number, receipt_date, total_amount, discount_amount, 
           tax_amount, net_amount, paid_amount, status, notes, created_at,
+          warehouse_id,
           suppliers(name),
           inventory_receipt_items(id, quantity)
         `)
@@ -112,6 +121,7 @@ export function InventoryReceiptsManager({ restaurantId, currency }: Props) {
         receipt_date: r.receipt_date,
         supplier_name: r.suppliers?.name,
         supplier_id: r.supplier_id,
+        warehouse_id: r.warehouse_id,
         total_amount: Number(r.total_amount) || 0,
         discount_amount: Number(r.discount_amount) || 0,
         tax_amount: Number(r.tax_amount) || 0,
@@ -129,6 +139,11 @@ export function InventoryReceiptsManager({ restaurantId, currency }: Props) {
     } finally {
       setLoading(false);
     }
+  };
+
+  const loadWarehouses = async () => {
+    const { data } = await supabase.from('warehouses').select('id, name').eq('restaurant_id', restaurantId);
+    setWarehouses(data || []);
   };
 
   const loadReceiptDetail = async (receiptId: string) => {
@@ -214,6 +229,7 @@ export function InventoryReceiptsManager({ restaurantId, currency }: Props) {
           restaurant_id: restaurantId,
           receipt_number: receiptNumber,
           supplier_id: selectedSupplier,
+          warehouse_id: selectedWarehouse || null,
           receipt_date: receiptDate,
           total_amount: totalAmount,
           discount_amount: discountAmount,
@@ -320,6 +336,7 @@ export function InventoryReceiptsManager({ restaurantId, currency }: Props) {
 
   const resetForm = () => {
     setSelectedSupplier('');
+    setSelectedWarehouse('');
     setReceiptDate(new Date().toISOString().split('T')[0]);
     setReceiptNotes('');
     setReceiptItemsData([]);
@@ -376,7 +393,7 @@ export function InventoryReceiptsManager({ restaurantId, currency }: Props) {
           <Button variant="outline" onClick={exportReceipts}>
             <Download className="w-4 h-4 ml-1" /> تصدير
           </Button>
-          <Button onClick={() => { loadSuppliers(); loadProducts(); setShowAddModal(true); }}>
+          <Button onClick={() => { loadSuppliers(); loadProducts(); loadWarehouses(); setShowAddModal(true); }}>
             <Plus className="w-4 h-4 ml-1" /> فاتورة جديدة
           </Button>
         </div>
@@ -545,8 +562,8 @@ export function InventoryReceiptsManager({ restaurantId, currency }: Props) {
             <DialogTitle>إنشاء فاتورة استلام مخزون جديدة</DialogTitle>
           </DialogHeader>
           <div className="space-y-4 mt-4">
-            {/* Supplier & Date */}
-            <div className="grid grid-cols-2 gap-3">
+            {/* Supplier & Date & Warehouse */}
+            <div className="grid grid-cols-3 gap-3">
               <div>
                 <Label className="flex items-center gap-2">
                   <Truck className="w-4 h-4" />
@@ -560,6 +577,22 @@ export function InventoryReceiptsManager({ restaurantId, currency }: Props) {
                   <option value="">اختر المورد...</option>
                   {suppliers.map(s => (
                     <option key={s.id} value={s.id}>{s.name} {s.phone && `- ${s.phone}`}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <Label className="flex items-center gap-2">
+                  <Warehouse className="w-4 h-4" />
+                  المستودع / الفرع *
+                </Label>
+                <select
+                  value={selectedWarehouse}
+                  onChange={(e) => setSelectedWarehouse(e.target.value)}
+                  className="w-full h-10 rounded-md border border-input bg-background px-3 mt-1"
+                >
+                  <option value="">اختر المستودع...</option>
+                  {warehouses.map(w => (
+                    <option key={w.id} value={w.id}>{w.name}</option>
                   ))}
                 </select>
               </div>
