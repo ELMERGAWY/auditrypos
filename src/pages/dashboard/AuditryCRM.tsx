@@ -5,7 +5,9 @@ import {
   TrendingUp, Star, Phone, Mail, MapPin, 
   Search, Filter, MoreVertical,
   Award, Zap, History,
-  Columns, Plus, Clock, CheckCircle, List
+  Columns, Plus, Clock, CheckCircle, List,
+  Truck, Activity, CheckCircle2, Eye, Calendar,
+  BarChart3, Package, ShoppingCart, ArrowRight
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -41,6 +43,8 @@ export function AuditryCRM({ restaurantId, currency }: Props) {
   const [selectedCustomer, setSelectedCustomer] = useState<any | null>(null);
   const [showCustomerDetails, setShowCustomerDetails] = useState(false);
   const [customerTransactions, setCustomerTransactions] = useState<any[]>([]);
+  const [customerOrders, setCustomerOrders] = useState<any[]>([]);
+  const [customerProducts, setCustomerProducts] = useState<any[]>([]);
 
   // New lead form state
   const [showAddLead, setShowAddLead] = useState(false);
@@ -76,18 +80,66 @@ export function AuditryCRM({ restaurantId, currency }: Props) {
 
   const loadCustomerFinancials = async (customer: any) => {
     try {
-      const { data: transactions } = await supabase
+      setLoading(true);
+      // 1. Fetch Transactions
+      const transactionsPromise = supabase
         .from('customer_transactions')
         .select('*')
         .eq('customer_id', customer.id)
         .order('created_at', { ascending: false })
-        .limit(10);
+        .limit(20);
       
-      setCustomerTransactions(transactions || []);
+      // 2. Fetch Orders (Recent activity)
+      const ordersPromise = supabase
+        .from('orders')
+        .select('id, order_number, total, created_at, status')
+        .eq('customer_id', customer.id)
+        .order('created_at', { ascending: false })
+        .limit(20);
+
+      // 3. Fetch Purchased Items (Detailed report)
+      const itemsPromise = supabase
+        .from('order_items')
+        .select(`
+          id,
+          name,
+          quantity,
+          unit_price,
+          total_price,
+          orders!inner(customer_id)
+        `)
+        .eq('orders.customer_id', customer.id)
+        .limit(50);
+
+      const [txRes, ordersRes, itemsRes] = await Promise.all([
+        transactionsPromise,
+        ordersPromise,
+        itemsPromise
+      ]);
+      
+      setCustomerTransactions(txRes.data || []);
+      setCustomerOrders(ordersRes.data || []);
+      
+      // Group items to see purchase frequency per product
+      const productMap = new Map();
+      (itemsRes.data || []).forEach((item: any) => {
+        const existing = productMap.get(item.name) || { name: item.name, qty: 0, total: 0, count: 0 };
+        productMap.set(item.name, {
+          name: item.name,
+          qty: existing.qty + (item.quantity || 0),
+          total: existing.total + (item.total_price || 0),
+          count: existing.count + 1
+        });
+      });
+      setCustomerProducts(Array.from(productMap.values()).sort((a, b) => b.qty - a.qty));
+
       setSelectedCustomer(customer);
       setShowCustomerDetails(true);
     } catch (err) {
-      toast.error('فشل تحميل البيانات المالية');
+      console.error(err);
+      toast.error('فشل تحميل البيانات التفصيلية للعميل');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -633,50 +685,115 @@ export function AuditryCRM({ restaurantId, currency }: Props) {
               </div>
             </div>
 
-            <div className="flex-1 overflow-y-auto p-6 space-y-6 custom-scrollbar">
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <Card className="p-4 border-primary/10 bg-secondary/20">
-                  <p className="text-xs text-muted-foreground mb-1">إجمالي المشتريات</p>
-                  <p className="text-xl font-black">{(selectedCustomer.total_spent || 0).toLocaleString()} {currency}</p>
+            <div className="flex-1 overflow-y-auto p-6 space-y-8 custom-scrollbar">
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                <Card className="p-4 border-primary/10 bg-secondary/20 shadow-sm">
+                  <p className="text-[10px] text-muted-foreground mb-1 font-bold uppercase tracking-tighter">إجمالي الإنفاق</p>
+                  <p className="text-xl font-black text-primary">{(selectedCustomer.total_spent || 0).toLocaleString()} {currency}</p>
                 </Card>
-                <Card className="p-4 border-primary/10 bg-secondary/20">
-                  <p className="text-xs text-muted-foreground mb-1">نقاط الولاء</p>
+                <Card className="p-4 border-primary/10 bg-secondary/20 shadow-sm">
+                  <p className="text-[10px] text-muted-foreground mb-1 font-bold uppercase tracking-tighter">عدد الطلبات</p>
+                  <p className="text-xl font-black">{customerOrders.length} طلب</p>
+                </Card>
+                <Card className="p-4 border-primary/10 bg-secondary/20 shadow-sm">
+                  <p className="text-[10px] text-muted-foreground mb-1 font-bold uppercase tracking-tighter">نقاط الولاء</p>
                   <p className="text-xl font-black text-amber-500">{selectedCustomer.loyalty_points || 0} نقطة</p>
                 </Card>
-                <Card className="p-4 border-primary/10 bg-secondary/20">
-                  <p className="text-xs text-muted-foreground mb-1">حد الائتمان</p>
-                  <p className="text-xl font-black">{(selectedCustomer.credit_limit || 0).toLocaleString()} {currency}</p>
+                <Card className="p-4 border-primary/10 bg-secondary/20 shadow-sm">
+                  <p className="text-[10px] text-muted-foreground mb-1 font-bold uppercase tracking-tighter">متوسط الفاتورة</p>
+                  <p className="text-xl font-black">
+                    {customerOrders.length > 0 
+                      ? (selectedCustomer.total_spent / customerOrders.length).toFixed(0) 
+                      : 0} {currency}
+                  </p>
                 </Card>
               </div>
 
-              <div>
-                <h3 className="font-bold mb-4 flex items-center gap-2"><History className="w-5 h-5 text-primary" /> السجل المالي الأخير</h3>
-                <div className="glass-card overflow-hidden">
-                  <table className="w-full text-right text-sm">
-                    <thead className="bg-muted/50 border-b">
-                      <tr>
-                        <th className="p-3">التاريخ</th>
-                        <th className="p-3">النوع</th>
-                        <th className="p-3">المبلغ</th>
-                        <th className="p-3">الحالة</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-border/30">
-                      {customerTransactions.map((tx, idx) => (
-                        <tr key={idx} className="hover:bg-muted/30">
-                          <td className="p-3 text-xs text-muted-foreground">{new Date(tx.created_at).toLocaleDateString('ar-EG')}</td>
-                          <td className="p-3 font-medium">{tx.type === 'payment' ? 'سداد' : 'فاتورة'}</td>
-                          <td className={`p-3 font-bold ${tx.type === 'payment' ? 'text-emerald-500' : 'text-red-500'}`}>
-                            {tx.amount.toLocaleString()} {currency}
-                          </td>
-                          <td className="p-3"><Badge variant="outline" className="text-[10px]">مكتمل</Badge></td>
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                {/* 1. Transaction History (Numerical Report) */}
+                <div className="space-y-4">
+                  <h3 className="font-bold text-lg flex items-center gap-2 text-primary">
+                    <Receipt className="w-5 h-5" /> سجل المعاملات المالية
+                  </h3>
+                  <div className="glass-card overflow-hidden border-primary/5">
+                    <table className="w-full text-right text-xs">
+                      <thead className="bg-muted/50 border-b">
+                        <tr>
+                          <th className="p-3">التاريخ</th>
+                          <th className="p-3">البيان</th>
+                          <th className="p-3">المبلغ</th>
                         </tr>
-                      ))}
-                      {customerTransactions.length === 0 && (
-                        <tr><td colSpan={4} className="p-8 text-center text-muted-foreground">لا توجد حركات مالية حديثة</td></tr>
-                      )}
-                    </tbody>
-                  </table>
+                      </thead>
+                      <tbody className="divide-y divide-border/30">
+                        {customerTransactions.map((tx, idx) => (
+                          <tr key={idx} className="hover:bg-primary/5 transition-colors">
+                            <td className="p-3 text-muted-foreground font-mono">{new Date(tx.created_at).toLocaleDateString('ar-EG')}</td>
+                            <td className="p-3 font-medium">
+                              {tx.type === 'payment' ? 'سداد نقدي' : `فاتورة رقم ${tx.order_id?.slice(-6) || ''}`}
+                            </td>
+                            <td className={`p-3 font-bold ${tx.type === 'payment' ? 'text-emerald-600' : 'text-red-500'}`}>
+                              {tx.type === 'payment' ? '+' : '-'}{tx.amount.toLocaleString()}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+
+                {/* 2. Top Purchased Items (Inventory Report) */}
+                <div className="space-y-4">
+                  <h3 className="font-bold text-lg flex items-center gap-2 text-amber-600">
+                    <Package className="w-5 h-5" /> الأصناف الأكثر شراءً
+                  </h3>
+                  <div className="glass-card overflow-hidden border-amber-500/5">
+                    <table className="w-full text-right text-xs">
+                      <thead className="bg-amber-500/5 border-b border-amber-500/10">
+                        <tr>
+                          <th className="p-3 text-amber-700">الصنف</th>
+                          <th className="p-3 text-amber-700">الكمية</th>
+                          <th className="p-3 text-amber-700">القيمة</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-border/30">
+                        {customerProducts.slice(0, 6).map((item, idx) => (
+                          <tr key={idx} className="hover:bg-amber-500/5 transition-colors">
+                            <td className="p-3 font-bold">{item.name}</td>
+                            <td className="p-3 font-mono">{item.qty} وحدة</td>
+                            <td className="p-3 font-bold text-emerald-600">{item.total.toLocaleString()} {currency}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+
+              {/* 3. Recent Orders Analysis */}
+              <div className="space-y-4 pt-4">
+                <h3 className="font-bold text-lg flex items-center gap-2 text-blue-600">
+                  <ShoppingCart className="w-5 h-5" /> تحليل معدل الشراء الأخير
+                </h3>
+                <div className="glass-card p-6 border-blue-500/5">
+                  <div className="h-48">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <AreaChart data={customerOrders.slice().reverse().map(o => ({
+                        date: new Date(o.created_at).toLocaleDateString('ar-EG', {month: 'short', day: 'numeric'}),
+                        amount: o.total
+                      }))}>
+                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
+                        <XAxis dataKey="date" axisLine={false} tickLine={false} tick={{fontSize: 10}} />
+                        <YAxis axisLine={false} tickLine={false} tick={{fontSize: 10}} />
+                        <Tooltip />
+                        <Area type="monotone" dataKey="amount" stroke="#3b82f6" fill="#3b82f6" fillOpacity={0.1} strokeWidth={2} />
+                      </AreaChart>
+                    </ResponsiveContainer>
+                  </div>
+                  <div className="mt-4 text-center">
+                    <p className="text-sm text-muted-foreground italic">
+                      يظهر الرسم البياني تطور قيمة مشتريات العميل خلال آخر {customerOrders.length} فواتير.
+                    </p>
+                  </div>
                 </div>
               </div>
             </div>
