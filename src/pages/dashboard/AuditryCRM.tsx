@@ -258,10 +258,22 @@ export function AuditryCRM({ restaurantId, currency, businessType }: Props) {
   };
 
   const updateLeadStage = async (id: string, stage: LeadStage) => {
-    const { error } = await supabase.from('crm_leads').update({ stage }).eq('id', id);
+    const { error } = await supabase.from('crm_leads').update({ 
+      stage,
+      last_contact_date: new Date().toISOString()
+    }).eq('id', id);
+    
     if (!error) {
-      setLeads(leads.map(l => l.id === id ? { ...l, stage } : l));
+      setLeads(leads.map(l => l.id === id ? { ...l, stage, last_contact_date: new Date().toISOString() } : l));
       toast.success('تم تحديث مرحلة العميل');
+      
+      // Auto-log the stage change as a communication
+      handleAddCommunicationLog({
+        lead_id: id,
+        type: 'status_update',
+        summary: `تغيير مرحلة العميل إلى: ${stage}`,
+        contact_date: new Date().toISOString()
+      });
     }
   };
 
@@ -298,8 +310,21 @@ export function AuditryCRM({ restaurantId, currency, businessType }: Props) {
                     </Select>
                   </div>
                   <h4 className="font-bold text-sm mb-1">{lead.name}</h4>
-                  <div className="flex items-center gap-2 mb-1">
+                  <div className="flex items-center justify-between mb-1">
                     <p className="text-xs text-muted-foreground flex items-center gap-1"><Phone className="w-3 h-3" /> {lead.phone || 'لا يوجد'}</p>
+                    {lead.last_contact_date ? (
+                      <div className="flex items-center gap-1 text-[9px] text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded-full">
+                        <Clock className="w-2.5 h-2.5" />
+                        <span>تم التواصل</span>
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-1 text-[9px] text-amber-600 bg-amber-50 px-1.5 py-0.5 rounded-full">
+                        <AlertCircle className="w-2.5 h-2.5" />
+                        <span>لم يتم التواصل</span>
+                      </div>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-2 mb-1">
                     {lead.platform && (
                       <Badge className="text-[8px] h-3.5 bg-primary/10 text-primary border-0 capitalize">{lead.platform}</Badge>
                     )}
@@ -314,12 +339,20 @@ export function AuditryCRM({ restaurantId, currency, businessType }: Props) {
 
                   <div className="flex items-center justify-between mt-2">
                     <span className="font-bold text-emerald-500 text-sm">{(lead.estimated_value || 0).toLocaleString()} {currency}</span>
-                    {stage.id !== 'won' && (
-                      <Button size="sm" variant="ghost" className="h-6 text-[10px] bg-primary/10 text-primary" onClick={() => {
-                        const nextIndex = stages.findIndex(s => s.id === stage.id) + 1;
-                        if (nextIndex < stages.length) updateLeadStage(lead.id, stages[nextIndex].id);
-                      }}>نقل للمرحلة التالية</Button>
-                    )}
+                    <div className="flex gap-1">
+                      <Button size="sm" variant="ghost" className="h-6 w-6 p-0" onClick={() => {
+                        const summary = prompt('سجل تفاصيل التواصل:');
+                        if (summary) handleAddCommunicationLog({ lead_id: lead.id, type: 'call', summary, contact_date: new Date().toISOString() });
+                      }}>
+                        <Phone className="w-3 h-3 text-primary" />
+                      </Button>
+                      {stage.id !== 'won' && (
+                        <Button size="sm" variant="ghost" className="h-6 text-[10px] bg-primary/10 text-primary" onClick={() => {
+                          const nextIndex = stages.findIndex(s => s.id === stage.id) + 1;
+                          if (nextIndex < stages.length) updateLeadStage(lead.id, stages[nextIndex].id);
+                        }}>نقل</Button>
+                      )}
+                    </div>
                   </div>
                 </div>
               ))}
@@ -338,6 +371,7 @@ export function AuditryCRM({ restaurantId, currency, businessType }: Props) {
       { id: 'meta', name: 'Meta (FB/IG)', icon: Facebook, color: 'text-blue-600', bg: 'bg-blue-50' },
       { id: 'google', name: 'Google Ads', icon: Search, color: 'text-red-600', bg: 'bg-red-50' },
       { id: 'tiktok', name: 'TikTok', icon: MessageCircle, color: 'text-black', bg: 'bg-slate-50' },
+      { id: 'linkedin', name: 'LinkedIn', icon: Share2, color: 'text-blue-700', bg: 'bg-blue-50' },
       { id: 'whatsapp', name: 'WhatsApp', icon: MessageCircle, color: 'text-emerald-600', bg: 'bg-emerald-50' }
     ];
 

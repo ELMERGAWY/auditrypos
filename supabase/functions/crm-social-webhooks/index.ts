@@ -87,6 +87,17 @@ Deno.serve(async (req) => {
         raw_social_data: body,
         campaign_name: body.campaign_name
       };
+    } else if (platform === "linkedin") {
+      // Handle LinkedIn Lead Gen Form Webhook
+      leadData = {
+        name: `${body.firstName || ''} ${body.lastName || ''}`.trim() || "LinkedIn Lead",
+        phone: body.phone || "",
+        email: body.email || "",
+        source: "linkedin",
+        platform: "linkedin",
+        raw_social_data: body,
+        campaign_name: body.campaignName || "LinkedIn Ad"
+      };
     }
 
     if (leadData && restaurantId) {
