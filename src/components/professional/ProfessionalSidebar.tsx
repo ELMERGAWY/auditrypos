@@ -2,8 +2,8 @@ import { useMemo, memo } from 'react';
 import { motion } from 'framer-motion';
 import { cn } from '@/lib/utils';
 import {
-  BarChart3, Bell, Building2, CalendarClock, ChefHat,
-  CreditCard, DollarSign, FileText, Gift, Heart, Landmark,
+  BarChart3, Bell, Building2, CalendarClock, ChefHat, Construction,
+  CreditCard, DollarSign, FileText, Gift, Heart, Landmark, Layers,
   LayoutGrid, LogOut, Moon, Network, Package, QrCode, Receipt, RefreshCw,
   RotateCcw, Settings, Settings2, Shield, ShoppingCart, Sparkles, Sun,
   Truck, Users, UsersRound, Volume2, VolumeX, Wallet, Wifi, WifiOff,
@@ -29,7 +29,7 @@ export type SidebarTab =
   | 'ai_assistant' | 'treasury' | 'users' | 'sales_invoices' | 'purchase_invoices'
   | 'sales_orders' | 'purchase_orders' | 'projects' | 'manual_journal'
   | 'chart_of_accounts' | 'accounting_mapping' | 'fixed_assets'
-  | 'loyalty' | 'gift_cards' | 'branches';
+  | 'loyalty' | 'gift_cards' | 'branches' | 'contracting' | 'bom';
 
 interface NavItem {
   id: SidebarTab;
@@ -149,6 +149,8 @@ export const ProfessionalSidebar = memo(function ProfessionalSidebar({
     manual_journal: { label: 'قيود اليومية', icon: FileText, section: 'accounting' },
     fixed_assets: { label: 'الأصول الثابتة', icon: Building2, section: 'accounting' },
     accounting_mapping: { label: 'توجيه المحاسبة', icon: Settings2, section: 'accounting' },
+    contracting: { label: 'المقاولات', icon: Construction, section: 'main' },
+    projects: { label: 'المشاريع', icon: Construction, section: 'main' },
 
     analytics: { label: 'التقارير', icon: BarChart3, section: 'analytics' },
     stats: { label: 'إحصائيات', icon: BarChart3, section: 'analytics' },
@@ -167,6 +169,7 @@ export const ProfessionalSidebar = memo(function ProfessionalSidebar({
     loyalty: { label: 'الولاء', icon: Heart, section: 'sales' },
     gift_cards: { label: 'الهدايا', icon: Gift, section: 'sales' },
     branches: { label: 'الفروع', icon: Building2, section: 'sales' },
+    bom: { label: 'تكاليف الإنتاج', icon: Layers, section: 'inventory' },
   };
 
   const navItems = useMemo(() => {

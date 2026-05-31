@@ -248,9 +248,19 @@ export default function Dashboard() {
         {/* Management Tabs */}
         {activeTab === 'menu' && <MenuTab restaurant={restaurant} menuItems={menuItems} setMenuItems={setMenuItems} loadData={loadData} />}
         {activeTab === 'inventory' && <InventoryTab {...commonProps} businessType={businessType} />}
+        {activeTab === 'inventory_receipts' && <InventoryReceiptsManager {...commonProps} />}
+        {activeTab === 'bom' && <BOMManager {...commonProps} />}
         {activeTab === 'customers' && <CustomerManager {...commonProps} />}
         {activeTab === 'suppliers' && <SupplierManager {...commonProps} />}
-        {activeTab === 'expenses' && <ExpensesTab {...commonProps} />}
+        {activeTab === 'sales_orders' && <SalesOrders {...commonProps} />}
+        {activeTab === 'sales_invoices' && <SalesInvoices {...commonProps} />}
+        {activeTab === 'sales_returns' && <SalesReturnsManager {...commonProps} />}
+        {activeTab === 'purchase_orders' && <PurchaseOrders {...commonProps} />}
+        {activeTab === 'purchase_invoices' && <PurchaseInvoices {...commonProps} />}
+        {activeTab === 'contracting' && <ContractingDashboard {...commonProps} />}
+         {activeTab === 'projects' && <ContractingDashboard {...commonProps} />}
+         {activeTab === 'expenses' && <ExpensesTab {...commonProps} />}
+        {activeTab === 'overheads' && <OverheadManager {...commonProps} />}
         {activeTab === 'delivery' && <DeliveryTab {...commonProps} agents={agents} setAgents={setAgents} deliveryOrders={deliveryOrders} onAssignAgent={(oid, aid) => supabase.from('orders').update({ delivery_agent_id: aid }).eq('id', oid).then(loadData)} />}
         {activeTab === 'shifts' && <ShiftsTab restaurant={restaurant} currentShift={currentShift} setCurrentShift={setCurrentShift} profileName={profileName} userId={user!.id} />}
         
