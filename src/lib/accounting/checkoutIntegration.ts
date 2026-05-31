@@ -138,6 +138,14 @@ class CheckoutIntegration {
       const isDirectSell = context.skipPreparation || 
         ['retail', 'grocery', 'pharmacy', 'wholesale', 'warehouse'].includes(context.businessType);
       
+      // Merge customer reference into notes if provided
+      let finalNotes = orderData.notes || '';
+      if (orderData.customerRef) {
+        finalNotes = finalNotes 
+          ? `${finalNotes} | المرجع: ${orderData.customerRef}` 
+          : `المرجع: ${orderData.customerRef}`;
+      }
+
       const orderPayload = {
         restaurant_id: context.restaurantId,
         order_number: orderNum,
@@ -148,12 +156,11 @@ class CheckoutIntegration {
         order_type: orderData.orderType,
         customer_name: orderData.customerName || 'عميل نقدي',
         customer_phone: orderData.customerPhone || null,
-        customer_reference: orderData.customerRef || null,
         delivery_address: orderData.deliveryAddress || '',
         delivery_agent_id: orderData.deliveryAgentId || null,
         payment_method: orderData.paymentMethod,
         paid_amount: paidAmount,
-        notes: orderData.notes || '',
+        notes: finalNotes,
         client_order_id: clientOrderId,
         customer_id: customerId,
       };
@@ -388,49 +395,73 @@ class CheckoutIntegration {
     phone?: string
   ): Promise<string | null> {
     try {
-      const query = supabase
+      if (!name || name === 'عميل نقدي' || name.trim() === '') return null;
+
+      const trimmedName = name.trim();
+      const trimmedPhone = phone?.trim();
+
+      // 1. Try to find existing customer
+      let query = supabase
         .from('customers')
-        .select('id')
+        .select('id, name, phone')
         .eq('restaurant_id', restaurantId);
       
-      if (phone) {
-        // If phone is provided, match by phone AND name to be safe
-        query.or(`phone.eq.${phone},name.ilike.${name}`);
+      if (trimmedPhone) {
+        query = query.or(`phone.eq.${trimmedPhone},name.ilike.${trimmedName}`);
       } else {
-        query.ilike('name', name);
+        query = query.ilike('name', trimmedName);
       }
 
-      const { data: existing } = await query.limit(1);
+      const { data: existing, error: searchError } = await query.limit(1);
+
+      if (searchError) {
+        console.warn('[checkout] customer search error:', searchError);
+      }
 
       if (existing && existing.length > 0) {
-        // If customer exists, update phone if it was missing
-        if (phone) {
-          await supabase.from('customers').update({ phone }).eq('id', existing[0].id).is('phone', null);
+        const customer = existing[0];
+        // If customer exists but phone was missing, update it
+        if (trimmedPhone && !customer.phone) {
+          await supabase
+            .from('customers')
+            .update({ phone: trimmedPhone })
+            .eq('id', customer.id);
         }
-        return existing[0].id;
+        return customer.id;
       }
 
-      // Create new customer
-      const { data: newCustomer, error } = await supabase
+      // 2. Create new customer if not found
+      console.log(`[checkout] Creating new customer: ${trimmedName}`);
+      const { data: newCustomer, error: insertError } = await supabase
         .from('customers')
         .insert({
           restaurant_id: restaurantId,
-          name,
-          phone: phone || null,
+          name: trimmedName,
+          phone: trimmedPhone || null,
           customer_type: 'regular',
           balance: 0
         })
-        .select()
+        .select('id')
         .single();
 
-      if (error) {
-        console.error('Failed to create customer:', error);
+      if (insertError) {
+        console.error('[checkout] Failed to create customer:', insertError);
+        // If it's a unique constraint error on name+restaurant_id, try one last fetch
+        if (insertError.code === '23505') {
+           const { data: lastTry } = await supabase
+             .from('customers')
+             .select('id')
+             .eq('restaurant_id', restaurantId)
+             .ilike('name', trimmedName)
+             .single();
+           return lastTry?.id || null;
+        }
         return null;
       }
 
-      return newCustomer.id;
+      return newCustomer?.id || null;
     } catch (error) {
-      console.error('Customer lookup/creation failed:', error);
+      console.error('[checkout] Customer lookup/creation failed:', error);
       return null;
     }
   }

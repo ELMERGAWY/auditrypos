@@ -436,9 +436,10 @@ export default function Dashboard() {
   const filteredOrders = orderFilter === 'all' ? orders : orders.filter(o => o.status === orderFilter);
 
 
-  const selectCustomerFromSearch = (name: string, phone?: string) => {
+  const selectCustomerFromSearch = (name: string, phone?: string, address?: string) => {
     setCustomerName(name);
     if (phone) setCustomerPhone(phone);
+    if (address) setDeliveryAddress(address);
     // Generate/Set reference number automatically if not set
     if (!customerRef) {
       const refNum = 250 + (counts.orders || 0) + invoiceTabs.length;
@@ -711,6 +712,13 @@ export default function Dashboard() {
         total: cartTotal,
         status: sendToPrep ? 'pending' : 'completed',
         client_order_id: clientOrderId,
+        customer_name: customerName,
+        customer_phone: customerPhone,
+        customer_reference: customerRef,
+        order_type: orderType,
+        payment_method: paymentMethod,
+        paid_amount: paidNum,
+        notes: customerRef ? `${orderNotes} | المرجع: ${customerRef}` : orderNotes,
       } as any,
       cartItems,
       orderNum

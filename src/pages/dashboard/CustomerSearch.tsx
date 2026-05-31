@@ -7,6 +7,7 @@ interface Customer {
   id: string;
   name: string;
   phone: string;
+  address?: string;
   balance: number;
   customer_type: string;
 }
@@ -14,7 +15,7 @@ interface Customer {
 interface Props {
   restaurantId: string;
   value: string;
-  onChange: (name: string, phone?: string) => void;
+  onChange: (name: string, phone?: string, address?: string) => void;
   placeholder?: string;
 }
 
@@ -35,7 +36,7 @@ export function CustomerSearch({ restaurantId, value, onChange, placeholder }: P
 
   useEffect(() => {
     const query = value.trim();
-    if (query.length < 2) {
+    if (query.length < 1) {
       setSuggestions([]);
       setShowSuggestions(false);
       return;
@@ -44,7 +45,7 @@ export function CustomerSearch({ restaurantId, value, onChange, placeholder }: P
     const timer = window.setTimeout(async () => {
       const safeQuery = query.replace(/[%,]/g, '');
       const { data } = await supabase.from('customers')
-        .select('id, name, phone, balance, customer_type')
+        .select('id, name, phone, address, balance, customer_type')
         .eq('restaurant_id', restaurantId)
         .or(`name.ilike.%${safeQuery}%,phone.ilike.%${safeQuery}%`)
         .limit(8);
@@ -57,7 +58,7 @@ export function CustomerSearch({ restaurantId, value, onChange, placeholder }: P
   }, [restaurantId, value]);
 
   const selectCustomer = (c: Customer) => {
-    onChange(c.name, c.phone);
+    onChange(c.name, c.phone, c.address);
     setShowSuggestions(false);
   };
 
@@ -67,7 +68,7 @@ export function CustomerSearch({ restaurantId, value, onChange, placeholder }: P
       <Input
         value={value}
         onChange={e => onChange(e.target.value)}
-        onFocus={() => value.length >= 2 && suggestions.length > 0 && setShowSuggestions(true)}
+        onFocus={() => value.length >= 1 && suggestions.length > 0 && setShowSuggestions(true)}
         placeholder={placeholder || 'بحث عن عميل...'}
         className="pr-8 h-9 text-xs"
       />
