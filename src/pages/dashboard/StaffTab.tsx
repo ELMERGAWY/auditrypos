@@ -19,7 +19,13 @@ interface StaffMember {
   created_at: string;
 }
 
-const STAFF_ROLES: Record<string, { label: string; icon: string; color: string }> = {
+interface CustomRole {
+  id: string;
+  name_ar: string;
+  description: string;
+}
+
+const STANDARD_ROLES: Record<string, { label: string; icon: string; color: string }> = {
   branch_manager: { label: 'مدير فرع', icon: '👔', color: 'bg-blue-500/20 text-blue-400 border-blue-500/30' },
   cashier: { label: 'كاشير', icon: '💰', color: 'bg-green-500/20 text-green-400 border-green-500/30' },
   waiter: { label: 'ويتر', icon: '🍽️', color: 'bg-orange-500/20 text-orange-400 border-orange-500/30' },
@@ -35,6 +41,7 @@ interface Props {
 
 export function StaffTab({ restaurantId, currency }: Props) {
   const [staff, setStaff] = useState<StaffMember[]>([]);
+  const [customRoles, setCustomRoles] = useState<CustomRole[]>([]);
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState<StaffMember | null>(null);
   const [form, setForm] = useState({ 
@@ -46,11 +53,23 @@ export function StaffTab({ restaurantId, currency }: Props) {
   const [payrollAmount, setPayrollAmount] = useState('');
 
   const load = async () => {
-    const { data } = await (supabase.from as any)('restaurant_staff').select('*').eq('restaurant_id', restaurantId).order('created_at', { ascending: false });
-    setStaff((data || []) as StaffMember[]);
+    const [staffRes, rolesRes] = await Promise.all([
+      supabase.from('restaurant_staff').select('*').eq('restaurant_id', restaurantId).order('created_at', { ascending: false }),
+      supabase.from('restaurant_custom_roles').select('*').eq('restaurant_id', restaurantId)
+    ]);
+    
+    setStaff((staffRes.data || []) as StaffMember[]);
+    setCustomRoles((rolesRes.data || []) as CustomRole[]);
   };
 
   useEffect(() => { load(); }, [restaurantId]);
+
+  const getRoleDisplay = (roleKey: string) => {
+    if (STANDARD_ROLES[roleKey]) return STANDARD_ROLES[roleKey];
+    const custom = customRoles.find(r => r.name_ar === roleKey);
+    if (custom) return { label: custom.name_ar, icon: '👤', color: 'bg-primary/10 text-primary border-primary/20' };
+    return { label: roleKey, icon: '👤', color: 'bg-secondary text-muted-foreground border-border' };
+  };
 
   const handleSave = async () => {
     if (!form.name.trim()) { toast.error('أدخل اسم الموظف'); return; }
@@ -142,7 +161,7 @@ export function StaffTab({ restaurantId, currency }: Props) {
   return (
     <div className="p-4 space-y-4">
       {/* Stats */}
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+      <div className="grid grid-cols-2 md:grid-cols-6 gap-3">
         <div className="glass-card p-3 flex items-center gap-3">
           <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
             <Users className="w-5 h-5 text-primary" />
@@ -152,7 +171,7 @@ export function StaffTab({ restaurantId, currency }: Props) {
             <p className="font-display font-bold text-sm text-primary">{staff.length}</p>
           </div>
         </div>
-        {Object.entries(STAFF_ROLES).map(([key, r]) => (
+        {Object.entries(STANDARD_ROLES).slice(0, 5).map(([key, r]) => (
           <div key={key} className="glass-card p-3 flex items-center gap-3">
             <span className="text-xl">{r.icon}</span>
             <div>
@@ -190,12 +209,19 @@ export function StaffTab({ restaurantId, currency }: Props) {
 
               <div>
                 <label className="text-xs text-muted-foreground mb-2 block">الدور الوظيفي</label>
-                <div className="grid grid-cols-2 gap-2">
-                  {Object.entries(STAFF_ROLES).map(([key, r]) => (
+                <div className="grid grid-cols-2 gap-2 max-h-[200px] overflow-auto p-1 custom-scrollbar">
+                  {Object.entries(STANDARD_ROLES).map(([key, r]) => (
                     <button key={key} onClick={() => setForm(f => ({ ...f, role: key }))}
                       className={`p-3 rounded-lg text-center transition-all text-sm border ${form.role === key ? 'gradient-bg text-primary-foreground border-transparent' : 'bg-secondary border-border'}`}>
                       <span className="text-lg block mb-1">{r.icon}</span>
                       {r.label}
+                    </button>
+                  ))}
+                  {customRoles.map(role => (
+                    <button key={role.id} onClick={() => setForm(f => ({ ...f, role: role.name_ar }))}
+                      className={`p-3 rounded-lg text-center transition-all text-sm border ${form.role === role.name_ar ? 'gradient-bg text-primary-foreground border-transparent' : 'bg-secondary border-border'}`}>
+                      <span className="text-lg block mb-1">👤</span>
+                      {role.name_ar}
                     </button>
                   ))}
                 </div>
@@ -262,7 +288,7 @@ export function StaffTab({ restaurantId, currency }: Props) {
       {/* Staff List */}
       <div className="space-y-2">
         {staff.map(s => {
-          const roleInfo = STAFF_ROLES[s.role] || STAFF_ROLES.cashier;
+          const roleInfo = getRoleDisplay(s.role);
           return (
             <motion.div key={s.id} initial={{ opacity: 0 }} animate={{ opacity: 1 }}
               className={`glass-card p-4 flex items-center gap-4 ${!s.is_active ? 'opacity-50' : ''}`}>

@@ -1,10 +1,16 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { motion } from 'framer-motion';
-import { Shield, ShieldAlert, ShieldCheck, Check, X, AlertCircle, UserCheck, Eye, Warehouse, Building } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { 
+  Shield, ShieldAlert, ShieldCheck, Check, X, AlertCircle, 
+  UserCheck, Eye, Warehouse, Building, Plus, Trash2, Edit2,
+  Lock, Settings, ShoppingCart, Package, DollarSign, Users, PieChart
+} from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 
 interface Permission {
   code: string;
@@ -19,15 +25,38 @@ interface RolePermission {
   is_allowed: boolean;
 }
 
+interface CustomRole {
+  id: string;
+  name_ar: string;
+  description: string;
+}
+
+const MODULE_ICONS: Record<string, any> = {
+  sales: ShoppingCart,
+  inventory: Package,
+  finance: DollarSign,
+  hr: Users,
+  crm: PieChart,
+  settings: Settings,
+};
+
+const MODULE_LABELS: Record<string, string> = {
+  sales: 'المبيعات ونقاط البيع',
+  inventory: 'المخزون والمستودعات',
+  finance: 'المحاسبة والمالية',
+  hr: 'الموارد البشرية والموظفين',
+  crm: 'العملاء والتسويق',
+  settings: 'إعدادات النظام',
+};
+
 const getPermissionStatus = (role: string, permissionCode: string, rolePermissions: RolePermission[]) => {
   const rp = rolePermissions.find(p => p.role === role && p.permission_code === permissionCode);
   if (rp) return rp.is_allowed;
   
-  // Default Fallbacks
+  // Default Fallbacks for standard roles
   if (role === 'manager' || role === 'branch_manager') return true;
   if (role === 'auditor' && (permissionCode.startsWith('finance.') || permissionCode.startsWith('inventory.'))) return true;
-  if (role === 'store_manager' && permissionCode.startsWith('inventory.')) return true;
-  if (role === 'cashier' && ['pos.access', 'pos.checkout', 'pos.delete_item'].includes(permissionCode)) return true;
+  if (role === 'cashier' && permissionCode.startsWith('pos.')) return true;
   if (role === 'accountant' && (permissionCode.startsWith('finance.') || permissionCode.startsWith('inventory.'))) return true;
   
   return false;
@@ -36,9 +65,13 @@ const getPermissionStatus = (role: string, permissionCode: string, rolePermissio
 export function RoleManager({ companyId }: { companyId: string }) {
   const [permissions, setPermissions] = useState<Permission[]>([]);
   const [rolePermissions, setRolePermissions] = useState<RolePermission[]>([]);
+  const [customRoles, setCustomRoles] = useState<CustomRole[]>([]);
   const [loading, setLoading] = useState(true);
-  
-  const roles = [
+  const [selectedRole, setSelectedRole] = useState<string>('manager');
+  const [showAddRole, setShowAddRole] = useState(false);
+  const [newRoleForm, setNewRoleForm] = useState({ name: '', desc: '' });
+
+  const standardRoles = [
     { id: 'manager', name: 'مدير عام', icon: ShieldCheck },
     { id: 'branch_manager', name: 'مدير فرع', icon: Building },
     { id: 'accountant', name: 'محاسب', icon: UserCheck },
@@ -47,6 +80,8 @@ export function RoleManager({ companyId }: { companyId: string }) {
     { id: 'cashier', name: 'كاشير', icon: Shield },
   ];
 
+  const allRoles = [...standardRoles, ...customRoles.map(r => ({ id: r.name_ar, name: r.name_ar, icon: UserCheck }))];
+
   useEffect(() => {
     loadData();
   }, [companyId]);
@@ -54,15 +89,17 @@ export function RoleManager({ companyId }: { companyId: string }) {
   const loadData = async () => {
     setLoading(true);
     try {
-      const [permRes, rolePermRes] = await Promise.all([
+      const [permRes, rolePermRes, customRolesRes] = await Promise.all([
         supabase.from('permissions').select('*'),
-        supabase.from('role_permissions').select('*').eq('company_id', companyId)
+        supabase.from('role_permissions').select('*').eq('company_id', companyId),
+        supabase.from('restaurant_custom_roles').select('*').eq('restaurant_id', companyId)
       ]);
 
       if (permRes.error) throw permRes.error;
       
       setPermissions(permRes.data || []);
       setRolePermissions(rolePermRes.data || []);
+      setCustomRoles(customRolesRes.data || []);
     } catch (error: any) {
       console.error(error);
       toast.error('خطأ في تحميل الصلاحيات');
@@ -71,9 +108,32 @@ export function RoleManager({ companyId }: { companyId: string }) {
     }
   };
 
+  const handleAddRole = async () => {
+    if (!newRoleForm.name) return toast.error('أدخل اسم الدور');
+    try {
+      const { data, error } = await supabase
+        .from('restaurant_custom_roles')
+        .insert({
+          restaurant_id: companyId,
+          name_ar: newRoleForm.name,
+          description: newRoleForm.desc
+        })
+        .select()
+        .single();
+      
+      if (error) throw error;
+      setCustomRoles([...customRoles, data]);
+      setShowAddRole(false);
+      setNewRoleForm({ name: '', desc: '' });
+      setSelectedRole(data.name_ar);
+      toast.success('تم إضافة الدور الجديد');
+    } catch (error: any) {
+      toast.error('خطأ: ' + error.message);
+    }
+  };
+
   const togglePermission = async (role: string, permissionCode: string, currentAllowed: boolean) => {
     try {
-      // Find existing
       const existing = rolePermissions.find(rp => rp.role === role && rp.permission_code === permissionCode);
       
       if (existing) {
@@ -112,68 +172,139 @@ export function RoleManager({ companyId }: { companyId: string }) {
   if (loading) return <div className="p-8 text-center"><div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto"></div></div>;
 
   const modules = Array.from(new Set(permissions.map(p => p.module)));
+  const selectedRoleInfo = allRoles.find(r => r.id === selectedRole);
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center gap-2 mb-4">
-        <Shield className="w-6 h-6 text-primary" />
-        <h2 className="font-display text-xl font-bold">مصفوفة الصلاحيات المتقدمة</h2>
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <div className="w-12 h-12 rounded-2xl gradient-bg flex items-center justify-center shadow-lg shadow-primary/20">
+            <Shield className="w-6 h-6 text-primary-foreground" />
+          </div>
+          <div>
+            <h2 className="font-display text-2xl font-black">إدارة الصلاحيات والأمان</h2>
+            <p className="text-sm text-muted-foreground">تحكم بدقة في ما يمكن لكل موظف القيام به داخل النظام</p>
+          </div>
+        </div>
+        <Button onClick={() => setShowAddRole(true)} variant="outline" className="rounded-xl gap-2 border-primary/20 hover:bg-primary/5">
+          <Plus className="w-4 h-4" /> إضافة دور وظيفي مخصص
+        </Button>
       </div>
 
-      <div className="glass-card p-4 overflow-x-auto">
-        <table className="w-full text-sm text-right border-collapse">
-          <thead className="border-b border-border bg-secondary/50">
-            <tr>
-              <th className="p-3 font-bold text-right">الصلاحية</th>
-              {roles.map(r => (
-                <th key={r.id} className="p-3 font-bold text-center">
-                  <div className="flex flex-col items-center gap-1">
-                    <r.icon className="w-4 h-4 text-primary" />
-                    <span className="whitespace-nowrap">{r.name}</span>
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+        {/* Roles Sidebar */}
+        <div className="lg:col-span-3 space-y-2">
+          <p className="text-xs font-bold text-muted-foreground px-2 mb-3 uppercase tracking-widest">الأدوار الوظيفية</p>
+          {allRoles.map(role => (
+            <button
+              key={role.id}
+              onClick={() => setSelectedRole(role.id)}
+              className={`w-full flex items-center gap-3 p-3 rounded-2xl transition-all text-right ${selectedRole === role.id ? 'gradient-bg text-primary-foreground shadow-lg shadow-primary/20' : 'bg-secondary/50 hover:bg-secondary border border-transparent'}`}
+            >
+              <role.icon className={`w-5 h-5 ${selectedRole === role.id ? 'text-primary-foreground' : 'text-primary'}`} />
+              <div className="flex-1">
+                <p className="font-bold text-sm">{role.name}</p>
+                {standardRoles.find(sr => sr.id === role.id) ? (
+                  <p className={`text-[10px] ${selectedRole === role.id ? 'opacity-80' : 'text-muted-foreground'}`}>دور نظامي</p>
+                ) : (
+                  <p className={`text-[10px] ${selectedRole === role.id ? 'opacity-80' : 'text-primary font-bold'}`}>دور مخصص</p>
+                )}
+              </div>
+            </button>
+          ))}
+        </div>
+
+        {/* Permissions Grid */}
+        <div className="lg:col-span-9 space-y-6">
+          <div className="glass-card p-6 rounded-3xl border-primary/10">
+            <div className="flex items-center justify-between mb-6 pb-4 border-b border-border/50">
+              <div className="flex items-center gap-3">
+                {selectedRoleInfo && <selectedRoleInfo.icon className="w-6 h-6 text-primary" />}
+                <h3 className="font-display font-bold text-lg">صلاحيات {selectedRoleInfo?.name}</h3>
+              </div>
+              <Badge variant="outline" className="bg-primary/5 text-primary border-primary/10 px-3 py-1">
+                {permissions.filter(p => getPermissionStatus(selectedRole, p.code, rolePermissions)).length} / {permissions.length} صلاحية مفعلة
+              </Badge>
+            </div>
+
+            <div className="grid gap-8">
+              {modules.map(mod => (
+                <div key={mod} className="space-y-4">
+                  <div className="flex items-center gap-2 text-primary">
+                    {React.createElement(MODULE_ICONS[mod] || Shield, { className: "w-5 h-5" })}
+                    <h4 className="font-bold text-sm">{MODULE_LABELS[mod] || mod}</h4>
                   </div>
-                </th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {modules.map(mod => (
-              <React.Fragment key={mod}>
-                <tr className="bg-secondary/20">
-                  <td colSpan={roles.length + 1} className="p-2 font-bold text-xs uppercase tracking-wider text-muted-foreground text-right pr-4">
-                    {mod}
-                  </td>
-                </tr>
-                {permissions.filter(p => p.module === mod).map(perm => (
-                  <tr key={perm.code} className="border-b border-border/50 hover:bg-secondary/30 transition-colors">
-                    <td className="p-3 text-right">
-                      <div className="font-medium">{perm.name_ar}</div>
-                      <div className="text-[10px] text-muted-foreground font-mono">{perm.code}</div>
-                    </td>
-                    {roles.map(role => {
-                      const isAllowed = getPermissionStatus(role.id, perm.code, rolePermissions);
+                  
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    {permissions.filter(p => p.module === mod).map(perm => {
+                      const isAllowed = getPermissionStatus(selectedRole, perm.code, rolePermissions);
                       return (
-                        <td key={`${role.id}-${perm.code}`} className="p-3 text-center">
-                          <button
-                            onClick={() => togglePermission(role.id, perm.code, isAllowed)}
-                            className={`w-8 h-8 rounded-md flex items-center justify-center mx-auto transition-colors ${isAllowed ? 'bg-success/20 text-success hover:bg-success/30' : 'bg-destructive/10 text-destructive hover:bg-destructive/20'}`}
-                          >
-                            {isAllowed ? <Check className="w-4 h-4" /> : <X className="w-4 h-4" />}
-                          </button>
-                        </td>
+                        <div key={perm.code} 
+                          onClick={() => togglePermission(selectedRole, perm.code, isAllowed)}
+                          className={`flex items-center justify-between p-4 rounded-2xl border transition-all cursor-pointer group ${isAllowed ? 'bg-success/5 border-success/20 hover:bg-success/10' : 'bg-secondary/30 border-transparent hover:border-border'}`}>
+                          <div className="flex-1 min-w-0">
+                            <p className={`font-bold text-sm mb-0.5 ${isAllowed ? 'text-success' : ''}`}>{perm.name_ar}</p>
+                            <p className="text-[10px] text-muted-foreground font-mono opacity-50">{perm.code}</p>
+                          </div>
+                          <div className={`w-6 h-6 rounded-full flex items-center justify-center transition-all ${isAllowed ? 'bg-success text-white scale-110 shadow-lg shadow-success/20' : 'bg-secondary text-muted-foreground group-hover:bg-border'}`}>
+                            {isAllowed ? <Check className="w-4 h-4" /> : <X className="w-3 h-3" />}
+                          </div>
+                        </div>
                       );
                     })}
-                  </tr>
-                ))}
-              </React.Fragment>
-            ))}
-          </tbody>
-        </table>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="flex items-center gap-3 p-4 rounded-2xl bg-amber-500/10 border border-amber-500/20 text-amber-600">
+            <AlertCircle className="w-5 h-5 shrink-0" />
+            <p className="text-xs font-medium">ملاحظة هامة: صلاحيات المالك (Owner) والمدير العام (Super Admin) ثابتة ولا يمكن تقييدها لضمان إمكانية الوصول الكامل للنظام دائماً.</p>
+          </div>
+        </div>
       </div>
-      
-      <div className="flex items-center gap-2 p-4 rounded-lg bg-primary/10 text-primary text-sm">
-        <AlertCircle className="w-5 h-5" />
-        <p>ملاحظة: المالك (Owner) والمدير المتميز (Admin) يمتلكون كافة الصلاحيات بشكل افتراضي ولا يمكن تقييدهم من هذه الشاشة.</p>
-      </div>
+
+      {/* Add Role Modal */}
+      <AnimatePresence>
+        {showAddRole && (
+          <div className="fixed inset-0 z-50 bg-background/80 backdrop-blur-sm flex items-center justify-center p-4">
+            <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="glass-card p-6 max-w-md w-full space-y-4 rounded-3xl shadow-2xl">
+              <div className="flex items-center justify-between">
+                <h3 className="font-display font-bold text-xl flex items-center gap-2">
+                  <Plus className="w-5 h-5 text-primary" />
+                  إضافة دور وظيفي مخصص
+                </h3>
+                <Button variant="ghost" size="sm" onClick={() => setShowAddRole(false)} className="rounded-full"><X className="w-5 h-5" /></Button>
+              </div>
+              <div className="space-y-4 py-2">
+                <div className="space-y-2">
+                  <Label>اسم الدور الوظيفي (مثلاً: مسؤول مشتريات)</Label>
+                  <Input 
+                    placeholder="أدخل اسم الدور..." 
+                    value={newRoleForm.name} 
+                    onChange={e => setNewRoleForm({...newRoleForm, name: e.target.value})}
+                    className="h-11 rounded-xl"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>وصف الصلاحيات</Label>
+                  <Input 
+                    placeholder="وصف مختصر لمسؤوليات هذا الدور..." 
+                    value={newRoleForm.desc} 
+                    onChange={e => setNewRoleForm({...newRoleForm, desc: e.target.value})}
+                    className="h-11 rounded-xl"
+                  />
+                </div>
+              </div>
+              <div className="flex gap-2 pt-2">
+                <Button onClick={handleAddRole} className="flex-1 h-11 gradient-bg text-primary-foreground border-0 rounded-xl font-bold shadow-lg shadow-primary/20">حفظ الدور</Button>
+                <Button onClick={() => setShowAddRole(false)} variant="outline" className="flex-1 h-11 rounded-xl font-bold">إلغاء</Button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
