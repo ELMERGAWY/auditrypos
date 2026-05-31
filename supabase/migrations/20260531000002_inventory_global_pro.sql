@@ -1,0 +1,74 @@
+-- Advanced Inventory & Costing Migration
+-- 1. Warehouses Table
+CREATE TABLE IF NOT EXISTS public.warehouses (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    restaurant_id UUID REFERENCES public.restaurants(id) ON DELETE CASCADE,
+    name VARCHAR(200) NOT NULL,
+    code VARCHAR(50),
+    type VARCHAR(50) DEFAULT 'main', -- 'main', 'sub', 'raw', 'finished', 'project'
+    location TEXT,
+    is_active BOOLEAN DEFAULT true,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- 2. Multi-Warehouse Stock Tracking
+CREATE TABLE IF NOT EXISTS public.warehouse_stock (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    warehouse_id UUID REFERENCES public.warehouses(id) ON DELETE CASCADE,
+    product_id UUID REFERENCES public.products(id) ON DELETE CASCADE,
+    quantity DECIMAL(15,3) DEFAULT 0,
+    min_quantity DECIMAL(15,3) DEFAULT 0,
+    location_in_warehouse VARCHAR(100), -- Shelf/Bin location
+    UNIQUE(warehouse_id, product_id)
+);
+
+-- 3. Advanced Costing: Landed Costs (Indirect Expenses)
+CREATE TABLE IF NOT EXISTS public.inventory_landed_costs (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    restaurant_id UUID REFERENCES public.restaurants(id) ON DELETE CASCADE,
+    receipt_id UUID REFERENCES public.inventory_receipts(id) ON DELETE CASCADE,
+    expense_type VARCHAR(100), -- 'shipping', 'customs', 'labor', 'other'
+    amount DECIMAL(15,2) DEFAULT 0,
+    allocation_method VARCHAR(50) DEFAULT 'value', -- 'value', 'quantity', 'weight'
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- 4. Inventory Transfers (Between Warehouses)
+CREATE TABLE IF NOT EXISTS public.inventory_transfers (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    restaurant_id UUID REFERENCES public.restaurants(id) ON DELETE CASCADE,
+    from_warehouse_id UUID REFERENCES public.warehouses(id) ON DELETE SET NULL,
+    to_warehouse_id UUID REFERENCES public.warehouses(id) ON DELETE SET NULL,
+    transfer_date TIMESTAMPTZ DEFAULT NOW(),
+    status VARCHAR(50) DEFAULT 'pending', -- 'pending', 'shipped', 'received'
+    notes TEXT,
+    created_by UUID REFERENCES auth.users(id),
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS public.inventory_transfer_items (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    transfer_id UUID REFERENCES public.inventory_transfers(id) ON DELETE CASCADE,
+    product_id UUID REFERENCES public.products(id) ON DELETE CASCADE,
+    quantity DECIMAL(15,3) NOT NULL,
+    cost_price DECIMAL(15,2) -- Cost at time of transfer
+);
+
+-- RLS
+ALTER TABLE public.warehouses ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.warehouse_stock ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.inventory_landed_costs ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.inventory_transfers ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.inventory_transfer_items ENABLE ROW LEVEL SECURITY;
+
+-- Owner Policies
+DO $$
+DECLARE
+  t text;
+  tables text[] := ARRAY['warehouses', 'warehouse_stock', 'inventory_landed_costs', 'inventory_transfers', 'inventory_transfer_items'];
+BEGIN
+  FOREACH t IN ARRAY tables LOOP
+    EXECUTE format('CREATE POLICY owner_all_%1$s ON public.%1$I FOR ALL USING (restaurant_id IN (SELECT id FROM public.restaurants WHERE owner_id = auth.uid()))', t);
+  END LOOP;
+END $$;
