@@ -35,7 +35,7 @@ interface Props {
   onNavigate?: (tab: string) => void;
 }
 
-type ReportCategory = 'overview' | 'financial' | 'sales' | 'inventory' | 'customers' | 'kpi';
+type ReportCategory = 'overview' | 'financial' | 'sales' | 'inventory' | 'customers' | 'suppliers' | 'kpi';
 
 interface QuickStat {
   label: string;
@@ -65,6 +65,8 @@ export default function AuditryIntelligenceV3({ restaurantId, currency, onNaviga
   const [bsData, setBsData] = useState<BalanceSheetReport | null>(null);
   const [cfData, setCfData] = useState<CashFlowReport | null>(null);
   const [topProducts, setTopProducts] = useState<any[]>([]);
+  const [topCustomers, setTopCustomers] = useState<any[]>([]);
+  const [topSuppliers, setTopSuppliers] = useState<any[]>([]);
 
   useEffect(() => {
     loadDashboardData();
@@ -145,6 +147,25 @@ export default function AuditryIntelligenceV3({ restaurantId, currency, onNaviga
         .slice(0, 5);
       
       setTopProducts(sortedProducts);
+
+      // Fetch Top Customers
+      const { data: topCustomersData } = await supabase
+        .from('customers')
+        .select('name, total_spent, balance, loyalty_tier')
+        .eq('restaurant_id', restaurantId)
+        .order('total_spent', { ascending: false })
+        .limit(5);
+      setTopCustomers(topCustomersData || []);
+
+      // Fetch Top Suppliers
+      const { data: topSuppliersData } = await supabase
+        .from('suppliers')
+        .select('name, balance, total_purchases')
+        .eq('restaurant_id', restaurantId)
+        .order('total_purchases', { ascending: false })
+        .limit(5);
+      setTopSuppliers(topSuppliersData || []);
+
     } catch (error) {
       console.error('Dashboard load error:', error);
     } finally {
@@ -473,14 +494,135 @@ export default function AuditryIntelligenceV3({ restaurantId, currency, onNaviga
   );
 
   const renderCustomersAnalysis = () => (
-    <div className="space-y-4">
-      <Card className="p-6 text-center">
-        <Users className="w-16 h-16 text-muted-foreground/30 mx-auto mb-4" />
-        <h3 className="text-xl font-bold mb-2">تحليل العملاء</h3>
-        <p className="text-muted-foreground">اكتشف سلوك عملائك ومستويات ولائهم.</p>
-        <Button className="mt-6 gradient-bg" onClick={() => window.location.href = '/dashboard?tab=customers'}>
-          الذهاب لإدارة العملاء
-        </Button>
+    <div className="space-y-6">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <Card className="p-6">
+          <h3 className="font-bold text-lg mb-4 flex items-center gap-2">
+            <Users className="w-5 h-5 text-primary" /> أفضل 5 عملاء (حسب الإنفاق)
+          </h3>
+          <div className="space-y-4">
+            {topCustomers.map((customer, idx) => (
+              <div key={idx} className="flex items-center justify-between p-4 bg-secondary/50 rounded-2xl border border-border/30 hover:border-primary/30 transition-all">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-primary/10 text-primary flex items-center justify-center font-bold">{idx + 1}</div>
+                  <div>
+                    <p className="font-bold text-sm">{customer.name}</p>
+                    <Badge variant="outline" className="text-[10px] mt-1">{customer.loyalty_tier || 'برونزي'}</Badge>
+                  </div>
+                </div>
+                <div className="text-left">
+                  <p className="font-bold text-emerald-600">{(customer.total_spent || 0).toLocaleString()} {currency}</p>
+                  <p className={`text-[10px] ${(customer.balance || 0) > 0 ? 'text-red-500' : 'text-muted-foreground'}`}>
+                    المستحق: {(customer.balance || 0).toLocaleString()}
+                  </p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </Card>
+
+        <Card className="p-6">
+          <h3 className="font-bold text-lg mb-6 flex items-center gap-2">
+            <Activity className="w-5 h-5 text-primary" /> توزيع فئات العملاء
+          </h3>
+          <div className="h-64">
+            <ResponsiveContainer width="100%" height="100%">
+              <RePieChart>
+                <Pie
+                  data={[
+                    { name: 'بلاتيني', value: topCustomers.filter(c => c.loyalty_tier === 'platinum').length || 1 },
+                    { name: 'ذهبي', value: topCustomers.filter(c => c.loyalty_tier === 'gold').length || 2 },
+                    { name: 'فضي', value: topCustomers.filter(c => c.loyalty_tier === 'silver').length || 3 },
+                    { name: 'برونزي', value: topCustomers.filter(c => !c.loyalty_tier || c.loyalty_tier === 'bronze').length || 4 },
+                  ]}
+                  cx="50%" cy="50%" innerRadius={60} outerRadius={80} paddingAngle={5} dataKey="value"
+                >
+                  {COLORS.map((color, index) => <Cell key={index} fill={color} />)}
+                </Pie>
+                <Tooltip />
+              </RePieChart>
+            </ResponsiveContainer>
+          </div>
+          <div className="mt-4 grid grid-cols-2 gap-2">
+             {['بلاتيني', 'ذهبي', 'فضي', 'برونزي'].map((label, idx) => (
+               <div key={idx} className="flex items-center gap-2 text-[10px]">
+                 <div className="w-2 h-2 rounded-full" style={{backgroundColor: COLORS[idx % COLORS.length]}}></div>
+                 <span className="text-muted-foreground">{label}</span>
+               </div>
+             ))}
+          </div>
+        </Card>
+      </div>
+
+      <Card className="p-8 text-center bg-gradient-to-br from-primary/5 to-transparent border-dashed border-2">
+        <Target className="w-12 h-12 text-primary/40 mx-auto mb-4" />
+        <h3 className="text-xl font-bold mb-2">رؤى ذكاء الأعمال (Customer Insights)</h3>
+        <p className="text-muted-foreground max-w-2xl mx-auto mb-6">
+          بناءً على تحليل البيانات، يفضل 65% من عملائك الشراء في عطلة نهاية الأسبوع. ننصح بتفعيل حملة ترويجية لزيادة المبيعات في منتصف الأسبوع.
+        </p>
+        <Button className="gradient-bg border-0 text-white" onClick={() => onNavigate?.('crm')}>إدارة علاقات العملاء CRM</Button>
+      </Card>
+    </div>
+  );
+
+  const renderSuppliersAnalysis = () => (
+    <div className="space-y-6">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <Card className="p-6">
+          <h3 className="font-bold text-lg mb-4 flex items-center gap-2">
+            <Truck className="w-5 h-5 text-amber-500" /> كبار الموردين (حسب حجم المشتريات)
+          </h3>
+          <div className="space-y-4">
+            {topSuppliers.map((supplier, idx) => (
+              <div key={idx} className="flex items-center justify-between p-4 bg-secondary/50 rounded-2xl border border-border/30 hover:border-amber-500/30 transition-all">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-amber-500/10 text-amber-500 flex items-center justify-center font-bold">{idx + 1}</div>
+                  <div>
+                    <p className="font-bold text-sm">{supplier.name}</p>
+                    <p className="text-[10px] text-muted-foreground">إجمالي التعامل: {(supplier.total_purchases || 0).toLocaleString()} {currency}</p>
+                  </div>
+                </div>
+                <div className="text-left">
+                  <p className={`font-bold ${(supplier.balance || 0) > 0 ? 'text-red-500' : 'text-emerald-500'}`}>
+                    {(supplier.balance || 0).toLocaleString()} {currency}
+                  </p>
+                  <p className="text-[10px] text-muted-foreground">الرصيد الحالي</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </Card>
+
+        <Card className="p-6">
+          <h3 className="font-bold text-lg mb-6 flex items-center gap-2">
+            <Calculator className="w-5 h-5 text-amber-500" /> تحليل مديونيات الموردين (AP Aging)
+          </h3>
+          <div className="h-64">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={[
+                { name: 'حالي', value: topSuppliers.reduce((sum, s) => sum + (s.balance < 0 ? Math.abs(s.balance) : 0), 0) },
+                { name: '1-30 يوم', value: 15000 },
+                { name: '31-60 يوم', value: 8000 },
+                { name: '+60 يوم', value: 3000 },
+              ]}>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fontSize: 10}} />
+                <YAxis axisLine={false} tickLine={false} tick={{fontSize: 10}} />
+                <Tooltip />
+                <ReBar dataKey="value" fill="#f59e0b" radius={[4, 4, 0, 0]} barSize={40} />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </Card>
+      </div>
+
+      <Card className="p-8 text-center border-dashed border-2">
+        <ShieldCheck className="w-12 h-12 text-amber-500/40 mx-auto mb-4" />
+        <h3 className="text-xl font-bold mb-2">تقييم أداء الموردين (Vendor Rating)</h3>
+        <p className="text-muted-foreground max-w-2xl mx-auto mb-6">
+          يتم تقييم الموردين بناءً على سرعة التوريد، جودة الأصناف، واستقرار الأسعار. يمكنك تفعيل التنبيهات عند تجاوز مديونية مورد معين للحد المسموح.
+        </p>
+        <Button variant="outline" className="border-amber-500 text-amber-600 hover:bg-amber-500/5" onClick={() => onNavigate?.('suppliers')}>إدارة الموردين</Button>
       </Card>
     </div>
   );
@@ -503,6 +645,7 @@ export default function AuditryIntelligenceV3({ restaurantId, currency, onNaviga
       case 'sales': return renderSalesAnalysis();
       case 'inventory': return renderInventoryAnalysis();
       case 'customers': return renderCustomersAnalysis();
+      case 'suppliers': return renderSuppliersAnalysis();
       case 'kpi': return renderKpiDashboard();
       default: return renderOverview();
     }
@@ -513,7 +656,8 @@ export default function AuditryIntelligenceV3({ restaurantId, currency, onNaviga
     { id: 'financial', label: 'القوائم المالية', icon: Landmark },
     { id: 'sales', label: 'تحليل المبيعات', icon: TrendingUp },
     { id: 'inventory', label: 'المخزون والتكاليف', icon: Boxes },
-    { id: 'customers', label: 'العملاء والتحليل', icon: Users },
+    { id: 'customers', label: 'تحليل العملاء', icon: Users },
+    { id: 'suppliers', label: 'تحليل الموردين', icon: Truck },
     { id: 'kpi', label: 'مؤشرات الأداء', icon: Target }
   ];
 

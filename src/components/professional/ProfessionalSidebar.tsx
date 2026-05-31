@@ -25,7 +25,7 @@ import { getBusinessConfig, type BusinessType } from '@/lib/businessTypes';
 
 export type SidebarTab =
   | 'home' | 'pos' | 'orders' | 'menu' | 'delivery' | 'shifts' | 'stats' | 'kds'
-  | 'inventory' | 'customers' | 'suppliers' | 'expenses' | 'qr'
+  | 'inventory' | 'customers' | 'suppliers' | 'expenses' | 'qr' | 'crm' | 'analytics'
   | 'waiter' | 'staff' | 'financials' | 'notifications' | 'settings' | 'overheads'
   | 'customer_accounts' | 'sales_returns' | 'supplier_accounts' | 'inventory_receipts'
   | 'ai_assistant' | 'treasury' | 'users' | 'sales_invoices' | 'purchase_invoices'
@@ -142,6 +142,7 @@ export const ProfessionalSidebar = memo(function ProfessionalSidebar({
     waiter: { label: 'طلبات الجرسون', icon: Bell, badge: stats.unackCalls, section: 'main' },
 
     customers: { label: config.labels.customers, icon: Users, badge: stats.customersCount, section: 'sales' },
+    crm: { label: 'إدارة العلاقات CRM', icon: Heart, section: 'sales' },
     sales_orders: { label: 'أوامر البيع', icon: FileText, section: 'sales' },
     sales_invoices: { label: 'فواتير البيع', icon: Receipt, badge: stats.salesInvoicesCount, section: 'sales' },
     sales_returns: { label: 'مرتجع المبيعات', icon: RotateCcw, badge: stats.returnsCount, section: 'sales' },
@@ -166,6 +167,7 @@ export const ProfessionalSidebar = memo(function ProfessionalSidebar({
     fixed_assets: { label: 'الأصول الثابتة', icon: Building2, section: 'accounting' },
 
     stats: { label: 'الإحصائيات', icon: BarChart3, section: 'analytics' },
+    analytics: { label: 'التقارير المتقدمة', icon: BarChart3, section: 'analytics' },
     ai_assistant: { label: 'مساعد المحاسب', icon: Sparkles, section: 'analytics' },
     staff: { label: 'الموظفين', icon: Users, section: 'system' },
     users: { label: 'الصلاحيات', icon: Shield, section: 'system' },

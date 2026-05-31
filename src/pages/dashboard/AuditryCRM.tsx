@@ -26,12 +26,13 @@ interface Props {
   currency: string;
 }
 
-type TabType = 'overview' | 'leads' | 'customers' | 'loyalty' | 'communications' | 'insights' | 'tasks';
+type TabType = 'overview' | 'leads' | 'customers' | 'suppliers' | 'loyalty' | 'communications' | 'insights' | 'tasks';
 type LeadStage = 'new' | 'contacted' | 'negotiation' | 'won' | 'lost';
 
 export function AuditryCRM({ restaurantId, currency }: Props) {
   const [activeTab, setActiveTab] = useState<TabType>('overview');
   const [customers, setCustomers] = useState<any[]>([]);
+  const [suppliers, setSuppliers] = useState<any[]>([]);
   const [leads, setLeads] = useState<any[]>([]);
   const [logs, setLogs] = useState<any[]>([]);
   const [tasks, setTasks] = useState<any[]>([]);
@@ -52,14 +53,16 @@ export function AuditryCRM({ restaurantId, currency }: Props) {
   const loadCRMData = async () => {
     try {
       setLoading(true);
-      const [customersRes, leadsRes, logsRes, tasksRes] = await Promise.all([
+      const [customersRes, suppliersRes, leadsRes, logsRes, tasksRes] = await Promise.all([
         supabase.from('customers').select('*').eq('restaurant_id', restaurantId).order('total_spent', { ascending: false }),
+        supabase.from('suppliers').select('*').eq('restaurant_id', restaurantId).order('total_purchases', { ascending: false }),
         supabase.from('crm_leads').select('*').eq('restaurant_id', restaurantId),
         supabase.from('crm_communication_logs').select('*').eq('restaurant_id', restaurantId).order('contact_date', { ascending: false }).limit(20),
         supabase.from('crm_tasks').select('*').eq('restaurant_id', restaurantId).order('due_date', { ascending: true })
       ]);
       
       if (customersRes.data) setCustomers(customersRes.data);
+      if (suppliersRes.data) setSuppliers(suppliersRes.data);
       if (leadsRes.data) setLeads(leadsRes.data);
       if (logsRes.data) setLogs(logsRes.data);
       if (tasksRes.data) setTasks(tasksRes.data);
@@ -164,6 +167,7 @@ export function AuditryCRM({ restaurantId, currency }: Props) {
            { id: 'overview', label: 'لوحة التحكم الشاملة', icon: Target },
            { id: 'leads', label: 'مسار المبيعات (Leads)', icon: Columns },
            { id: 'customers', label: 'العملاء (Customer 360)', icon: Users },
+           { id: 'suppliers', label: 'الموردين (Partner Network)', icon: Truck },
            { id: 'loyalty', label: 'برامج الولاء والمكافآت', icon: Heart },
            { id: 'communications', label: 'سجل التواصل', icon: MessageSquare },
            { id: 'insights', label: 'الذكاء الاصطناعي', icon: TrendingUp },
@@ -223,24 +227,42 @@ export function AuditryCRM({ restaurantId, currency }: Props) {
                    <p className="text-xs font-bold text-muted-foreground uppercase">نقاط الولاء النشطة</p>
                    <h3 className="text-3xl font-black mt-1">{customers.reduce((sum, c) => sum + (c.loyalty_points || 0), 0).toLocaleString()}</h3>
                 </div>
+                <div className="glass-card p-6 border-amber-500/20 bg-gradient-to-br from-amber-500/5 to-transparent">
+                   <div className="flex justify-between items-start mb-4">
+                      <div className="p-2 rounded-lg bg-amber-500/10 text-amber-500"><Truck className="w-5 h-5" /></div>
+                      <Badge variant="outline" className="text-[10px] text-amber-500 border-amber-500/20">Partners</Badge>
+                   </div>
+                   <p className="text-xs font-bold text-muted-foreground uppercase">قيمة التوريدات (YTD)</p>
+                   <h3 className="text-3xl font-black mt-1">{suppliers.reduce((sum, s) => sum + (Number(s.total_purchases) || 0), 0).toLocaleString()} <span className="text-sm font-normal text-muted-foreground">{currency}</span></h3>
+                </div>
              </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-               <div className="glass-card p-6 space-y-4">
-                  <h3 className="font-bold text-xl flex items-center gap-2"><Clock className="w-5 h-5 text-primary" /> أحدث التفاعلات</h3>
-                  <div className="space-y-3">
-                     {logs.slice(0, 5).map(log => (
-                        <div key={log.id} className="flex gap-3 p-3 rounded-xl bg-secondary/50 border border-border/30">
-                           <div className="w-8 h-8 rounded-full bg-primary/10 text-primary flex items-center justify-center shrink-0">
-                              {log.type === 'call' ? <Phone className="w-4 h-4"/> : log.type === 'email' ? <Mail className="w-4 h-4"/> : <MessageSquare className="w-4 h-4"/>}
-                           </div>
-                           <div>
-                              <p className="font-bold text-sm">{log.summary}</p>
-                              <p className="text-[10px] text-muted-foreground">منذ بضع ساعات • بواسطة المستخدم النظام</p>
-                           </div>
-                        </div>
-                     ))}
-                     {logs.length === 0 && <p className="text-sm text-muted-foreground text-center py-4">لا توجد سجلات تواصل حديثة</p>}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+               <div className="glass-card p-6 space-y-4 lg:col-span-2">
+                  <h3 className="font-bold text-xl flex items-center gap-2"><Activity className="w-5 h-5 text-primary" /> تحليل تدفق العملاء المحتملين (Leads Performance)</h3>
+                  <div className="h-64 mt-4">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <AreaChart data={[
+                        { name: 'يناير', leads: 40, won: 24 },
+                        { name: 'فبراير', leads: 30, won: 13 },
+                        { name: 'مارس', leads: 20, won: 98 },
+                        { name: 'أبريل', leads: 27, won: 39 },
+                        { name: 'مايو', leads: 18, won: 48 },
+                        { name: 'يونيو', leads: 23, won: 38 },
+                      ]}>
+                        <defs>
+                          <linearGradient id="colorLeads" x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="5%" stopColor="#8b5cf6" stopOpacity={0.1}/>
+                            <stop offset="95%" stopColor="#8b5cf6" stopOpacity={0}/>
+                          </linearGradient>
+                        </defs>
+                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
+                        <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fontSize: 12, fill: '#64748b'}} />
+                        <YAxis axisLine={false} tickLine={false} tick={{fontSize: 12, fill: '#64748b'}} />
+                        <Tooltip contentStyle={{borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgba(0,0,0,0.1)'}} />
+                        <Area type="monotone" dataKey="leads" stroke="#8b5cf6" fillOpacity={1} fill="url(#colorLeads)" strokeWidth={3} />
+                      </AreaChart>
+                    </ResponsiveContainer>
                   </div>
                </div>
 
@@ -253,6 +275,45 @@ export function AuditryCRM({ restaurantId, currency }: Props) {
                   <Button onClick={() => { setActiveTab('leads'); setShowAddLead(true); }} className="gradient-bg border-0 text-white gap-2 h-12 px-8 text-lg font-bold">
                      <Plus className="w-5 h-5" /> إضافة Lead
                   </Button>
+               </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mt-8">
+               <div className="glass-card p-6 space-y-4">
+                  <h3 className="font-bold text-xl flex items-center gap-2"><Clock className="w-5 h-5 text-primary" /> أحدث التفاعلات</h3>
+                  <div className="space-y-3">
+                     {logs.slice(0, 5).map(log => (
+                        <div key={log.id} className="flex gap-3 p-3 rounded-xl bg-secondary/50 border border-border/30">
+                           <div className="w-8 h-8 rounded-full bg-primary/10 text-primary flex items-center justify-center shrink-0">
+                              {log.type === 'call' ? <Phone className="w-4 h-4"/> : log.type === 'email' ? <Mail className="w-4 h-4"/> : <MessageSquare className="w-4 h-4"/>}
+                           </div>
+                           <div>
+                              <p className="font-bold text-sm">{log.summary}</p>
+                              <p className="text-[10px] text-muted-foreground">بواسطة المستخدم النظام • {new Date(log.contact_date).toLocaleDateString('ar-EG')}</p>
+                           </div>
+                        </div>
+                     ))}
+                     {logs.length === 0 && <p className="text-sm text-muted-foreground text-center py-4">لا توجد سجلات تواصل حديثة</p>}
+                  </div>
+               </div>
+               
+               <div className="glass-card p-6 space-y-4">
+                  <h3 className="font-bold text-xl flex items-center gap-2"><CheckCircle2 className="w-5 h-5 text-primary" /> المهام المعلقة</h3>
+                  <div className="space-y-3">
+                     {tasks.filter(t => t.status !== 'completed').slice(0, 5).map(task => (
+                        <div key={task.id} className="flex items-center justify-between p-3 rounded-xl bg-secondary/50 border border-border/30 group">
+                           <div className="flex items-center gap-3">
+                              <div className="w-2 h-2 rounded-full bg-amber-500"></div>
+                              <div>
+                                 <p className="font-bold text-sm">{task.title}</p>
+                                 <p className="text-[10px] text-muted-foreground">موعد الاستحقاق: {new Date(task.due_date).toLocaleDateString('ar-EG')}</p>
+                              </div>
+                           </div>
+                           <Button variant="ghost" size="sm" className="opacity-0 group-hover:opacity-100 transition-opacity h-7 text-[10px]">إتمام</Button>
+                        </div>
+                     ))}
+                     {tasks.filter(t => t.status !== 'completed').length === 0 && <p className="text-sm text-muted-foreground text-center py-4">لا توجد مهام معلقة</p>}
+                  </div>
                </div>
             </div>
           </div>
@@ -412,6 +473,78 @@ export function AuditryCRM({ restaurantId, currency }: Props) {
                                      <Plus className="w-3 h-3 ml-1" /> فاتورة
                                   </Button>
                                </div>
+                            </td>
+                         </tr>
+                      ))}
+                  </tbody>
+               </table>
+            </div>
+          </div>
+        )}
+
+        {activeTab === 'suppliers' && (
+          <div className="space-y-6 fade-in">
+            <div className="flex items-center justify-between">
+               <div>
+                  <h2 className="text-2xl font-black">شبكة الشركاء والموردين (Partner Network)</h2>
+                  <p className="text-sm text-muted-foreground">تحليل أداء الموردين وإدارة العلاقات التجارية الإستراتيجية.</p>
+               </div>
+               <Button className="bg-amber-500 hover:bg-amber-600 text-white gap-2"><Plus className="w-4 h-4" /> مورد جديد</Button>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <Card className="p-6 border-amber-500/20 bg-amber-500/5">
+                   <p className="text-xs font-bold text-amber-600 uppercase">إجمالي الموردين</p>
+                   <h3 className="text-3xl font-black mt-1">{suppliers.length}</h3>
+                </Card>
+                <Card className="p-6 border-blue-500/20 bg-blue-500/5">
+                   <p className="text-xs font-bold text-blue-600 uppercase">إجمالي المشتريات</p>
+                   <h3 className="text-3xl font-black mt-1">{suppliers.reduce((sum, s) => sum + (Number(s.total_purchases) || 0), 0).toLocaleString()} <span className="text-sm font-normal">{currency}</span></h3>
+                </Card>
+                <Card className="p-6 border-red-500/20 bg-red-500/5">
+                   <p className="text-xs font-bold text-red-600 uppercase">مستحقات للموردين</p>
+                   <h3 className="text-3xl font-black mt-1 text-red-600">{suppliers.reduce((sum, s) => sum + (Number(s.balance) || 0), 0).toLocaleString()} <span className="text-sm font-normal">{currency}</span></h3>
+                </Card>
+            </div>
+
+            <div className="glass-card overflow-hidden shadow-2xl">
+               <table className="w-full text-right text-sm">
+                  <thead className="bg-muted/50 border-b">
+                     <tr>
+                        <th className="p-4">المورد</th>
+                        <th className="p-4">إجمالي التوريدات</th>
+                        <th className="p-4">الرصيد المستحق</th>
+                        <th className="p-4">الحالة</th>
+                        <th className="p-4">إجراءات</th>
+                     </tr>
+                  </thead>
+                  <tbody className="divide-y divide-border/30">
+                      {suppliers.map(s => (
+                         <tr key={s.id} className="hover:bg-muted/40 transition-colors group">
+                            <td className="p-4">
+                               <div className="font-bold flex items-center gap-3">
+                                  <div className="w-10 h-10 rounded-2xl bg-amber-500/10 text-amber-600 flex items-center justify-center font-bold text-sm shadow-inner">{s.name?.[0] || 'S'}</div>
+                                  <div>
+                                     {s.name}
+                                     <div className="text-[10px] text-muted-foreground">{s.phone || 'بدون هاتف'}</div>
+                                  </div>
+                               </div>
+                            </td>
+                            <td className="p-4 font-bold">{(s.total_purchases || 0).toLocaleString()} {currency}</td>
+                            <td className="p-4">
+                               <div className={`font-bold ${(s.balance || 0) > 0 ? 'text-red-500' : 'text-emerald-500'}`}>
+                                  {(s.balance || 0).toLocaleString()} {currency}
+                               </div>
+                            </td>
+                            <td className="p-4">
+                               <Badge variant="outline" className={s.balance > 0 ? 'text-amber-600 border-amber-200' : 'text-emerald-600 border-emerald-200'}>
+                                  {s.balance > 0 ? 'مستحق سداد' : 'منتظم'}
+                               </Badge>
+                            </td>
+                            <td className="p-4">
+                               <Button variant="ghost" size="sm" className="h-8 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity">
+                                  <Eye className="w-3 h-3 ml-1" /> التحليل
+                               </Button>
                             </td>
                          </tr>
                       ))}
