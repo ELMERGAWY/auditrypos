@@ -34,7 +34,7 @@ interface Props {
   businessType: string;
 }
 
-type TabType = 'overview' | 'leads' | 'social' | 'customers' | 'suppliers' | 'loyalty' | 'communications' | 'insights' | 'tasks';
+type TabType = 'overview' | 'leads' | 'social' | 'customers' | 'suppliers' | 'loyalty' | 'communications' | 'insights' | 'tasks' | 'settings';
 type LeadStage = 'new' | 'contacted' | 'negotiation' | 'won' | 'lost';
 
 export function AuditryCRM({ restaurantId, currency, businessType }: Props) {
@@ -47,6 +47,7 @@ export function AuditryCRM({ restaurantId, currency, businessType }: Props) {
   const [staff, setStaff] = useState<any[]>([]);
   const [socialAccounts, setSocialAccounts] = useState<any[]>([]);
   const [socialMessages, setSocialMessages] = useState<any[]>([]);
+  const [platformConfigs, setPlatformConfigs] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [viewMode, setViewMode] = useState<'kanban' | 'table'>('kanban');
   const [selectedCustomer, setSelectedCustomer] = useState<any | null>(null);
@@ -54,6 +55,10 @@ export function AuditryCRM({ restaurantId, currency, businessType }: Props) {
   const [customerTransactions, setCustomerTransactions] = useState<any[]>([]);
   const [customerOrders, setCustomerOrders] = useState<any[]>([]);
   const [customerProducts, setCustomerProducts] = useState<any[]>([]);
+
+  // Platform Setup Dialog
+  const [showPlatformSetup, setShowPlatformSetup] = useState<string | null>(null);
+  const [configData, setConfigData] = useState({ api_key: '', api_secret: '', webhook_verify_token: '' });
 
   // New lead form state
   const [showAddLead, setShowAddLead] = useState(false);
@@ -81,14 +86,15 @@ export function AuditryCRM({ restaurantId, currency, businessType }: Props) {
 
       if (custError) throw custError;
 
-      const [suppliersRes, leadsRes, logsRes, tasksRes, staffRes, socialAccRes, socialMsgRes] = await Promise.all([
+      const [suppliersRes, leadsRes, logsRes, tasksRes, staffRes, socialAccRes, socialMsgRes, platformCfgRes] = await Promise.all([
         supabase.from('suppliers').select('*').eq('restaurant_id', restaurantId).order('total_purchases', { ascending: false }),
         supabase.from('crm_leads').select('*').eq('restaurant_id', restaurantId).order('created_at', { ascending: false }),
         supabase.from('crm_communication_logs').select('*').eq('restaurant_id', restaurantId).order('contact_date', { ascending: false }).limit(50),
         supabase.from('crm_tasks').select('*').eq('restaurant_id', restaurantId).order('due_date', { ascending: true }),
         supabase.from('staff').select('id, name, role').eq('restaurant_id', restaurantId),
         supabase.from('crm_social_accounts').select('*').eq('restaurant_id', restaurantId),
-        supabase.from('crm_social_messages').select('*').eq('restaurant_id', restaurantId).order('created_at', { ascending: false })
+        supabase.from('crm_social_messages').select('*').eq('restaurant_id', restaurantId).order('created_at', { ascending: false }),
+        supabase.from('crm_platform_configs').select('*').eq('restaurant_id', restaurantId)
       ]);
       
       if (customersData) {
@@ -108,12 +114,28 @@ export function AuditryCRM({ restaurantId, currency, businessType }: Props) {
       if (staffRes.data) setStaff(staffRes.data);
       if (socialAccRes.data) setSocialAccounts(socialAccRes.data);
       if (socialMsgRes.data) setSocialMessages(socialMsgRes.data);
+      if (platformCfgRes.data) setPlatformConfigs(platformCfgRes.data);
     } catch (err) {
       console.error(err);
       toast.error('حدث خطأ أثناء تحميل بيانات CRM');
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleSaveConfig = async () => {
+    if (!showPlatformSetup) return;
+    const { error } = await supabase.from('crm_platform_configs').upsert({
+      restaurant_id: restaurantId,
+      platform: showPlatformSetup,
+      ...configData,
+      is_active: true
+    });
+    
+    if (error) return toast.error('فشل حفظ الإعدادات');
+    toast.success(`تم تفعيل ربط ${showPlatformSetup} بنجاح`);
+    setShowPlatformSetup(null);
+    loadCRMData();
   };
 
   const handleAssignLead = async (leadId: string, staffId: string) => {
@@ -276,7 +298,12 @@ export function AuditryCRM({ restaurantId, currency, businessType }: Props) {
                     </Select>
                   </div>
                   <h4 className="font-bold text-sm mb-1">{lead.name}</h4>
-                  <p className="text-xs text-muted-foreground flex items-center gap-1 mb-1"><Phone className="w-3 h-3" /> {lead.phone || 'لا يوجد'}</p>
+                  <div className="flex items-center gap-2 mb-1">
+                    <p className="text-xs text-muted-foreground flex items-center gap-1"><Phone className="w-3 h-3" /> {lead.phone || 'لا يوجد'}</p>
+                    {lead.platform && (
+                      <Badge className="text-[8px] h-3.5 bg-primary/10 text-primary border-0 capitalize">{lead.platform}</Badge>
+                    )}
+                  </div>
                   
                   {lead.assigned_to && (
                     <div className="flex items-center gap-1 mb-3 text-[10px] text-primary bg-primary/5 p-1 rounded">
@@ -307,125 +334,165 @@ export function AuditryCRM({ restaurantId, currency, businessType }: Props) {
   };
 
   const renderSocialIntegration = () => {
+    const platforms = [
+      { id: 'meta', name: 'Meta (FB/IG)', icon: Facebook, color: 'text-blue-600', bg: 'bg-blue-50' },
+      { id: 'google', name: 'Google Ads', icon: Search, color: 'text-red-600', bg: 'bg-red-50' },
+      { id: 'tiktok', name: 'TikTok', icon: MessageCircle, color: 'text-black', bg: 'bg-slate-50' },
+      { id: 'whatsapp', name: 'WhatsApp', icon: MessageCircle, color: 'text-emerald-600', bg: 'bg-emerald-50' }
+    ];
+
     return (
       <div className="space-y-8 fade-in">
         <header className="flex justify-between items-end">
           <div>
-            <h2 className="text-2xl font-black">مركز التواصل الاجتماعي العالمي</h2>
-            <p className="text-muted-foreground">اربط منصاتك واستقبل الطلبات والرسائل في مكان واحد مع توزيعها على فريق البيع.</p>
-          </div>
-          <div className="flex gap-2">
-            <Button onClick={() => handleSocialConnect('facebook')} variant="outline" className="gap-2 border-blue-500/30 text-blue-600 hover:bg-blue-50">
-              <Facebook className="w-4 h-4" /> ربط Facebook
-            </Button>
-            <Button onClick={() => handleSocialConnect('instagram')} variant="outline" className="gap-2 border-pink-500/30 text-pink-600 hover:bg-pink-50">
-              <Instagram className="w-4 h-4" /> ربط Instagram
-            </Button>
-            <Button onClick={() => handleSocialConnect('whatsapp')} variant="outline" className="gap-2 border-emerald-500/30 text-emerald-600 hover:bg-emerald-50">
-              <MessageCircle className="w-4 h-4" /> ربط WhatsApp
-            </Button>
+            <h2 className="text-2xl font-black">مركز الربط المباشر</h2>
+            <p className="text-muted-foreground">استقبل الليدز الفعلية من جميع المنصات وقم بتوزيعها آلياً على فريقك.</p>
           </div>
         </header>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 h-[600px]">
-          {/* Inbox List */}
-          <div className="glass-card flex flex-col overflow-hidden">
-            <div className="p-4 border-b bg-muted/30 flex justify-between items-center">
-              <h3 className="font-bold text-sm">صندوق الوارد الموحد</h3>
-              <Badge variant="secondary">{socialMessages.length} رسالة</Badge>
-            </div>
-            <div className="flex-1 overflow-y-auto divide-y divide-border/30">
-              {socialMessages.map(msg => (
-                <div 
-                  key={msg.id} 
-                  onClick={() => setSelectedMessage(msg)}
-                  className={`p-4 cursor-pointer hover:bg-primary/5 transition-all ${selectedMessage?.id === msg.id ? 'bg-primary/10 border-r-4 border-primary' : ''}`}
-                >
-                  <div className="flex justify-between items-start mb-1">
-                    <span className="font-bold text-sm">{msg.sender_name}</span>
-                    <span className="text-[10px] text-muted-foreground">{new Date(msg.created_at).toLocaleTimeString('ar-EG', {hour: '2-digit', minute: '2-digit'})}</span>
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+          {platforms.map(p => {
+            const isConnected = platformConfigs.some(c => c.platform === p.id && c.is_active);
+            return (
+              <Card key={p.id} className={`p-6 border-2 transition-all ${isConnected ? 'border-emerald-500/20 bg-emerald-500/5' : 'border-border hover:border-primary/20'}`}>
+                <div className="flex justify-between items-start mb-4">
+                  <div className={`p-3 rounded-2xl ${p.bg} ${p.color}`}>
+                    <p.icon className="w-6 h-6" />
                   </div>
-                  <p className="text-xs text-muted-foreground line-clamp-1">{msg.message_content}</p>
-                  <div className="flex gap-1 mt-2">
-                    <Badge className="text-[9px] h-4 bg-blue-500/10 text-blue-600 border-0 capitalize">{msg.platform}</Badge>
-                    {msg.status === 'unread' && <Badge className="text-[9px] h-4 bg-red-500 text-white border-0">جديد</Badge>}
-                  </div>
+                  <Badge variant={isConnected ? 'default' : 'outline'} className={isConnected ? 'bg-emerald-500' : ''}>
+                    {isConnected ? 'متصل' : 'غير نشط'}
+                  </Badge>
                 </div>
-              ))}
-              {socialMessages.length === 0 && (
-                <div className="flex flex-col items-center justify-center h-full text-muted-foreground gap-2 p-8 text-center">
-                  <Share2 className="w-12 h-12 opacity-20" />
-                  <p className="text-sm">لم يتم ربط حسابات نشطة أو لا توجد رسائل حالياً</p>
+                <h3 className="font-bold mb-1">{p.name}</h3>
+                <p className="text-[10px] text-muted-foreground mb-4">استقبال الليدز والرسائل المباشرة آلياً.</p>
+                <Button 
+                  onClick={() => setShowPlatformSetup(p.id)} 
+                  variant={isConnected ? 'outline' : 'default'} 
+                  className="w-full text-xs h-9"
+                >
+                  {isConnected ? 'تعديل الإعدادات' : 'ربط المنصة الآن'}
+                </Button>
+              </Card>
+            );
+          })}
+        </div>
+
+        {/* Unified Social Inbox */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 h-[500px]">
+           <div className="glass-card flex flex-col overflow-hidden">
+             <div className="p-4 border-b bg-muted/30 flex justify-between items-center">
+               <h3 className="font-bold text-sm">صندوق الوارد (الرسائل والليدز)</h3>
+               <Badge variant="secondary">{socialMessages.length}</Badge>
+             </div>
+             <div className="flex-1 overflow-y-auto divide-y divide-border/30">
+               {socialMessages.map(msg => (
+                 <div 
+                   key={msg.id} 
+                   onClick={() => setSelectedMessage(msg)}
+                   className={`p-4 cursor-pointer hover:bg-primary/5 transition-all ${selectedMessage?.id === msg.id ? 'bg-primary/10 border-r-4 border-primary' : ''}`}
+                 >
+                   <div className="flex justify-between items-start mb-1">
+                     <span className="font-bold text-xs">{msg.sender_name}</span>
+                     <span className="text-[9px] text-muted-foreground">{new Date(msg.created_at).toLocaleTimeString('ar-EG')}</span>
+                   </div>
+                   <p className="text-[10px] text-muted-foreground truncate">{msg.message_content}</p>
+                   <div className="flex gap-1 mt-2">
+                     <Badge className="text-[8px] h-3.5 bg-primary/10 text-primary border-0 capitalize">{msg.platform}</Badge>
+                     {msg.status === 'unread' && <Badge className="text-[8px] h-3.5 bg-red-500 text-white border-0">جديد</Badge>}
+                   </div>
+                 </div>
+               ))}
+               {socialMessages.length === 0 && (
+                 <div className="flex flex-col items-center justify-center h-full text-muted-foreground opacity-30 p-8 text-center">
+                   <Share2 className="w-12 h-12" />
+                   <p className="text-xs mt-2">لا توجد رسائل واردة حالياً</p>
+                 </div>
+               )}
+             </div>
+           </div>
+
+           <div className="lg:col-span-2 glass-card flex flex-col overflow-hidden">
+              {selectedMessage ? (
+                <>
+                  <div className="p-4 border-b bg-muted/30 flex justify-between items-center">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center font-bold text-primary">{selectedMessage.sender_name?.[0]}</div>
+                      <div>
+                        <h3 className="font-bold text-sm">{selectedMessage.sender_name}</h3>
+                        <Badge variant="outline" className="text-[8px]">{selectedMessage.platform}</Badge>
+                      </div>
+                    </div>
+                    <div className="flex gap-2">
+                       <Button size="sm" variant="outline" className="h-8 text-[10px] gap-1"><UserPlus className="w-3 h-3" /> تحويل لعميل محتمل</Button>
+                       <Select onValueChange={(val) => handleAssignLead(selectedMessage.id, val)}>
+                          <SelectTrigger className="h-8 text-[10px] w-32">
+                             <SelectValue placeholder="توجيه لموظف" />
+                          </SelectTrigger>
+                          <SelectContent>
+                             {staff.map(s => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}
+                          </SelectContent>
+                       </Select>
+                    </div>
+                  </div>
+                  <div className="flex-1 p-6 bg-secondary/5 overflow-y-auto">
+                     <div className="bg-card p-4 rounded-2xl rounded-tr-none border shadow-sm max-w-[80%]">
+                        <p className="text-sm">{selectedMessage.message_content}</p>
+                        <span className="text-[9px] text-muted-foreground mt-2 block">{new Date(selectedMessage.created_at).toLocaleString('ar-EG')}</span>
+                     </div>
+                  </div>
+                  <div className="p-4 border-t bg-card">
+                     <div className="flex gap-2">
+                        <Input placeholder="رد سريع..." className="h-9 text-xs" />
+                        <Button className="h-9 text-xs gap-2"><Send className="w-3 h-3" /> إرسال</Button>
+                     </div>
+                  </div>
+                </>
+              ) : (
+                <div className="flex-1 flex flex-col items-center justify-center text-muted-foreground opacity-20">
+                   <MessageSquare className="w-16 h-16" />
+                   <p className="text-sm mt-4">اختر محادثة للبدء في المعالجة والتوجيه</p>
                 </div>
               )}
-            </div>
-          </div>
-
-          {/* Conversation Detail */}
-          <div className="lg:col-span-2 glass-card flex flex-col overflow-hidden relative">
-            {selectedMessage ? (
-              <>
-                <div className="p-4 border-b bg-muted/30 flex justify-between items-center">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center font-bold text-primary">
-                      {selectedMessage.sender_name?.[0]}
-                    </div>
-                    <div>
-                      <h3 className="font-bold text-sm">{selectedMessage.sender_name}</h3>
-                      <p className="text-[10px] text-muted-foreground">عبر {selectedMessage.platform}</p>
-                    </div>
-                  </div>
-                  <div className="flex gap-2">
-                    <Button variant="outline" size="sm" className="h-8 gap-1 text-[10px]">
-                      <UserCheck className="w-3 h-3" /> تحويل لـ Lead
-                    </Button>
-                    <Select onValueChange={(val) => handleAssignLead(selectedMessage.id, val)}>
-                      <SelectTrigger className="h-8 text-[10px] w-32">
-                        <SelectValue placeholder="تعيين موظف" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {staff.map(s => (
-                          <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-
-                <div className="flex-1 overflow-y-auto p-6 space-y-4 bg-secondary/10">
-                   <div className="flex justify-start">
-                      <div className="max-w-[80%] bg-card p-4 rounded-2xl rounded-tr-none shadow-sm border">
-                         <p className="text-sm">{selectedMessage.message_content}</p>
-                         <span className="text-[10px] text-muted-foreground mt-2 block">{new Date(selectedMessage.created_at).toLocaleString('ar-EG')}</span>
-                      </div>
-                   </div>
-                   
-                   {/* AI Suggestion */}
-                   <div className="flex justify-center py-4">
-                      <div className="bg-primary/5 border border-primary/20 p-4 rounded-2xl flex items-center gap-3 max-w-md">
-                         <Sparkles className="w-5 h-5 text-primary shrink-0" />
-                         <div className="text-xs text-primary">
-                            <strong>اقتراح الذكاء الاصطناعي:</strong> يبدو أن العميل مهتم بـ {businessType === 'restaurant' ? 'قائمة الطعام' : 'خدمات المقاولات'}. نقترح إرسال بروفايل الشركة أو {businessType === 'restaurant' ? 'عرض الغداء' : 'سابقة الأعمال'}.
-                         </div>
-                      </div>
-                   </div>
-                </div>
-
-                <div className="p-4 border-t bg-card">
-                   <div className="flex gap-2">
-                      <Input placeholder="اكتب ردك هنا..." className="flex-1" />
-                      <Button className="bg-primary text-white gap-2"><Send className="w-4 h-4" /> إرسال</Button>
-                   </div>
-                </div>
-              </>
-            ) : (
-              <div className="flex-1 flex flex-col items-center justify-center text-muted-foreground gap-4">
-                 <MessageSquare className="w-20 h-20 opacity-10" />
-                 <p>اختر محادثة لعرض التفاصيل والرد عليها</p>
-              </div>
-            )}
-          </div>
+           </div>
         </div>
+
+        {/* Webhook Settings Dialog */}
+        <Dialog open={!!showPlatformSetup} onOpenChange={() => setShowPlatformSetup(null)}>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                إعداد ربط {showPlatformSetup}
+              </DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4 py-4">
+              <div className="space-y-2">
+                <label className="text-xs font-bold">API Key / Access Token</label>
+                <Input 
+                  type="password" 
+                  placeholder="أدخل مفتاح الربط..." 
+                  value={configData.api_key} 
+                  onChange={e => setConfigData({...configData, api_key: e.target.value})} 
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="text-xs font-bold">Webhook Verify Token</label>
+                <Input 
+                  placeholder="token-for-verification" 
+                  value={configData.webhook_verify_token} 
+                  onChange={e => setConfigData({...configData, webhook_verify_token: e.target.value})} 
+                />
+              </div>
+              <div className="p-3 rounded-xl bg-blue-50 border border-blue-100 space-y-2">
+                <p className="text-[10px] text-blue-700 font-bold flex items-center gap-1"><AlertCircle className="w-3 h-3" /> رابط Webhook الخاص بك:</p>
+                <code className="text-[9px] block bg-white p-2 rounded border break-all">
+                  {`https://lovable-auditry.supabase.co/functions/v1/crm-social-webhooks?platform=${showPlatformSetup}&restaurant_id=${restaurantId}`}
+                </code>
+                <p className="text-[9px] text-blue-600 italic">قم بنسخ هذا الرابط ووضعه في إعدادات المطورين بالمنصة (Meta/Google/TikTok).</p>
+              </div>
+              <Button onClick={handleSaveConfig} className="w-full gradient-bg border-0 text-white font-bold">تفعيل الربط المباشر</Button>
+            </div>
+          </DialogContent>
+        </Dialog>
       </div>
     );
   };
