@@ -315,7 +315,7 @@ export default function Dashboard() {
         {activeTab === 'fixed_assets' && <FixedAssetsTab {...commonProps} />}
         
         {/* Advanced Tabs */}
-        {activeTab === 'crm' && <AuditryCRM {...commonProps} />}
+        {activeTab === 'crm' && <AuditryCRM {...commonProps} businessType={businessType} />}
         {activeTab === 'analytics' && <AdvancedReportsHub {...commonProps} onNavigate={setActiveTab} />}
         {activeTab === 'ai_assistant' && <AIAccountantUnified {...commonProps} />}
         {activeTab === 'loyalty' && <LoyaltyPoints {...commonProps} />}
