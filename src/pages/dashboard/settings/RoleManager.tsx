@@ -82,6 +82,8 @@ export function RoleManager({ companyId }: { companyId: string }) {
 
   const allRoles = [...standardRoles, ...customRoles.map(r => ({ id: r.name_ar, name: r.name_ar, icon: UserCheck }))];
 
+  const modules = Array.from(new Set(permissions.map(p => p.module)));
+
   useEffect(() => {
     loadData();
   }, [companyId]);
@@ -169,9 +171,13 @@ export function RoleManager({ companyId }: { companyId: string }) {
     }
   };
 
-  if (loading) return <div className="p-8 text-center"><div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto"></div></div>;
+  if (loading) return (
+    <div className="p-20 text-center flex flex-col items-center justify-center space-y-4">
+      <div className="w-10 h-10 border-4 border-primary border-t-transparent rounded-full animate-spin"></div>
+      <p className="text-muted-foreground text-sm font-bold">جاري تحميل مصفوفة الصلاحيات...</p>
+    </div>
+  );
 
-  const modules = Array.from(new Set(permissions.map(p => p.module)));
   const selectedRoleInfo = allRoles.find(r => r.id === selectedRole);
 
   return (

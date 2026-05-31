@@ -67,8 +67,17 @@ CREATE TABLE IF NOT EXISTS public.restaurant_custom_roles (
 -- Enable RLS for custom roles
 ALTER TABLE public.restaurant_custom_roles ENABLE ROW LEVEL SECURITY;
 
-CREATE POLICY owner_all_custom_roles ON public.restaurant_custom_roles
-    FOR ALL USING (restaurant_id IN (SELECT id FROM public.restaurants WHERE owner_id = auth.uid()));
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_policy 
+        WHERE polname = 'owner_all_custom_roles' 
+        AND polrelid = 'public.restaurant_custom_roles'::regclass
+    ) THEN
+        CREATE POLICY owner_all_custom_roles ON public.restaurant_custom_roles
+            FOR ALL USING (restaurant_id IN (SELECT id FROM public.restaurants WHERE owner_id = auth.uid()));
+    END IF;
+END $$;
 
 -- 3. Update check_user_permission to handle custom roles and restaurant_id
 CREATE OR REPLACE FUNCTION public.check_staff_permission(p_staff_id UUID, p_permission_code VARCHAR)
