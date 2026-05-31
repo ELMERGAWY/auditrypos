@@ -87,6 +87,280 @@ const CHART_COLORS = [
 
 export default function Dashboard() {
   const navigate = useNavigate();
+
+  // Performance Optimization: Memoize the active tab content to prevent unnecessary re-renders
+  // of the entire dashboard when sidebar stats or other global state changes.
+  const activeTabContent = useMemo(() => {
+    if (!restaurant) return null;
+
+    return (
+      <Suspense fallback={
+        <div className="h-full flex flex-col items-center justify-center p-20 space-y-4">
+          <RefreshCcw className="w-12 h-12 animate-spin text-primary opacity-20" />
+          <p className="text-sm font-bold text-muted-foreground animate-pulse">جاري تحميل الوحدة...</p>
+        </div>
+      }>
+        {activeTab === 'home' && (
+          <ModuleErrorBoundary moduleName="لوحة التحكم">
+            <HomeDashboard 
+              restaurantId={restaurant.id} 
+              currency={currency}
+              userId={user?.id || ''}
+              onNavigate={(tab) => setActiveTab(tab as SidebarTab)}
+            />
+          </ModuleErrorBoundary>
+        )}
+        
+        {activeTab === 'pos' && (
+          <div className="h-full flex flex-col">
+            <div className="flex gap-2 overflow-x-auto pb-3 mb-3 border-b border-border/50 no-scrollbar">
+              {[
+                { id: 'pos', label: 'البيع', icon: LayoutGrid },
+                { id: 'orders', label: 'الطلبات', icon: Receipt },
+                { id: 'menu', label: 'المنتجات', icon: Store },
+                { id: 'inventory', label: 'المخزون', icon: Package },
+                { id: 'treasury', label: 'الخزينة', icon: Wallet },
+                { id: 'shifts', label: 'الشيفتات', icon: CalendarClock },
+              ].map(action => (
+                <Button
+                  key={action.id}
+                  variant={activeTab === action.id ? 'default' : 'outline'}
+                  className={activeTab === action.id ? 'gradient-bg border-0 text-white rounded-xl shadow-sm' : 'rounded-xl'}
+                  onClick={() => setActiveTab(action.id as SidebarTab)}
+                >
+                  <action.icon className="w-4 h-4 ml-1" />
+                  {action.label}
+                </Button>
+              ))}
+            </div>
+            <div className="flex flex-col lg:flex-row flex-1 min-h-0 gap-4">
+              <POSGrid
+                currency={currency}
+                todayRevenue={todayRevenue}
+                todayOrders={todayOrders}
+                avgOrderValue={avgOrderValue}
+                pendingOrders={pendingOrders}
+                businessType={businessType}
+                orderType={orderType}
+                orders={orders}
+                tableNumber={tableNumber}
+                setTableNumber={setTableNumber}
+                categories={categories}
+                selectedCategory={selectedCategory}
+                setSelectedCategory={setSelectedCategory}
+                searchQuery={searchQuery}
+                setSearchQuery={setSearchQuery}
+                filteredItems={filteredItems}
+                addToCart={addToCart}
+              />
+              <POSCart
+                activeInvoiceId={activeInvoiceId}
+                invoiceTabs={invoiceTabs}
+                cart={cart}
+                holdCurrentInvoice={holdCurrentInvoice}
+                setShowInvoiceTabs={setShowInvoiceTabs}
+                clearCart={clearCart}
+                businessType={businessType}
+                orderType={orderType}
+                setOrderType={setOrderType}
+                tableNumber={tableNumber}
+                setTableNumber={setTableNumber}
+                restaurant={restaurant}
+                customerName={customerName}
+                setCustomerName={selectCustomerFromSearch}
+                customerPhone={customerPhone}
+                setCustomerPhone={setCustomerPhone}
+                customerRef={customerRef}
+                setCustomerRef={setCustomerRef}
+                deliveryAddress={deliveryAddress}
+                setDeliveryAddress={setDeliveryAddress}
+                agents={agents}
+                selectedDeliveryAgent={selectedDeliveryAgent}
+                setSelectedDeliveryAgent={setSelectedDeliveryAgent}
+                orderNotes={orderNotes}
+                setOrderNotes={setOrderNotes}
+                discount={discount}
+                setDiscount={setDiscount}
+                discountType={discountType}
+                setDiscountType={setDiscountType}
+                currency={currency}
+                getUnitOptions={getUnitOptions}
+                setCartItemUnit={setCartItemUnit}
+                updateQty={updateQty}
+                setCartItemQty={setCartItemQty}
+                discountAmount={discountAmount}
+                taxAmount={totalTax}
+                cartSubtotal={cartSubtotal}
+                cartTotal={cartTotal}
+                paymentMethod={paymentMethod}
+                setPaymentMethod={setPaymentMethod}
+                paidAmount={paidAmount}
+                setPaidAmount={setPaidAmount}
+                remaining={remaining}
+                checkout={checkout}
+                previewInvoice={previewInvoice}
+                updateValue={updateValue}
+                removeFromCart={removeFromCart}
+                accountingAccounts={accountingAccounts}
+                selectedAccountId={selectedAccountId}
+                setSelectedAccountId={setSelectedAccountId}
+              />
+              <Suspense fallback={null}>
+                <InvoiceTabs
+                  show={showInvoiceTabs}
+                  onClose={() => setShowInvoiceTabs(false)}
+                  invoiceTabs={invoiceTabs}
+                  activeInvoiceId={activeInvoiceId}
+                  recallInvoice={recallInvoice}
+                  deleteInvoiceTab={deleteInvoiceTab}
+                  clearCart={clearCart}
+                  currency={currency}
+                />
+              </Suspense>
+            </div>
+          </div>
+        )}
+
+        {activeTab === 'orders' && (
+          <ModuleErrorBoundary moduleName="الطلبات">
+            <div className="p-4 space-y-4">
+              <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-4">
+                <h2 className="text-3xl font-black">{config.labels.orders} ({filteredOrders.length})</h2>
+                <div className="flex gap-2 overflow-x-auto pb-2 no-scrollbar">
+                  {(['all', 'pending', 'preparing', 'ready', 'completed', 'cancelled'] as const).map(status => (
+                    <button key={status} onClick={() => setOrderFilter(status)}
+                      className={`px-4 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition-all ${orderFilter === status ? 'gradient-bg text-white shadow-lg shadow-primary/20' : 'bg-secondary text-muted-foreground hover:bg-secondary/80'}`}>
+                      {status === 'all' ? `الكل (${orders.length})` : `${STATUS_CONFIG[status].label} (${orders.filter(o => o.status === status).length})`}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              {filteredOrders.length === 0 ? (
+                <div className="py-20 text-center text-muted-foreground italic border-2 border-dashed rounded-3xl">لا توجد طلبات حالياً</div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {filteredOrders.map(order => {
+                    const statusCfg = STATUS_CONFIG[order.status as OrderStatus] || STATUS_CONFIG.pending;
+                    return (
+                      <motion.div key={order.id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="glass-card p-5 group hover:border-primary/50 transition-all">
+                        <div className="flex items-center justify-between mb-4">
+                          <div className="flex flex-col">
+                            <span className="font-black text-lg">#{order.order_number.slice(-4)}</span>
+                            <span className="text-[10px] text-muted-foreground font-mono">{new Date(order.created_at).toLocaleString('ar-EG')}</span>
+                          </div>
+                          <Badge className={`${statusCfg.className} px-3 py-1 rounded-lg text-[10px] font-bold`}>{statusCfg.label}</Badge>
+                        </div>
+                        <div className="space-y-2 mb-6 min-h-[60px]">
+                          {order.items.map((item, idx) => (
+                            <div key={idx} className="flex justify-between items-center text-sm">
+                              <span className="text-muted-foreground">{item.menu_item_name} <span className="text-primary font-bold">× {item.quantity}</span></span>
+                              <span className="font-mono">{(item.price * item.quantity).toFixed(2)}</span>
+                            </div>
+                          ))}
+                        </div>
+                        <div className="flex items-center justify-between pt-4 border-t border-border/50">
+                          <span className="font-black text-xl text-primary">{Number(order.total).toFixed(2)} <span className="text-[10px] text-muted-foreground font-normal">{currency}</span></span>
+                          <div className="flex gap-2">
+                             <Button size="sm" variant="outline" className="h-8 px-2 text-[10px]" onClick={() => openOrderReceipt(order)}>تفاصيل</Button>
+                             {statusCfg.next && (
+                               <Button size="sm" className="gradient-bg border-0 text-white text-[10px] font-bold h-8 px-3" onClick={() => updateOrderStatus(order.id, statusCfg.next!)}>
+                                 {statusCfg.next === 'preparing' ? 'تحضير' : statusCfg.next === 'ready' ? 'جاهز' : 'إتمام'}
+                               </Button>
+                             )}
+                           </div>
+                        </div>
+                      </motion.div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          </ModuleErrorBoundary>
+        )}
+
+        {activeTab === 'menu' && (
+          <ModuleErrorBoundary moduleName="المنتجات">
+            <MenuTab
+              restaurant={restaurant}
+              menuItems={menuItems}
+              setMenuItems={setMenuItems}
+              menuForm={menuForm}
+              setMenuForm={setMenuForm}
+              showAddItem={showAddItem}
+              setShowAddItem={setShowAddItem}
+              editingItem={editingItem}
+              setEditingItem={setEditingItem}
+              loadData={loadData}
+            />
+          </ModuleErrorBoundary>
+        )}
+
+        {activeTab === 'inventory' && (
+          <ModuleErrorBoundary moduleName="المخزون">
+            <div className="p-4 space-y-6">
+              <header className="flex justify-between items-center">
+                <div>
+                  <h2 className="text-3xl font-black">إدارة المخزون</h2>
+                  <p className="text-muted-foreground text-sm">متابعة الأرصدة والتكاليف.</p>
+                </div>
+                <div className="flex gap-1 p-1 bg-secondary/50 rounded-2xl">
+                  <Button variant={activeSubView === 'stock' ? 'default' : 'ghost'} size="sm" onClick={() => setActiveSubView('stock')} className={activeSubView === 'stock' ? 'gradient-bg text-white shadow-md' : ''}>أرصدة المخزن</Button>
+                  <Button variant={activeSubView === 'bom' ? 'default' : 'ghost'} size="sm" onClick={() => setActiveSubView('bom')} className={activeSubView === 'bom' ? 'gradient-bg text-white shadow-md' : ''}>تكاليف الـ BOM</Button>
+                </div>
+              </header>
+              {activeSubView === 'stock' ? <InventoryTab restaurantId={restaurant.id} currency={currency} businessType={businessType} /> : <BOMManager restaurantId={restaurant.id} currency={currency} />}
+            </div>
+          </ModuleErrorBoundary>
+        )}
+
+        {activeTab === 'inventory_receipts' && <InventoryReceiptsManager restaurantId={restaurant.id} currency={currency} />}
+        {activeTab === 'purchase_invoices' && <PurchaseInvoices restaurantId={restaurant.id} currency={currency} />}
+        {activeTab === 'purchase_orders' && <PurchaseOrders restaurantId={restaurant.id} currency={currency} />}
+        {activeTab === 'sales_orders' && <SalesOrders restaurantId={restaurant.id} currency={currency} />}
+        {activeTab === 'sales_invoices' && <SalesInvoices restaurantId={restaurant.id} currency={currency} />}
+        {activeTab === 'treasury' && <TreasuryTab restaurantId={restaurant.id} currency={currency} />}
+        {activeTab === 'crm' && <AuditryCRM restaurantId={restaurant.id} currency={currency} />}
+        {activeTab === 'customers' && <CustomerManager restaurantId={restaurant.id} currency={currency} />}
+        {activeTab === 'suppliers' && <SupplierManager restaurantId={restaurant.id} currency={currency} />}
+        {activeTab === 'expenses' && <ExpensesTab restaurantId={restaurant.id} currency={currency} />}
+        {activeTab === 'financials' && <FinancialsTab restaurantId={restaurant.id} currency={currency} businessType={businessType} />}
+        {activeTab === 'delivery' && (
+          <DeliveryTab 
+            restaurantId={restaurant.id} 
+            agents={agents} 
+            setAgents={setAgents} 
+            deliveryOrders={deliveryOrders} 
+            onAssignAgent={onAssignAgent} 
+          />
+        )}
+        {activeTab === 'stats' && <AdvancedReportsHub restaurantId={restaurant.id} currency={currency} onNavigate={setActiveTab} />}
+        {activeTab === 'analytics' && <AdvancedReportsHub restaurantId={restaurant.id} currency={currency} onNavigate={setActiveTab} />}
+        {activeTab === 'ai_assistant' && <AIAccountantUnified restaurantId={restaurant.id} />}
+        {activeTab === 'settings' && <SettingsTab restaurant={restaurant} businessType={businessType} profileName={profileName} user={user} agents={agents} isSuspended={isSuspended} isSuperAdmin={isSuperAdmin} loadData={loadData} />}
+        {activeTab === 'qr' && (
+          <div className="p-10 flex flex-col items-center justify-center space-y-8 h-full">
+            <div className="p-8 bg-white rounded-3xl shadow-2xl scale-110">
+              <QRCodeSVG value={`${window.location.origin}/menu/${restaurant.id}`} size={250} level="H" />
+            </div>
+            <div className="text-center space-y-4">
+              <h3 className="text-3xl font-black">كود المنيو الذكي (QR Menu)</h3>
+              <p className="text-muted-foreground max-w-md">وجه الكاميرا لمسح الكود واستعراض المنيو.</p>
+              <Button className="gradient-bg border-0 text-white rounded-xl px-8" onClick={() => window.open(`${window.location.origin}/menu/${restaurant.id}`, '_blank')}>معاينة القائمة</Button>
+            </div>
+          </div>
+        )}
+        {activeTab === 'loyalty' && <LoyaltyPoints restaurantId={restaurant.id} />}
+        {activeTab === 'gift_cards' && <GiftCards restaurantId={restaurant.id} />}
+        {activeTab === 'branches' && <BranchManager restaurantId={restaurant.id} />}
+      </Suspense>
+    );
+  }, [
+    activeTab, restaurant, currency, businessType, cart, orders, orderFilter, 
+    activeInvoiceId, invoiceTabs, agents, currentShift, todayRevenue, 
+    todayOrders, activeSubView, menuItems, taxes, selectedAccountId, 
+    customerName, customerPhone, customerRef, deliveryAddress, selectedDeliveryAgent,
+    orderNotes, discount, discountType, paidAmount
+  ]);
   const { isSuperAdmin } = useAuth();
   const { isDark, toggleDarkMode } = useDarkMode(true);
   const {
@@ -1362,401 +1636,7 @@ export default function Dashboard() {
                 </motion.div>
               )}
             </AnimatePresence>
-          <Suspense fallback={<div className="h-full flex items-center justify-center p-12"><RefreshCcw className="w-10 h-10 animate-spin text-primary" /></div>}>
-            {/* ===================== HOME DASHBOARD ===================== */}
-            {activeTab === 'home' && (
-              <ModuleErrorBoundary moduleName="لوحة التحكم">
-                <HomeDashboard 
-                  restaurantId={restaurant!.id} 
-                  currency={currency}
-                  userId={user?.id || ''}
-                  onNavigate={(tab) => setActiveTab(tab as SidebarTab)}
-                />
-              </ModuleErrorBoundary>
-            )}
-            
-            {/* ===================== POS TAB ===================== */}
-            {activeTab === 'pos' && (
-            <div className="h-full flex flex-col">
-              <div className="flex gap-2 overflow-x-auto pb-3 mb-3 border-b border-border/50">
-                {[
-                  { id: 'pos', label: 'البيع', icon: LayoutGrid },
-                  { id: 'orders', label: 'الطلبات', icon: Receipt },
-                  { id: 'menu', label: 'المنتجات', icon: Store },
-                  { id: 'inventory', label: 'المخزون', icon: Package },
-                  { id: 'treasury', label: 'الخزينة', icon: Wallet },
-                  { id: 'shifts', label: 'الشيفتات', icon: CalendarClock },
-                ].map(action => (
-                  <Button
-                    key={action.id}
-                    variant={activeTab === action.id ? 'default' : 'outline'}
-                    className={activeTab === action.id ? 'gradient-bg border-0 text-white' : ''}
-                    onClick={() => setActiveTab(action.id as SidebarTab)}
-                  >
-                    <action.icon className="w-4 h-4 ml-1" />
-                    {action.label}
-                  </Button>
-                ))}
-              </div>
-            <div className="flex flex-col lg:flex-row flex-1 min-h-0">
-              <POSGrid
-                currency={currency}
-                todayRevenue={todayRevenue}
-                todayOrders={todayOrders}
-                avgOrderValue={avgOrderValue}
-                pendingOrders={pendingOrders}
-                businessType={businessType}
-                orderType={orderType}
-                orders={orders}
-                tableNumber={tableNumber}
-                setTableNumber={setTableNumber}
-                categories={categories}
-                selectedCategory={selectedCategory}
-                setSelectedCategory={setSelectedCategory}
-                searchQuery={searchQuery}
-                setSearchQuery={setSearchQuery}
-                filteredItems={filteredItems}
-                addToCart={addToCart}
-              />
-              <POSCart
-                activeInvoiceId={activeInvoiceId}
-                invoiceTabs={invoiceTabs}
-                cart={cart}
-                holdCurrentInvoice={holdCurrentInvoice}
-                setShowInvoiceTabs={setShowInvoiceTabs}
-                clearCart={clearCart}
-                businessType={businessType}
-                orderType={orderType}
-                setOrderType={setOrderType}
-                tableNumber={tableNumber}
-                setTableNumber={setTableNumber}
-                restaurant={restaurant}
-                customerName={customerName}
-                setCustomerName={selectCustomerFromSearch}
-                customerPhone={customerPhone}
-                setCustomerPhone={setCustomerPhone}
-                customerRef={customerRef}
-                setCustomerRef={setCustomerRef}
-                deliveryAddress={deliveryAddress}
-                setDeliveryAddress={setDeliveryAddress}
-                agents={agents}
-                selectedDeliveryAgent={selectedDeliveryAgent}
-                setSelectedDeliveryAgent={setSelectedDeliveryAgent}
-                orderNotes={orderNotes}
-                setOrderNotes={setOrderNotes}
-                discount={discount}
-                setDiscount={setDiscount}
-                discountType={discountType}
-                setDiscountType={setDiscountType}
-                currency={currency}
-                getUnitOptions={getUnitOptions}
-                setCartItemUnit={setCartItemUnit}
-                updateQty={updateQty}
-                setCartItemQty={setCartItemQty}
-                discountAmount={discountAmount}
-                taxAmount={totalTax}
-                cartSubtotal={cartSubtotal}
-                cartTotal={cartTotal}
-                paymentMethod={paymentMethod}
-                setPaymentMethod={setPaymentMethod}
-                paidAmount={paidAmount}
-                setPaidAmount={setPaidAmount}
-                remaining={remaining}
-                checkout={checkout}
-                previewInvoice={previewInvoice}
-                updateValue={updateValue}
-                removeFromCart={removeFromCart}
-                accountingAccounts={accountingAccounts}
-                selectedAccountId={selectedAccountId}
-                setSelectedAccountId={setSelectedAccountId}
-              />
-              <Suspense fallback={null}>
-                <InvoiceTabs
-                  show={showInvoiceTabs}
-                  onClose={() => setShowInvoiceTabs(false)}
-                  invoiceTabs={invoiceTabs}
-                  activeInvoiceId={activeInvoiceId}
-                  recallInvoice={recallInvoice}
-                  deleteInvoiceTab={deleteInvoiceTab}
-                  clearCart={clearCart}
-                  currency={currency}
-                />
-              </Suspense>
-            </div>
-            </div>
-          )}
-
-          {/* ===================== ERP MODULES ROUTING ===================== */}
-          <Suspense fallback={<div className="h-full flex items-center justify-center p-20"><RefreshCcw className="w-10 h-10 animate-spin text-primary opacity-20" /></div>}>
-            
-            {/* POS Tab handled above as default */}
-
-            {/* ORDERS TAB */}
-            {activeTab === 'orders' && (
-              <ModuleErrorBoundary moduleName="الطلبات">
-                <div className="p-4 space-y-4">
-                <div className="flex items-center justify-between mb-4">
-                  <h2 className="text-3xl font-black">{config.labels.orders} ({filteredOrders.length})</h2>
-                  <div className="flex gap-2 overflow-x-auto pb-2">
-                    {(['all', 'pending', 'preparing', 'ready', 'completed', 'cancelled'] as const).map(status => (
-                      <button key={status} onClick={() => setOrderFilter(status)}
-                        className={`px-4 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition-all ${orderFilter === status ? 'gradient-bg text-white shadow-lg shadow-primary/20' : 'bg-secondary text-muted-foreground hover:bg-secondary/80'}`}>
-                        {status === 'all' ? `الكل (${orders.length})` : `${STATUS_CONFIG[status].label} (${orders.filter(o => o.status === status).length})`}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-                {filteredOrders.length === 0 ? (
-                  <div className="py-20 text-center text-muted-foreground italic">لا توجد طلبات حالياً</div>
-                ) : (
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    {filteredOrders.map(order => {
-                      const statusCfg = STATUS_CONFIG[order.status as OrderStatus] || STATUS_CONFIG.pending;
-                      const assignedAgent = agents.find(a => a.id === order.delivery_agent_id);
-                      return (
-                        <motion.div key={order.id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="glass-card p-5 group hover:border-primary/50 transition-all">
-                          <div className="flex items-center justify-between mb-4">
-                            <div className="flex flex-col">
-                              <span className="font-black text-lg">#{order.order_number.slice(-4)}</span>
-                              <span className="text-[10px] text-muted-foreground font-mono">{new Date(order.created_at).toLocaleString('ar-EG')}</span>
-                            </div>
-                            <Badge className={`${statusCfg.className} px-3 py-1 rounded-lg text-[10px] font-bold`}>{statusCfg.label}</Badge>
-                          </div>
-                          <div className="space-y-2 mb-6 min-h-[60px]">
-                            {order.items.map((item, idx) => (
-                              <div key={idx} className="flex justify-between items-center text-sm">
-                                <span className="text-muted-foreground">{item.menu_item_name} <span className="text-primary font-bold">× {item.quantity}</span></span>
-                                <span className="font-mono">{(item.price * item.quantity).toFixed(2)}</span>
-                              </div>
-                            ))}
-                          </div>
-                          <div className="flex items-center justify-between pt-4 border-t border-border/50">
-                            <span className="font-black text-xl text-primary">{Number(order.total).toFixed(2)} <span className="text-[10px] text-muted-foreground font-normal">{currency}</span></span>
-                            <div className="flex gap-2">
-                               <Button size="sm" variant="outline" className="h-8 px-2 text-[10px]" onClick={() => openOrderReceipt(order)} title="تفاصيل الطلب">
-                                 تفاصيل
-                               </Button>
-                               <Button size="sm" variant="ghost" className="h-8 w-8 p-0" onClick={() => openOrderReceipt(order)} title="طباعة الفاتورة">
-                                 <Printer className="w-4 h-4" />
-                               </Button>
-                               
-                               {order.status !== 'cancelled' && order.status !== 'completed' && (
-                                 <Button size="sm" variant="ghost" className="h-8 w-8 p-0 text-destructive hover:bg-destructive/10" onClick={() => updateOrderStatus(order.id, 'cancelled')} title="إلغاء الطلب">
-                                   <X className="w-4 h-4" />
-                                 </Button>
-                               )}
-
-                               {(isSuperAdmin || restaurant) && (
-                                 <Button size="sm" variant="ghost" className="h-8 w-8 p-0 text-destructive/70 hover:bg-destructive/10" onClick={() => deleteOrder(order.id)} title="حذف نهائي">
-                                   <Trash2 className="w-4 h-4" />
-                                 </Button>
-                               )}
-
-                               {statusCfg.next && (
-                                 <Button size="sm" className="gradient-bg border-0 text-white text-[10px] font-bold h-8 px-3" onClick={() => updateOrderStatus(order.id, statusCfg.next!)}>
-                                   {statusCfg.next === 'preparing' ? 'تحضير' : statusCfg.next === 'ready' ? 'جاهز' : 'إتمام'}
-                                 </Button>
-                               )}
-                             </div>
-                          </div>
-                        </motion.div>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
-              </ModuleErrorBoundary>
-            )}
-
-            {/* PRODUCTS / MENU TAB */}
-            {activeTab === 'menu' && (
-              <ModuleErrorBoundary moduleName="الخدمات والمنتجات">
-                <MenuTab
-                restaurant={restaurant!}
-                menuItems={menuItems}
-                setMenuItems={setMenuItems}
-                menuForm={menuForm}
-                setMenuForm={setMenuForm}
-                showAddItem={showAddItem}
-                setShowAddItem={setShowAddItem}
-                editingItem={editingItem}
-                setEditingItem={setEditingItem}
-                loadData={loadData}
-              />
-              </ModuleErrorBoundary>
-            )}
-
-            {/* INVENTORY TAB */}
-            {activeTab === 'inventory' && (
-              <ModuleErrorBoundary moduleName="المخزون">
-                <div className="p-4 space-y-6">
-                <header className="flex justify-between items-center">
-                  <div>
-                    <h2 className="text-3xl font-black">إدارة المخزون</h2>
-                    <p className="text-muted-foreground text-sm">متابعة الأرصدة، مستويات الطلب، وهندسة تكاليف الأصناف.</p>
-                  </div>
-                  <div className="flex gap-1 p-1 bg-secondary/50 rounded-2xl">
-                    <Button variant={activeSubView === 'stock' ? 'default' : 'ghost'} size="sm" onClick={() => setActiveSubView('stock')} className={activeSubView === 'stock' ? 'gradient-bg text-white shadow-md' : 'text-muted-foreground'}>أرصدة المخزن</Button>
-                    <Button variant={activeSubView === 'bom' ? 'default' : 'ghost'} size="sm" onClick={() => setActiveSubView('bom')} className={activeSubView === 'bom' ? 'gradient-bg text-white shadow-md' : 'text-muted-foreground'}>تكاليف الـ BOM</Button>
-                  </div>
-                </header>
-                {activeSubView === 'stock' ? <InventoryTab restaurantId={restaurant!.id} currency={currency} businessType={businessType} /> : <BOMManager restaurantId={restaurant!.id} currency={currency} />}
-              </div>
-              </ModuleErrorBoundary>
-            )}
-
-            {activeTab === 'inventory_receipts' && <InventoryReceiptsManager restaurantId={restaurant!.id} currency={currency} />}
-            {activeTab === 'purchase_invoices' && <PurchaseInvoices restaurantId={restaurant!.id} currency={currency} />}
-            {activeTab === 'purchase_orders' && <PurchaseOrders restaurantId={restaurant!.id} currency={currency} />}
-            {activeTab === 'orders' && <SalesOrders restaurantId={restaurant!.id} currency={currency} />}
-            {activeTab === 'sales_orders' && <SalesOrders restaurantId={restaurant!.id} currency={currency} />}
-            {activeTab === 'sales_invoices' && <SalesInvoices restaurantId={restaurant!.id} currency={currency} />}
-            {activeTab === 'treasury' && <TreasuryTab restaurantId={restaurant!.id} currency={currency} />}
-            {activeTab === 'users' && <StaffTab restaurantId={restaurant!.id} currency={currency} />}
-            {activeTab === 'crm' && <AuditryCRM restaurantId={restaurant!.id} currency={currency} />}
-            
-            {activeTab === 'customers' && <CustomerManager restaurantId={restaurant!.id} currency={currency} />}
-            {activeTab === 'suppliers' && <SupplierManager restaurantId={restaurant!.id} currency={currency} />}
-            
-            {activeTab === 'customer_accounts' && <CustomersTab restaurantId={restaurant!.id} currency={currency} />}
-            {activeTab === 'supplier_accounts' && <SuppliersTab restaurantId={restaurant!.id} currency={currency} />}
-            
-            {activeTab === 'expenses' && (
-              <ModuleErrorBoundary moduleName="المصروفات">
-                <ExpensesTab restaurantId={restaurant!.id} currency={currency} />
-              </ModuleErrorBoundary>
-            )}
-            {activeTab === 'financials' && (
-              <ModuleErrorBoundary moduleName="التقارير المالية">
-                <FinancialsTab restaurantId={restaurant!.id} currency={currency} businessType={businessType} />
-              </ModuleErrorBoundary>
-            )}
-            {activeTab === 'projects' && (
-              <ModuleErrorBoundary moduleName="إدارة المشاريع">
-                <ContractingDashboard restaurantId={restaurant!.id} currency={currency} />
-              </ModuleErrorBoundary>
-            )}
-            {activeTab === 'manual_journal' && (
-              <ModuleErrorBoundary moduleName="قيود اليومية">
-                <ManualJournalTab restaurantId={restaurant!.id} currency={currency} />
-              </ModuleErrorBoundary>
-            )}
-            {activeTab === 'chart_of_accounts' && (
-              <ModuleErrorBoundary moduleName="شجرة الحسابات">
-                <ChartOfAccountsTab restaurantId={restaurant!.id} currency={currency} />
-              </ModuleErrorBoundary>
-            )}
-            {activeTab === 'treasury' && (
-              <ModuleErrorBoundary moduleName="الخزينة والبنوك">
-                <TreasuryTab restaurantId={restaurant!.id} currency={currency} />
-              </ModuleErrorBoundary>
-            )}
-            {activeTab === 'fixed_assets' && (
-              <ModuleErrorBoundary moduleName="الأصول الثابتة">
-                <FixedAssetsTab restaurantId={restaurant!.id} currency={currency} />
-              </ModuleErrorBoundary>
-            )}
-            {activeTab === 'accounting_mapping' && (
-              <ModuleErrorBoundary moduleName="التوجيه المحاسبي">
-                <AccountingMappingTab restaurantId={restaurant!.id} currency={currency} />
-              </ModuleErrorBoundary>
-            )}
-            {activeTab === 'overheads' && <OverheadManager restaurantId={restaurant!.id} currency={currency} />}
-            
-            {activeTab === 'sales_returns' && (
-              <ModuleErrorBoundary moduleName="مرتجعات المبيعات">
-                <SalesReturnsManager restaurantId={restaurant!.id} currency={currency} />
-              </ModuleErrorBoundary>
-            )}
-            
-            {activeTab === 'delivery' && (
-              <ModuleErrorBoundary moduleName="التوصيل">
-                <DeliveryTab 
-                restaurantId={restaurant!.id} 
-                agents={agents} 
-                setAgents={setAgents} 
-                deliveryOrders={deliveryOrders} 
-                onAssignAgent={onAssignAgent} 
-              />
-              </ModuleErrorBoundary>
-            )}
-            {activeTab === 'shifts' && <ShiftsTab restaurant={restaurant!} currentShift={currentShift} setCurrentShift={setCurrentShift} profileName={profileName} userId={user!.id} todayRevenue={todayRevenue} todayOrdersCount={todayOrders.length} />}
-            
-            {activeTab === 'stats' && (
-              <ModuleErrorBoundary moduleName="الإحصائيات">
-                <div className="p-4 h-full">
-                  <AdvancedReportsHub restaurantId={restaurant!.id} currency={currency} onNavigate={(t) => setActiveTab(t as any)} />
-                </div>
-              </ModuleErrorBoundary>
-            )}
-            
-            {activeTab === 'analytics' && <AdvancedReportsHub restaurantId={restaurant!.id} currency={currency} onNavigate={(t) => setActiveTab(t as any)} />}
-            
-            {activeTab === 'ai_assistant' && (
-              <ModuleErrorBoundary moduleName="مساعد المحاسب (AI)">
-                <AIAccountantUnified restaurantId={restaurant!.id} />
-              </ModuleErrorBoundary>
-            )}
-            
-            {activeTab === 'staff' && <StaffTab restaurantId={restaurant!.id} currency={currency} />}
-            {activeTab === 'notifications' && <NotificationsTab restaurantId={restaurant!.id} />}
-            
-            {activeTab === 'settings' && (
-              <SettingsTab 
-                restaurant={restaurant!} 
-                businessType={businessType} 
-                profileName={profileName} 
-                user={user} 
-                agents={agents} 
-                isSuspended={isSuspended} 
-                isSuperAdmin={isSuperAdmin} 
-                loadData={loadData} 
-              />
-            )}
-            
-            {activeTab === 'qr' && (
-              <div className="p-10 flex flex-col items-center justify-center space-y-8 bg-card/30 rounded-3xl border-2 border-dashed border-primary/20 m-4">
-                 <div className="p-8 bg-white rounded-3xl shadow-2xl scale-110">
-                    <QRCodeSVG value={`${window.location.origin}/menu/${restaurant!.id}`} size={250} level="H" />
-                 </div>
-                 <div className="text-center space-y-4">
-                    <h3 className="text-3xl font-black">كود المنيو الذكي (QR Menu)</h3>
-                    <p className="text-muted-foreground max-w-md">وجه الكاميرا لمسح الكود واستعراض المنيو بشكل تفاعلي سريع.</p>
-                    <div className="flex gap-3 justify-center">
-                       <Button className="gradient-bg border-0 text-white rounded-xl px-8" onClick={() => window.open(`${window.location.origin}/menu/${restaurant!.id}`, '_blank')}>معاينة القائمة</Button>
-                       <Button variant="outline" className="rounded-xl px-8" onClick={() => window.print()}>طباعة الكود</Button>
-                    </div>
-                 </div>
-              </div>
-            )}
-            
-{activeTab === 'waiter' && (
-                <div className="p-6 space-y-6">
-                  <h2 className="text-3xl font-black">طلبات الجرسون (Waiter Calls)</h2>
-                  {waiterCalls.length === 0 ? (
-                    <div className="py-20 text-center text-muted-foreground italic border-2 border-dashed rounded-3xl">لا توجد نداءات حالياً</div>
-                  ) : (
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                       {waiterCalls.map(call => (
-                         <Card key={call.id} className={`p-6 glass-card border-2 transition-all ${call.acknowledged ? 'opacity-50' : 'border-primary shadow-lg shadow-primary/10 animate-pulse'}`}>
-                         </Card>
-                       ))}
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {activeTab === 'kds' && (
-              <ModuleErrorBoundary moduleName="عرض المطبخ">
-                <KitchenDisplay restaurantId={restaurant!.id} />
-              </ModuleErrorBoundary>
-            )}
-            {activeTab === 'loyalty' && <LoyaltyPoints restaurantId={restaurant!.id} />}
-            {activeTab === 'gift_cards' && <GiftCards restaurantId={restaurant!.id} />}
-            {activeTab === 'branches' && <BranchManager restaurantId={restaurant!.id} />}
-
-            </Suspense>
-          </Suspense>
+            {activeTabContent}
           </div>
         </main>
       </div>

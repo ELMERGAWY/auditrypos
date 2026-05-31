@@ -57,22 +57,42 @@ export function AuditryCRM({ restaurantId, currency }: Props) {
   const loadCRMData = async () => {
     try {
       setLoading(true);
-      const [customersRes, suppliersRes, leadsRes, logsRes, tasksRes] = await Promise.all([
-        supabase.from('customers').select('*').eq('restaurant_id', restaurantId).order('total_spent', { ascending: false }),
+      // Fetch customers with their orders and transactions to calculate accurate CRM data
+      const { data: customersData, error: custError } = await supabase
+        .from('customers')
+        .select(`
+          *,
+          orders(id, total, created_at, status),
+          customer_transactions(id, amount, type, created_at)
+        `)
+        .eq('restaurant_id', restaurantId);
+
+      if (custError) throw custError;
+
+      const [suppliersRes, leadsRes, logsRes, tasksRes] = await Promise.all([
         supabase.from('suppliers').select('*').eq('restaurant_id', restaurantId).order('total_purchases', { ascending: false }),
         supabase.from('crm_leads').select('*').eq('restaurant_id', restaurantId),
         supabase.from('crm_communication_logs').select('*').eq('restaurant_id', restaurantId).order('contact_date', { ascending: false }).limit(20),
         supabase.from('crm_tasks').select('*').eq('restaurant_id', restaurantId).order('due_date', { ascending: true })
       ]);
       
-      if (customersRes.data) setCustomers(customersRes.data);
+      if (customersData) {
+        const formatted = customersData.map((c: any) => ({
+          ...c,
+          total_spent: c.orders?.filter((o: any) => o.status === 'completed').reduce((sum: number, o: any) => sum + Number(o.total), 0) || 0,
+          loyalty_points: c.loyalty_points || 0,
+          last_order_date: c.orders?.sort((a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())[0]?.created_at
+        }));
+        setCustomers(formatted.sort((a, b) => b.total_spent - a.total_spent));
+      }
+      
       if (suppliersRes.data) setSuppliers(suppliersRes.data);
       if (leadsRes.data) setLeads(leadsRes.data);
       if (logsRes.data) setLogs(logsRes.data);
       if (tasksRes.data) setTasks(tasksRes.data);
     } catch (err) {
       console.error(err);
-      toast.error('حدث خطأ أثناء تحميل البيانات');
+      toast.error('حدث خطأ أثناء تحميل بيانات CRM');
     } finally {
       setLoading(false);
     }
