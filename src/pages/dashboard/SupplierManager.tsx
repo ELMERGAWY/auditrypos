@@ -135,17 +135,8 @@ export function SupplierManager({ restaurantId, currency }: Props) {
         )[0];
 
         return {
-          id: s.id,
-          name: s.name,
-          phone: s.phone,
-          email: s.email,
-          address: s.address,
+          ...s,
           balance: Number(s.balance) || 0,
-          credit_limit: s.credit_limit,
-          tax_number: s.tax_number,
-          contact_person: s.contact_person,
-          payment_terms: s.payment_terms,
-          created_at: s.created_at,
           last_transaction_date: lastTx?.created_at,
           total_purchases: purchases
         };
@@ -161,8 +152,8 @@ export function SupplierManager({ restaurantId, currency }: Props) {
 
   const loadSupplierStatement = async (supplierId: string) => {
     try {
-      // Get inventory receipts with items (more detailed for statements)
-      const { data: receipts } = await supabase
+      // Get inventory receipts (purchases) with items
+      const { data: receiptsData } = await supabase
         .from('inventory_receipts')
         .select(`
           id, receipt_number, receipt_date, total_amount, tax_amount, net_amount, paid_amount, status,
@@ -172,22 +163,24 @@ export function SupplierManager({ restaurantId, currency }: Props) {
         .eq('status', 'posted')
         .order('receipt_date', { ascending: true });
 
-      // Get supplier transactions (payments)
-      const { data: payments } = await supabase
+      // Get supplier transactions (payments, etc.)
+      // Filter out redundant 'purchase' or 'sale' types if they exist
+      const { data: transactionsData } = await supabase
         .from('supplier_transactions')
         .select('id, amount, type, description, created_at')
         .eq('supplier_id', supplierId)
+        .neq('type', 'purchase')
         .order('created_at', { ascending: true });
 
       // Build statement
-      let runningBalance = 0;
       const statement: SupplierTransaction[] = [];
 
-      // Add receipts as debits (What we owe)
-      receipts?.forEach((receipt: any) => {
+      // Add receipts (Purchases)
+      receiptsData?.forEach((receipt: any) => {
         const totalAmount = Number(receipt.net_amount || receipt.total_amount);
-        const paidAmount = Number(receipt.paid_amount || 0);
+        const paidAtReceipt = Number(receipt.paid_amount || 0);
 
+        // 1. Add the Purchase as a DEBIT (What we owe them)
         statement.push({
           id: receipt.id,
           date: receipt.receipt_date,
@@ -196,12 +189,12 @@ export function SupplierManager({ restaurantId, currency }: Props) {
           description: 'فاتورة مشتريات / استلام',
           debit: totalAmount,
           credit: 0,
-          balance: 0, // Will be recalculated
+          balance: 0,
           items: receipt.inventory_receipt_items
         });
 
-        // If paid during receipt, add payment record as credit
-        if (paidAmount > 0) {
+        // 2. Add the payment made during receipt as a CREDIT (What we paid)
+        if (paidAtReceipt > 0) {
           statement.push({
             id: `${receipt.id}-payment`,
             date: receipt.receipt_date,
@@ -209,63 +202,40 @@ export function SupplierManager({ restaurantId, currency }: Props) {
             reference: receipt.receipt_number,
             description: 'سداد دفعة مقدمة (المشتريات)',
             debit: 0,
-            credit: paidAmount,
-            balance: 0 // Will be recalculated
+            credit: paidAtReceipt,
+            balance: 0
           });
         }
       });
 
-      // Get purchase returns
-      const { data: returnsData } = await supabase
-        .from('purchase_returns')
-        .select('id, return_number, return_date, total_amount, status')
-        .eq('supplier_id', supplierId)
-        .eq('status', 'completed')
-        .order('return_date', { ascending: true });
-
-      // Add purchase returns as credits
-      returnsData?.forEach((ret: any) => {
-        const amount = Number(ret.total_amount);
+      // Add other transactions (subsequent payments, returns, etc.)
+      transactionsData?.forEach((tx: any) => {
+        const amount = Number(tx.amount);
         statement.push({
-          id: ret.id,
-          date: ret.return_date,
-          type: 'return',
-          reference: ret.return_number,
-          description: 'مردود مشتريات',
-          debit: 0,
-          credit: amount,
-          balance: 0 // Will be recalculated
-        });
-      });
-
-      // Add payments as credits
-      payments?.forEach((payment: any) => {
-        const amount = Number(payment.amount);
-        statement.push({
-          id: payment.id,
-          date: payment.created_at,
-          type: payment.type as any,
+          id: tx.id,
+          date: tx.created_at,
+          type: tx.type as any,
           reference: '',
-          description: payment.description || 'سداد',
-          debit: 0,
-          credit: amount,
-          balance: 0 // Will be recalculated
+          description: tx.description || (tx.type === 'payment' ? 'سداد للمورد' : 'تسوية'),
+          debit: tx.type === 'debit' ? amount : 0,
+          credit: tx.type !== 'debit' ? amount : 0,
+          balance: 0
         });
       });
 
-      // Sort by date
+      // Sort by date then calculate cumulative balance
       statement.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
       
-      // Recalculate running balance
-      let balance = 0;
+      let runningBalance = 0;
       statement.forEach(tx => {
-        balance += Number(tx.debit || 0) - Number(tx.credit || 0);
-        tx.balance = balance;
+        runningBalance += (Number(tx.debit) || 0) - (Number(tx.credit) || 0);
+        tx.balance = runningBalance;
       });
 
       setTransactions(statement);
     } catch (error: any) {
-      toast.error('فشل تحميل كشف الحساب: ' + error.message);
+      console.error('Failed to load supplier statement:', error);
+      toast.error('فشل تحميل كشف حساب المورد: ' + error.message);
     }
   };
 

@@ -100,10 +100,10 @@ export function CustomerManager({ restaurantId, currency }: Props) {
       if (error) throw error;
 
       const formattedCustomers: Customer[] = (data || []).map((c: any) => {
-        const sales = c.orders?.filter((o: any) => o.status !== 'cancelled')
+        const sales = (c.orders || []).filter((o: any) => o.status !== 'cancelled')
           .reduce((sum: number, o: any) => sum + Number(o.total), 0) || 0;
         
-        const lastTx = c.customer_transactions?.sort((a: any, b: any) => 
+        const lastTx = (c.customer_transactions || []).sort((a: any, b: any) => 
           new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
         )[0];
 
@@ -133,7 +133,7 @@ export function CustomerManager({ restaurantId, currency }: Props) {
   const loadCustomerStatement = async (customerId: string) => {
     try {
       // Get orders (invoices) with items
-      const { data: orders } = await supabase
+      const { data: ordersData } = await supabase
         .from('orders')
         .select(`
           id, order_number, created_at, total, paid_amount, status,
@@ -143,24 +143,25 @@ export function CustomerManager({ restaurantId, currency }: Props) {
         .eq('restaurant_id', restaurantId)
         .order('created_at', { ascending: true });
 
-      // Get customer transactions (payments)
-      const { data: payments } = await supabase
+      // Get customer transactions (subsequent payments)
+      // We filter out 'sale' type because we already add the full order total as debit
+      const { data: paymentsData } = await supabase
         .from('customer_transactions')
-        .select('id, amount, type, description, created_at')
+        .select('id, amount, type, description, created_at, order_id')
         .eq('customer_id', customerId)
+        .neq('type', 'sale') // CRITICAL: 'sale' in transactions is redundant with 'orders' table
         .order('created_at', { ascending: true });
 
       // Build statement
-      let runningBalance = 0;
       const statement: CustomerTransaction[] = [];
 
-      // Add orders as debits
-      orders?.forEach((order: any) => {
+      // Add orders and their immediate payments
+      ordersData?.forEach((order: any) => {
         if (order.status !== 'cancelled') {
           const totalAmount = Number(order.total);
-          const paidAmount = Number(order.paid_amount || 0);
+          const paidAtCheckout = Number(order.paid_amount || 0);
           
-          // The order is a debit for the total amount
+          // 1. Add the Invoice as a DEBIT (What they owe)
           statement.push({
             id: order.id,
             date: order.created_at,
@@ -169,53 +170,53 @@ export function CustomerManager({ restaurantId, currency }: Props) {
             description: 'فاتورة مبيعات',
             debit: totalAmount,
             credit: 0,
-            balance: 0, // Will be recalculated
+            balance: 0,
             items: order.order_items
           });
 
-          // If there was a payment at the time of invoice, it's a credit
-          if (paidAmount > 0) {
+          // 2. Add the payment made at checkout as a CREDIT (What they paid)
+          if (paidAtCheckout > 0) {
             statement.push({
               id: `${order.id}-payment`,
               date: order.created_at,
               type: 'payment',
               reference: order.order_number,
-              description: 'سداد دفعة مقدمة (الفاتورة)',
+              description: 'سداد دفعة مقدمة (عند الفاتورة)',
               debit: 0,
-              credit: paidAmount,
-              balance: 0 // Will be recalculated
+              credit: paidAtCheckout,
+              balance: 0
             });
           }
         }
       });
 
-      // Add payments from customer_transactions as credits
-      payments?.forEach((payment: any) => {
+      // Add other transactions (subsequent payments, returns, etc.)
+      paymentsData?.forEach((payment: any) => {
         const amount = Number(payment.amount);
         statement.push({
           id: payment.id,
           date: payment.created_at,
           type: payment.type as any,
           reference: '',
-          description: payment.description || 'سداد',
-          debit: 0,
-          credit: amount,
-          balance: 0 // Will be recalculated
+          description: payment.description || (payment.type === 'payment' ? 'سداد' : 'تسوية'),
+          debit: payment.type === 'debit' ? amount : 0,
+          credit: payment.type !== 'debit' ? amount : 0,
+          balance: 0
         });
       });
 
-      // Sort by date
+      // Sort by date then calculate cumulative balance
       statement.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
       
-      // Recalculate running balance in correct order
-      let balance = 0;
+      let runningBalance = 0;
       statement.forEach(tx => {
-        balance += Number(tx.debit || 0) - Number(tx.credit || 0);
-        tx.balance = balance;
+        runningBalance += (Number(tx.debit) || 0) - (Number(tx.credit) || 0);
+        tx.balance = runningBalance;
       });
 
       setTransactions(statement);
     } catch (error: any) {
+      console.error('Failed to load statement:', error);
       toast.error('فشل تحميل كشف الحساب: ' + error.message);
     }
   };

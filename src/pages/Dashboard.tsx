@@ -135,7 +135,7 @@ export default function Dashboard() {
     return options;
   }, []);
 
-  const cartSubtotal = useMemo(() => cart.reduce((s, c) => {
+  const cartSubtotal = useMemo(() => (cart || []).reduce((s, c) => {
     const units = getUnitOptions(c.item);
     const unitFactor = units.find(u => u.label === c.unitMode)?.factor || 1;
     return s + (c.item.price * unitFactor * c.qty);
@@ -143,23 +143,23 @@ export default function Dashboard() {
   
   const discountAmount = useMemo(() => discountType === 'percent' ? (cartSubtotal * Number(discount || 0)) / 100 : Number(discount || 0), [cartSubtotal, discount, discountType]);
   const taxableAmount = useMemo(() => Math.max(0, cartSubtotal - discountAmount), [cartSubtotal, discountAmount]);
-  const totalTax = useMemo(() => taxes.reduce((sum, tax) => (!tax.is_included_in_price ? sum + (taxableAmount * (tax.rate / 100)) : sum), 0), [taxes, taxableAmount]);
+  const totalTax = useMemo(() => (taxes || []).reduce((sum, tax) => (!tax.is_included_in_price ? sum + (taxableAmount * (tax.rate / 100)) : sum), 0), [taxes, taxableAmount]);
   const cartTotal = useMemo(() => taxableAmount + totalTax, [taxableAmount, totalTax]);
   const paidNum = useMemo(() => Number(paidAmount || 0), [paidAmount]);
   const remaining = useMemo(() => Math.max(0, cartTotal - paidNum), [cartTotal, paidNum]);
 
-  const pendingOrders = orders.filter(o => o.status === 'pending' || o.status === 'preparing');
-  const deliveryOrders = orders.filter(o => (o.order_type === 'delivery' || o.delivery_agent_id) && o.status !== 'completed' && o.status !== 'cancelled');
-  const filteredOrders = useMemo(() => orderFilter === 'all' ? orders : orders.filter(o => o.status === orderFilter), [orders, orderFilter]);
-  const categories = useMemo(() => ['all', ...new Set(menuItems.map(item => item.category))], [menuItems]);
-  const filteredItems = useMemo(() => menuItems.filter(item => {
+  const pendingOrders = (orders || []).filter(o => o.status === 'pending' || o.status === 'preparing');
+  const deliveryOrders = (orders || []).filter(o => (o.order_type === 'delivery' || o.delivery_agent_id) && o.status !== 'completed' && o.status !== 'cancelled');
+  const filteredOrders = useMemo(() => orderFilter === 'all' ? (orders || []) : (orders || []).filter(o => o.status === orderFilter), [orders, orderFilter]);
+  const categories = useMemo(() => ['all', ...new Set((menuItems || []).map(item => item.category))], [menuItems]);
+  const filteredItems = useMemo(() => (menuItems || []).filter(item => {
     const matchesCategory = selectedCategory === 'all' || item.category === selectedCategory;
     const matchesSearch = item.name.toLowerCase().includes(searchQuery.toLowerCase()) || (item.barcode && item.barcode.includes(searchQuery));
     return matchesCategory && matchesSearch && item.available;
   }), [menuItems, selectedCategory, searchQuery]);
 
-  const todayOrdersList = useMemo(() => (orders || []).filter(o => new Date(o.created_at).toDateString() === new Date().toDateString()), [orders]);
-  const todayRevenue = useMemo(() => todayOrdersList.filter(o => o.status !== 'cancelled').reduce((sum, o) => sum + Number(o.total || 0), 0), [todayOrdersList]);
+  const todayOrdersList = useMemo(() => Array.isArray(orders) ? orders.filter(o => new Date(o.created_at).toDateString() === new Date().toDateString()) : [], [orders]);
+  const todayRevenue = useMemo(() => todayOrdersList.length > 0 ? todayOrdersList.filter(o => o.status !== 'cancelled').reduce((sum, o) => sum + Number(o.total || 0), 0) : 0, [todayOrdersList]);
   const avgOrderValue = useMemo(() => todayOrdersList.length > 0 ? Number((todayRevenue / todayOrdersList.length).toFixed(2)) : 0, [todayRevenue, todayOrdersList.length]);
 
   // Handlers
