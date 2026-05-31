@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { journalService } from '@/lib/accounting/journalService';
+import { CustomerSearch } from './CustomerSearch';
 
 interface Invoice {
   id: string;
@@ -202,8 +203,13 @@ export function SalesInvoices({ restaurantId, currency }: Props) {
               
               <div className="space-y-4">
                 <div>
-                  <Label>اسم العميل</Label>
-                  <Input placeholder="اسم العميل أو الشركة" value={form.customer_name} onChange={e => setForm({...form, customer_name: e.target.value})} />
+                  <Label className="mb-2 block">اسم العميل</Label>
+                  <CustomerSearch
+                    restaurantId={restaurantId}
+                    value={form.customer_name}
+                    onChange={(name) => setForm({ ...form, customer_name: name })}
+                    placeholder="ابحث عن عميل أو أدخل اسم جديد..."
+                  />
                 </div>
 
                 <div>
