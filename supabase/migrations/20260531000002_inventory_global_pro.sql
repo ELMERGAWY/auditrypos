@@ -15,6 +15,7 @@ CREATE TABLE IF NOT EXISTS public.warehouses (
 -- 2. Multi-Warehouse Stock Tracking
 CREATE TABLE IF NOT EXISTS public.warehouse_stock (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    restaurant_id UUID REFERENCES public.restaurants(id) ON DELETE CASCADE,
     warehouse_id UUID REFERENCES public.warehouses(id) ON DELETE CASCADE,
     product_id UUID REFERENCES public.products(id) ON DELETE CASCADE,
     quantity DECIMAL(15,3) DEFAULT 0,
@@ -49,6 +50,7 @@ CREATE TABLE IF NOT EXISTS public.inventory_transfers (
 
 CREATE TABLE IF NOT EXISTS public.inventory_transfer_items (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    restaurant_id UUID REFERENCES public.restaurants(id) ON DELETE CASCADE,
     transfer_id UUID REFERENCES public.inventory_transfers(id) ON DELETE CASCADE,
     product_id UUID REFERENCES public.products(id) ON DELETE CASCADE,
     quantity DECIMAL(15,3) NOT NULL,
@@ -61,6 +63,17 @@ ALTER TABLE public.warehouse_stock ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.inventory_landed_costs ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.inventory_transfers ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.inventory_transfer_items ENABLE ROW LEVEL SECURITY;
+
+-- Ensure restaurant_id exists on all relevant tables for RLS
+DO $$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='warehouse_stock' AND column_name='restaurant_id') THEN
+        ALTER TABLE public.warehouse_stock ADD COLUMN restaurant_id UUID REFERENCES public.restaurants(id) ON DELETE CASCADE;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='inventory_transfer_items' AND column_name='restaurant_id') THEN
+        ALTER TABLE public.inventory_transfer_items ADD COLUMN restaurant_id UUID REFERENCES public.restaurants(id) ON DELETE CASCADE;
+    END IF;
+END $$;
 
 -- Owner Policies
 DO $$
