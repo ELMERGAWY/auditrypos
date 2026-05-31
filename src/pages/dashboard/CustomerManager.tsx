@@ -11,9 +11,11 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { 
   Users, Plus, Search, Phone, MapPin, FileText, TrendingUp, 
   TrendingDown, Wallet, Download, CreditCard, AlertCircle, Receipt,
-  ArrowRight, Calendar, Eye
+  ArrowRight, Calendar, Eye, FileJson
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
+import jsPDF from 'jspdf';
+import 'jspdf-autotable';
 
 interface Customer {
   id: string;
@@ -287,6 +289,42 @@ export function CustomerManager({ restaurantId, currency }: Props) {
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, 'كشف حساب');
     XLSX.writeFile(workbook, `كشف_حساب_${selectedCustomer?.name}_${new Date().toISOString().split('T')[0]}.xlsx`);
+  };
+
+  const exportStatementPDF = () => {
+    if (!selectedCustomer) return;
+    
+    const doc = new jsPDF({ orientation: 'p', unit: 'mm', format: 'a4' });
+    
+    // Add title and customer info
+    doc.setFontSize(20);
+    doc.text('Statement of Account / كشف حساب', 105, 15, { align: 'center' });
+    
+    doc.setFontSize(12);
+    doc.text(`Customer: ${selectedCustomer.name}`, 190, 30, { align: 'right' });
+    doc.text(`Date: ${new Date().toLocaleDateString('ar-EG')}`, 190, 37, { align: 'right' });
+    doc.text(`Balance: ${selectedCustomer.balance.toFixed(2)} ${currency}`, 190, 44, { align: 'right' });
+
+    const tableData = transactions.map(t => [
+      t.balance.toFixed(2),
+      t.credit > 0 ? t.credit.toFixed(2) : '-',
+      t.debit > 0 ? t.debit.toFixed(2) : '-',
+      t.reference || '-',
+      t.type === 'invoice' ? 'Invoice' : 'Payment',
+      new Date(t.date).toLocaleDateString('ar-EG')
+    ]);
+
+    (doc as any).autoTable({
+      startY: 55,
+      head: [['Balance', 'Credit', 'Debit', 'Ref', 'Type', 'Date']],
+      body: tableData,
+      theme: 'striped',
+      headStyles: { fillColor: [41, 128, 185], textColor: 255 },
+      styles: { fontSize: 10, cellPadding: 3 },
+      columnStyles: { 0: { fontStyle: 'bold' } }
+    });
+
+    doc.save(`statement_${selectedCustomer.name}.pdf`);
   };
 
   const filteredCustomers = useMemo(() => {
@@ -572,9 +610,14 @@ export function CustomerManager({ restaurantId, currency }: Props) {
           <DialogHeader>
             <DialogTitle className="flex items-center justify-between">
               <span>كشف حساب: {selectedCustomer?.name}</span>
-              <Button variant="outline" size="sm" onClick={exportStatement}>
-                <Download className="w-4 h-4 ml-1" /> تصدير
-              </Button>
+              <div className="flex gap-2">
+                <Button variant="outline" size="sm" onClick={exportStatement}>
+                  <Download className="w-4 h-4 ml-1" /> Excel
+                </Button>
+                <Button variant="outline" size="sm" onClick={exportStatementPDF} className="border-red-200 text-red-600 hover:bg-red-50">
+                  <FileJson className="w-4 h-4 ml-1" /> PDF
+                </Button>
+              </div>
             </DialogTitle>
           </DialogHeader>
           <div className="mt-4">

@@ -10,9 +10,11 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { 
   Truck, Plus, Search, Phone, MapPin, FileText, TrendingUp, 
   TrendingDown, Wallet, Download, CreditCard, AlertCircle, Receipt,
-  ArrowRight, Package, DollarSign, Eye, Banknote
+  ArrowRight, Package, DollarSign, Eye, Banknote, FileJson
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
+import jsPDF from 'jspdf';
+import 'jspdf-autotable';
 
 interface Supplier {
   id: string;
@@ -312,6 +314,41 @@ export function SupplierManager({ restaurantId, currency }: Props) {
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, 'كشف حساب');
     XLSX.writeFile(workbook, `كشف_حساب_مورد_${selectedSupplier?.name}_${new Date().toISOString().split('T')[0]}.xlsx`);
+  };
+
+  const exportStatementPDF = () => {
+    if (!selectedSupplier) return;
+    
+    const doc = new jsPDF({ orientation: 'p', unit: 'mm', format: 'a4' });
+    
+    doc.setFontSize(20);
+    doc.text('Supplier Statement / كشف حساب مورد', 105, 15, { align: 'center' });
+    
+    doc.setFontSize(12);
+    doc.text(`Supplier: ${selectedSupplier.name}`, 190, 30, { align: 'right' });
+    doc.text(`Date: ${new Date().toLocaleDateString('ar-EG')}`, 190, 37, { align: 'right' });
+    doc.text(`Outstanding Balance: ${selectedSupplier.balance.toFixed(2)} ${currency}`, 190, 44, { align: 'right' });
+
+    const tableData = transactions.map(t => [
+      t.balance.toFixed(2),
+      t.credit > 0 ? t.credit.toFixed(2) : '-',
+      t.debit > 0 ? t.debit.toFixed(2) : '-',
+      t.reference || '-',
+      t.type === 'purchase' ? 'Purchase' : t.type === 'return' ? 'Return' : 'Payment',
+      new Date(t.date).toLocaleDateString('ar-EG')
+    ]);
+
+    (doc as any).autoTable({
+      startY: 55,
+      head: [['Balance', 'Credit', 'Debit', 'Ref', 'Type', 'Date']],
+      body: tableData,
+      theme: 'grid',
+      headStyles: { fillColor: [44, 62, 80], textColor: 255 },
+      styles: { fontSize: 10, cellPadding: 3 },
+      columnStyles: { 0: { fontStyle: 'bold' } }
+    });
+
+    doc.save(`supplier_statement_${selectedSupplier.name}.pdf`);
   };
 
   const filteredSuppliers = useMemo(() => {
@@ -632,9 +669,14 @@ export function SupplierManager({ restaurantId, currency }: Props) {
           <DialogHeader>
             <DialogTitle className="flex items-center justify-between">
               <span>كشف حساب: {selectedSupplier?.name}</span>
-              <Button variant="outline" size="sm" onClick={exportStatement}>
-                <Download className="w-4 h-4 ml-1" /> تصدير
-              </Button>
+              <div className="flex gap-2">
+                <Button variant="outline" size="sm" onClick={exportStatement}>
+                  <Download className="w-4 h-4 ml-1" /> Excel
+                </Button>
+                <Button variant="outline" size="sm" onClick={exportStatementPDF} className="border-red-200 text-red-600 hover:bg-red-50">
+                  <FileJson className="w-4 h-4 ml-1" /> PDF
+                </Button>
+              </div>
             </DialogTitle>
           </DialogHeader>
           <div className="mt-4">
