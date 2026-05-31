@@ -41,6 +41,7 @@ interface SupplierTransaction {
   debit: number;
   credit: number;
   balance: number;
+  items?: any[];
 }
 
 interface SupplierPurchaseReturn {
@@ -160,13 +161,16 @@ export function SupplierManager({ restaurantId, currency }: Props) {
 
   const loadSupplierStatement = async (supplierId: string) => {
     try {
-      // Get purchase invoices
-      const { data: invoices } = await supabase
-        .from('purchase_invoices')
-        .select('id, invoice_number, invoice_date, total_amount, tax_amount, net_amount, paid_amount, status')
+      // Get inventory receipts with items (more detailed for statements)
+      const { data: receipts } = await supabase
+        .from('inventory_receipts')
+        .select(`
+          id, receipt_number, receipt_date, total_amount, tax_amount, net_amount, paid_amount, status,
+          inventory_receipt_items(product_name, quantity, unit_price)
+        `)
         .eq('supplier_id', supplierId)
         .eq('status', 'posted')
-        .order('invoice_date', { ascending: true });
+        .order('receipt_date', { ascending: true });
 
       // Get supplier transactions (payments)
       const { data: payments } = await supabase
@@ -175,6 +179,27 @@ export function SupplierManager({ restaurantId, currency }: Props) {
         .eq('supplier_id', supplierId)
         .order('created_at', { ascending: true });
 
+      // Build statement
+      let runningBalance = 0;
+      const statement: SupplierTransaction[] = [];
+
+      // Add receipts as debits
+      receipts?.forEach((receipt: any) => {
+        const amount = Number(receipt.net_amount || receipt.total_amount);
+        runningBalance += amount;
+        statement.push({
+          id: receipt.id,
+          date: receipt.receipt_date,
+          type: 'purchase',
+          reference: receipt.receipt_number,
+          description: 'فاتورة مشتريات / استلام',
+          debit: amount,
+          credit: 0,
+          balance: runningBalance,
+          items: receipt.inventory_receipt_items
+        });
+      });
+
       // Get purchase returns
       const { data: returnsData } = await supabase
         .from('purchase_returns')
@@ -182,26 +207,6 @@ export function SupplierManager({ restaurantId, currency }: Props) {
         .eq('supplier_id', supplierId)
         .eq('status', 'completed')
         .order('return_date', { ascending: true });
-
-      // Build statement
-      let runningBalance = 0;
-      const statement: SupplierTransaction[] = [];
-
-      // Add purchases as debits (we owe supplier)
-      invoices?.forEach((invoice: any) => {
-        const amount = Number(invoice.net_amount || invoice.total_amount);
-        runningBalance += amount;
-        statement.push({
-          id: invoice.id,
-          date: invoice.invoice_date,
-          type: 'purchase',
-          reference: invoice.invoice_number,
-          description: 'فاتورة مشتريات',
-          debit: amount,
-          credit: 0,
-          balance: runningBalance
-        });
-      });
 
       // Add purchase returns as credits
       returnsData?.forEach((ret: any) => {
@@ -319,36 +324,80 @@ export function SupplierManager({ restaurantId, currency }: Props) {
   const exportStatementPDF = () => {
     if (!selectedSupplier) return;
     
-    const doc = new jsPDF({ orientation: 'p', unit: 'mm', format: 'a4' });
-    
-    doc.setFontSize(20);
-    doc.text('Supplier Statement / كشف حساب مورد', 105, 15, { align: 'center' });
-    
-    doc.setFontSize(12);
-    doc.text(`Supplier: ${selectedSupplier.name}`, 190, 30, { align: 'right' });
-    doc.text(`Date: ${new Date().toLocaleDateString('ar-EG')}`, 190, 37, { align: 'right' });
-    doc.text(`Outstanding Balance: ${selectedSupplier.balance.toFixed(2)} ${currency}`, 190, 44, { align: 'right' });
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) return;
 
-    const tableData = transactions.map(t => [
-      t.balance.toFixed(2),
-      t.credit > 0 ? t.credit.toFixed(2) : '-',
-      t.debit > 0 ? t.debit.toFixed(2) : '-',
-      t.reference || '-',
-      t.type === 'purchase' ? 'Purchase' : t.type === 'return' ? 'Return' : 'Payment',
-      new Date(t.date).toLocaleDateString('ar-EG')
-    ]);
+    const html = `
+      <html dir="rtl">
+        <head>
+          <title>كشف حساب مورد - ${selectedSupplier.name}</title>
+          <style>
+            body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; padding: 20px; }
+            h1 { text-align: center; color: #333; }
+            .header-info { margin-bottom: 30px; border-bottom: 2px solid #eee; padding-bottom: 10px; }
+            table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+            th, td { border: 1px solid #ddd; padding: 12px; text-align: right; }
+            th { background-color: #f8f9fa; font-weight: bold; }
+            .items-list { font-size: 0.85em; color: #666; margin-top: 5px; }
+            .debit { color: #dc3545; }
+            .credit { color: #28a745; }
+            .balance { font-weight: bold; }
+            @media print {
+              .no-print { display: none; }
+            }
+          </style>
+        </head>
+        <body>
+          <div class="header-info">
+            <h1>كشف حساب مورد</h1>
+            <p><strong>المورد:</strong> ${selectedSupplier.name}</p>
+            <p><strong>الهاتف:</strong> ${selectedSupplier.phone || '-'}</p>
+            <p><strong>التاريخ:</strong> ${new Date().toLocaleDateString('ar-EG')}</p>
+            <p><strong>الرصيد الحالي:</strong> ${selectedSupplier.balance.toFixed(2)} ${currency}</p>
+          </div>
+          <table>
+            <thead>
+              <tr>
+                <th>التاريخ</th>
+                <th>البيان</th>
+                <th>المرجع</th>
+                <th>مدين (لنا)</th>
+                <th>دائن (له)</th>
+                <th>الرصيد</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${transactions.map(t => `
+                <tr>
+                  <td>${new Date(t.date).toLocaleDateString('ar-EG')}</td>
+                  <td>
+                    ${t.description}
+                    ${t.items && t.items.length > 0 ? `
+                      <div class="items-list">
+                        ${t.items.map(i => `${i.product_name} (x${i.quantity})`).join('، ')}
+                      </div>
+                    ` : ''}
+                  </td>
+                  <td>${t.reference || '-'}</td>
+                  <td class="credit">${t.credit > 0 ? t.credit.toFixed(2) : '-'}</td>
+                  <td class="debit">${t.debit > 0 ? t.debit.toFixed(2) : '-'}</td>
+                  <td class="balance">${t.balance.toFixed(2)}</td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+          <script>
+            window.onload = () => {
+              window.print();
+              // window.close();
+            };
+          </script>
+        </body>
+      </html>
+    `;
 
-    (doc as any).autoTable({
-      startY: 55,
-      head: [['Balance', 'Credit', 'Debit', 'Ref', 'Type', 'Date']],
-      body: tableData,
-      theme: 'grid',
-      headStyles: { fillColor: [44, 62, 80], textColor: 255 },
-      styles: { fontSize: 10, cellPadding: 3 },
-      columnStyles: { 0: { fontStyle: 'bold' } }
-    });
-
-    doc.save(`supplier_statement_${selectedSupplier.name}.pdf`);
+    printWindow.document.write(html);
+    printWindow.document.close();
   };
 
   const filteredSuppliers = useMemo(() => {
@@ -712,9 +761,16 @@ export function SupplierManager({ restaurantId, currency }: Props) {
                   <tr key={idx} className="border-b border-border/50">
                     <td className="px-3 py-2">{new Date(tx.date).toLocaleDateString('ar-EG')}</td>
                     <td className="px-3 py-2">
-                      <Badge variant={tx.type === 'purchase' ? 'destructive' : tx.type === 'return' ? 'outline' : 'secondary'}>
-                        {tx.type === 'purchase' ? 'مشتريات' : tx.type === 'return' ? 'مردود' : 'سداد'}
-                      </Badge>
+                      <div>
+                        <Badge variant={tx.type === 'purchase' ? 'destructive' : tx.type === 'return' ? 'outline' : 'secondary'}>
+                          {tx.type === 'purchase' ? 'مشتريات' : tx.type === 'return' ? 'مردود' : 'سداد'}
+                        </Badge>
+                      </div>
+                      {tx.items && tx.items.length > 0 && (
+                        <div className="text-[10px] text-muted-foreground mt-1 bg-muted/30 p-1 rounded">
+                          {tx.items.map(i => `${i.product_name} (x${i.quantity})`).join('، ')}
+                        </div>
+                      )}
                     </td>
                     <td className="px-3 py-2">{tx.reference}</td>
                     <td className="px-3 py-2 text-destructive">{tx.debit > 0 ? tx.debit.toFixed(2) : '-'}</td>

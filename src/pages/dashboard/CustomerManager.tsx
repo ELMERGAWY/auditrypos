@@ -40,6 +40,7 @@ interface CustomerTransaction {
   debit: number;
   credit: number;
   balance: number;
+  items?: any[];
 }
 
 interface CustomerSalesReturn {
@@ -131,10 +132,13 @@ export function CustomerManager({ restaurantId, currency }: Props) {
 
   const loadCustomerStatement = async (customerId: string) => {
     try {
-      // Get orders (invoices)
+      // Get orders (invoices) with items
       const { data: orders } = await supabase
         .from('orders')
-        .select('id, order_number, created_at, total, paid_amount, status')
+        .select(`
+          id, order_number, created_at, total, paid_amount, status,
+          order_items(menu_item_name, quantity, price)
+        `)
         .eq('customer_id', customerId)
         .eq('restaurant_id', restaurantId)
         .order('created_at', { ascending: true });
@@ -163,7 +167,8 @@ export function CustomerManager({ restaurantId, currency }: Props) {
             description: 'فاتورة مبيعات',
             debit: amount,
             credit: 0,
-            balance: runningBalance
+            balance: runningBalance,
+            items: order.order_items
           });
         }
       });
@@ -294,37 +299,80 @@ export function CustomerManager({ restaurantId, currency }: Props) {
   const exportStatementPDF = () => {
     if (!selectedCustomer) return;
     
-    const doc = new jsPDF({ orientation: 'p', unit: 'mm', format: 'a4' });
-    
-    // Add title and customer info
-    doc.setFontSize(20);
-    doc.text('Statement of Account / كشف حساب', 105, 15, { align: 'center' });
-    
-    doc.setFontSize(12);
-    doc.text(`Customer: ${selectedCustomer.name}`, 190, 30, { align: 'right' });
-    doc.text(`Date: ${new Date().toLocaleDateString('ar-EG')}`, 190, 37, { align: 'right' });
-    doc.text(`Balance: ${selectedCustomer.balance.toFixed(2)} ${currency}`, 190, 44, { align: 'right' });
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) return;
 
-    const tableData = transactions.map(t => [
-      t.balance.toFixed(2),
-      t.credit > 0 ? t.credit.toFixed(2) : '-',
-      t.debit > 0 ? t.debit.toFixed(2) : '-',
-      t.reference || '-',
-      t.type === 'invoice' ? 'Invoice' : 'Payment',
-      new Date(t.date).toLocaleDateString('ar-EG')
-    ]);
+    const html = `
+      <html dir="rtl">
+        <head>
+          <title>كشف حساب - ${selectedCustomer.name}</title>
+          <style>
+            body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; padding: 20px; }
+            h1 { text-align: center; color: #333; }
+            .header-info { margin-bottom: 30px; border-bottom: 2px solid #eee; padding-bottom: 10px; }
+            table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+            th, td { border: 1px solid #ddd; padding: 12px; text-align: right; }
+            th { bg-color: #f8f9fa; font-weight: bold; }
+            .items-list { font-size: 0.85em; color: #666; margin-top: 5px; }
+            .debit { color: #dc3545; }
+            .credit { color: #28a745; }
+            .balance { font-weight: bold; }
+            @media print {
+              .no-print { display: none; }
+            }
+          </style>
+        </head>
+        <body>
+          <div class="header-info">
+            <h1>كشف حساب عميل</h1>
+            <p><strong>العميل:</strong> ${selectedCustomer.name}</p>
+            <p><strong>الهاتف:</strong> ${selectedCustomer.phone || '-'}</p>
+            <p><strong>التاريخ:</strong> ${new Date().toLocaleDateString('ar-EG')}</p>
+            <p><strong>الرصيد الحالي:</strong> ${selectedCustomer.balance.toFixed(2)} ${currency}</p>
+          </div>
+          <table>
+            <thead>
+              <tr>
+                <th>التاريخ</th>
+                <th>البيان</th>
+                <th>المرجع</th>
+                <th>مدين</th>
+                <th>دائن</th>
+                <th>الرصيد</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${transactions.map(t => `
+                <tr>
+                  <td>${new Date(t.date).toLocaleDateString('ar-EG')}</td>
+                  <td>
+                    ${t.description}
+                    ${t.items && t.items.length > 0 ? `
+                      <div class="items-list">
+                        ${t.items.map(i => `${i.menu_item_name} (x${i.quantity})`).join('، ')}
+                      </div>
+                    ` : ''}
+                  </td>
+                  <td>${t.reference || '-'}</td>
+                  <td class="debit">${t.debit > 0 ? t.debit.toFixed(2) : '-'}</td>
+                  <td class="credit">${t.credit > 0 ? t.credit.toFixed(2) : '-'}</td>
+                  <td class="balance">${t.balance.toFixed(2)}</td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+          <script>
+            window.onload = () => {
+              window.print();
+              // window.close();
+            };
+          </script>
+        </body>
+      </html>
+    `;
 
-    (doc as any).autoTable({
-      startY: 55,
-      head: [['Balance', 'Credit', 'Debit', 'Ref', 'Type', 'Date']],
-      body: tableData,
-      theme: 'striped',
-      headStyles: { fillColor: [41, 128, 185], textColor: 255 },
-      styles: { fontSize: 10, cellPadding: 3 },
-      columnStyles: { 0: { fontStyle: 'bold' } }
-    });
-
-    doc.save(`statement_${selectedCustomer.name}.pdf`);
+    printWindow.document.write(html);
+    printWindow.document.close();
   };
 
   const filteredCustomers = useMemo(() => {
@@ -653,9 +701,16 @@ export function CustomerManager({ restaurantId, currency }: Props) {
                   <tr key={idx} className="border-b border-border/50">
                     <td className="px-3 py-2">{new Date(tx.date).toLocaleDateString('ar-EG')}</td>
                     <td className="px-3 py-2">
-                      <Badge variant={tx.type === 'invoice' ? 'default' : 'secondary'}>
-                        {tx.type === 'invoice' ? 'فاتورة' : 'سداد'}
-                      </Badge>
+                      <div>
+                        <Badge variant={tx.type === 'invoice' ? 'default' : 'secondary'}>
+                          {tx.type === 'invoice' ? 'فاتورة' : 'سداد'}
+                        </Badge>
+                      </div>
+                      {tx.items && tx.items.length > 0 && (
+                        <div className="text-[10px] text-muted-foreground mt-1 bg-muted/30 p-1 rounded">
+                          {tx.items.map(i => `${i.menu_item_name} (x${i.quantity})`).join('، ')}
+                        </div>
+                      )}
                     </td>
                     <td className="px-3 py-2">{tx.reference}</td>
                     <td className="px-3 py-2 text-destructive">{tx.debit > 0 ? tx.debit.toFixed(2) : '-'}</td>

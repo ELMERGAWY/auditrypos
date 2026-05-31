@@ -187,6 +187,18 @@ export default function Dashboard() {
 
   const updateQty = useCallback((id: string, d: number) => setCart(prev => prev.map(c => c.item.id === id ? { ...c, qty: Math.max(0, Math.round((c.qty + d) * 100) / 100), qtyText: String(Math.max(0, Math.round((c.qty + d) * 100) / 100)) } : c).filter(c => c.qty > 0)), []);
 
+  const handleDeleteOrder = async (id: string) => {
+    if (!confirm('هل أنت متأكد من حذف هذا الطلب؟')) return;
+    try {
+      const { error } = await supabase.from('orders').delete().eq('id', id);
+      if (error) throw error;
+      setOrders(prev => prev.filter(o => o.id !== id));
+      toast.success('تم حذف الطلب بنجاح');
+    } catch (e) {
+      toast.error('فشل حذف الطلب');
+    }
+  };
+
   const performCheckout = async (sendToPrep: boolean = false) => {
     if (cart.length === 0) return;
     setIsProcessingCheckout(true);
@@ -241,7 +253,21 @@ export default function Dashboard() {
         {activeTab === 'orders' && (
           <div className="p-4 space-y-4 h-full overflow-auto">
             <div className="flex justify-between items-center"><h2 className="text-2xl font-black">{config.labels.orders}</h2><div className="flex gap-2">{(['all', 'pending', 'completed', 'cancelled'] as const).map(s => <Button key={s} size="sm" variant={orderFilter === s ? 'default' : 'outline'} onClick={() => setOrderFilter(s)}>{s === 'all' ? 'الكل' : STATUS_CONFIG[s]?.label || s}</Button>)}</div></div>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">{filteredOrders.map(o => <Card key={o.id} className="p-4"><div className="flex justify-between font-bold mb-2"><span>#{o.order_number.slice(-4)}</span><Badge>{o.status}</Badge></div><div className="text-xl font-black text-primary">{o.total} {currency}</div><Button className="w-full mt-4" variant="outline" size="sm" onClick={() => { setLastReceipt(o); setShowReceipt(true); }}>تفاصيل</Button></Card>)}</div>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">{filteredOrders.map(o => (
+              <Card key={o.id} className="p-4">
+                <div className="flex justify-between font-bold mb-2">
+                  <span>#{o.order_number.slice(-4)}</span>
+                  <Badge>{o.status}</Badge>
+                </div>
+                <div className="text-xl font-black text-primary">{o.total} {currency}</div>
+                <div className="flex gap-2 mt-4">
+                  <Button className="flex-1" variant="outline" size="sm" onClick={() => { setLastReceipt(o); setShowReceipt(true); }}>تفاصيل</Button>
+                  <Button variant="ghost" size="sm" className="text-destructive hover:bg-destructive/10" onClick={() => handleDeleteOrder(o.id)}>
+                    <Trash2 className="w-4 h-4" />
+                  </Button>
+                </div>
+              </Card>
+            ))}</div>
           </div>
         )}
         
