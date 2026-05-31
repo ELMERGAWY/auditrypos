@@ -67,8 +67,16 @@ DO $$
 DECLARE
   t text;
   tables text[] := ARRAY['warehouses', 'warehouse_stock', 'inventory_landed_costs', 'inventory_transfers', 'inventory_transfer_items'];
+  policy_name text;
 BEGIN
   FOREACH t IN ARRAY tables LOOP
-    EXECUTE format('CREATE POLICY owner_all_%1$s ON public.%1$I FOR ALL USING (restaurant_id IN (SELECT id FROM public.restaurants WHERE owner_id = auth.uid()))', t);
+    policy_name := 'owner_all_' || t;
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_policy 
+        WHERE polname = policy_name 
+        AND polrelid = ('public.' || t)::regclass
+    ) THEN
+      EXECUTE format('CREATE POLICY %I ON public.%I FOR ALL USING (restaurant_id IN (SELECT id FROM public.restaurants WHERE owner_id = auth.uid()))', policy_name, t);
+    END IF;
   END LOOP;
 END $$;

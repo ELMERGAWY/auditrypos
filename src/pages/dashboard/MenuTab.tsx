@@ -27,19 +27,11 @@ interface Props {
   restaurant: Restaurant;
   menuItems: MenuItem[];
   setMenuItems: (items: MenuItem[]) => void;
-  menuForm: MenuFormState;
-  setMenuForm: (f: MenuFormState) => void;
-  showAddItem: boolean;
-  setShowAddItem: (v: boolean) => void;
-  editingItem: MenuItem | null;
-  setEditingItem: (item: MenuItem | null) => void;
   loadData: () => void;
 }
 
 export function MenuTab({
-  restaurant, menuItems, setMenuItems,
-  menuForm, setMenuForm, showAddItem, setShowAddItem,
-  editingItem, setEditingItem, loadData
+  restaurant, menuItems, setMenuItems, loadData
 }: Props) {
   if (!restaurant) return <div className="p-8 text-center">جاري تحميل بيانات النشاط...</div>;
   
@@ -51,6 +43,20 @@ export function MenuTab({
   const defaultIcon = getDefaultItemIcon(businessType);
 
   const categories = [...new Set(menuItems.map(i => i.category))];
+
+  // Local state for the form
+  const [showAddItem, setShowAddItem] = useState(false);
+  const [editingItem, setEditingItem] = useState<MenuItem | null>(null);
+  const [menuForm, setMenuForm] = useState<MenuFormState>({
+    name: '',
+    price: '',
+    category: '',
+    image: defaultIcon,
+    product_type: 'inventory',
+    pricing_method: 'fixed',
+    profit_margin_percent: '30',
+    product_id: ''
+  });
 
   // Inventory products for auto-complete
   const [inventoryProducts, setInventoryProducts] = useState<Array<{id: string; name: string; price: number; cost_price: number; unit: string; category: string}>>([]);
