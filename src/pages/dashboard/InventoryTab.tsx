@@ -116,7 +116,7 @@ export function InventoryTab({ restaurantId, currency, businessType }: Props) {
 
   const handleSave = async () => {
     if (!form.name) { toast.error('أدخل اسم المنتج'); return; }
-    const data = {
+    const data: any = {
       restaurant_id: restaurantId,
       name: form.name, barcode: form.barcode, sku: form.sku, category: form.category,
       price: Number(form.price) || 0, cost_price: Number(form.cost_price) || 0,
@@ -125,22 +125,29 @@ export function InventoryTab({ restaurantId, currency, businessType }: Props) {
       expiry_date: form.expiry_date || null,
       secondary_unit: form.secondary_unit || '',
       unit_conversion_factor: Number(form.unit_conversion_factor) || 1,
-      batch_number: form.batch_number || '',
     };
-    if (editingProduct) {
-      await supabase.from('products').update(data).eq('id', editingProduct.id);
-      toast.success('تم تحديث المنتج');
-    } else {
-      await supabase.from('products').insert(data);
-      toast.success('تم إضافة المنتج');
+    try {
+      if (editingProduct) {
+        const { error } = await supabase.from('products').update(data).eq('id', editingProduct.id);
+        if (error) throw error;
+        toast.success('تم تحديث المنتج');
+      } else {
+        const { error } = await supabase.from('products').insert(data);
+        if (error) throw error;
+        toast.success('تم إضافة المنتج');
+      }
+      resetForm();
+      load();
+    } catch (e: any) {
+      console.error('Product save error:', e);
+      toast.error(`فشل الحفظ: ${e?.message || 'تحقق من الصلاحيات والاتصال'}`);
     }
-    resetForm();
-    load();
   };
 
   const handleDelete = async (id: string) => {
     if (!confirm('حذف هذا المنتج?')) return;
-    await supabase.from('products').delete().eq('id', id);
+    const { error } = await supabase.from('products').delete().eq('id', id);
+    if (error) { toast.error(`فشل الحذف: ${error.message}`); return; }
     toast.success('تم الحذف');
     load();
   };
@@ -150,56 +157,57 @@ export function InventoryTab({ restaurantId, currency, businessType }: Props) {
     const qty = Number(movementQty);
     const newQty = movementType === 'in' ? showMovement.quantity + qty : Math.max(0, showMovement.quantity - qty);
     
-    // Update product quantity
-    await supabase.from('products').update({ quantity: newQty }).eq('id', showMovement.id);
-    
-    // Log movement
-     const { data: moveData } = await supabase.from('stock_movements').insert({
-       product_id: showMovement.id, 
-       restaurant_id: restaurantId,
-       type: movementType, 
-       quantity: qty, 
-       reason: movementReason,
-       project_id: selectedProjectId || null,
-     }).select().single();
+    try {
+      const { error: updErr } = await supabase.from('products').update({ quantity: newQty }).eq('id', showMovement.id);
+      if (updErr) throw updErr;
+      
+      const { error: mvErr } = await supabase.from('stock_movements').insert({
+        product_id: showMovement.id, 
+        restaurant_id: restaurantId,
+        type: movementType, 
+        quantity: qty, 
+        reason: movementReason,
+        project_id: selectedProjectId || null,
+      });
+      if (mvErr) console.warn('stock_movements log failed (continuing):', mvErr.message);
 
-     // Advanced Accounting: Auto-post Journal Entry if enabled
-     if (hasFeature(businessType, 'advanced_accounting')) {
-       const { journalService } = await import('@/lib/accounting/journalService');
-       const totalCost = qty * showMovement.cost_price;
-       
-       if (movementType === 'out' && totalCost > 0) {
-         // Post wastage/adjustment or project expense
-         const project = projects.find(p => p.id === selectedProjectId);
-         const description = selectedProjectId 
-           ? `صرف خامات لمشروع: ${project?.name} - الصنف: ${showMovement.name}`
-           : `تسوية مخزون (صادر) - ${showMovement.name}: ${movementReason}`;
-
-         await journalService.createJournalEntry(restaurantId, {
-           entry_date: new Date(),
-           description,
-           source: 'inventory',
-           lines: [
-             { 
-               account_id: selectedProjectId ? (await journalService.getAccountByCode(restaurantId, '4900'))?.id : (await journalService.getAccountByCode(restaurantId, '5200'))?.id, 
-               debit: totalCost, 
-               credit: 0, 
-               description 
-             },
-             { 
-               account_id: (await journalService.getAccountByCode(restaurantId, '1300'))?.id, 
-               debit: 0, 
-               credit: totalCost, 
-               description: 'تخفيض المخزون' 
-             }
-           ]
-         });
-       }
-     }
-
-    toast.success(movementType === 'in' ? 'تم إضافة الكمية' : 'تم صرف الكمية');
-    setShowMovement(null); setMovementQty(''); setMovementReason('');
-    load();
+      // Advanced Accounting: Auto-post Journal Entry if enabled
+      if (hasFeature(businessType, 'advanced_accounting')) {
+        try {
+          const { journalService } = await import('@/lib/accounting/journalService');
+          const totalCost = qty * showMovement.cost_price;
+          if (movementType === 'out' && totalCost > 0) {
+            const project = projects.find(p => p.id === selectedProjectId);
+            const description = selectedProjectId 
+              ? `صرف خامات لمشروع: ${project?.name} - الصنف: ${showMovement.name}`
+              : `تسوية مخزون (صادر) - ${showMovement.name}: ${movementReason}`;
+            const debitAcc = selectedProjectId 
+              ? (await journalService.getAccountByCode(restaurantId, '4900'))?.id
+              : (await journalService.getAccountByCode(restaurantId, '5200'))?.id;
+            const creditAcc = (await journalService.getAccountByCode(restaurantId, '1300'))?.id;
+            if (debitAcc && creditAcc) {
+              await journalService.createJournalEntry(restaurantId, {
+                entry_date: new Date(),
+                description,
+                source: 'inventory',
+                lines: [
+                  { account_id: debitAcc, debit: totalCost, credit: 0, description },
+                  { account_id: creditAcc, debit: 0, credit: totalCost, description: 'تخفيض المخزون' }
+                ]
+              });
+            }
+          }
+        } catch (je: any) {
+          console.warn('Journal posting skipped:', je.message);
+        }
+      }
+      toast.success(movementType === 'in' ? 'تم إضافة الكمية' : 'تم صرف الكمية');
+      setShowMovement(null); setMovementQty(''); setMovementReason('');
+      load();
+    } catch (e: any) {
+      console.error('Movement error:', e);
+      toast.error(`فشل: ${e?.message || 'تحقق من الصلاحيات'}`);
+    }
   };
 
   const loadReports = async () => {

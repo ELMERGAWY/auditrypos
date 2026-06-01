@@ -156,8 +156,11 @@ export default function Dashboard() {
   const filteredItems = useMemo(() => (menuItems || []).filter(item => {
     if (!item) return false;
     const matchesCategory = selectedCategory === 'all' || item.category === selectedCategory;
-    const matchesSearch = item.name.toLowerCase().includes(searchQuery.toLowerCase()) || (item.barcode && item.barcode.includes(searchQuery));
-    return matchesCategory && matchesSearch && item.available;
+    const q = searchQuery.toLowerCase();
+    const matchesSearch = !q || item.name.toLowerCase().includes(q) || (item.barcode && item.barcode.includes(searchQuery));
+    // Treat available as true unless explicitly false (legacy data may have null/undefined)
+    const isAvailable = item.available !== false;
+    return matchesCategory && matchesSearch && isAvailable;
   }), [menuItems, selectedCategory, searchQuery]);
 
   const todayOrdersList = useMemo(() => Array.isArray(orders) ? orders.filter(o => o && o.created_at && new Date(o.created_at).toDateString() === new Date().toDateString()) : [], [orders]);
