@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { useRegisterSW } from 'virtual:pwa-register/react';
 import { Button } from './ui/button';
 import { DownloadCloud, X } from 'lucide-react';

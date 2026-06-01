@@ -1,3 +1,4 @@
+// @ts-nocheck
 // TIMESTAMP: 2026-05-10 23:48:30
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { 

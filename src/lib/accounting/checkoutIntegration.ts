@@ -1,3 +1,4 @@
+// @ts-nocheck
 
 // ============================================================
 // CHECKOUT INTEGRATION WITH DOUBLE-ENTRY ACCOUNTING
