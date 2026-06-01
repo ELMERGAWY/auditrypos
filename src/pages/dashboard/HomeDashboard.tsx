@@ -195,14 +195,26 @@ export function HomeDashboard({ restaurantId, currency, onNavigate, userId }: Ho
 
       // Accounting reports are useful for profit/balance sheet, but POS sales must
       // come from operational orders because journal posting can be deferred.
-      const engine = createFinancialReporting(restaurantId);
+      // Optimization: skip expensive financial-engine calls when there are no posted journals yet.
+      const { count: jeCount } = await supabase
+        .from('journal_entries')
+        .select('id', { count: 'exact', head: true })
+        .eq('restaurant_id', restaurantId)
+        .eq('is_posted', true)
+        .limit(1);
 
-      const [plToday, plYest, plMonth, bs] = await Promise.all([
-        engine.generateProfitLoss(todayStart.toISOString().split('T')[0], todayStart.toISOString().split('T')[0]),
-        engine.generateProfitLoss(yesterdayStart.toISOString().split('T')[0], yesterdayStart.toISOString().split('T')[0]),
-        engine.generateProfitLoss(monthStartDate.toISOString().split('T')[0], todayStart.toISOString().split('T')[0]),
-        engine.generateBalanceSheet(todayStart.toISOString().split('T')[0]),
-      ]);
+      const engine = createFinancialReporting(restaurantId);
+      const emptyPL = { revenue: { total: 0 }, cogs: { total: 0 }, operating_expenses: { total: 0 }, net_profit: 0 } as any;
+      const emptyBS = { assets: { current: { inventory: 0, cash: 0, bank: 0 } }, liabilities: { current: { payables: 0 } } } as any;
+
+      const [plToday, plYest, plMonth, bs] = (jeCount && jeCount > 0)
+        ? await Promise.all([
+            engine.generateProfitLoss(todayStart.toISOString().split('T')[0], todayStart.toISOString().split('T')[0]),
+            engine.generateProfitLoss(yesterdayStart.toISOString().split('T')[0], yesterdayStart.toISOString().split('T')[0]),
+            engine.generateProfitLoss(monthStartDate.toISOString().split('T')[0], todayStart.toISOString().split('T')[0]),
+            engine.generateBalanceSheet(todayStart.toISOString().split('T')[0]),
+          ])
+        : [emptyPL, emptyPL, emptyPL, emptyBS];
 
       const sumOrders = (rows: any[] = []) => rows.reduce((s, o) => s + Number(o.total || 0), 0);
       const sumCost = (rows: any[] = []) => rows.reduce((s, o) => s + Number(o.total_cost || 0), 0);

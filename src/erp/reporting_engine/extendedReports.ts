@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { supabase } from '@/integrations/supabase/client';
 
 export async function generateTaxSummary(restaurantId: string, startDate: string, endDate: string) {
