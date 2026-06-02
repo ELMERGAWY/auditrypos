@@ -23,7 +23,7 @@ const QRMenu = () => {
       if (rest) setRestaurantName(rest.name);
 
       const { data: menuData } = await supabase.from('public_menu_items' as any).select('*').eq('restaurant_id', restaurantId).order('sort_order');
-      const menuItems = (menuData || []) as MenuItem[];
+      const menuItems = (menuData || []) as unknown as MenuItem[];
       setItems(menuItems);
       setCategories([...new Set(menuItems.map(i => i.category))]);
     };
