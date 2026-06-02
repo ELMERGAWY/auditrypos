@@ -219,7 +219,12 @@ export function SalesOrders({ restaurantId, currency }: Props) {
                       </Badge>
                     </td>
                     <td className="px-6 py-4 flex gap-1">
-                      <Button variant="ghost" size="sm" title="عرض التفاصيل"><Eye className="w-4 h-4" /></Button>
+                      <Button variant="ghost" size="sm" title="عرض التفاصيل" onClick={() => setViewingId(order.id)}>
+                        <Eye className="w-4 h-4" />
+                      </Button>
+                      <Button variant="ghost" size="sm" title="حذف" className="text-destructive hover:bg-destructive/10" onClick={() => handleDelete(order)}>
+                        <Trash2 className="w-4 h-4" />
+                      </Button>
                       {order.status === 'confirmed' && (
                         <Button 
                           variant="ghost" 
