@@ -254,7 +254,7 @@ export const ProfessionalSidebar = memo(function ProfessionalSidebar({
                       <ChevronDown className={cn("w-3 h-3 opacity-50 transition-transform", isSectionActive && "rotate-180")} />
                     </button>
                   </DropdownMenuTrigger>
-                  <DropdownMenuContent align="center" className="w-56 glass-card !rounded-2xl border-white/20 p-2 shadow-2xl z-[60]">
+                  <DropdownMenuContent align="center" className="w-72 max-h-[70vh] overflow-y-auto glass-card !rounded-2xl border-white/20 p-2 shadow-2xl z-[60]">
                     {items.map(item => {
                       const Icon = item.icon;
                       const isActive = activeTab === item.id;
