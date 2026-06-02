@@ -310,6 +310,16 @@ export function SalesOrders({ restaurantId, currency }: Props) {
           </div>
         </DialogContent>
       </Dialog>
+
+      {viewingId && (
+        <InvoiceViewer
+          open={!!viewingId}
+          onClose={() => setViewingId(null)}
+          source="sales_order"
+          recordId={viewingId}
+          currency={currency}
+        />
+      )}
     </div>
   );
 }
