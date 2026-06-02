@@ -191,7 +191,7 @@ export const ProfessionalSidebar = memo(function ProfessionalSidebar({
           label: item.label!,
           icon: item.icon!,
           badge: item.badge,
-          section: item.section || 'main',
+          section: SECTION_MAP[item.section || 'main'] || 'main',
         } as NavItem;
       })
       .filter(Boolean) as NavItem[];
