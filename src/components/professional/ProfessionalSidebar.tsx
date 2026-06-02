@@ -89,12 +89,20 @@ interface ProfessionalSidebarProps {
 
 const SECTIONS: Record<string, { label: string; icon: React.ElementType }> = {
   main: { label: 'الرئيسية', icon: LayoutGrid },
-  sales: { label: 'المبيعات والعملاء', icon: Users },
-  purchases: { label: 'المشتريات والموردين', icon: ShoppingCart },
-  inventory: { label: 'المخازن', icon: Package },
-  accounting: { label: 'المحاسبة والمالية', icon: Landmark },
-  analytics: { label: 'التقارير والذكاء', icon: BarChart3 },
+  parties: { label: 'العملاء والموردين والمخازن', icon: Users },
+  finance: { label: 'المحاسبة والتقارير والذكاء', icon: Landmark },
   system: { label: 'النظام والإعدادات', icon: Settings },
+};
+
+// Map legacy section IDs to the new consolidated sections
+const SECTION_MAP: Record<string, string> = {
+  main: 'main',
+  sales: 'parties',
+  purchases: 'parties',
+  inventory: 'parties',
+  accounting: 'finance',
+  analytics: 'finance',
+  system: 'system',
 };
 
 export const ProfessionalSidebar = memo(function ProfessionalSidebar({
