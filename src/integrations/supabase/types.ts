@@ -7860,13 +7860,6 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: "role_permissions_company_id_fkey"
-            columns: ["company_id"]
-            isOneToOne: false
-            referencedRelation: "companies"
-            referencedColumns: ["id"]
-          },
-          {
             foreignKeyName: "role_permissions_permission_code_fkey"
             columns: ["permission_code"]
             isOneToOne: false

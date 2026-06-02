@@ -1,0 +1,1 @@
+ALTER TABLE public.role_permissions DROP CONSTRAINT IF EXISTS role_permissions_company_id_fkey;
