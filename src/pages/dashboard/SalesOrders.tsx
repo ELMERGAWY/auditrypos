@@ -9,8 +9,9 @@ import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { 
   FileText, Plus, Search, Calendar, Package, DollarSign, 
-  CheckCircle, Clock, Eye, RefreshCcw, ShoppingBag, Users
+  CheckCircle, Clock, Eye, RefreshCcw, ShoppingBag, Users, Trash2
 } from 'lucide-react';
+import { InvoiceViewer } from '@/components/InvoiceViewer';
 
 interface SalesOrder {
   id: string;
