@@ -48,13 +48,13 @@ const StoreFront = () => {
 
       if (isFoodType) {
         // Food sectors: load menu_items
-        const { data: menuData } = await supabase.from('menu_items').select('*').eq('restaurant_id', restaurantId).eq('available', true).order('sort_order');
+        const { data: menuData } = await supabase.from('public_menu_items' as any).select('*').eq('restaurant_id', restaurantId).order('sort_order');
         const menuItems = (menuData || []).map((m: any) => ({ id: m.id, name: m.name, price: m.price, category: m.category, image: m.image })) as MenuItem[];
         setItems(menuItems);
         setCategories([...new Set(menuItems.map(i => i.category))]);
       } else {
         // Non-food sectors: load products
-        const { data: prodData } = await supabase.from('products').select('*').eq('restaurant_id', restaurantId).eq('available', true).order('sort_order');
+        const { data: prodData } = await supabase.from('public_products' as any).select('*').eq('restaurant_id', restaurantId).order('sort_order');
         const prods = (prodData || []).map((p: any) => ({ id: p.id, name: p.name, price: p.price, category: p.category, image: p.image })) as MenuItem[];
         setItems(prods);
         setCategories([...new Set(prods.map(i => i.category))]);

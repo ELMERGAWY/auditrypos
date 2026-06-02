@@ -22,8 +22,8 @@ const QRMenu = () => {
       const { data: rest } = await supabase.from('restaurants').select('name').eq('id', restaurantId).maybeSingle();
       if (rest) setRestaurantName(rest.name);
 
-      const { data: menuData } = await supabase.from('menu_items').select('*').eq('restaurant_id', restaurantId).eq('available', true).order('sort_order');
-      const menuItems = (menuData || []) as MenuItem[];
+      const { data: menuData } = await supabase.from('public_menu_items' as any).select('*').eq('restaurant_id', restaurantId).order('sort_order');
+      const menuItems = (menuData || []) as unknown as MenuItem[];
       setItems(menuItems);
       setCategories([...new Set(menuItems.map(i => i.category))]);
     };
