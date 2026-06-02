@@ -9,11 +9,12 @@ import { Badge } from '@/components/ui/badge';
 import { Label } from '@/components/ui/label';
 import { 
   FileText, Search, Calendar, Printer, Download, 
-  RotateCcw, Eye, RefreshCcw, DollarSign, Users, Plus, X
+  RotateCcw, Eye, RefreshCcw, DollarSign, Users, Plus, X, Trash2
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { journalService } from '@/lib/accounting/journalService';
 import { CustomerSearch } from './CustomerSearch';
+import { InvoiceViewer } from '@/components/InvoiceViewer';
 
 interface Invoice {
   id: string;
