@@ -89,12 +89,20 @@ interface ProfessionalSidebarProps {
 
 const SECTIONS: Record<string, { label: string; icon: React.ElementType }> = {
   main: { label: 'الرئيسية', icon: LayoutGrid },
-  sales: { label: 'المبيعات والعملاء', icon: Users },
-  purchases: { label: 'المشتريات والموردين', icon: ShoppingCart },
-  inventory: { label: 'المخازن', icon: Package },
-  accounting: { label: 'المحاسبة والمالية', icon: Landmark },
-  analytics: { label: 'التقارير والذكاء', icon: BarChart3 },
+  parties: { label: 'العملاء والموردين والمخازن', icon: Users },
+  finance: { label: 'المحاسبة والتقارير والذكاء', icon: Landmark },
   system: { label: 'النظام والإعدادات', icon: Settings },
+};
+
+// Map legacy section IDs to the new consolidated sections
+const SECTION_MAP: Record<string, string> = {
+  main: 'main',
+  sales: 'parties',
+  purchases: 'parties',
+  inventory: 'parties',
+  accounting: 'finance',
+  analytics: 'finance',
+  system: 'system',
 };
 
 export const ProfessionalSidebar = memo(function ProfessionalSidebar({
@@ -183,7 +191,7 @@ export const ProfessionalSidebar = memo(function ProfessionalSidebar({
           label: item.label!,
           icon: item.icon!,
           badge: item.badge,
-          section: item.section || 'main',
+          section: SECTION_MAP[item.section || 'main'] || 'main',
         } as NavItem;
       })
       .filter(Boolean) as NavItem[];
@@ -246,7 +254,7 @@ export const ProfessionalSidebar = memo(function ProfessionalSidebar({
                       <ChevronDown className={cn("w-3 h-3 opacity-50 transition-transform", isSectionActive && "rotate-180")} />
                     </button>
                   </DropdownMenuTrigger>
-                  <DropdownMenuContent align="center" className="w-56 glass-card !rounded-2xl border-white/20 p-2 shadow-2xl z-[60]">
+                  <DropdownMenuContent align="center" className="w-72 max-h-[70vh] overflow-y-auto glass-card !rounded-2xl border-white/20 p-2 shadow-2xl z-[60]">
                     {items.map(item => {
                       const Icon = item.icon;
                       const isActive = activeTab === item.id;

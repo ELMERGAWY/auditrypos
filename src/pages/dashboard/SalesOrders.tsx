@@ -9,8 +9,9 @@ import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { 
   FileText, Plus, Search, Calendar, Package, DollarSign, 
-  CheckCircle, Clock, Eye, RefreshCcw, ShoppingBag, Users
+  CheckCircle, Clock, Eye, RefreshCcw, ShoppingBag, Users, Trash2
 } from 'lucide-react';
+import { InvoiceViewer } from '@/components/InvoiceViewer';
 
 interface SalesOrder {
   id: string;
@@ -32,6 +33,7 @@ export function SalesOrders({ restaurantId, currency }: Props) {
   const [orders, setOrders] = useState<SalesOrder[]>([]);
   const [loading, setLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [viewingId, setViewingId] = useState<string | null>(null);
 
   const [showAddModal, setShowAddModal] = useState(false);
   const [customers, setCustomers] = useState<any[]>([]);
@@ -39,6 +41,19 @@ export function SalesOrders({ restaurantId, currency }: Props) {
   const [selectedItems, setSelectedItems] = useState<any[]>([]);
   const [selectedCustomerId, setSelectedCustomerId] = useState<string>('');
   const [newOrderLoading, setNewOrderLoading] = useState(false);
+
+  const handleDelete = async (order: SalesOrder) => {
+    if (!confirm(`هل أنت متأكد من حذف الأمر ${order.order_number}؟`)) return;
+    try {
+      await supabase.from('sales_order_items').delete().eq('sales_order_id', order.id);
+      const { error } = await supabase.from('sales_orders').delete().eq('id', order.id);
+      if (error) throw error;
+      toast.success('تم حذف الأمر');
+      loadOrders();
+    } catch (e: any) {
+      toast.error('فشل الحذف: ' + e.message);
+    }
+  };
 
   useEffect(() => {
     loadOrders();
@@ -204,7 +219,12 @@ export function SalesOrders({ restaurantId, currency }: Props) {
                       </Badge>
                     </td>
                     <td className="px-6 py-4 flex gap-1">
-                      <Button variant="ghost" size="sm" title="عرض التفاصيل"><Eye className="w-4 h-4" /></Button>
+                      <Button variant="ghost" size="sm" title="عرض التفاصيل" onClick={() => setViewingId(order.id)}>
+                        <Eye className="w-4 h-4" />
+                      </Button>
+                      <Button variant="ghost" size="sm" title="حذف" className="text-destructive hover:bg-destructive/10" onClick={() => handleDelete(order)}>
+                        <Trash2 className="w-4 h-4" />
+                      </Button>
                       {order.status === 'confirmed' && (
                         <Button 
                           variant="ghost" 
@@ -290,6 +310,16 @@ export function SalesOrders({ restaurantId, currency }: Props) {
           </div>
         </DialogContent>
       </Dialog>
+
+      {viewingId && (
+        <InvoiceViewer
+          open={!!viewingId}
+          onClose={() => setViewingId(null)}
+          source="sales_order"
+          recordId={viewingId}
+          currency={currency}
+        />
+      )}
     </div>
   );
 }

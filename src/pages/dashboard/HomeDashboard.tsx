@@ -319,23 +319,30 @@ export function HomeDashboard({ restaurantId, currency, onNavigate, userId }: Ho
     }
   };
 
-  // Auto-refresh dashboard data every 30 seconds
+  // Auto-refresh dashboard data every 5 minutes (was 30s — caused heavy load)
   useEffect(() => {
     const interval = setInterval(() => {
       loadDashboardData();
-    }, 30000);
+    }, 5 * 60 * 1000);
     return () => clearInterval(interval);
   }, []);
 
-  // Real‑time updates via Supabase channel
+  // Real‑time updates via Supabase channel — debounced + scoped to this restaurant
   useEffect(() => {
-    const channel = supabase.channel('public:orders')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, payload => {
-        // Reload data when any order changes (insert, update, delete)
-        loadDashboardData();
-      })
+    if (!restaurantId) return;
+    let debounceTimer: any = null;
+    const channel = supabase.channel(`orders:${restaurantId}`)
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'orders', filter: `restaurant_id=eq.${restaurantId}` },
+        () => {
+          if (debounceTimer) clearTimeout(debounceTimer);
+          debounceTimer = setTimeout(() => loadDashboardData(), 3000);
+        }
+      )
       .subscribe();
     return () => {
+      if (debounceTimer) clearTimeout(debounceTimer);
       supabase.removeChannel(channel);
     };
   }, [restaurantId]);

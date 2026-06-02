@@ -9,11 +9,12 @@ import { Badge } from '@/components/ui/badge';
 import { Label } from '@/components/ui/label';
 import { 
   FileText, Search, Calendar, Printer, Download, 
-  RotateCcw, Eye, RefreshCcw, DollarSign, Users, Plus, X
+  RotateCcw, Eye, RefreshCcw, DollarSign, Users, Plus, X, Trash2
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { journalService } from '@/lib/accounting/journalService';
 import { CustomerSearch } from './CustomerSearch';
+import { InvoiceViewer } from '@/components/InvoiceViewer';
 
 interface Invoice {
   id: string;
@@ -35,6 +36,7 @@ export function SalesInvoices({ restaurantId, currency }: Props) {
   const [loading, setLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [showManualForm, setShowManualForm] = useState(false);
+  const [viewingId, setViewingId] = useState<string | null>(null);
   const [form, setForm] = useState({
     customer_name: '',
     amount: '',
@@ -110,6 +112,22 @@ export function SalesInvoices({ restaurantId, currency }: Props) {
     }
   };
 
+  const handleDelete = async (inv: Invoice) => {
+    if (!confirm(`هل أنت متأكد من حذف الفاتورة ${inv.order_number}؟ سيتم حذف الأصناف وقيود اليومية المرتبطة.`)) return;
+    try {
+      // Delete dependents first (order_items, order_taxes, journal_entries)
+      await supabase.from('order_items').delete().eq('order_id', inv.id);
+      await supabase.from('order_taxes').delete().eq('order_id', inv.id);
+      await supabase.from('journal_entries').delete().eq('source_id', inv.id).eq('source', 'sale');
+      const { error } = await supabase.from('orders').delete().eq('id', inv.id);
+      if (error) throw error;
+      toast.success('تم حذف الفاتورة');
+      loadInvoices();
+    } catch (e: any) {
+      toast.error('فشل الحذف: ' + e.message);
+    }
+  };
+
   const filteredInvoices = invoices.filter(inv => 
     inv.order_number.toLowerCase().includes(searchQuery.toLowerCase()) ||
     inv.customer_name?.toLowerCase().includes(searchQuery.toLowerCase())
@@ -180,8 +198,15 @@ export function SalesInvoices({ restaurantId, currency }: Props) {
                 <span className="text-[10px] text-muted-foreground mr-1">{currency}</span>
               </div>
               <div className="flex gap-1">
-                <Button size="icon" variant="ghost" className="h-8 w-8"><Eye className="w-4 h-4" /></Button>
-                <Button size="icon" variant="ghost" className="h-8 w-8"><Printer className="w-4 h-4" /></Button>
+                <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => setViewingId(inv.id)} title="عرض الفاتورة">
+                  <Eye className="w-4 h-4" />
+                </Button>
+                <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => setViewingId(inv.id)} title="طباعة">
+                  <Printer className="w-4 h-4" />
+                </Button>
+                <Button size="icon" variant="ghost" className="h-8 w-8 text-destructive hover:bg-destructive/10" onClick={() => handleDelete(inv)} title="حذف">
+                  <Trash2 className="w-4 h-4" />
+                </Button>
               </div>
             </div>
           </Card>
@@ -234,6 +259,16 @@ export function SalesInvoices({ restaurantId, currency }: Props) {
           </div>
         )}
       </AnimatePresence>
+
+      {viewingId && (
+        <InvoiceViewer
+          open={!!viewingId}
+          onClose={() => setViewingId(null)}
+          source="order"
+          recordId={viewingId}
+          currency={currency}
+        />
+      )}
     </div>
   );
 }
