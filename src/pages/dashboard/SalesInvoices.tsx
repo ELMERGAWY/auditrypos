@@ -198,8 +198,15 @@ export function SalesInvoices({ restaurantId, currency }: Props) {
                 <span className="text-[10px] text-muted-foreground mr-1">{currency}</span>
               </div>
               <div className="flex gap-1">
-                <Button size="icon" variant="ghost" className="h-8 w-8"><Eye className="w-4 h-4" /></Button>
-                <Button size="icon" variant="ghost" className="h-8 w-8"><Printer className="w-4 h-4" /></Button>
+                <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => setViewingId(inv.id)} title="عرض الفاتورة">
+                  <Eye className="w-4 h-4" />
+                </Button>
+                <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => setViewingId(inv.id)} title="طباعة">
+                  <Printer className="w-4 h-4" />
+                </Button>
+                <Button size="icon" variant="ghost" className="h-8 w-8 text-destructive hover:bg-destructive/10" onClick={() => handleDelete(inv)} title="حذف">
+                  <Trash2 className="w-4 h-4" />
+                </Button>
               </div>
             </div>
           </Card>
