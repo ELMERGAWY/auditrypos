@@ -259,6 +259,16 @@ export function SalesInvoices({ restaurantId, currency }: Props) {
           </div>
         )}
       </AnimatePresence>
+
+      {viewingId && (
+        <InvoiceViewer
+          open={!!viewingId}
+          onClose={() => setViewingId(null)}
+          source="order"
+          recordId={viewingId}
+          currency={currency}
+        />
+      )}
     </div>
   );
 }
