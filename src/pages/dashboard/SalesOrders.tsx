@@ -33,6 +33,7 @@ export function SalesOrders({ restaurantId, currency }: Props) {
   const [orders, setOrders] = useState<SalesOrder[]>([]);
   const [loading, setLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [viewingId, setViewingId] = useState<string | null>(null);
 
   const [showAddModal, setShowAddModal] = useState(false);
   const [customers, setCustomers] = useState<any[]>([]);
@@ -40,6 +41,19 @@ export function SalesOrders({ restaurantId, currency }: Props) {
   const [selectedItems, setSelectedItems] = useState<any[]>([]);
   const [selectedCustomerId, setSelectedCustomerId] = useState<string>('');
   const [newOrderLoading, setNewOrderLoading] = useState(false);
+
+  const handleDelete = async (order: SalesOrder) => {
+    if (!confirm(`هل أنت متأكد من حذف الأمر ${order.order_number}؟`)) return;
+    try {
+      await supabase.from('sales_order_items').delete().eq('sales_order_id', order.id);
+      const { error } = await supabase.from('sales_orders').delete().eq('id', order.id);
+      if (error) throw error;
+      toast.success('تم حذف الأمر');
+      loadOrders();
+    } catch (e: any) {
+      toast.error('فشل الحذف: ' + e.message);
+    }
+  };
 
   useEffect(() => {
     loadOrders();
