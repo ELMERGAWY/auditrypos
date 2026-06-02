@@ -36,6 +36,7 @@ export function SalesInvoices({ restaurantId, currency }: Props) {
   const [loading, setLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [showManualForm, setShowManualForm] = useState(false);
+  const [viewingId, setViewingId] = useState<string | null>(null);
   const [form, setForm] = useState({
     customer_name: '',
     amount: '',
