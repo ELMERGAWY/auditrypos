@@ -3749,6 +3749,13 @@ export type Database = {
             foreignKeyName: "inventory_audit_lines_product_id_fkey"
             columns: ["product_id"]
             isOneToOne: false
+            referencedRelation: "public_products"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inventory_audit_lines_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
             referencedRelation: "v_inventory_valuation"
             referencedColumns: ["id"]
           },
@@ -4022,6 +4029,13 @@ export type Database = {
             foreignKeyName: "inventory_cost_layers_product_id_fkey"
             columns: ["product_id"]
             isOneToOne: false
+            referencedRelation: "public_products"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inventory_cost_layers_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
             referencedRelation: "v_inventory_valuation"
             referencedColumns: ["id"]
           },
@@ -4085,6 +4099,13 @@ export type Database = {
             columns: ["product_id"]
             isOneToOne: false
             referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inventory_items_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "public_products"
             referencedColumns: ["id"]
           },
           {
@@ -4370,6 +4391,13 @@ export type Database = {
             foreignKeyName: "inventory_products_source_product_id_fkey"
             columns: ["source_product_id"]
             isOneToOne: false
+            referencedRelation: "public_products"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inventory_products_source_product_id_fkey"
+            columns: ["source_product_id"]
+            isOneToOne: false
             referencedRelation: "v_inventory_valuation"
             referencedColumns: ["id"]
           },
@@ -4431,6 +4459,13 @@ export type Database = {
             columns: ["product_id"]
             isOneToOne: false
             referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inventory_receipt_items_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "public_products"
             referencedColumns: ["id"]
           },
           {
@@ -4669,6 +4704,13 @@ export type Database = {
             columns: ["product_id"]
             isOneToOne: false
             referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inventory_transfer_items_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "public_products"
             referencedColumns: ["id"]
           },
           {
@@ -5238,6 +5280,13 @@ export type Database = {
             foreignKeyName: "manufacturing_orders_product_id_fkey"
             columns: ["product_id"]
             isOneToOne: false
+            referencedRelation: "public_products"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "manufacturing_orders_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
             referencedRelation: "v_inventory_valuation"
             referencedColumns: ["id"]
           },
@@ -5298,10 +5347,24 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "menu_item_components_menu_item_id_fkey"
+            columns: ["menu_item_id"]
+            isOneToOne: false
+            referencedRelation: "public_menu_items"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "menu_item_components_product_id_fkey"
             columns: ["product_id"]
             isOneToOne: false
             referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "menu_item_components_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "public_products"
             referencedColumns: ["id"]
           },
           {
@@ -5399,6 +5462,13 @@ export type Database = {
             foreignKeyName: "menu_items_product_id_fkey"
             columns: ["product_id"]
             isOneToOne: false
+            referencedRelation: "public_products"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "menu_items_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
             referencedRelation: "v_inventory_valuation"
             referencedColumns: ["id"]
           },
@@ -5466,6 +5536,13 @@ export type Database = {
             columns: ["menu_item_id"]
             isOneToOne: false
             referencedRelation: "menu_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "menu_items_costing_menu_item_id_fkey"
+            columns: ["menu_item_id"]
+            isOneToOne: false
+            referencedRelation: "public_menu_items"
             referencedColumns: ["id"]
           },
           {
@@ -5719,6 +5796,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "order_items_menu_item_id_fkey"
+            columns: ["menu_item_id"]
+            isOneToOne: false
+            referencedRelation: "public_menu_items"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "order_items_order_id_fkey"
             columns: ["order_id"]
             isOneToOne: false
@@ -5751,6 +5835,13 @@ export type Database = {
             columns: ["product_id"]
             isOneToOne: false
             referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "order_items_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "public_products"
             referencedColumns: ["id"]
           },
           {
@@ -6841,6 +6932,13 @@ export type Database = {
             foreignKeyName: "purchase_return_items_product_id_fkey"
             columns: ["product_id"]
             isOneToOne: false
+            referencedRelation: "public_products"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "purchase_return_items_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
             referencedRelation: "v_inventory_valuation"
             referencedColumns: ["id"]
           },
@@ -6986,6 +7084,13 @@ export type Database = {
             referencedRelation: "menu_items"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "recipe_components_menu_item_id_fkey"
+            columns: ["menu_item_id"]
+            isOneToOne: false
+            referencedRelation: "public_menu_items"
+            referencedColumns: ["id"]
+          },
         ]
       }
       recipes: {
@@ -7028,6 +7133,13 @@ export type Database = {
             foreignKeyName: "recipes_ingredient_id_fkey"
             columns: ["ingredient_id"]
             isOneToOne: false
+            referencedRelation: "public_products"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "recipes_ingredient_id_fkey"
+            columns: ["ingredient_id"]
+            isOneToOne: false
             referencedRelation: "v_inventory_valuation"
             referencedColumns: ["id"]
           },
@@ -7036,6 +7148,13 @@ export type Database = {
             columns: ["menu_item_id"]
             isOneToOne: false
             referencedRelation: "menu_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "recipes_menu_item_id_fkey"
+            columns: ["menu_item_id"]
+            isOneToOne: false
+            referencedRelation: "public_menu_items"
             referencedColumns: ["id"]
           },
           {
@@ -7203,6 +7322,13 @@ export type Database = {
             columns: ["menu_item_id"]
             isOneToOne: false
             referencedRelation: "menu_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "restaurant_order_lines_menu_item_id_fkey"
+            columns: ["menu_item_id"]
+            isOneToOne: false
+            referencedRelation: "public_menu_items"
             referencedColumns: ["id"]
           },
           {
@@ -8029,6 +8155,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "sales_return_items_menu_item_id_fkey"
+            columns: ["menu_item_id"]
+            isOneToOne: false
+            referencedRelation: "public_menu_items"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "sales_return_items_original_order_item_id_fkey"
             columns: ["original_order_item_id"]
             isOneToOne: false
@@ -8047,6 +8180,13 @@ export type Database = {
             columns: ["product_id"]
             isOneToOne: false
             referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sales_return_items_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "public_products"
             referencedColumns: ["id"]
           },
           {
@@ -8545,6 +8685,13 @@ export type Database = {
             foreignKeyName: "stock_batches_product_id_fkey"
             columns: ["product_id"]
             isOneToOne: false
+            referencedRelation: "public_products"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "stock_batches_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
             referencedRelation: "v_inventory_valuation"
             referencedColumns: ["id"]
           },
@@ -8621,6 +8768,13 @@ export type Database = {
             columns: ["product_id"]
             isOneToOne: false
             referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "stock_movements_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "public_products"
             referencedColumns: ["id"]
           },
           {
@@ -9481,6 +9635,13 @@ export type Database = {
             foreignKeyName: "warehouse_stock_product_id_fkey"
             columns: ["product_id"]
             isOneToOne: false
+            referencedRelation: "public_products"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "warehouse_stock_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
             referencedRelation: "v_inventory_valuation"
             referencedColumns: ["id"]
           },
@@ -9858,6 +10019,125 @@ export type Database = {
           },
           {
             foreignKeyName: "delivery_agents_restaurant_id_fkey"
+            columns: ["restaurant_id"]
+            isOneToOne: false
+            referencedRelation: "restaurants_public"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      public_menu_items: {
+        Row: {
+          available: boolean | null
+          category: string | null
+          id: string | null
+          image: string | null
+          name: string | null
+          price: number | null
+          product_type: string | null
+          restaurant_id: string | null
+          sort_order: number | null
+        }
+        Insert: {
+          available?: boolean | null
+          category?: string | null
+          id?: string | null
+          image?: string | null
+          name?: string | null
+          price?: number | null
+          product_type?: string | null
+          restaurant_id?: string | null
+          sort_order?: number | null
+        }
+        Update: {
+          available?: boolean | null
+          category?: string | null
+          id?: string | null
+          image?: string | null
+          name?: string | null
+          price?: number | null
+          product_type?: string | null
+          restaurant_id?: string | null
+          sort_order?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "menu_items_restaurant_id_fkey"
+            columns: ["restaurant_id"]
+            isOneToOne: false
+            referencedRelation: "public_restaurant_info"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "menu_items_restaurant_id_fkey"
+            columns: ["restaurant_id"]
+            isOneToOne: false
+            referencedRelation: "restaurants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "menu_items_restaurant_id_fkey"
+            columns: ["restaurant_id"]
+            isOneToOne: false
+            referencedRelation: "restaurants_public"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      public_products: {
+        Row: {
+          available: boolean | null
+          category: string | null
+          id: string | null
+          image: string | null
+          name: string | null
+          price: number | null
+          quantity: number | null
+          restaurant_id: string | null
+          sort_order: number | null
+          unit: string | null
+        }
+        Insert: {
+          available?: boolean | null
+          category?: string | null
+          id?: string | null
+          image?: string | null
+          name?: string | null
+          price?: number | null
+          quantity?: number | null
+          restaurant_id?: string | null
+          sort_order?: number | null
+          unit?: string | null
+        }
+        Update: {
+          available?: boolean | null
+          category?: string | null
+          id?: string | null
+          image?: string | null
+          name?: string | null
+          price?: number | null
+          quantity?: number | null
+          restaurant_id?: string | null
+          sort_order?: number | null
+          unit?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "products_restaurant_id_fkey"
+            columns: ["restaurant_id"]
+            isOneToOne: false
+            referencedRelation: "public_restaurant_info"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "products_restaurant_id_fkey"
+            columns: ["restaurant_id"]
+            isOneToOne: false
+            referencedRelation: "restaurants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "products_restaurant_id_fkey"
             columns: ["restaurant_id"]
             isOneToOne: false
             referencedRelation: "restaurants_public"
@@ -10629,6 +10909,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "order_items_menu_item_id_fkey"
+            columns: ["menu_item_id"]
+            isOneToOne: false
+            referencedRelation: "public_menu_items"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "order_items_order_id_fkey"
             columns: ["order_id"]
             isOneToOne: false
@@ -10661,6 +10948,13 @@ export type Database = {
             columns: ["product_id"]
             isOneToOne: false
             referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "order_items_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "public_products"
             referencedColumns: ["id"]
           },
           {
