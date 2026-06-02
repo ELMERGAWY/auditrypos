@@ -177,8 +177,8 @@ export function RoleManager({ companyId }: { companyId: string }) {
       }
       toast.success('تم تحديث الصلاحية');
     } catch (error: any) {
-      console.error(error);
-      toast.error('فشل تحديث الصلاحية');
+      console.error('Permission toggle error:', error);
+      toast.error('فشل تحديث الصلاحية: ' + (error?.message || 'خطأ غير معروف'));
     }
   };
 
