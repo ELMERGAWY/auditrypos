@@ -112,6 +112,22 @@ export function SalesInvoices({ restaurantId, currency }: Props) {
     }
   };
 
+  const handleDelete = async (inv: Invoice) => {
+    if (!confirm(`هل أنت متأكد من حذف الفاتورة ${inv.order_number}؟ سيتم حذف الأصناف وقيود اليومية المرتبطة.`)) return;
+    try {
+      // Delete dependents first (order_items, order_taxes, journal_entries)
+      await supabase.from('order_items').delete().eq('order_id', inv.id);
+      await supabase.from('order_taxes').delete().eq('order_id', inv.id);
+      await supabase.from('journal_entries').delete().eq('source_id', inv.id).eq('source', 'sale');
+      const { error } = await supabase.from('orders').delete().eq('id', inv.id);
+      if (error) throw error;
+      toast.success('تم حذف الفاتورة');
+      loadInvoices();
+    } catch (e: any) {
+      toast.error('فشل الحذف: ' + e.message);
+    }
+  };
+
   const filteredInvoices = invoices.filter(inv => 
     inv.order_number.toLowerCase().includes(searchQuery.toLowerCase()) ||
     inv.customer_name?.toLowerCase().includes(searchQuery.toLowerCase())
