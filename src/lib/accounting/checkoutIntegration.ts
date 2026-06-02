@@ -196,6 +196,9 @@ class CheckoutIntegration {
 
       if (itemsError) {
         console.error('Failed to create order items:', itemsError);
+        // Rollback the order so we don't end up with a header without items
+        await supabase.from('orders').delete().eq('id', order.id);
+        throw new Error(`فشل حفظ أصناف الفاتورة: ${itemsError.message}`);
       }
 
       // 11. Create tax records
