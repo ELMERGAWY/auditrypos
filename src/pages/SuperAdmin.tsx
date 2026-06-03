@@ -356,8 +356,16 @@ const SuperAdmin = () => {
 
         {/* ... other tabs like receipts, bans, backup ... */}
       </div>
+
+      <CompanyDrillIn
+        restaurantId={drillIn?.id || null}
+        restaurantName={drillIn?.name}
+        open={!!drillIn}
+        onClose={() => setDrillIn(null)}
+      />
     </div>
   );
 };
+
 
 export default SuperAdmin;
