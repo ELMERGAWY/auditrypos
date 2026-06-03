@@ -8,8 +8,10 @@ import {
   Truck, Ban, AlertTriangle, UserX, Search,
   DollarSign, ShoppingCart, MapPin, Phone, Eye, EyeOff,
   Calendar, ArrowUpRight, ArrowDownRight, Activity,
-  Store, Database, CalendarPlus
+  Store, Database, CalendarPlus, LayoutGrid, Building2, Package,
+  UserPlus, ChevronRight, Sparkles
 } from 'lucide-react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
