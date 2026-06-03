@@ -51,6 +51,7 @@ const SuperAdmin = () => {
   const [bans, setBans] = useState<any[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [extendDays, setExtendDays] = useState<Record<string, number>>({});
+  const [drillIn, setDrillIn] = useState<{ id: string; name: string } | null>(null);
   const [issues, setIssues] = useState<any[]>([]);
 
   useEffect(() => {
