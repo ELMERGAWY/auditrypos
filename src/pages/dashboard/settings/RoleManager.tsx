@@ -208,8 +208,10 @@ export function RoleManager({ companyId }: { companyId: string }) {
           <Plus className="w-4 h-4" /> إضافة دور وظيفي مخصص
         </Button>
       </div>
+      <AIPermissionsAssistant companyId={companyId} onCreated={loadData} />
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+
         {/* Roles Sidebar */}
         <div className="lg:col-span-3 space-y-2">
           <p className="text-xs font-bold text-muted-foreground px-2 mb-3 uppercase tracking-widest">الأدوار الوظيفية</p>
