@@ -314,10 +314,14 @@ const SuperAdmin = () => {
                       {r.status === 'active' ? <Pause className="w-4 h-4 ml-1" /> : <Play className="w-4 h-4 ml-1" />}
                       {r.status === 'active' ? 'إيقاف' : 'تفعيل'}
                     </Button>
+                    <Button size="sm" variant="outline" onClick={() => setDrillIn({ id: r.id, name: r.name })} className="w-full sm:w-auto gap-1 border-primary/30 text-primary">
+                      <ChevronRight className="w-4 h-4" /> إدارة شاملة
+                    </Button>
                     <Button size="sm" variant="ghost" onClick={() => handleDelete(r.id)} className="w-full sm:w-auto text-destructive hover:bg-destructive/10">
                       <Trash2 className="w-4 h-4" />
                     </Button>
                   </div>
+
                 </div>
               ))}
             </div>
