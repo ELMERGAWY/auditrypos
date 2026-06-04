@@ -192,6 +192,31 @@ export default function Dashboard() {
 
   const updateQty = useCallback((id: string, d: number) => setCart(prev => prev.map(c => c.item.id === id ? { ...c, qty: Math.max(0, Math.round((c.qty + d) * 100) / 100), qtyText: String(Math.max(0, Math.round((c.qty + d) * 100) / 100)) } : c).filter(c => c.qty > 0)), []);
 
+  const setCartItemQty = useCallback((id: string, text: string) => {
+    setCart(prev => prev.map(c => {
+      if (c.item.id !== id) return c;
+      const cleaned = text.replace(/[^0-9.]/g, '');
+      const n = parseFloat(cleaned);
+      return { ...c, qtyText: cleaned, qty: isNaN(n) ? c.qty : Math.max(0, n) };
+    }));
+  }, []);
+
+  const setCartItemUnit = useCallback((id: string, label: string) => {
+    setCart(prev => prev.map(c => c.item.id === id ? { ...c, unitMode: label } : c));
+  }, []);
+
+  // Bidirectional: editing the value (amount) field recomputes qty = value / unitPrice
+  const updateValue = useCallback((id: string, value: number) => {
+    if (isNaN(value) || value < 0) return;
+    setCart(prev => prev.map(c => {
+      if (c.item.id !== id) return c;
+      const price = Number(c.item.price) || 0;
+      if (price <= 0) return c;
+      const newQty = Math.round((value / price) * 1000) / 1000;
+      return { ...c, qty: newQty, qtyText: String(newQty) };
+    }).filter(c => c.qty > 0));
+  }, []);
+
   const handleDeleteOrder = async (id: string) => {
     if (!confirm('هل أنت متأكد من حذف هذا الطلب؟')) return;
     try {
