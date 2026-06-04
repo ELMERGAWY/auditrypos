@@ -118,11 +118,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     session,
     loading,
     isSuperAdmin,
+    adminChecked,
     signUp,
     signIn,
     signOut,
     lastKnownUser
-  }), [user, session, loading, isSuperAdmin, lastKnownUser]);
+  }), [user, session, loading, isSuperAdmin, adminChecked, lastKnownUser]);
 
   return (
     <AuthContext.Provider value={value}>
