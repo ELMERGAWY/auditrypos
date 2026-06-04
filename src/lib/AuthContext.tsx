@@ -39,13 +39,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setSession(null);
         setUser(null);
         setIsSuperAdmin(false);
+        setAdminChecked(true);
         setLoading(false);
       } else if (session) {
         setSession(session);
         setUser(session.user);
         setLastKnownUser(session.user);
         localStorage.setItem('last_known_user', JSON.stringify(session.user));
-        
+        setAdminChecked(false);
         // Only check admin if we have a user and something changed
         setTimeout(async () => {
           try {
@@ -58,11 +59,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             setIsSuperAdmin(!!data);
           } catch (err) {
             console.error("Error checking admin status:", err);
+          } finally {
+            setAdminChecked(true);
           }
         }, 0);
         setLoading(false);
       } else {
         // Fallback for INITIAL_SESSION with no user
+        setAdminChecked(true);
         setLoading(false);
       }
     });
