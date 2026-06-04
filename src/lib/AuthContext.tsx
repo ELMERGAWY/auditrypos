@@ -20,6 +20,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
   const [isSuperAdmin, setIsSuperAdmin] = useState(false);
+  const [adminChecked, setAdminChecked] = useState(false);
   const [lastKnownUser, setLastKnownUser] = useState<User | null>(() => {
     const saved = localStorage.getItem('last_known_user');
     return saved ? JSON.parse(saved) : null;
