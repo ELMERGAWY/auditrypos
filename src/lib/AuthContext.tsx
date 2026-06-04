@@ -7,6 +7,7 @@ interface AuthContextType {
   session: Session | null;
   loading: boolean;
   isSuperAdmin: boolean;
+  adminChecked: boolean;
   signUp: (email: string, password: string, fullName: string) => Promise<{ error: Error | null }>;
   signIn: (email: string, password: string) => Promise<{ error: Error | null }>;
   signOut: () => Promise<void>;
@@ -20,6 +21,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
   const [isSuperAdmin, setIsSuperAdmin] = useState(false);
+  const [adminChecked, setAdminChecked] = useState(false);
   const [lastKnownUser, setLastKnownUser] = useState<User | null>(() => {
     const saved = localStorage.getItem('last_known_user');
     return saved ? JSON.parse(saved) : null;
@@ -38,13 +40,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setSession(null);
         setUser(null);
         setIsSuperAdmin(false);
+        setAdminChecked(true);
         setLoading(false);
       } else if (session) {
         setSession(session);
         setUser(session.user);
         setLastKnownUser(session.user);
         localStorage.setItem('last_known_user', JSON.stringify(session.user));
-        
+        setAdminChecked(false);
         // Only check admin if we have a user and something changed
         setTimeout(async () => {
           try {
@@ -57,11 +60,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             setIsSuperAdmin(!!data);
           } catch (err) {
             console.error("Error checking admin status:", err);
+          } finally {
+            setAdminChecked(true);
           }
         }, 0);
         setLoading(false);
       } else {
         // Fallback for INITIAL_SESSION with no user
+        setAdminChecked(true);
         setLoading(false);
       }
     });
@@ -112,11 +118,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     session,
     loading,
     isSuperAdmin,
+    adminChecked,
     signUp,
     signIn,
     signOut,
     lastKnownUser
-  }), [user, session, loading, isSuperAdmin, lastKnownUser]);
+  }), [user, session, loading, isSuperAdmin, adminChecked, lastKnownUser]);
 
   return (
     <AuthContext.Provider value={value}>
