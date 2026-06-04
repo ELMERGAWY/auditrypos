@@ -205,17 +205,23 @@ export const POSCart = memo(function POSCart({
             <div className="flex flex-col gap-1 items-end">
               <div className="flex items-center gap-1">
                 <div className="relative w-20">
-                  <Input 
-                    type="text" 
+                  <Input
+                    key={`val-${c.item.id}-${c.qty}`}
+                    type="text"
                     inputMode="decimal"
-                    defaultValue={(c.item.price * c.qty).toFixed(2)} 
-                    onBlur={e => updateValue(c.item.id, parseFloat(e.target.value))}
+                    defaultValue={(c.item.price * c.qty).toFixed(2)}
+                    onBlur={e => {
+                      const v = parseFloat(e.target.value);
+                      if (!isNaN(v) && Math.abs(v - c.item.price * c.qty) > 0.001) updateValue(c.item.id, v);
+                    }}
                     onKeyDown={e => {
                       if (e.key === 'Enter') {
-                        updateValue(c.item.id, parseFloat((e.target as HTMLInputElement).value));
+                        const v = parseFloat((e.target as HTMLInputElement).value);
+                        if (!isNaN(v)) updateValue(c.item.id, v);
                         (e.target as HTMLInputElement).blur();
                       }
                     }}
+                    title="اكتب المبلغ ليُحسب الكمية تلقائياً"
                     className="h-7 text-[10px] pr-5 text-center bg-blue-50/50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800"
                     placeholder="المبلغ"
                   />
