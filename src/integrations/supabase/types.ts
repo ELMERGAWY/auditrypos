@@ -10164,6 +10164,7 @@ export type Database = {
       }
       restaurants_public: {
         Row: {
+          business_type: Database["public"]["Enums"]["business_type"] | null
           currency: string | null
           id: string | null
           logo_url: string | null
@@ -10171,6 +10172,7 @@ export type Database = {
           status: string | null
         }
         Insert: {
+          business_type?: Database["public"]["Enums"]["business_type"] | null
           currency?: string | null
           id?: string | null
           logo_url?: string | null
@@ -10178,6 +10180,7 @@ export type Database = {
           status?: string | null
         }
         Update: {
+          business_type?: Database["public"]["Enums"]["business_type"] | null
           currency?: string | null
           id?: string | null
           logo_url?: string | null
