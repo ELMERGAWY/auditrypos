@@ -136,7 +136,7 @@ export function MenuTab({
         product_type: menuForm.product_type,
         pricing_method: menuForm.pricing_method,
         profit_margin_percent: Number(menuForm.profit_margin_percent),
-        product_id: menuForm.product_type === 'inventory' ? menuForm.product_id : null,
+        product_id: (menuForm.product_type === 'inventory' && menuForm.product_id) ? menuForm.product_id : null,
       })
     };
 
