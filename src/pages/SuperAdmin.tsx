@@ -42,7 +42,7 @@ const BAN_LEVELS = {
 const SuperAdmin = () => {
   useDarkMode();
   const navigate = useNavigate();
-  const { user, isSuperAdmin, loading: authLoading } = useAuth();
+  const { user, isSuperAdmin, adminChecked, loading: authLoading } = useAuth();
   const [tab, setTab] = useState<Tab>('overview');
   const [restaurants, setRestaurants] = useState<any[]>([]);
   const [receipts, setReceipts] = useState<any[]>([]);
@@ -55,11 +55,12 @@ const SuperAdmin = () => {
   const [issues, setIssues] = useState<any[]>([]);
 
   useEffect(() => {
-    if (!authLoading && (!user || !isSuperAdmin)) {
+    // Wait for both authLoading AND adminChecked before redirecting (prevents race condition kicking super admins out)
+    if (!authLoading && adminChecked && (!user || !isSuperAdmin)) {
       toast.error('غير مصرح لك بالوصول - يجب أن تكون سوبر أدمن');
       navigate('/');
     }
-  }, [user, isSuperAdmin, authLoading, navigate]);
+  }, [user, isSuperAdmin, adminChecked, authLoading, navigate]);
 
   const load = async () => {
     const [restsRes, rcptsRes, ordersRes, agentsRes, bansRes, issuesRes] = await Promise.all([
