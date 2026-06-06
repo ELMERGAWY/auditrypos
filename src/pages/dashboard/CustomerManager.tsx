@@ -260,8 +260,10 @@ export function CustomerManager({ restaurantId, currency }: Props) {
           address: formData.address || null,
           credit_limit: formData.credit_limit ? Number(formData.credit_limit) : null,
           tax_number: formData.tax_number || null,
+          customer_type: formData.customer_type || 'retail',
+          notes: formData.notes || null,
           balance: 0
-        });
+        } as any);
 
       if (error) throw error;
 
@@ -286,8 +288,10 @@ export function CustomerManager({ restaurantId, currency }: Props) {
           email: formData.email || null,
           address: formData.address || null,
           credit_limit: formData.credit_limit ? Number(formData.credit_limit) : null,
-          tax_number: formData.tax_number || null
-        })
+          tax_number: formData.tax_number || null,
+          customer_type: formData.customer_type || 'retail',
+          notes: formData.notes || null,
+        } as any)
         .eq('id', selectedCustomer.id);
 
       if (error) throw error;
@@ -299,6 +303,75 @@ export function CustomerManager({ restaurantId, currency }: Props) {
       loadCustomers();
     } catch (error: any) {
       toast.error('فشل تحديث العميل: ' + error.message);
+    }
+  };
+
+  const handleDeleteCustomer = async (customer: Customer) => {
+    if (!confirm(`حذف العميل "${customer.name}"؟ سيتم حذف جميع البيانات المرتبطة بدون رجعة.`)) return;
+    try {
+      const { error } = await supabase.from('customers').delete().eq('id', customer.id);
+      if (error) throw error;
+      toast.success('تم حذف العميل');
+      loadCustomers();
+    } catch (error: any) {
+      toast.error('فشل الحذف: ' + error.message);
+    }
+  };
+
+  const handleRecordPayment = async () => {
+    if (!selectedCustomer) return;
+    const amount = Number(paymentForm.amount);
+    if (!amount || amount <= 0) { toast.error('أدخل مبلغ صحيح'); return; }
+    setProcessingPayment(true);
+    try {
+      const newBalance = selectedCustomer.balance - amount;
+      await supabase.from('customers').update({ balance: newBalance }).eq('id', selectedCustomer.id);
+      await supabase.from('customer_transactions').insert({
+        customer_id: selectedCustomer.id,
+        restaurant_id: restaurantId,
+        type: 'payment',
+        amount: -amount,
+        description: paymentForm.notes || 'دفعة نقدية من العميل',
+        payment_method: paymentForm.payment_method,
+      } as any);
+
+      // Print payment receipt (سند قبض)
+      const w = window.open('', '_blank', 'width=320,height=600');
+      if (w) {
+        const d = new Date();
+        w.document.write(`<!DOCTYPE html><html dir="rtl" lang="ar"><head><meta charset="UTF-8"><title>سند قبض</title><style>
+          *{margin:0;padding:0;box-sizing:border-box}body{font-family:'Courier New',monospace;font-size:12px;padding:10px;max-width:300px;margin:0 auto}
+          .center{text-align:center}.bold{font-weight:bold}
+          .title{font-size:18px;font-weight:bold;margin:8px 0;border:2px solid #000;padding:4px;text-align:center}
+          .divider{border-top:1px dashed #333;margin:8px 0}.row{display:flex;justify-content:space-between;padding:3px 0}
+          .amount{font-size:20px;font-weight:bold;text-align:center;margin:8px 0}
+          @media print{@page{margin:0}}</style></head><body>
+          <div class="title">سند قبض</div>
+          <div class="row"><span>التاريخ:</span><span>${d.toLocaleDateString('ar-EG')}</span></div>
+          <div class="row"><span>الوقت:</span><span>${d.toLocaleTimeString('ar-EG')}</span></div>
+          <div class="divider"></div>
+          <div class="row"><span>اسم العميل:</span><span class="bold">${selectedCustomer.name}</span></div>
+          <div class="row"><span>الهاتف:</span><span>${selectedCustomer.phone || '-'}</span></div>
+          <div class="divider"></div>
+          <div class="amount">${amount.toFixed(2)} ${currency}</div>
+          <div class="row"><span>الرصيد السابق:</span><span>${selectedCustomer.balance.toFixed(2)} ${currency}</span></div>
+          <div class="row"><span>الرصيد الجديد:</span><span class="bold">${newBalance.toFixed(2)} ${currency}</span></div>
+          ${paymentForm.notes ? `<div class="divider"></div><div>ملاحظات: ${paymentForm.notes}</div>` : ''}
+          <div class="divider"></div>
+          <div class="center" style="font-size:10px;color:#666;margin-top:8px">Powered by AuditryPOS</div>
+        </body></html>`);
+        w.document.close();
+        w.onload = () => { w.focus(); w.print(); };
+      }
+
+      toast.success(`تم تسجيل دفعة ${amount.toFixed(2)} ${currency}`);
+      setShowPaymentModal(false);
+      setPaymentForm({ amount: '', payment_method: 'cash', notes: '' });
+      loadCustomers();
+    } catch (error: any) {
+      toast.error('فشل تسجيل الدفعة: ' + error.message);
+    } finally {
+      setProcessingPayment(false);
     }
   };
 
