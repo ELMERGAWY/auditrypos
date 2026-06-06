@@ -278,7 +278,7 @@ export function PurchaseInvoices({ restaurantId, currency }: Props) {
 
         // Apply costing method via service
         try {
-          await inventoryCostingService.addCostLayer(restaurantId, l.product_id, Number(l.quantity), Number(l.unit_cost), 'purchase', receipt.id);
+          await inventoryCosting.addCostLayer(restaurantId, l.product_id, Number(l.quantity), Number(l.unit_cost), 'purchase', receipt.id);
         } catch (e) { console.warn('cost layer:', e); }
 
         // Update product on-hand quantity + new cost (WAC) or last cost (FIFO/LIFO)
