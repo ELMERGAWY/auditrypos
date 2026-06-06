@@ -1,4 +1,5 @@
 // @ts-nocheck
+// Sync update for Lovable - 2026-06-06
 import { useState, useRef, useEffect, useCallback, Suspense, lazy, useMemo } from 'react';
 import { format, startOfMonth, endOfDay } from 'date-fns';
 import { useNavigate } from 'react-router-dom';
