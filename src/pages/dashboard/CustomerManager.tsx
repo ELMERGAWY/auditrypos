@@ -439,7 +439,7 @@ export function CustomerManager({ restaurantId, currency }: Props) {
             <p className="text-xs text-muted-foreground">{customers.length} عميل | إجمالي الذمم: {totalReceivables.toFixed(2)} {currency}</p>
           </div>
         </div>
-        <Button onClick={() => { setSelectedCustomer(null); setFormData({ name: '', phone: '', email: '', address: '', credit_limit: '', tax_number: '' }); setShowAddModal(true); }}>
+        <Button onClick={() => { setSelectedCustomer(null); setFormData({ name: '', phone: '', email: '', address: '', credit_limit: '', tax_number: '', customer_type: 'retail', notes: '' }); setShowAddModal(true); }}>
           <Plus className="w-4 h-4 ml-1" /> عميل جديد
         </Button>
       </div>
