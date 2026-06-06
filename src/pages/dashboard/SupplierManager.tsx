@@ -423,7 +423,7 @@ export function SupplierManager({ restaurantId, currency }: Props) {
             <Truck className="w-5 h-5 text-primary" />
           </div>
           <div>
-            <h2 className="font-display font-bold text-lg">إدارة الموردين</h2>
+            <h2 className="font-display font-bold text-lg">الموردين وحساباتهم</h2>
             <p className="text-xs text-muted-foreground">{suppliers.length} مورد | إجمالي المستحقات: {totalPayables.toFixed(2)} {currency}</p>
           </div>
         </div>
