@@ -263,19 +263,6 @@ export const POSCart = memo(function POSCart({
                   />
                   <span className="absolute right-1 top-1/2 -translate-y-1/2 text-[8px] text-blue-600 dark:text-blue-400 font-bold">{currency}</span>
                 </div>
-                    onKeyDown={e => {
-                      if (e.key === 'Enter') {
-                        const v = parseFloat((e.target as HTMLInputElement).value);
-                        if (!isNaN(v)) updateValue(c.item.id, v);
-                        (e.target as HTMLInputElement).blur();
-                      }
-                    }}
-                    title="اكتب المبلغ ليُحسب الكمية تلقائياً"
-                    className="h-7 text-[10px] pr-5 text-center bg-blue-50/50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800"
-                    placeholder="المبلغ"
-                  />
-                  <span className="absolute right-1 top-1/2 -translate-y-1/2 text-[8px] text-blue-600 dark:text-blue-400 font-bold">{currency}</span>
-                </div>
                 <div className="flex items-center gap-1 bg-secondary rounded-md p-0.5">
                   <button onClick={() => updateQty(c.item.id, -1)} className="w-6 h-6 flex items-center justify-center hover:bg-destructive/20 rounded"><Minus className="w-3 h-3" /></button>
                   <input
