@@ -636,6 +636,15 @@ export function SupplierManager({ restaurantId, currency }: Props) {
                         >
                           <Banknote className="w-4 h-4" />
                         </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          title="حذف"
+                          className="text-destructive hover:text-destructive"
+                          onClick={() => handleDeleteSupplier(supplier)}
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
                       </div>
                     </td>
                   </tr>
