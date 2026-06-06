@@ -120,6 +120,12 @@ export default function Dashboard() {
   const [showReceipt, setShowReceipt] = useState(false);
   const [isProcessingCheckout, setIsProcessingCheckout] = useState(false);
 
+  // Reset modals on tab change
+  useEffect(() => {
+    setShowReceipt(false);
+    setShowInvoiceTabs(false);
+  }, [activeTab]);
+
   // Derived
   const businessType = (restaurant?.business_type || 'restaurant') as BusinessType;
   const currency = restaurant?.currency || 'ج.م';
@@ -441,7 +447,11 @@ export default function Dashboard() {
         <ProfessionalSidebar 
           businessType={businessType} 
           activeTab={activeTab} 
-          onTabChange={setActiveTab} 
+          onTabChange={(tab) => {
+            setActiveTab(tab);
+            setShowReceipt(false);
+            setShowInvoiceTabs(false);
+          }} 
           restaurant={restaurant} 
           user={{ email: user?.email, full_name: profileName }} 
           stats={{ pendingOrders: pendingOrders.length, deliveryOrders: deliveryOrders.length, todayRevenue, isOnline, currency }} 
