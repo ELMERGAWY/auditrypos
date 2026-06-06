@@ -68,6 +68,10 @@ export function CustomerManager({ restaurantId, currency }: Props) {
   const [transactions, setTransactions] = useState<CustomerTransaction[]>([]);
   const [returns, setReturns] = useState<CustomerSalesReturn[]>([]);
   
+  const [showPaymentModal, setShowPaymentModal] = useState(false);
+  const [paymentForm, setPaymentForm] = useState({ amount: '', payment_method: 'cash', notes: '' });
+  const [processingPayment, setProcessingPayment] = useState(false);
+
   // Form state
   const [formData, setFormData] = useState({
     name: '',
@@ -75,7 +79,9 @@ export function CustomerManager({ restaurantId, currency }: Props) {
     email: '',
     address: '',
     credit_limit: '',
-    tax_number: ''
+    tax_number: '',
+    customer_type: 'retail',
+    notes: ''
   });
 
   useEffect(() => {
