@@ -134,15 +134,15 @@ export const ProfessionalSidebar = memo(function ProfessionalSidebar({
     orders: { label: config.labels.orders, icon: Receipt, badge: stats.pendingOrders, section: 'main' },
     menu: { label: config.labels.menu, icon: config.category === 'food' ? ChefHat : Package, section: 'main' },
     
-    customers: { label: 'إدارة العملاء', icon: Users, badge: stats.customersCount, section: 'sales' },
-    customer_accounts: { label: 'حسابات العملاء', icon: CreditCard, section: 'sales' },
+    customers: { label: 'العملاء والحسابات', icon: Users, badge: stats.customersCount, section: 'sales' },
+    customer_accounts: { label: '', icon: CreditCard, section: 'sales' }, // merged into 'customers'
     crm: { label: 'CRM', icon: Heart, section: 'sales' },
     sales_orders: { label: 'أوامر البيع', icon: FileText, section: 'sales' },
     sales_invoices: { label: 'فواتير البيع', icon: Receipt, badge: stats.salesInvoicesCount, section: 'sales' },
     sales_returns: { label: 'مرتجعات مبيعات', icon: RotateCcw, badge: stats.returnsCount, section: 'sales' },
     
-    suppliers: { label: 'إدارة الموردين', icon: UsersRound, badge: stats.suppliersCount, section: 'purchases' },
-    supplier_accounts: { label: 'حسابات الموردين', icon: Wallet, section: 'purchases' },
+    suppliers: { label: 'الموردين والحسابات', icon: UsersRound, badge: stats.suppliersCount, section: 'purchases' },
+    supplier_accounts: { label: '', icon: Wallet, section: 'purchases' }, // merged into 'suppliers'
     purchase_orders: { label: 'أوامر شراء', icon: ShoppingCart, section: 'purchases' },
     purchase_invoices: { label: 'فواتير شراء', icon: DollarSign, badge: stats.purchaseInvoicesCount, section: 'purchases' },
     
@@ -186,6 +186,7 @@ export const ProfessionalSidebar = memo(function ProfessionalSidebar({
       .map(tabId => {
         const item = allNavItems[tabId];
         if (!item) return null;
+        if (!item.label) return null; // hide merged duplicates (customer_accounts, supplier_accounts)
         return {
           id: tabId,
           label: item.label!,

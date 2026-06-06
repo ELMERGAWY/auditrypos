@@ -11,7 +11,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { 
   Users, Plus, Search, Phone, MapPin, FileText, TrendingUp, 
   TrendingDown, Wallet, Download, CreditCard, AlertCircle, Receipt,
-  ArrowRight, Calendar, Eye, FileJson
+  ArrowRight, Calendar, Eye, FileJson, Trash2, Banknote
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import jsPDF from 'jspdf';
@@ -68,6 +68,10 @@ export function CustomerManager({ restaurantId, currency }: Props) {
   const [transactions, setTransactions] = useState<CustomerTransaction[]>([]);
   const [returns, setReturns] = useState<CustomerSalesReturn[]>([]);
   
+  const [showPaymentModal, setShowPaymentModal] = useState(false);
+  const [paymentForm, setPaymentForm] = useState({ amount: '', payment_method: 'cash', notes: '' });
+  const [processingPayment, setProcessingPayment] = useState(false);
+
   // Form state
   const [formData, setFormData] = useState({
     name: '',
@@ -75,7 +79,9 @@ export function CustomerManager({ restaurantId, currency }: Props) {
     email: '',
     address: '',
     credit_limit: '',
-    tax_number: ''
+    tax_number: '',
+    customer_type: 'retail',
+    notes: ''
   });
 
   useEffect(() => {
@@ -254,14 +260,16 @@ export function CustomerManager({ restaurantId, currency }: Props) {
           address: formData.address || null,
           credit_limit: formData.credit_limit ? Number(formData.credit_limit) : null,
           tax_number: formData.tax_number || null,
+          customer_type: formData.customer_type || 'retail',
+          notes: formData.notes || null,
           balance: 0
-        });
+        } as any);
 
       if (error) throw error;
 
       toast.success('تم إضافة العميل بنجاح');
       setShowAddModal(false);
-      setFormData({ name: '', phone: '', email: '', address: '', credit_limit: '', tax_number: '' });
+      setFormData({ name: '', phone: '', email: '', address: '', credit_limit: '', tax_number: '', customer_type: 'retail', notes: '' });
       loadCustomers();
     } catch (error: any) {
       toast.error('فشل إضافة العميل: ' + error.message);
@@ -280,8 +288,10 @@ export function CustomerManager({ restaurantId, currency }: Props) {
           email: formData.email || null,
           address: formData.address || null,
           credit_limit: formData.credit_limit ? Number(formData.credit_limit) : null,
-          tax_number: formData.tax_number || null
-        })
+          tax_number: formData.tax_number || null,
+          customer_type: formData.customer_type || 'retail',
+          notes: formData.notes || null,
+        } as any)
         .eq('id', selectedCustomer.id);
 
       if (error) throw error;
@@ -289,10 +299,79 @@ export function CustomerManager({ restaurantId, currency }: Props) {
       toast.success('تم تحديث العميل بنجاح');
       setShowAddModal(false);
       setSelectedCustomer(null);
-      setFormData({ name: '', phone: '', email: '', address: '', credit_limit: '', tax_number: '' });
+      setFormData({ name: '', phone: '', email: '', address: '', credit_limit: '', tax_number: '', customer_type: 'retail', notes: '' });
       loadCustomers();
     } catch (error: any) {
       toast.error('فشل تحديث العميل: ' + error.message);
+    }
+  };
+
+  const handleDeleteCustomer = async (customer: Customer) => {
+    if (!confirm(`حذف العميل "${customer.name}"؟ سيتم حذف جميع البيانات المرتبطة بدون رجعة.`)) return;
+    try {
+      const { error } = await supabase.from('customers').delete().eq('id', customer.id);
+      if (error) throw error;
+      toast.success('تم حذف العميل');
+      loadCustomers();
+    } catch (error: any) {
+      toast.error('فشل الحذف: ' + error.message);
+    }
+  };
+
+  const handleRecordPayment = async () => {
+    if (!selectedCustomer) return;
+    const amount = Number(paymentForm.amount);
+    if (!amount || amount <= 0) { toast.error('أدخل مبلغ صحيح'); return; }
+    setProcessingPayment(true);
+    try {
+      const newBalance = selectedCustomer.balance - amount;
+      await supabase.from('customers').update({ balance: newBalance }).eq('id', selectedCustomer.id);
+      await supabase.from('customer_transactions').insert({
+        customer_id: selectedCustomer.id,
+        restaurant_id: restaurantId,
+        type: 'payment',
+        amount: -amount,
+        description: paymentForm.notes || 'دفعة نقدية من العميل',
+        payment_method: paymentForm.payment_method,
+      } as any);
+
+      // Print payment receipt (سند قبض)
+      const w = window.open('', '_blank', 'width=320,height=600');
+      if (w) {
+        const d = new Date();
+        w.document.write(`<!DOCTYPE html><html dir="rtl" lang="ar"><head><meta charset="UTF-8"><title>سند قبض</title><style>
+          *{margin:0;padding:0;box-sizing:border-box}body{font-family:'Courier New',monospace;font-size:12px;padding:10px;max-width:300px;margin:0 auto}
+          .center{text-align:center}.bold{font-weight:bold}
+          .title{font-size:18px;font-weight:bold;margin:8px 0;border:2px solid #000;padding:4px;text-align:center}
+          .divider{border-top:1px dashed #333;margin:8px 0}.row{display:flex;justify-content:space-between;padding:3px 0}
+          .amount{font-size:20px;font-weight:bold;text-align:center;margin:8px 0}
+          @media print{@page{margin:0}}</style></head><body>
+          <div class="title">سند قبض</div>
+          <div class="row"><span>التاريخ:</span><span>${d.toLocaleDateString('ar-EG')}</span></div>
+          <div class="row"><span>الوقت:</span><span>${d.toLocaleTimeString('ar-EG')}</span></div>
+          <div class="divider"></div>
+          <div class="row"><span>اسم العميل:</span><span class="bold">${selectedCustomer.name}</span></div>
+          <div class="row"><span>الهاتف:</span><span>${selectedCustomer.phone || '-'}</span></div>
+          <div class="divider"></div>
+          <div class="amount">${amount.toFixed(2)} ${currency}</div>
+          <div class="row"><span>الرصيد السابق:</span><span>${selectedCustomer.balance.toFixed(2)} ${currency}</span></div>
+          <div class="row"><span>الرصيد الجديد:</span><span class="bold">${newBalance.toFixed(2)} ${currency}</span></div>
+          ${paymentForm.notes ? `<div class="divider"></div><div>ملاحظات: ${paymentForm.notes}</div>` : ''}
+          <div class="divider"></div>
+          <div class="center" style="font-size:10px;color:#666;margin-top:8px">Powered by AuditryPOS</div>
+        </body></html>`);
+        w.document.close();
+        w.onload = () => { w.focus(); w.print(); };
+      }
+
+      toast.success(`تم تسجيل دفعة ${amount.toFixed(2)} ${currency}`);
+      setShowPaymentModal(false);
+      setPaymentForm({ amount: '', payment_method: 'cash', notes: '' });
+      loadCustomers();
+    } catch (error: any) {
+      toast.error('فشل تسجيل الدفعة: ' + error.message);
+    } finally {
+      setProcessingPayment(false);
     }
   };
 
@@ -413,7 +492,9 @@ export function CustomerManager({ restaurantId, currency }: Props) {
       email: customer.email || '',
       address: customer.address || '',
       credit_limit: customer.credit_limit?.toString() || '',
-      tax_number: customer.tax_number || ''
+      tax_number: customer.tax_number || '',
+      customer_type: (customer as any).customer_type || 'retail',
+      notes: (customer as any).notes || ''
     });
     setShowAddModal(true);
   };
@@ -427,11 +508,11 @@ export function CustomerManager({ restaurantId, currency }: Props) {
             <Users className="w-5 h-5 text-primary" />
           </div>
           <div>
-            <h2 className="font-display font-bold text-lg">إدارة العملاء</h2>
+            <h2 className="font-display font-bold text-lg">العملاء وحساباتهم</h2>
             <p className="text-xs text-muted-foreground">{customers.length} عميل | إجمالي الذمم: {totalReceivables.toFixed(2)} {currency}</p>
           </div>
         </div>
-        <Button onClick={() => { setSelectedCustomer(null); setFormData({ name: '', phone: '', email: '', address: '', credit_limit: '', tax_number: '' }); setShowAddModal(true); }}>
+        <Button onClick={() => { setSelectedCustomer(null); setFormData({ name: '', phone: '', email: '', address: '', credit_limit: '', tax_number: '', customer_type: 'retail', notes: '' }); setShowAddModal(true); }}>
           <Plus className="w-4 h-4 ml-1" /> عميل جديد
         </Button>
       </div>
@@ -582,8 +663,30 @@ export function CustomerManager({ restaurantId, currency }: Props) {
                         >
                           <Receipt className="w-4 h-4" />
                         </Button>
-                        <Button variant="ghost" size="sm" onClick={() => startEdit(customer)}>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          title="سند قبض"
+                          disabled={customer.balance <= 0}
+                          onClick={() => {
+                            setSelectedCustomer(customer);
+                            setPaymentForm({ amount: customer.balance.toString(), payment_method: 'cash', notes: '' });
+                            setShowPaymentModal(true);
+                          }}
+                        >
+                          <Banknote className="w-4 h-4" />
+                        </Button>
+                        <Button variant="ghost" size="sm" title="تعديل" onClick={() => startEdit(customer)}>
                           <Eye className="w-4 h-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          title="حذف"
+                          className="text-destructive hover:text-destructive"
+                          onClick={() => handleDeleteCustomer(customer)}
+                        >
+                          <Trash2 className="w-4 h-4" />
                         </Button>
                       </div>
                     </td>
@@ -652,6 +755,28 @@ export function CustomerManager({ restaurantId, currency }: Props) {
                   value={formData.tax_number} 
                   onChange={(e) => setFormData({ ...formData, tax_number: e.target.value })}
                   placeholder="رقم التسجيل الضريبي"
+                />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label>تصنيف العميل</Label>
+                <select
+                  value={formData.customer_type}
+                  onChange={(e) => setFormData({ ...formData, customer_type: e.target.value })}
+                  className="w-full px-3 py-2 rounded-md bg-background border border-input text-sm"
+                >
+                  <option value="retail">تجزئة</option>
+                  <option value="wholesale">جملة</option>
+                  <option value="vip">VIP</option>
+                </select>
+              </div>
+              <div>
+                <Label>ملاحظات</Label>
+                <Input
+                  value={formData.notes}
+                  onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+                  placeholder="ملاحظات اختيارية"
                 />
               </div>
             </div>
@@ -785,6 +910,57 @@ export function CustomerManager({ restaurantId, currency }: Props) {
                 </tbody>
               </table>
             )}
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Payment Modal — سند قبض */}
+      <Dialog open={showPaymentModal} onOpenChange={setShowPaymentModal}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>سند قبض من العميل: {selectedCustomer?.name}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 mt-4">
+            <div className="bg-secondary/50 p-3 rounded-lg">
+              <p className="text-sm text-muted-foreground">الرصيد الحالي</p>
+              <p className="text-2xl font-bold text-destructive">{selectedCustomer?.balance?.toFixed(2)} {currency}</p>
+            </div>
+            <div>
+              <Label>المبلغ *</Label>
+              <Input
+                type="number"
+                value={paymentForm.amount}
+                onChange={(e) => setPaymentForm({ ...paymentForm, amount: e.target.value })}
+                placeholder="0.00"
+              />
+            </div>
+            <div>
+              <Label>طريقة الدفع</Label>
+              <select
+                value={paymentForm.payment_method}
+                onChange={(e) => setPaymentForm({ ...paymentForm, payment_method: e.target.value })}
+                className="w-full px-3 py-2 rounded-md bg-background border border-input text-sm"
+              >
+                <option value="cash">💵 نقدي</option>
+                <option value="instapay">📱 إنستاباي</option>
+                <option value="vodafone_cash">📲 فودافون كاش</option>
+                <option value="bank">🏦 تحويل بنكي</option>
+              </select>
+            </div>
+            <div>
+              <Label>ملاحظات</Label>
+              <Input
+                value={paymentForm.notes}
+                onChange={(e) => setPaymentForm({ ...paymentForm, notes: e.target.value })}
+                placeholder="اختياري"
+              />
+            </div>
+            <div className="flex gap-2">
+              <Button className="flex-1 gradient-bg text-primary-foreground border-0" disabled={processingPayment} onClick={handleRecordPayment}>
+                {processingPayment ? 'جاري التسجيل...' : 'تسجيل وطباعة السند'}
+              </Button>
+              <Button variant="outline" onClick={() => setShowPaymentModal(false)}>إلغاء</Button>
+            </div>
           </div>
         </DialogContent>
       </Dialog>

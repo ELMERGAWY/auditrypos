@@ -6677,41 +6677,156 @@ export type Database = {
           },
         ]
       }
+      purchase_invoice_items: {
+        Row: {
+          created_at: string
+          description: string
+          gl_account_id: string | null
+          id: string
+          invoice_id: string
+          line_type: string
+          product_id: string | null
+          quantity: number
+          tax_amount: number
+          total: number
+          unit_cost: number
+          warehouse_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          description?: string
+          gl_account_id?: string | null
+          id?: string
+          invoice_id: string
+          line_type?: string
+          product_id?: string | null
+          quantity?: number
+          tax_amount?: number
+          total?: number
+          unit_cost?: number
+          warehouse_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          description?: string
+          gl_account_id?: string | null
+          id?: string
+          invoice_id?: string
+          line_type?: string
+          product_id?: string | null
+          quantity?: number
+          tax_amount?: number
+          total?: number
+          unit_cost?: number
+          warehouse_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "purchase_invoice_items_gl_account_id_fkey"
+            columns: ["gl_account_id"]
+            isOneToOne: false
+            referencedRelation: "chart_of_accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "purchase_invoice_items_invoice_id_fkey"
+            columns: ["invoice_id"]
+            isOneToOne: false
+            referencedRelation: "purchase_invoices"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "purchase_invoice_items_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "purchase_invoice_items_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "public_products"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "purchase_invoice_items_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "v_inventory_valuation"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "purchase_invoice_items_warehouse_id_fkey"
+            columns: ["warehouse_id"]
+            isOneToOne: false
+            referencedRelation: "warehouses"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       purchase_invoices: {
         Row: {
           created_at: string | null
+          goods_received_at: string | null
           id: string
+          inventory_receipt_id: string | null
           invoice_date: string
           invoice_number: string
+          is_credit: boolean
           journal_entry_id: string | null
+          net_amount: number
+          notes: string | null
+          paid_amount: number
           restaurant_id: string
+          status: string
           supplier_id: string | null
           supplier_name: string
+          tax_amount: number
           total_amount: number
+          updated_at: string
           warehouse_id: string | null
         }
         Insert: {
           created_at?: string | null
+          goods_received_at?: string | null
           id?: string
+          inventory_receipt_id?: string | null
           invoice_date: string
           invoice_number: string
+          is_credit?: boolean
           journal_entry_id?: string | null
+          net_amount?: number
+          notes?: string | null
+          paid_amount?: number
           restaurant_id: string
+          status?: string
           supplier_id?: string | null
           supplier_name: string
+          tax_amount?: number
           total_amount?: number
+          updated_at?: string
           warehouse_id?: string | null
         }
         Update: {
           created_at?: string | null
+          goods_received_at?: string | null
           id?: string
+          inventory_receipt_id?: string | null
           invoice_date?: string
           invoice_number?: string
+          is_credit?: boolean
           journal_entry_id?: string | null
+          net_amount?: number
+          notes?: string | null
+          paid_amount?: number
           restaurant_id?: string
+          status?: string
           supplier_id?: string | null
           supplier_name?: string
+          tax_amount?: number
           total_amount?: number
+          updated_at?: string
           warehouse_id?: string | null
         }
         Relationships: [

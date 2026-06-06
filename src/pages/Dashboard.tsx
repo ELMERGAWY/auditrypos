@@ -338,8 +338,9 @@ export default function Dashboard() {
         {activeTab === 'chart_of_accounts' && <ChartOfAccountsTab {...commonProps} />}
         {activeTab === 'accounting_mapping' && <AccountingMappingTab {...commonProps} />}
         {activeTab === 'manual_journal' && <ManualJournalTab {...commonProps} />}
-        {activeTab === 'customer_accounts' && <CustomersTab {...commonProps} />}
-        {activeTab === 'supplier_accounts' && <SuppliersTab {...commonProps} />}
+        {/* Customer/Supplier accounts merged with management — same unified component */}
+        {activeTab === 'customer_accounts' && <CustomerManager {...commonProps} />}
+        {activeTab === 'supplier_accounts' && <SupplierManager {...commonProps} />}
         {activeTab === 'fixed_assets' && <FixedAssetsTab {...commonProps} />}
         
         {/* Advanced Tabs */}

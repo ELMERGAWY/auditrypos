@@ -11,7 +11,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { 
   Truck, Plus, Search, Phone, MapPin, FileText, TrendingUp, 
   TrendingDown, Wallet, Download, CreditCard, AlertCircle, Receipt,
-  ArrowRight, Package, DollarSign, Eye, Banknote, FileJson
+  ArrowRight, Package, DollarSign, Eye, Banknote, FileJson, Trash2
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import jsPDF from 'jspdf';
@@ -289,6 +289,45 @@ export function SupplierManager({ restaurantId, currency }: Props) {
     }
   };
 
+  const handleUpdateSupplier = async () => {
+    if (!selectedSupplier) return;
+    try {
+      const { error } = await supabase
+        .from('suppliers')
+        .update({
+          name: formData.name,
+          phone: formData.phone || null,
+          email: formData.email || null,
+          address: formData.address || null,
+          contact_person: formData.contact_person || null,
+          credit_limit: formData.credit_limit ? Number(formData.credit_limit) : null,
+          payment_terms: formData.payment_terms || null,
+          tax_number: formData.tax_number || null,
+        })
+        .eq('id', selectedSupplier.id);
+      if (error) throw error;
+      toast.success('تم تحديث المورد');
+      setShowAddModal(false);
+      setSelectedSupplier(null);
+      setFormData({ name: '', phone: '', email: '', address: '', contact_person: '', credit_limit: '', payment_terms: '', tax_number: '' });
+      loadSuppliers();
+    } catch (error: any) {
+      toast.error('فشل التحديث: ' + error.message);
+    }
+  };
+
+  const handleDeleteSupplier = async (supplier: Supplier) => {
+    if (!confirm(`حذف المورد "${supplier.name}"؟ سيتم حذف جميع البيانات المرتبطة بدون رجعة.`)) return;
+    try {
+      const { error } = await supabase.from('suppliers').delete().eq('id', supplier.id);
+      if (error) throw error;
+      toast.success('تم حذف المورد');
+      loadSuppliers();
+    } catch (error: any) {
+      toast.error('فشل الحذف: ' + error.message);
+    }
+  };
+
   const exportStatement = () => {
     const worksheet = XLSX.utils.json_to_sheet(transactions.map(t => ({
       'التاريخ': new Date(t.date).toLocaleDateString('ar-EG'),
@@ -423,7 +462,7 @@ export function SupplierManager({ restaurantId, currency }: Props) {
             <Truck className="w-5 h-5 text-primary" />
           </div>
           <div>
-            <h2 className="font-display font-bold text-lg">إدارة الموردين</h2>
+            <h2 className="font-display font-bold text-lg">الموردين وحساباتهم</h2>
             <p className="text-xs text-muted-foreground">{suppliers.length} مورد | إجمالي المستحقات: {totalPayables.toFixed(2)} {currency}</p>
           </div>
         </div>
@@ -597,6 +636,15 @@ export function SupplierManager({ restaurantId, currency }: Props) {
                         >
                           <Banknote className="w-4 h-4" />
                         </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          title="حذف"
+                          className="text-destructive hover:text-destructive"
+                          onClick={() => handleDeleteSupplier(supplier)}
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
                       </div>
                     </td>
                   </tr>
@@ -686,7 +734,7 @@ export function SupplierManager({ restaurantId, currency }: Props) {
             <div className="flex gap-2 mt-4">
               <Button 
                 className="flex-1" 
-                onClick={selectedSupplier ? () => {} : handleAddSupplier}
+                onClick={selectedSupplier ? handleUpdateSupplier : handleAddSupplier}
               >
                 {selectedSupplier ? 'تحديث' : 'إضافة'}
               </Button>
