@@ -9,6 +9,7 @@ import { BUSINESS_TYPES, type BusinessType } from '@/lib/businessTypes';
 import { RoleManager } from './settings/RoleManager';
 import { TaxManager } from './settings/TaxManager';
 import { AccountingSettings } from './settings/AccountingSettings';
+import { MarketingSettings } from './settings/MarketingSettings';
 import { DatabaseAuditTool } from '@/components/DatabaseAuditTool';
 
 interface SettingsTabProps {
@@ -33,7 +34,7 @@ export function SettingsTab({
   loadData
 }: SettingsTabProps) {
   const navigate = useNavigate();
-  const [activeSubTab, setActiveSubTab] = useState<'profile' | 'roles' | 'taxes' | 'accounting' | 'audit'>('profile');
+  const [activeSubTab, setActiveSubTab] = useState<'profile' | 'roles' | 'taxes' | 'accounting' | 'marketing' | 'audit'>('profile');
 
   const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -74,6 +75,12 @@ export function SettingsTab({
           className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm transition-colors whitespace-nowrap ${activeSubTab === 'accounting' ? 'gradient-bg text-primary-foreground' : 'bg-secondary hover:bg-secondary/80'}`}
         >
           <BookOpen className="w-4 h-4" /> إعدادات الموديولات والمحاسبة
+        </button>
+        <button
+          onClick={() => setActiveSubTab('marketing')}
+          className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm transition-colors whitespace-nowrap ${activeSubTab === 'marketing' ? 'gradient-bg text-primary-foreground' : 'bg-secondary hover:bg-secondary/80'}`}
+        >
+          <Share2 className="w-4 h-4" /> التسويق والبيكسل
         </button>
         <button
           onClick={() => setActiveSubTab('audit')}
@@ -184,6 +191,11 @@ export function SettingsTab({
         {activeSubTab === 'accounting' && (
           <div className="max-w-4xl">
             <AccountingSettings restaurant={restaurant} loadData={loadData} />
+          </div>
+        )}
+        {activeSubTab === 'marketing' && (
+          <div className="max-w-4xl">
+            <MarketingSettings restaurant={restaurant} />
           </div>
         )}
         {activeSubTab === 'audit' && (

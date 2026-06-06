@@ -85,6 +85,7 @@ interface ProfessionalSidebarProps {
   isSyncing?: boolean;
   syncStatus?: { synced: number; errors: number; lastSync: Date | null };
   onForceSync?: () => void;
+  isSuperAdmin?: boolean;
 }
 
 const SECTIONS: Record<string, { label: string; icon: React.ElementType }> = {
@@ -124,7 +125,8 @@ export const ProfessionalSidebar = memo(function ProfessionalSidebar({
   pendingCount = 0,
   isSyncing = false,
   syncStatus,
-  onForceSync
+  onForceSync,
+  isSuperAdmin
 }: ProfessionalSidebarProps) {
   const config = getBusinessConfig(businessType);
 
@@ -167,6 +169,7 @@ export const ProfessionalSidebar = memo(function ProfessionalSidebar({
     
     staff: { label: 'الموظفين', icon: Users, section: 'system' },
     users: { label: 'الصلاحيات', icon: Shield, section: 'system' },
+    super_admin: { label: 'لوحة التحكم الشاملة', icon: Shield, section: 'system' },
     settings: { label: 'إعدادات النظام', icon: Settings, section: 'system' },
     notifications: { label: 'التنبيهات', icon: Bell, section: 'system' },
     
@@ -187,6 +190,10 @@ export const ProfessionalSidebar = memo(function ProfessionalSidebar({
         const item = allNavItems[tabId];
         if (!item) return null;
         if (!item.label) return null; // hide merged duplicates (customer_accounts, supplier_accounts)
+        
+        // Super Admin protection
+        if (tabId === 'super_admin' && !isSuperAdmin) return null;
+
         return {
           id: tabId,
           label: item.label!,
@@ -196,7 +203,7 @@ export const ProfessionalSidebar = memo(function ProfessionalSidebar({
         } as NavItem;
       })
       .filter(Boolean) as NavItem[];
-  }, [tabs, config.tabs, stats]);
+  }, [tabs, config.tabs, stats, isSuperAdmin]);
 
   const groupedItems = navItems.reduce((acc, item) => {
     if (!acc[item.section]) acc[item.section] = [];

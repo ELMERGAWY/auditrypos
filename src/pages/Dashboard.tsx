@@ -1,6 +1,6 @@
 // @ts-nocheck
 // Final Force Sync for Lovable - 2026-06-06 19:15
-import { useState, useRef, useEffect, useCallback, Suspense, lazy, useMemo } from 'react';
+import { useState, useRef, useEffect, useCallback, Suspense, lazy, useMemo, memo } from 'react';
 import { format, startOfMonth, endOfDay } from 'date-fns';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -60,6 +60,7 @@ const SettingsTab = lazy(() => import('./dashboard/SettingsTab').then(m => ({ de
 const InvoiceTabs = lazy(() => import('./dashboard/pos/InvoiceTabs').then(m => ({ default: m.InvoiceTabs })));
 const SalesOrders = lazy(() => import('./dashboard/SalesOrders').then(m => ({ default: m.SalesOrders })));
 const PurchaseOrders = lazy(() => import('./dashboard/PurchaseOrders').then(m => ({ default: m.PurchaseOrders })));
+const SuperAdmin = lazy(() => import('./SuperAdmin').then(m => ({ default: m.SuperAdmin })));
 const PurchaseInvoices = lazy(() => import('./dashboard/PurchaseInvoices').then(m => ({ default: m.PurchaseInvoices })));
 const SalesInvoices = lazy(() => import('./dashboard/SalesInvoices').then(m => ({ default: m.SalesInvoices })));
 const FixedAssetsTab = lazy(() => import('./dashboard/FixedAssetsTab').then(m => ({ default: m.FixedAssetsTab })));
@@ -390,6 +391,7 @@ export default function Dashboard() {
         {activeTab === 'sales_returns' && <SalesReturnsManager {...commonProps} />}
         {activeTab === 'purchase_orders' && <PurchaseOrders {...commonProps} />}
         {activeTab === 'purchase_invoices' && <PurchaseInvoices {...commonProps} />}
+        {activeTab === 'super_admin' && <SuperAdmin />}
         {activeTab === 'contracting' && <ContractingDashboard {...commonProps} />}
          {activeTab === 'projects' && <ContractingDashboard {...commonProps} />}
          {activeTab === 'expenses' && <ExpensesTab {...commonProps} />}
@@ -469,6 +471,7 @@ export default function Dashboard() {
           onToggleSound={() => setSoundEnabled(!soundEnabled)}
           isDark={isDark}
           onToggleDark={toggleDarkMode}
+          isSuperAdmin={isSuperAdmin}
         />
         <main className="flex-1 pt-16 h-[100dvh] overflow-hidden">
           <div className="h-full overflow-auto custom-scrollbar p-2 sm:p-4">
