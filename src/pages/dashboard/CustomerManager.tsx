@@ -295,7 +295,7 @@ export function CustomerManager({ restaurantId, currency }: Props) {
       toast.success('تم تحديث العميل بنجاح');
       setShowAddModal(false);
       setSelectedCustomer(null);
-      setFormData({ name: '', phone: '', email: '', address: '', credit_limit: '', tax_number: '' });
+      setFormData({ name: '', phone: '', email: '', address: '', credit_limit: '', tax_number: '', customer_type: 'retail', notes: '' });
       loadCustomers();
     } catch (error: any) {
       toast.error('فشل تحديث العميل: ' + error.message);
