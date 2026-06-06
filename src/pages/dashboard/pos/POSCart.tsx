@@ -202,7 +202,7 @@ export const POSCart = memo(function POSCart({
                 <span className="text-[10px] text-muted-foreground">السعر:</span>
                 <input
                   type="number"
-                  defaultValue={c.manualPrice !== undefined ? c.manualPrice : Number(c.item.price)}
+                  defaultValue={Number(c.price)}
                   onBlur={e => {
                     const val = parseFloat(e.target.value);
                     if (!isNaN(val)) updatePrice(c.item.id, val);
@@ -214,7 +214,7 @@ export const POSCart = memo(function POSCart({
                       e.target.blur();
                     }
                   }}
-                  className={`w-14 h-5 text-[10px] font-bold bg-transparent border-b transition-all focus:outline-none ${c.manualPrice !== undefined ? 'text-amber-600 border-amber-300' : 'text-primary border-primary/20 focus:border-primary'}`}
+                  className={`w-14 h-5 text-[10px] font-bold bg-transparent border-b transition-all focus:outline-none ${Number(c.price) !== Number(c.item.price) ? 'text-amber-600 border-amber-300' : 'text-primary border-primary/20 focus:border-primary'}`}
                 />
                 <span className="text-[10px] font-bold text-primary">{currency}</span>
               </div>
