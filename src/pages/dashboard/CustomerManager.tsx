@@ -663,8 +663,30 @@ export function CustomerManager({ restaurantId, currency }: Props) {
                         >
                           <Receipt className="w-4 h-4" />
                         </Button>
-                        <Button variant="ghost" size="sm" onClick={() => startEdit(customer)}>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          title="سند قبض"
+                          disabled={customer.balance <= 0}
+                          onClick={() => {
+                            setSelectedCustomer(customer);
+                            setPaymentForm({ amount: customer.balance.toString(), payment_method: 'cash', notes: '' });
+                            setShowPaymentModal(true);
+                          }}
+                        >
+                          <Banknote className="w-4 h-4" />
+                        </Button>
+                        <Button variant="ghost" size="sm" title="تعديل" onClick={() => startEdit(customer)}>
                           <Eye className="w-4 h-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          title="حذف"
+                          className="text-destructive hover:text-destructive"
+                          onClick={() => handleDeleteCustomer(customer)}
+                        >
+                          <Trash2 className="w-4 h-4" />
                         </Button>
                       </div>
                     </td>
