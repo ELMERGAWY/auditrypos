@@ -334,15 +334,21 @@ export default function Dashboard() {
                     <div className="flex items-center gap-1">
                       <span className="text-muted-foreground">العميل:</span>
                       {(() => {
-                        const ref = o.customer_ref || o.customer_phone || (o.notes?.includes('المرجع:') ? o.notes.split('المرجع:')[1].split('|')[0].trim() : '');
-                        return ref ? (
-                          <span className="text-primary font-black">
-                            ({ref})
-                          </span>
-                        ) : null;
+                        try {
+                          if (!o) return null;
+                          const ref = o.customer_ref || o.customer_phone || (o.notes?.includes('المرجع:') ? o.notes.split('المرجع:')[1]?.split('|')[0]?.trim() : '');
+                          return ref ? (
+                            <span className="text-primary font-black">
+                              ({ref})
+                            </span>
+                          ) : null;
+                        } catch (e) {
+                          console.error("Error rendering customer ref:", e);
+                          return null;
+                        }
                       })()}
                     </div>
-                    <span className="font-bold">{o.customer_name || 'عميل نقدي'}</span>
+                    <span className="font-bold">{o?.customer_name || 'عميل نقدي'}</span>
                   </div>
                   <div className="h-px bg-border/50 my-1" />
                   <div className="flex justify-between text-sm">
