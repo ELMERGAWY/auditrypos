@@ -313,14 +313,47 @@ export default function Dashboard() {
           <div className="p-4 space-y-4 h-full overflow-auto">
             <div className="flex justify-between items-center"><h2 className="text-2xl font-black">{config.labels.orders}</h2><div className="flex gap-2">{(['all', 'pending', 'completed', 'cancelled'] as const).map(s => <Button key={s} size="sm" variant={orderFilter === s ? 'default' : 'outline'} onClick={() => setOrderFilter(s)}>{s === 'all' ? 'الكل' : STATUS_CONFIG[s]?.label || s}</Button>)}</div></div>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">{filteredOrders.map(o => (
-              <Card key={o.id} className="p-4">
-                <div className="flex justify-between font-bold mb-2">
-                  <span>#{o.order_number.slice(-4)}</span>
-                  <Badge>{o.status}</Badge>
+              <Card key={o.id} className="p-4 hover:shadow-md transition-shadow border-primary/10">
+                <div className="flex justify-between items-start font-bold mb-3">
+                  <div className="flex flex-col">
+                    <span className="text-primary font-black">#{o.order_number.slice(-4)}</span>
+                    <span className="text-[10px] text-muted-foreground">{new Date(o.created_at).toLocaleString('ar-EG')}</span>
+                  </div>
+                  <Badge variant={o.status === 'completed' ? 'default' : 'outline'} className={o.status === 'completed' ? 'bg-emerald-500' : ''}>
+                    {STATUS_CONFIG[o.status as OrderStatus]?.label || o.status}
+                  </Badge>
                 </div>
-                <div className="text-xl font-black text-primary">{o.total} {currency}</div>
-                <div className="flex gap-2 mt-4">
-                  <Button className="flex-1" variant="outline" size="sm" onClick={() => { setLastReceipt(o); setShowReceipt(true); }}>تفاصيل</Button>
+                
+                <div className="space-y-2 mb-4">
+                  <div className="flex justify-between text-sm">
+                    <span className="text-muted-foreground">العميل:</span>
+                    <span className="font-bold">{o.customer_name || 'عميل نقدي'}</span>
+                  </div>
+                  {o.customer_ref && (
+                    <div className="flex justify-between text-[10px]">
+                      <span className="text-muted-foreground">المرجع:</span>
+                      <span className="font-mono bg-secondary/50 px-1 rounded">{o.customer_ref}</span>
+                    </div>
+                  )}
+                  <div className="h-px bg-border/50 my-1" />
+                  <div className="flex justify-between text-sm">
+                    <span className="text-muted-foreground">الإجمالي:</span>
+                    <span className="font-black text-primary">{Number(o.total).toLocaleString()} {currency}</span>
+                  </div>
+                  <div className="flex justify-between text-xs">
+                    <span className="text-muted-foreground">المدفوع:</span>
+                    <span className="text-emerald-600 font-bold">{Number(o.paid_amount || 0).toLocaleString()} {currency}</span>
+                  </div>
+                  <div className="flex justify-between text-xs">
+                    <span className="text-muted-foreground">المتبقي:</span>
+                    <span className="text-destructive font-bold">{Math.max(0, Number(o.total) - Number(o.paid_amount || 0)).toLocaleString()} {currency}</span>
+                  </div>
+                </div>
+
+                <div className="flex gap-2 mt-auto">
+                  <Button className="flex-1 gradient-bg border-0 text-white" size="sm" onClick={() => { setLastReceipt(o); setShowReceipt(true); }}>
+                    <FileText className="w-4 h-4 ml-1" /> تفاصيل
+                  </Button>
                   <Button variant="ghost" size="sm" className="text-destructive hover:bg-destructive/10" onClick={() => handleDeleteOrder(o.id)}>
                     <Trash2 className="w-4 h-4" />
                   </Button>

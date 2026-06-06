@@ -48,6 +48,7 @@ export interface Order {
   delivery_address: string;
   customer_phone: string;
   customer_ref?: string; // قابل للتعديل يدويًا
+  paid_amount?: number;
   delivery_lat: number | null;
   delivery_lng: number | null;
   tracking_token: string | null;
