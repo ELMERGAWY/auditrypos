@@ -633,11 +633,11 @@ export function HomeDashboard({ restaurantId, currency, onNavigate, userId }: Ho
               onClick={() => onNavigate('pos')}
             />
             <QuickActionCard
-              icon={Package}
-              title="استلام مخزون"
-              description="تسجيل واردات جديدة"
+              icon={ShoppingCart}
+              title="طلب شراء"
+              description="إنشاء فاتورة مشتريات"
               color="bg-blue-500"
-              onClick={() => onNavigate('inventory_receipts')}
+              onClick={() => onNavigate('purchase_invoices')}
             />
             <QuickActionCard
               icon={Receipt}

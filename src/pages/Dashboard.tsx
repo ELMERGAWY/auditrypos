@@ -96,7 +96,7 @@ export default function Dashboard() {
   const [counts, setCounts] = useState({ orders: 0, salesInvoices: 0, purchaseInvoices: 0, expenses: 0, returns: 0, inventoryReceipts: 0, customers: 0, suppliers: 0, totalSales: 0, totalProfit: 0 });
 
   // POS State
-  const [cart, setCart] = useState<{ item: MenuItem; qty: number; qtyText: string; unitMode: string }[]>([]);
+  const [cart, setCart] = useState<{ item: MenuItem; qty: number; qtyText: string; unitMode: string; manualPrice?: number }[]>([]);
   const [tableNumber, setTableNumber] = useState('');
   const [customerName, setCustomerName] = useState('');
   const [customerPhone, setCustomerPhone] = useState('');
@@ -139,7 +139,8 @@ export default function Dashboard() {
     if (!c || !c.item) return s;
     const units = getUnitOptions(c.item);
     const unitFactor = units.find(u => u && u.label === c.unitMode)?.factor || 1;
-    return s + ((Number(c.item.price) || 0) * unitFactor * (Number(c.qty) || 0));
+    const priceToUse = c.manualPrice !== undefined ? c.manualPrice : (Number(c.item.price) || 0);
+    return s + (priceToUse * unitFactor * (Number(c.qty) || 0));
   }, 0), [cart, getUnitOptions]);
   
   const discountAmount = useMemo(() => discountType === 'percent' ? (cartSubtotal * Number(discount || 0)) / 100 : Number(discount || 0), [cartSubtotal, discount, discountType]);
@@ -210,11 +211,19 @@ export default function Dashboard() {
     if (isNaN(value) || value < 0) return;
     setCart(prev => prev.map(c => {
       if (c.item.id !== id) return c;
-      const price = Number(c.item.price) || 0;
+      const price = c.manualPrice !== undefined ? c.manualPrice : (Number(c.item.price) || 0);
       if (price <= 0) return c;
       const newQty = Math.round((value / price) * 1000) / 1000;
       return { ...c, qty: newQty, qtyText: String(newQty) };
     }).filter(c => c.qty > 0));
+  }, []);
+
+  const updatePrice = useCallback((id: string, newPrice: number) => {
+    if (isNaN(newPrice) || newPrice < 0) return;
+    setCart(prev => prev.map(c => {
+      if (c.item.id !== id) return c;
+      return { ...c, manualPrice: newPrice };
+    }));
   }, []);
 
   const handleDeleteOrder = async (id: string) => {
@@ -235,7 +244,14 @@ export default function Dashboard() {
     try {
       const result = await checkoutIntegration.processCheckout(
         { restaurantId: restaurant!.id, businessType: businessType as any, currency, isOnline, userId: user?.id, skipPreparation: !sendToPrep },
-        { cart: cart.map(c => ({ ...c.item, quantity: c.qty, unitMode: c.unitMode, unitFactor: getUnitOptions(c.item).find(u => u.label === c.unitMode)?.factor || 1 })), customerName, customerPhone, customerRef, orderType: orderType as any, deliveryAddress, deliveryAgentId: selectedDeliveryAgent, paymentMethod: paymentMethod as any, paidAmount: paidNum, discount: discountAmount, discountType: discountType === 'percent' ? 'percentage' : 'fixed', notes: orderNotes, destinationAccountId: selectedAccountId }
+        { cart: cart.map(c => ({ 
+            ...c.item, 
+            price: c.manualPrice !== undefined ? c.manualPrice : Number(c.item.price),
+            quantity: c.qty, 
+            unitMode: c.unitMode, 
+            unitFactor: getUnitOptions(c.item).find(u => u.label === c.unitMode)?.factor || 1 
+          })), 
+          customerName, customerPhone, customerRef, orderType: orderType as any, deliveryAddress, deliveryAgentId: selectedDeliveryAgent, paymentMethod: paymentMethod as any, paidAmount: paidNum, discount: discountAmount, discountType: discountType === 'percent' ? 'percentage' : 'fixed', notes: orderNotes, destinationAccountId: selectedAccountId }
       );
       if (result.success && result.order) {
         const completeOrder = {
@@ -243,10 +259,11 @@ export default function Dashboard() {
           items: cart.map(c => {
             const units = getUnitOptions(c.item);
             const factor = units.find(u => u.label === c.unitMode)?.factor || 1;
+            const finalPrice = c.manualPrice !== undefined ? c.manualPrice : Number(c.item.price);
             return {
               menu_item_name: c.item.name,
               quantity: c.qty,
-              price: Number(c.item.price) * factor
+              price: finalPrice * factor
             };
           })
         };
@@ -289,7 +306,7 @@ export default function Dashboard() {
         {activeTab === 'pos' && (
           <div className="flex flex-col lg:flex-row h-full gap-4 overflow-hidden">
             <POSGrid restaurant={restaurant} currency={currency} categories={categories} selectedCategory={selectedCategory} setSelectedCategory={setSelectedCategory} searchQuery={searchQuery} setSearchQuery={setSearchQuery} filteredItems={filteredItems} addToCart={addToCart} businessType={businessType} todayRevenue={todayRevenue} todayOrders={todayOrdersList} avgOrderValue={avgOrderValue} pendingOrders={pendingOrders} orderType={orderType} orders={orders} tableNumber={tableNumber} setTableNumber={setTableNumber} />
-            <POSCart activeInvoiceId={activeInvoiceId} invoiceTabs={invoiceTabs} cart={cart} holdCurrentInvoice={holdCurrentInvoice} setShowInvoiceTabs={setShowInvoiceTabs} clearCart={clearCart} businessType={businessType} orderType={orderType} setOrderType={setOrderType} tableNumber={tableNumber} setTableNumber={setTableNumber} restaurant={restaurant} customerName={customerName} setCustomerName={selectCustomerFromSearch} customerPhone={customerPhone} setCustomerPhone={setCustomerPhone} customerRef={customerRef} setCustomerRef={setCustomerRef} deliveryAddress={deliveryAddress} setDeliveryAddress={setDeliveryAddress} agents={agents} selectedDeliveryAgent={selectedDeliveryAgent} setSelectedDeliveryAgent={setSelectedDeliveryAgent} orderNotes={orderNotes} setOrderNotes={setOrderNotes} discount={discount} setDiscount={setDiscount} discountType={discountType} setDiscountType={setDiscountType} currency={currency} getUnitOptions={getUnitOptions} updateQty={updateQty} setCartItemQty={setCartItemQty} setCartItemUnit={setCartItemUnit} updateValue={updateValue} discountAmount={discountAmount} taxAmount={totalTax} cartSubtotal={cartSubtotal} cartTotal={cartTotal} paymentMethod={paymentMethod} setPaymentMethod={setPaymentMethod} paidAmount={paidAmount} setPaidAmount={setPaidAmount} remaining={remaining} checkout={performCheckout} previewInvoice={() => { setLastReceipt({ total: cartTotal, items: cart.map(c => ({ menu_item_name: c.item.name, quantity: c.qty, price: c.item.price })) } as any); setShowReceipt(true); }} removeFromCart={(id) => setCart(prev => prev.filter(c => c.item.id !== id))} accountingAccounts={accountingAccounts} selectedAccountId={selectedAccountId} setSelectedAccountId={setSelectedAccountId} isProcessing={isProcessingCheckout} />
+            <POSCart activeInvoiceId={activeInvoiceId} invoiceTabs={invoiceTabs} cart={cart} holdCurrentInvoice={holdCurrentInvoice} setShowInvoiceTabs={setShowInvoiceTabs} clearCart={clearCart} businessType={businessType} orderType={orderType} setOrderType={setOrderType} tableNumber={tableNumber} setTableNumber={setTableNumber} restaurant={restaurant} customerName={customerName} setCustomerName={selectCustomerFromSearch} customerPhone={customerPhone} setCustomerPhone={setCustomerPhone} customerRef={customerRef} setCustomerRef={setCustomerRef} deliveryAddress={deliveryAddress} setDeliveryAddress={setDeliveryAddress} agents={agents} selectedDeliveryAgent={selectedDeliveryAgent} setSelectedDeliveryAgent={setSelectedDeliveryAgent} orderNotes={orderNotes} setOrderNotes={setOrderNotes} discount={discount} setDiscount={setDiscount} discountType={discountType} setDiscountType={setDiscountType} currency={currency} getUnitOptions={getUnitOptions} updateQty={updateQty} setCartItemQty={setCartItemQty} setCartItemUnit={setCartItemUnit} updateValue={updateValue} updatePrice={updatePrice} discountAmount={discountAmount} taxAmount={totalTax} cartSubtotal={cartSubtotal} cartTotal={cartTotal} paymentMethod={paymentMethod} setPaymentMethod={setPaymentMethod} paidAmount={paidAmount} setPaidAmount={setPaidAmount} remaining={remaining} checkout={performCheckout} previewInvoice={() => { setLastReceipt({ total: cartTotal, items: cart.map(c => ({ menu_item_name: c.item.name, quantity: c.qty, price: c.manualPrice !== undefined ? c.manualPrice : c.item.price })) } as any); setShowReceipt(true); }} removeFromCart={(id) => setCart(prev => prev.filter(c => c.item.id !== id))} accountingAccounts={accountingAccounts} selectedAccountId={selectedAccountId} setSelectedAccountId={setSelectedAccountId} isProcessing={isProcessingCheckout} />
           </div>
         )}
         {activeTab === 'orders' && (

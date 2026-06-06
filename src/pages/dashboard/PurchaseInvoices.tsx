@@ -55,6 +55,7 @@ export function PurchaseInvoices({ restaurantId, currency }: Props) {
   const [invoices, setInvoices] = useState<PurchaseInvoice[]>([]);
   const [loading, setLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [barcodeInput, setBarcodeInput] = useState('');
   const [showAddModal, setShowAddModal] = useState(false);
   const [showViewModal, setShowViewModal] = useState(false);
   const [showPayModal, setShowPayModal] = useState(false);
@@ -130,6 +131,37 @@ export function PurchaseInvoices({ restaurantId, currency }: Props) {
   const addLine = () => setLines([...lines, { line_type: 'inventory', description: '', quantity: 1, unit_cost: 0, tax_amount: 0 }]);
   const updateLine = (i: number, patch: Partial<LineItem>) => setLines(prev => prev.map((l, idx) => idx === i ? { ...l, ...patch } : l));
   const removeLine = (i: number) => setLines(prev => prev.filter((_, idx) => idx !== i));
+
+  const handleBarcodeScan = (code: string) => {
+    if (!code) return;
+    const p = products.find(pr => pr.barcode === code || pr.sku === code);
+    if (p) {
+      const existingIdx = lines.findIndex(l => l.product_id === p.id && l.line_type === 'inventory');
+      if (existingIdx >= 0) {
+        const currentQty = Number(lines[existingIdx].quantity) || 0;
+        updateLine(existingIdx, { quantity: currentQty + 1 });
+      } else {
+        const newLine = { 
+          line_type: 'inventory' as const, 
+          product_id: p.id, 
+          unit_cost: p.cost_price || 0, 
+          description: p.name, 
+          quantity: 1, 
+          tax_amount: 0 
+        };
+        // If the last line is empty, replace it, otherwise add new
+        if (lines.length === 1 && !lines[0].product_id && !lines[0].gl_account_id) {
+          setLines([newLine]);
+        } else {
+          setLines([...lines, newLine]);
+        }
+      }
+      setBarcodeInput('');
+      toast.success(`تمت إضافة: ${p.name}`);
+    } else {
+      toast.error('لم يتم العثور على منتج بهذا الباركود');
+    }
+  };
 
   const handleSave = async () => {
     if (!form.supplier_id) { toast.error('اختر المورد'); return; }
@@ -507,21 +539,42 @@ export function PurchaseInvoices({ restaurantId, currency }: Props) {
             </div>
           </div>
 
+          <div className="bg-primary/5 p-3 rounded-xl border border-primary/10 flex items-center gap-4">
+            <div className="flex-1 relative">
+              <Barcode className="w-4 h-4 absolute right-3 top-1/2 -translate-y-1/2 text-primary" />
+              <Input
+                placeholder="امسح الباركود لإضافة منتج فورا..."
+                value={barcodeInput}
+                onChange={e => setBarcodeInput(e.target.value)}
+                onKeyDown={e => {
+                  if (e.key === 'Enter') {
+                    handleBarcodeScan(barcodeInput);
+                    e.preventDefault();
+                  }
+                }}
+                className="pr-10 border-primary/20 focus:border-primary"
+              />
+            </div>
+            <p className="text-[10px] text-muted-foreground max-w-[150px]">يمكنك استخدام قارئ الباركود أو إدخال الكود يدوياً والضغط على Enter</p>
+          </div>
+
           {/* Lines table */}
           <div className="space-y-2">
             <div className="flex items-center justify-between">
               <h3 className="font-bold text-sm">بنود الفاتورة</h3>
-              <Button size="sm" variant="outline" onClick={addLine}><Plus className="w-4 h-4 ml-1" /> إضافة بند</Button>
+              <div className="flex gap-2">
+                <Button size="sm" variant="outline" onClick={addLine}><Plus className="w-4 h-4 ml-1" /> إضافة بند</Button>
+              </div>
             </div>
             <div className="overflow-x-auto border rounded-lg">
               <table className="w-full text-xs">
                 <thead className="bg-muted/40">
                   <tr>
                     <th className="px-2 py-2 text-right">النوع</th>
-                    <th className="px-2 py-2 text-right">المنتج / الحساب</th>
+                    <th className="px-2 py-2 text-right min-w-[200px]">المنتج / الحساب (بحث)</th>
                     <th className="px-2 py-2 text-right">المخزن</th>
                     <th className="px-2 py-2 text-right">الوصف</th>
-                    <th className="px-2 py-2 text-right w-20">الكمية</th>
+                    <th className="px-2 py-2 text-center w-32">الكمية</th>
                     <th className="px-2 py-2 text-right w-24">التكلفة</th>
                     <th className="px-2 py-2 text-right w-20">الضريبة</th>
                     <th className="px-2 py-2 text-right w-24">الإجمالي</th>
@@ -541,19 +594,27 @@ export function PurchaseInvoices({ restaurantId, currency }: Props) {
                           <option value="gl">حساب</option>
                         </select>
                       </td>
-                      <td className="px-2 py-1 min-w-[160px]">
+                      <td className="px-2 py-1">
                         {l.line_type === 'inventory' ? (
-                          <select
-                            value={l.product_id || ''}
-                            onChange={e => {
-                              const p = products.find(pr => pr.id === e.target.value);
-                              updateLine(i, { product_id: e.target.value, unit_cost: l.unit_cost || (p?.cost_price ?? 0), description: l.description || p?.name || '' });
-                            }}
-                            className="w-full px-2 py-1 rounded bg-background border border-input"
-                          >
-                            <option value="">— اختر منتج —</option>
-                            {products.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
-                          </select>
+                          <div className="relative group">
+                            <Input
+                              placeholder="بحث بالاسم أو الكود..."
+                              defaultValue={products.find(p => p.id === l.product_id)?.name || ''}
+                              className="h-8 text-xs pr-7"
+                              list={`product-list-${i}`}
+                              onChange={e => {
+                                const val = e.target.value;
+                                const p = products.find(pr => pr.name === val || pr.barcode === val || pr.sku === val);
+                                if (p) {
+                                  updateLine(i, { product_id: p.id, unit_cost: l.unit_cost || (p?.cost_price ?? 0), description: l.description || p?.name || '' });
+                                }
+                              }}
+                            />
+                            <Search className="w-3.5 h-3.5 absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                            <datalist id={`product-list-${i}`}>
+                              {products.map(p => <option key={p.id} value={p.name}>{p.barcode ? `[${p.barcode}] ` : ''}{p.category}</option>)}
+                            </datalist>
+                          </div>
                         ) : (
                           <select
                             value={l.gl_account_id || ''}
@@ -561,7 +622,7 @@ export function PurchaseInvoices({ restaurantId, currency }: Props) {
                               const acc = glAccounts.find(a => a.id === e.target.value);
                               updateLine(i, { gl_account_id: e.target.value, description: l.description || acc?.name || '' });
                             }}
-                            className="w-full px-2 py-1 rounded bg-background border border-input"
+                            className="w-full px-2 py-1 rounded bg-background border border-input h-8"
                           >
                             <option value="">— اختر حساب —</option>
                             {glAccounts.map(a => <option key={a.id} value={a.id}>{a.code} - {a.name}</option>)}
@@ -573,7 +634,7 @@ export function PurchaseInvoices({ restaurantId, currency }: Props) {
                           <select
                             value={l.warehouse_id || ''}
                             onChange={e => updateLine(i, { warehouse_id: e.target.value })}
-                            className="w-full px-2 py-1 rounded bg-background border border-input"
+                            className="w-full px-2 py-1 rounded bg-background border border-input h-8"
                           >
                             <option value="">افتراضي</option>
                             {warehouses.map(w => <option key={w.id} value={w.id}>{w.name}</option>)}
@@ -581,16 +642,26 @@ export function PurchaseInvoices({ restaurantId, currency }: Props) {
                         ) : <span className="text-muted-foreground">-</span>}
                       </td>
                       <td className="px-2 py-1">
-                        <Input value={l.description} onChange={e => updateLine(i, { description: e.target.value })} className="h-7 text-xs" />
+                        <Input value={l.description} onChange={e => updateLine(i, { description: e.target.value })} className="h-8 text-xs" />
                       </td>
                       <td className="px-2 py-1">
-                        <Input type="number" step="0.001" value={l.quantity} onChange={e => updateLine(i, { quantity: Number(e.target.value) })} className="h-7 text-xs" />
+                        <div className="flex items-center gap-1 bg-secondary/30 rounded-lg p-0.5">
+                          <Button size="sm" variant="ghost" className="h-6 w-6 p-0" onClick={() => updateLine(i, { quantity: Math.max(0, (Number(l.quantity) || 0) - 1) })}><Minus className="w-3 h-3" /></Button>
+                          <Input 
+                            type="number" 
+                            step="0.001" 
+                            value={l.quantity} 
+                            onChange={e => updateLine(i, { quantity: Number(e.target.value) })} 
+                            className="h-7 text-xs text-center border-0 bg-transparent focus-visible:ring-0 px-0" 
+                          />
+                          <Button size="sm" variant="ghost" className="h-6 w-6 p-0" onClick={() => updateLine(i, { quantity: (Number(l.quantity) || 0) + 1 })}><Plus className="w-3 h-3" /></Button>
+                        </div>
                       </td>
                       <td className="px-2 py-1">
-                        <Input type="number" step="0.01" value={l.unit_cost} onChange={e => updateLine(i, { unit_cost: Number(e.target.value) })} className="h-7 text-xs" />
+                        <Input type="number" step="0.01" value={l.unit_cost} onChange={e => updateLine(i, { unit_cost: Number(e.target.value) })} className="h-8 text-xs" />
                       </td>
                       <td className="px-2 py-1">
-                        <Input type="number" step="0.01" value={l.tax_amount} onChange={e => updateLine(i, { tax_amount: Number(e.target.value) })} className="h-7 text-xs" />
+                        <Input type="number" step="0.01" value={l.tax_amount} onChange={e => updateLine(i, { tax_amount: Number(e.target.value) })} className="h-8 text-xs" />
                       </td>
                       <td className="px-2 py-1 font-bold">{((Number(l.quantity) || 0) * (Number(l.unit_cost) || 0)).toFixed(2)}</td>
                       <td className="px-2 py-1">

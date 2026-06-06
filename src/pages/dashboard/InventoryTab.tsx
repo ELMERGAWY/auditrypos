@@ -551,11 +551,65 @@ export function InventoryTab({ restaurantId, currency, businessType }: Props) {
                   <Label className="text-xs mb-1 block mr-1">اسم الصنف *</Label>
                   <Input placeholder="مثال: دقيق فاخر 50 كجم" value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} className="h-11 rounded-xl" />
                 </div>
-                <div>
-                  <Label className="text-xs mb-1 block mr-1">الباركود</Label>
-                  <Input placeholder="Barcode" value={form.barcode} onChange={e => setForm(f => ({ ...f, barcode: e.target.value }))} className="h-11 rounded-xl" />
+                <div className="col-span-2 space-y-4">
+                  <div className="flex items-end gap-3">
+                    <div className="flex-1">
+                      <Label className="text-xs mb-1 block mr-1">الباركود</Label>
+                      <div className="relative">
+                        <Input placeholder="Barcode" value={form.barcode} onChange={e => setForm(f => ({ ...f, barcode: e.target.value }))} className="h-11 rounded-xl pr-10" />
+                        <Boxes className="w-4 h-4 absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                      </div>
+                    </div>
+                    <Button type="button" variant="outline" onClick={() => {
+                      const random = Math.floor(Math.random() * 900000000000) + 100000000000;
+                      setForm(f => ({ ...f, barcode: String(random) }));
+                    }} className="h-11 rounded-xl px-3" title="توليد باركود تلقائي">
+                      <RefreshCw className="w-4 h-4" />
+                    </Button>
+                    {form.barcode && (
+                      <Button type="button" variant="outline" onClick={() => {
+                        const canvas = document.createElement('canvas');
+                        const ctx = canvas.getContext('2d');
+                        canvas.width = 300;
+                        canvas.height = 150;
+                        ctx.fillStyle = 'white';
+                        ctx.fillRect(0, 0, canvas.width, canvas.height);
+                        ctx.fillStyle = 'black';
+                        ctx.font = 'bold 24px monospace';
+                        ctx.textAlign = 'center';
+                        ctx.fillText(form.barcode, 150, 40);
+                        ctx.fillText(form.name || 'Product', 150, 130);
+                        // Simple barcode lines
+                        const startX = 40;
+                        const barcodeWidth = 220;
+                        for (let i = 0; i < barcodeWidth; i += 3) {
+                          const w = Math.random() > 0.5 ? 2 : 1;
+                          ctx.fillRect(startX + i, 50, w, 60);
+                        }
+                        const link = document.createElement('a');
+                        link.download = `barcode-${form.barcode}.png`;
+                        link.href = canvas.toDataURL();
+                        link.click();
+                      }} className="h-11 rounded-xl px-3 bg-primary/10 text-primary border-primary/20" title="تحميل الباركود للطباعة">
+                        <Download className="w-4 h-4" />
+                      </Button>
+                    )}
+                  </div>
+                  {form.barcode && (
+                    <div className="p-3 bg-white border border-dashed rounded-2xl flex flex-col items-center justify-center space-y-2">
+                      <div className="flex gap-0.5 h-10 items-end">
+                        {form.barcode.split('').map((char, i) => (
+                          <div key={i} className="bg-black w-[2px]" style={{ height: `${20 + (parseInt(char) || 0) * 2}px` }} />
+                        ))}
+                        {form.barcode.split('').reverse().map((char, i) => (
+                          <div key={i+100} className="bg-black w-[1px]" style={{ height: `${25 + (parseInt(char) || 0) * 1.5}px` }} />
+                        ))}
+                      </div>
+                      <span className="text-[10px] font-mono font-bold tracking-[0.2em]">{form.barcode}</span>
+                    </div>
+                  )}
                 </div>
-                <div>
+                <div className="col-span-2 sm:col-span-1">
                   <Label className="text-xs mb-1 block mr-1">رمز SKU</Label>
                   <Input placeholder="Stock Keeping Unit" value={form.sku} onChange={e => setForm(f => ({ ...f, sku: e.target.value }))} className="h-11 rounded-xl" />
                 </div>

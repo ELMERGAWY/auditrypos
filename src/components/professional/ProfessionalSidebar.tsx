@@ -147,8 +147,9 @@ export const ProfessionalSidebar = memo(function ProfessionalSidebar({
     purchase_invoices: { label: 'فواتير شراء', icon: DollarSign, badge: stats.purchaseInvoicesCount, section: 'purchases' },
     
     inventory: { label: 'المخزون', icon: Package, section: 'inventory' },
-    inventory_receipts: { label: 'استلام بضاعة', icon: FileText, badge: stats.inventoryReceiptsCount, section: 'inventory' },
-    overheads: { label: 'التكاليف', icon: BarChart3, section: 'inventory' },
+    // inventory_receipts: { label: 'استلام بضاعة', icon: FileText, badge: stats.inventoryReceiptsCount, section: 'inventory' },
+    
+    bom: { label: 'تكاليف الإنتاج', icon: Layers, section: 'inventory' },
     
     financials: { label: 'القوائم المالية', icon: Wallet, section: 'accounting' },
     treasury: { label: 'الخزينة والبنك', icon: Wallet, section: 'accounting' },

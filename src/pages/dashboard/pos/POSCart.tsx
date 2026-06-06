@@ -57,6 +57,7 @@ interface POSCartProps {
   checkout: (sendToPrep: boolean) => void;
   previewInvoice: () => void;
   updateValue: (id: string, value: number) => void;
+  updatePrice: (id: string, price: number) => void;
   removeFromCart: (id: string) => void;
   accountingAccounts: any[];
   selectedAccountId: string | null;
@@ -71,7 +72,7 @@ export const POSCart = memo(function POSCart({
   orderNotes, setOrderNotes, discount, setDiscount, discountType, setDiscountType,
   currency, getUnitOptions, setCartItemUnit, updateQty, setCartItemQty,
   discountAmount, taxAmount, cartSubtotal, cartTotal, paymentMethod, setPaymentMethod,
-  paidAmount, setPaidAmount, remaining, customerRef, setCustomerRef, checkout, previewInvoice, updateValue, removeFromCart,
+  paidAmount, setPaidAmount, remaining, customerRef, setCustomerRef, checkout, previewInvoice, updateValue, updatePrice, removeFromCart,
   accountingAccounts, selectedAccountId, setSelectedAccountId
 }: POSCartProps) {
   const { hasPermission } = usePermissions(restaurant?.id);
@@ -199,7 +200,23 @@ export const POSCart = memo(function POSCart({
               <p className="text-sm font-medium truncate">{c.item.name}</p>
               <div className="flex items-center gap-1">
                 <span className="text-[10px] text-muted-foreground">السعر:</span>
-                <span className="text-[10px] font-bold text-primary">{Number(c.item.price).toFixed(2)} {currency}</span>
+                <input
+                  type="number"
+                  defaultValue={c.manualPrice !== undefined ? c.manualPrice : Number(c.item.price)}
+                  onBlur={e => {
+                    const val = parseFloat(e.target.value);
+                    if (!isNaN(val)) updatePrice(c.item.id, val);
+                  }}
+                  onKeyDown={e => {
+                    if (e.key === 'Enter') {
+                      const val = parseFloat(e.target.value);
+                      if (!isNaN(val)) updatePrice(c.item.id, val);
+                      e.target.blur();
+                    }
+                  }}
+                  className={`w-14 h-5 text-[10px] font-bold bg-transparent border-b transition-all focus:outline-none ${c.manualPrice !== undefined ? 'text-amber-600 border-amber-300' : 'text-primary border-primary/20 focus:border-primary'}`}
+                />
+                <span className="text-[10px] font-bold text-primary">{currency}</span>
               </div>
             </div>
             <div className="flex flex-col gap-1 items-end">
