@@ -508,7 +508,7 @@ export function CustomerManager({ restaurantId, currency }: Props) {
             <Users className="w-5 h-5 text-primary" />
           </div>
           <div>
-            <h2 className="font-display font-bold text-lg">إدارة العملاء</h2>
+            <h2 className="font-display font-bold text-lg">العملاء وحساباتهم</h2>
             <p className="text-xs text-muted-foreground">{customers.length} عميل | إجمالي الذمم: {totalReceivables.toFixed(2)} {currency}</p>
           </div>
         </div>
