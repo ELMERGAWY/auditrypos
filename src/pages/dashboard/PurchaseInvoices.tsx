@@ -12,7 +12,7 @@ import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@
 import { Textarea } from '@/components/ui/textarea';
 import {
   FileText, Plus, Search, Clock, Eye, RefreshCcw, Trash2,
-  TrendingUp, TrendingDown, Package, Warehouse, Banknote, CheckCircle2, X
+  TrendingUp, TrendingDown, Package, Warehouse, Banknote, CheckCircle2, X, Barcode, Minus
 } from 'lucide-react';
 import { journalService } from '@/lib/accounting/journalService';
 import { inventoryCosting } from '@/lib/accounting/inventoryCosting';

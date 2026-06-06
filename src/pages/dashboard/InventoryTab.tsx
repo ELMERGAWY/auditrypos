@@ -4,7 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Package, Plus, Search, AlertTriangle, Edit2, Trash2, 
   ArrowDown, ArrowUp, BarChart3, X, TrendingUp, DollarSign,
-  Truck, Calculator, History, FileSpreadsheet, Layers, Boxes, Save
+  Truck, Calculator, History, FileSpreadsheet, Layers, Boxes, Save, RefreshCw, Download
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';

@@ -178,7 +178,6 @@ export const ProfessionalSidebar = memo(function ProfessionalSidebar({
     loyalty: { label: 'الولاء', icon: Heart, section: 'sales' },
     gift_cards: { label: 'الهدايا', icon: Gift, section: 'sales' },
     branches: { label: 'الفروع', icon: Building2, section: 'sales' },
-    bom: { label: 'تكاليف الإنتاج', icon: Layers, section: 'inventory' },
   };
 
   const navItems = useMemo(() => {
