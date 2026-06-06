@@ -758,6 +758,28 @@ export function CustomerManager({ restaurantId, currency }: Props) {
                 />
               </div>
             </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label>تصنيف العميل</Label>
+                <select
+                  value={formData.customer_type}
+                  onChange={(e) => setFormData({ ...formData, customer_type: e.target.value })}
+                  className="w-full px-3 py-2 rounded-md bg-background border border-input text-sm"
+                >
+                  <option value="retail">تجزئة</option>
+                  <option value="wholesale">جملة</option>
+                  <option value="vip">VIP</option>
+                </select>
+              </div>
+              <div>
+                <Label>ملاحظات</Label>
+                <Input
+                  value={formData.notes}
+                  onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+                  placeholder="ملاحظات اختيارية"
+                />
+              </div>
+            </div>
             <div className="flex gap-2 mt-4">
               <Button 
                 className="flex-1" 
