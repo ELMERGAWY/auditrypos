@@ -725,7 +725,7 @@ export function SupplierManager({ restaurantId, currency }: Props) {
             <div className="flex gap-2 mt-4">
               <Button 
                 className="flex-1" 
-                onClick={selectedSupplier ? () => {} : handleAddSupplier}
+                onClick={selectedSupplier ? handleUpdateSupplier : handleAddSupplier}
               >
                 {selectedSupplier ? 'تحديث' : 'إضافة'}
               </Button>
