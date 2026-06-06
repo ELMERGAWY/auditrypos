@@ -332,15 +332,14 @@ export default function Dashboard() {
                 
                 <div className="space-y-2 mb-4">
                   <div className="flex justify-between text-sm">
-                    <span className="text-muted-foreground">العميل:</span>
+                    <div className="flex items-center gap-1">
+                      <span className="text-muted-foreground">العميل:</span>
+                      {o.customer_ref && (
+                        <span className="text-primary font-black text-xs">({o.customer_ref})</span>
+                      )}
+                    </div>
                     <span className="font-bold">{o.customer_name || 'عميل نقدي'}</span>
                   </div>
-                  {o.customer_ref && (
-                    <div className="flex justify-between text-[10px]">
-                      <span className="text-muted-foreground">المرجع:</span>
-                      <span className="font-mono bg-secondary/50 px-1 rounded">{o.customer_ref}</span>
-                    </div>
-                  )}
                   <div className="h-px bg-border/50 my-1" />
                   <div className="flex justify-between text-sm">
                     <span className="text-muted-foreground">الإجمالي:</span>
