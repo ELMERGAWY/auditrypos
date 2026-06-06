@@ -1,5 +1,5 @@
 // @ts-nocheck
-import React, { memo } from 'react';
+import React, { memo, useState } from 'react';
 import { motion } from 'framer-motion';
 import { ShoppingCart, Pause, Play, Trash2, Hash, Phone, MapPin, StickyNote, Percent, DollarSign, Send, Receipt, Minus, Plus, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -76,8 +76,10 @@ export const POSCart = memo(function POSCart({
   accountingAccounts, selectedAccountId, setSelectedAccountId
 }: POSCartProps) {
   const { hasPermission } = usePermissions(restaurant?.id);
+  const [editingPriceId, setEditingPriceId] = useState<string | null>(null);
+
   return (
-    <div className="w-full lg:w-96 bg-card border-r border-border flex flex-col h-full shadow-2xl">
+    <div className="flex flex-col h-full bg-background border-r border-border shadow-xl">
       {/* Cart Header */}
       <div className="p-4 border-b border-border bg-gradient-to-b from-secondary/20 to-transparent">
         <div className="flex items-center justify-between mb-3">
@@ -197,40 +199,70 @@ export const POSCart = memo(function POSCart({
             </button>
             <span className="text-xl shrink-0">{c.item.image}</span>
             <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium truncate">{c.item.name}</p>
-              <div className="flex items-center gap-1">
-                <span className="text-[10px] text-muted-foreground">السعر:</span>
-                <input
-                  type="number"
-                  defaultValue={Number(c.price)}
-                  onBlur={e => {
-                    const val = parseFloat(e.target.value);
-                    if (!isNaN(val)) updatePrice(c.item.id, val);
-                  }}
-                  onKeyDown={e => {
-                    if (e.key === 'Enter') {
+              <div className="flex items-center gap-1 group cursor-pointer" onClick={() => setEditingPriceId(editingPriceId === c.item.id ? null : c.item.id)}>
+                <p className="text-sm font-medium truncate">{c.item.name}</p>
+                <div className={`p-0.5 rounded transition-colors ${editingPriceId === c.item.id ? 'bg-primary text-white' : 'group-hover:bg-secondary text-muted-foreground'}`}>
+                  <DollarSign className="w-3 h-3" />
+                </div>
+              </div>
+              
+              {editingPriceId === c.item.id && (
+                <div className="flex items-center gap-1 mt-1 animate-in fade-in slide-in-from-top-1 duration-200">
+                  <span className="text-[10px] text-muted-foreground">تعديل السعر:</span>
+                  <input
+                    type="number"
+                    autoFocus
+                    defaultValue={c.price}
+                    onBlur={e => {
                       const val = parseFloat(e.target.value);
                       if (!isNaN(val)) updatePrice(c.item.id, val);
-                      e.target.blur();
-                    }
-                  }}
-                  className={`w-14 h-5 text-[10px] font-bold bg-transparent border-b transition-all focus:outline-none ${Number(c.price) !== Number(c.item.price) ? 'text-amber-600 border-amber-300' : 'text-primary border-primary/20 focus:border-primary'}`}
-                />
-                <span className="text-[10px] font-bold text-primary">{currency}</span>
-              </div>
+                      setEditingPriceId(null);
+                    }}
+                    onKeyDown={e => {
+                      if (e.key === 'Enter') {
+                        const val = parseFloat(e.target.value);
+                        if (!isNaN(val)) updatePrice(c.item.id, val);
+                        setEditingPriceId(null);
+                      }
+                    }}
+                    className="w-16 h-5 text-[10px] font-bold bg-secondary rounded border-0 px-1 focus:ring-1 focus:ring-primary"
+                  />
+                  <span className="text-[10px] font-bold text-primary">{currency}</span>
+                </div>
+              )}
+              
+              {Number(c.price) !== Number(c.item.price) && !editingPriceId && (
+                <p className="text-[9px] text-amber-600 font-bold">سعر معدل: {c.price} {currency}</p>
+              )}
             </div>
             <div className="flex flex-col gap-1 items-end">
               <div className="flex items-center gap-1">
                 <div className="relative w-20">
                   <Input
-                    key={`val-${c.item.id}-${c.qty}`}
+                    key={`val-${c.item.id}-${c.price}-${c.qty}`}
                     type="text"
                     inputMode="decimal"
-                    defaultValue={(c.item.price * c.qty).toFixed(2)}
+                    defaultValue={(() => {
+                      const total = c.price * c.qty;
+                      return Number.isInteger(total) ? total.toString() : total.toFixed(2).replace(/\.?0+$/, "");
+                    })()}
                     onBlur={e => {
                       const v = parseFloat(e.target.value);
-                      if (!isNaN(v) && Math.abs(v - c.item.price * c.qty) > 0.001) updateValue(c.item.id, v);
+                      if (!isNaN(v) && Math.abs(v - c.price * c.qty) > 0.001) updateValue(c.item.id, v);
                     }}
+                    onKeyDown={e => {
+                      if (e.key === 'Enter') {
+                        const v = parseFloat((e.target as HTMLInputElement).value);
+                        if (!isNaN(v)) updateValue(c.item.id, v);
+                        (e.target as HTMLInputElement).blur();
+                      }
+                    }}
+                    title="اكتب المبلغ ليُحسب الكمية تلقائياً"
+                    className="h-7 text-[10px] pr-5 text-center bg-blue-50/50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800"
+                    placeholder="المبلغ"
+                  />
+                  <span className="absolute right-1 top-1/2 -translate-y-1/2 text-[8px] text-blue-600 dark:text-blue-400 font-bold">{currency}</span>
+                </div>
                     onKeyDown={e => {
                       if (e.key === 'Enter') {
                         const v = parseFloat((e.target as HTMLInputElement).value);
@@ -269,7 +301,10 @@ export const POSCart = memo(function POSCart({
       {/* Totals & Checkout */}
       <div className="p-4 border-t border-border space-y-2">
         <div className="flex justify-between font-display font-bold text-lg">
-          <span>الإجمالي</span><span className="text-primary">{cartTotal.toFixed(2)} {currency}</span>
+          <span>الإجمالي</span>
+          <span className="text-primary">
+            {Number.isInteger(cartTotal) ? cartTotal : cartTotal.toFixed(2).replace(/\.?0+$/, "")} {currency}
+          </span>
         </div>
         <div className="flex gap-1 rounded-lg bg-secondary p-1">
           {['cash', 'instapay', 'vodafone_cash', 'bank'].map(m => (
