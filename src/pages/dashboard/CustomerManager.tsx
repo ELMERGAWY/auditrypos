@@ -267,7 +267,7 @@ export function CustomerManager({ restaurantId, currency }: Props) {
 
       toast.success('تم إضافة العميل بنجاح');
       setShowAddModal(false);
-      setFormData({ name: '', phone: '', email: '', address: '', credit_limit: '', tax_number: '' });
+      setFormData({ name: '', phone: '', email: '', address: '', credit_limit: '', tax_number: '', customer_type: 'retail', notes: '' });
       loadCustomers();
     } catch (error: any) {
       toast.error('فشل إضافة العميل: ' + error.message);
