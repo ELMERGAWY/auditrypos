@@ -15,7 +15,7 @@ import {
   TrendingUp, TrendingDown, Package, Warehouse, Banknote, CheckCircle2, X
 } from 'lucide-react';
 import { journalService } from '@/lib/accounting/journalService';
-import { inventoryCostingService } from '@/lib/accounting/inventoryCosting';
+import { inventoryCosting } from '@/lib/accounting/inventoryCosting';
 
 interface PurchaseInvoice {
   id: string;
