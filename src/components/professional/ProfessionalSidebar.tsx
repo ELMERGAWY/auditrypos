@@ -186,6 +186,7 @@ export const ProfessionalSidebar = memo(function ProfessionalSidebar({
       .map(tabId => {
         const item = allNavItems[tabId];
         if (!item) return null;
+        if (!item.label) return null; // hide merged duplicates (customer_accounts, supplier_accounts)
         return {
           id: tabId,
           label: item.label!,
