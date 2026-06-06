@@ -120,13 +120,29 @@ export function PurchaseInvoices({ restaurantId, currency }: Props) {
         .eq('restaurant_id', restaurantId)
         .order('created_at', { ascending: false });
       if (error) throw error;
-      setInvoices((data || []).map((r: any) => ({
+      const mapped = (data || []).map((r: any) => ({
         ...r,
         total_amount: Number(r.total_amount || 0),
         tax_amount: Number(r.tax_amount || 0),
         net_amount: Number(r.net_amount || 0),
         paid_amount: Number(r.paid_amount || 0),
-      })));
+      }));
+      setInvoices(mapped);
+
+      // Generate next invoice number based on history
+      if (mapped.length > 0) {
+        const lastNum = mapped[0].invoice_number;
+        const match = lastNum.match(/\d+/);
+        if (match) {
+          const nextVal = parseInt(match[0]) + 1;
+          const prefix = lastNum.replace(/\d+/, '');
+          setForm(prev => ({ ...prev, invoice_number: `${prefix}${nextVal}` }));
+        } else {
+          setForm(prev => ({ ...prev, invoice_number: `PI-${mapped.length + 1}` }));
+        }
+      } else {
+        setForm(prev => ({ ...prev, invoice_number: 'PI-1001' }));
+      }
     } catch (e: any) {
       toast.error('فشل تحميل الفواتير: ' + e.message);
     } finally {
