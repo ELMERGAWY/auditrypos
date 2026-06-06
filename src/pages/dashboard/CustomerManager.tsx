@@ -913,6 +913,57 @@ export function CustomerManager({ restaurantId, currency }: Props) {
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Payment Modal — سند قبض */}
+      <Dialog open={showPaymentModal} onOpenChange={setShowPaymentModal}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>سند قبض من العميل: {selectedCustomer?.name}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 mt-4">
+            <div className="bg-secondary/50 p-3 rounded-lg">
+              <p className="text-sm text-muted-foreground">الرصيد الحالي</p>
+              <p className="text-2xl font-bold text-destructive">{selectedCustomer?.balance?.toFixed(2)} {currency}</p>
+            </div>
+            <div>
+              <Label>المبلغ *</Label>
+              <Input
+                type="number"
+                value={paymentForm.amount}
+                onChange={(e) => setPaymentForm({ ...paymentForm, amount: e.target.value })}
+                placeholder="0.00"
+              />
+            </div>
+            <div>
+              <Label>طريقة الدفع</Label>
+              <select
+                value={paymentForm.payment_method}
+                onChange={(e) => setPaymentForm({ ...paymentForm, payment_method: e.target.value })}
+                className="w-full px-3 py-2 rounded-md bg-background border border-input text-sm"
+              >
+                <option value="cash">💵 نقدي</option>
+                <option value="instapay">📱 إنستاباي</option>
+                <option value="vodafone_cash">📲 فودافون كاش</option>
+                <option value="bank">🏦 تحويل بنكي</option>
+              </select>
+            </div>
+            <div>
+              <Label>ملاحظات</Label>
+              <Input
+                value={paymentForm.notes}
+                onChange={(e) => setPaymentForm({ ...paymentForm, notes: e.target.value })}
+                placeholder="اختياري"
+              />
+            </div>
+            <div className="flex gap-2">
+              <Button className="flex-1 gradient-bg text-primary-foreground border-0" disabled={processingPayment} onClick={handleRecordPayment}>
+                {processingPayment ? 'جاري التسجيل...' : 'تسجيل وطباعة السند'}
+              </Button>
+              <Button variant="outline" onClick={() => setShowPaymentModal(false)}>إلغاء</Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
