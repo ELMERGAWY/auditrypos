@@ -419,7 +419,9 @@ export function CustomerManager({ restaurantId, currency }: Props) {
       email: customer.email || '',
       address: customer.address || '',
       credit_limit: customer.credit_limit?.toString() || '',
-      tax_number: customer.tax_number || ''
+      tax_number: customer.tax_number || '',
+      customer_type: (customer as any).customer_type || 'retail',
+      notes: (customer as any).notes || ''
     });
     setShowAddModal(true);
   };
