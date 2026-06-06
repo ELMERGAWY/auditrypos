@@ -332,11 +332,14 @@ export default function Dashboard() {
                   <div className="flex justify-between text-sm">
                     <div className="flex items-center gap-1">
                       <span className="text-muted-foreground">العميل:</span>
-                      {(o.customer_ref || o.customer_phone) && (
-                        <span className="text-primary font-black text-xs">
-                          ({o.customer_ref || o.customer_phone})
-                        </span>
-                      )}
+                      {(() => {
+                        const ref = o.customer_ref || o.customer_phone || (o.notes?.includes('المرجع:') ? o.notes.split('المرجع:')[1].split('|')[0].trim() : '');
+                        return ref ? (
+                          <span className="text-primary font-black">
+                            ({ref})
+                          </span>
+                        ) : null;
+                      })()}
                     </div>
                     <span className="font-bold">{o.customer_name || 'عميل نقدي'}</span>
                   </div>
