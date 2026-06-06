@@ -11,7 +11,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { 
   Users, Plus, Search, Phone, MapPin, FileText, TrendingUp, 
   TrendingDown, Wallet, Download, CreditCard, AlertCircle, Receipt,
-  ArrowRight, Calendar, Eye, FileJson
+  ArrowRight, Calendar, Eye, FileJson, Trash2, Banknote
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import jsPDF from 'jspdf';
