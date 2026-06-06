@@ -18,16 +18,26 @@ class InventoryCostingService {
 
   async getCostingMethod(restaurantId: string): Promise<CostingMethod> {
     const { data, error } = await supabase
-      .from('inventory_settings')
-      .select('costing_method')
-      .eq('restaurant_id', restaurantId)
+      .from('restaurants')
+      .select('inventory_method')
+      .eq('id', restaurantId)
       .single();
 
     if (error || !data) {
-      return 'fifo'; // Default
+      // Fallback to inventory_settings if restaurant column not found or empty
+      const { data: settings } = await supabase
+        .from('inventory_settings')
+        .select('costing_method')
+        .eq('restaurant_id', restaurantId)
+        .single();
+      
+      if (!settings) return 'fifo';
+      return (settings.costing_method as CostingMethod) || 'fifo';
     }
 
-    return (data.costing_method as CostingMethod) || 'fifo';
+    const method = data.inventory_method?.toLowerCase();
+    if (method === 'weighted_avg') return 'wac';
+    return (method as CostingMethod) || 'fifo';
   }
 
   async setCostingMethod(restaurantId: string, method: CostingMethod): Promise<void> {
@@ -76,7 +86,35 @@ class InventoryCostingService {
       return null;
     }
 
+    // After adding a layer, update the product's cost_price to reflect the new state
+    await this.updateProductCostPrice(restaurantId, productId);
+
     return data as unknown as InventoryCostLayer;
+  }
+
+  private async updateProductCostPrice(restaurantId: string, productId: string): Promise<void> {
+    const method = await this.getCostingMethod(restaurantId);
+    const layers = await this.getCostLayers(productId, 'fifo');
+    
+    if (layers.length === 0) return;
+
+    let newCostPrice = 0;
+    if (method === 'wac') {
+      const totalQty = layers.reduce((sum, l) => sum + l.remaining_qty, 0);
+      const totalCost = layers.reduce((sum, l) => sum + (l.remaining_qty * l.unit_cost), 0);
+      newCostPrice = totalQty > 0 ? totalCost / totalQty : 0;
+    } else {
+      // For FIFO/LIFO, we often show the latest purchase price as the "cost_price" in the UI
+      // but the actual COGS uses the layers.
+      newCostPrice = layers[layers.length - 1].unit_cost;
+    }
+
+    if (newCostPrice > 0) {
+      await supabase
+        .from('products')
+        .update({ cost_price: newCostPrice })
+        .eq('id', productId);
+    }
   }
 
   async getCostLayers(
@@ -164,15 +202,24 @@ class InventoryCostingService {
       .eq('id', layerId);
 
     if (error) {
-      // Fallback: direct update
-      await supabase
+      // Fallback: direct update if RPC fails
+      const { data: layer } = await supabase
         .from('inventory_cost_layers')
-        .update({
-          remaining_qty: 0,
-          is_consumed: true,
-          consumed_at: new Date().toISOString(),
-        })
-        .eq('id', layerId);
+        .select('remaining_qty')
+        .eq('id', layerId)
+        .single();
+      
+      if (layer) {
+        const newQty = Math.max(0, layer.remaining_qty - qty);
+        await supabase
+          .from('inventory_cost_layers')
+          .update({
+            remaining_qty: newQty,
+            is_consumed: newQty <= 0,
+            consumed_at: newQty <= 0 ? new Date().toISOString() : null,
+          })
+          .eq('id', layerId);
+      }
     }
   }
 
@@ -277,18 +324,40 @@ class InventoryCostingService {
     productId: string, 
     requestedQty: number
   ): Promise<{ totalCost: number; avgUnitCost: number }> {
-    const { data: product } = await supabase
-      .from('products')
-      .select('cost_price, quantity')
-      .eq('id', productId)
-      .single();
-
-    if (!product) {
-      return { totalCost: 0, avgUnitCost: 0 };
+    // Get all active layers for this product
+    const layers = await this.getCostLayers(productId, 'fifo');
+    
+    if (layers.length === 0) {
+      // Fallback to product cost_price if no layers found
+      const { data: product } = await supabase
+        .from('products')
+        .select('cost_price')
+        .eq('id', productId)
+        .single();
+      const avg = product?.cost_price || 0;
+      return { totalCost: requestedQty * avg, avgUnitCost: avg };
     }
 
-    const avgUnitCost = product.cost_price || 0;
+    // Calculate moving average: Total Cost / Total Qty
+    const totalAvailableQty = layers.reduce((sum, l) => sum + l.remaining_qty, 0);
+    const totalAvailableCost = layers.reduce((sum, l) => sum + (l.remaining_qty * l.unit_cost), 0);
+    
+    const avgUnitCost = totalAvailableQty > 0 ? totalAvailableCost / totalAvailableQty : 0;
     const totalCost = requestedQty * avgUnitCost;
+
+    // We still need to consume from layers (FIFO order) to track stock correctly
+    let remainingToConsume = requestedQty;
+    const consumedLayers: { layerId: string; qty: number }[] = [];
+
+    for (const layer of layers) {
+      if (remainingToConsume <= 0) break;
+      const qtyFromLayer = Math.min(remainingToConsume, layer.remaining_qty);
+      remainingToConsume -= qtyFromLayer;
+      consumedLayers.push({ layerId: layer.id, qty: qtyFromLayer });
+    }
+
+    // Update layers in DB
+    await Promise.all(consumedLayers.map(c => this.consumeFromLayer(c.layerId, c.qty)));
 
     return { totalCost, avgUnitCost };
   }
@@ -411,9 +480,16 @@ class InventoryCostingService {
         );
       }
 
-      // If negative adjustment, consume from layers
+      // If negative adjustment, consume from layers using configured method
       if (quantityChange < 0) {
-        await this.calculateFIFO(productId, Math.abs(quantityChange));
+        const method = await this.getCostingMethod(restaurantId);
+        if (method === 'fifo') {
+          await this.calculateFIFO(productId, Math.abs(quantityChange));
+        } else if (method === 'wac') {
+          await this.calculateWAC(productId, Math.abs(quantityChange));
+        } else if (method === 'lifo') {
+          await this.calculateLIFO(productId, Math.abs(quantityChange));
+        }
       }
 
       return true;
