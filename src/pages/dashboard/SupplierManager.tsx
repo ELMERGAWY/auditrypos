@@ -12,7 +12,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { 
   Truck, Plus, Search, Phone, MapPin, FileText, TrendingUp, 
   TrendingDown, Wallet, Download, CreditCard, AlertCircle, Receipt,
-  ArrowRight, Package, DollarSign, Eye, Banknote, FileJson, Trash2
+  ArrowRight, Package, DollarSign, Eye, Banknote, FileJson, Trash2, Edit
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import jsPDF from 'jspdf';
@@ -158,6 +158,16 @@ export function SupplierManager({ restaurantId, currency }: Props) {
       ...prev,
       account_id: accountId,
       counter_account_id: isPayableAccount(accountId) ? accountId : prev.counter_account_id
+    }));
+  };
+
+  const handleSupplierChange = (supplierId: string) => {
+    const payAcc = accounts.find(acc => acc.code?.startsWith('21') || acc.name?.includes('مورد') || acc.name?.includes('دائنة'));
+    setVoucherForm(prev => ({
+      ...prev,
+      supplier_id: supplierId,
+      account_id: payAcc ? payAcc.id : prev.account_id,
+      counter_account_id: payAcc ? payAcc.id : prev.counter_account_id
     }));
   };
 
@@ -1233,8 +1243,9 @@ export function SupplierManager({ restaurantId, currency }: Props) {
                                 });
                                 setShowVoucherModal(true);
                               }}
+                              title="تعديل الإذن"
                             >
-                              <Eye className="w-4 h-4" />
+                              <Edit className="w-4 h-4" />
                             </Button>
                             <Button
                               variant="ghost"
@@ -1267,7 +1278,7 @@ export function SupplierManager({ restaurantId, currency }: Props) {
               <Label>المورد *</Label>
               <select
                 value={voucherForm.supplier_id}
-                onChange={(e) => setVoucherForm({ ...voucherForm, supplier_id: e.target.value })}
+                onChange={(e) => handleSupplierChange(e.target.value)}
                 className="w-full h-10 rounded-md border border-input bg-background px-3"
               >
                 <option value="">اختر المورد</option>

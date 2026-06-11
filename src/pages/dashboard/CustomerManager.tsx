@@ -11,7 +11,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { 
   Users, Plus, Search, Phone, MapPin, FileText, TrendingUp, 
   TrendingDown, Wallet, Download, CreditCard, AlertCircle, Receipt,
-  ArrowRight, Calendar, Eye, FileJson, Trash2, Banknote
+  ArrowRight, Calendar, Eye, FileJson, Trash2, Banknote, Edit
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import jsPDF from 'jspdf';
@@ -147,6 +147,16 @@ export function CustomerManager({ restaurantId, currency }: Props) {
       ...prev,
       account_id: accountId,
       counter_account_id: isReceivableAccount(accountId) ? accountId : prev.counter_account_id
+    }));
+  };
+
+  const handleCustomerChange = (customerId: string) => {
+    const recAcc = accounts.find(acc => acc.code?.startsWith('12') || acc.name?.includes('عملاء') || acc.name?.includes('مدينة'));
+    setReceiptVoucherForm(prev => ({
+      ...prev,
+      customer_id: customerId,
+      account_id: recAcc ? recAcc.id : prev.account_id,
+      counter_account_id: recAcc ? recAcc.id : prev.counter_account_id
     }));
   };
 
@@ -1277,8 +1287,9 @@ export function CustomerManager({ restaurantId, currency }: Props) {
                                 });
                                 setShowReceiptVoucherModal(true);
                               }}
+                              title="تعديل السند"
                             >
-                              <Eye className="w-4 h-4" />
+                              <Edit className="w-4 h-4" />
                             </Button>
                             <Button
                               variant="ghost"
@@ -1311,7 +1322,7 @@ export function CustomerManager({ restaurantId, currency }: Props) {
               <Label>العميل *</Label>
               <select
                 value={receiptVoucherForm.customer_id}
-                onChange={(e) => setReceiptVoucherForm({ ...receiptVoucherForm, customer_id: e.target.value })}
+                onChange={(e) => handleCustomerChange(e.target.value)}
                 className="w-full px-3 py-2 rounded-md bg-background border border-input text-sm"
               >
                 <option value="">اختر العميل</option>

@@ -207,6 +207,7 @@ export function SalesInvoices({ restaurantId, currency }: Props) {
     const q = searchQuery.toLowerCase();
     return inv.order_number.toLowerCase().includes(q) ||
       inv.customer_name?.toLowerCase().includes(q) ||
+      inv.customer_ref?.toLowerCase().includes(q) ||
       extractCustomerRef(inv).toLowerCase().includes(q);
   });
 
@@ -317,13 +318,6 @@ export function SalesInvoices({ restaurantId, currency }: Props) {
                   />
                 </div>
 
-                {editingInvoice && (
-                  <div>
-                    <Label>الرقم المرجعي</Label>
-                    <Input value={form.customer_ref} onChange={e => setForm({ ...form, customer_ref: e.target.value })} />
-                  </div>
-                )}
-
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <Label>المبلغ الإجمالي</Label>
@@ -341,21 +335,25 @@ export function SalesInvoices({ restaurantId, currency }: Props) {
                   <div className="space-y-2 max-h-40 overflow-y-auto border rounded-lg p-2">
                     <Label>بنود الفاتورة</Label>
                     {editItems.map((item, idx) => (
-                      <div key={item.id} className="grid grid-cols-3 gap-2 text-sm">
-                        <Input value={item.menu_item_name} onChange={e => {
+                      <div key={item.id || idx} className="grid grid-cols-3 gap-2 text-sm">
+                        <Input value={item.menu_item_name || ''} onChange={e => {
                           const next = [...editItems];
                           next[idx] = { ...item, menu_item_name: e.target.value };
                           setEditItems(next);
                         }} />
-                        <Input type="number" value={item.quantity} onChange={e => {
+                        <Input type="number" value={item.quantity || 0} onChange={e => {
                           const next = [...editItems];
                           next[idx] = { ...item, quantity: Number(e.target.value) };
                           setEditItems(next);
+                          const newTotal = next.reduce((sum, it) => sum + (Number(it.price || 0) * Number(it.quantity || 0)), 0);
+                          setForm(f => ({ ...f, amount: String(newTotal), paid_amount: String(newTotal) }));
                         }} />
-                        <Input type="number" value={item.price} onChange={e => {
+                        <Input type="number" value={item.price || 0} onChange={e => {
                           const next = [...editItems];
                           next[idx] = { ...item, price: Number(e.target.value) };
                           setEditItems(next);
+                          const newTotal = next.reduce((sum, it) => sum + (Number(it.price || 0) * Number(it.quantity || 0)), 0);
+                          setForm(f => ({ ...f, amount: String(newTotal), paid_amount: String(newTotal) }));
                         }} />
                       </div>
                     ))}

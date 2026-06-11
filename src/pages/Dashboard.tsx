@@ -72,7 +72,7 @@ const GiftCards = lazy(() => import('./dashboard/GiftCards').then(m => ({ defaul
 const BranchManager = lazy(() => import('./dashboard/BranchManager').then(m => ({ default: m.default || m.BranchManager })));
 const ServicePackages = lazy(() => import('./dashboard/ServicePackages').then(m => ({ default: m.ServicePackages })));
 
-import { BUSINESS_TYPES, BUSINESS_TABS, getDefaultOrderType, isFoodSector, isInventoryDrivenBusiness, type BusinessType } from '@/lib/businessTypes';
+import { BUSINESS_TYPES, BUSINESS_TABS, getBusinessConfig, getDefaultOrderType, isFoodSector, isInventoryDrivenBusiness, type BusinessType } from '@/lib/businessTypes';
 import { useAuth } from '@/lib/AuthContext';
 import { useDarkMode } from '@/lib/useDarkMode';
 import { checkoutIntegration } from '@/lib/accounting';
@@ -103,6 +103,7 @@ export default function Dashboard() {
   const [counts, setCounts] = useState({ orders: 0, salesInvoices: 0, purchaseInvoices: 0, expenses: 0, returns: 0, inventoryReceipts: 0, customers: 0, suppliers: 0, totalSales: 0, totalProfit: 0 });
   const [editingOrder, setEditingOrder] = useState<any | null>(null);
   const [showEditOrderModal, setShowEditOrderModal] = useState(false);
+  const [editOrderItems, setEditOrderItems] = useState<any[]>([]);
   const [editOrderForm, setEditOrderForm] = useState({
     customer_name: '',
     customer_phone: '',
@@ -149,7 +150,7 @@ export default function Dashboard() {
   // Derived
   const businessType = (restaurant?.business_type || 'restaurant') as BusinessType;
   const currency = restaurant?.currency || 'ج.م';
-  const config = BUSINESS_TYPES[businessType] || BUSINESS_TYPES.other;
+  const config = getBusinessConfig(businessType);
   
   console.log('🔍 Debug:', { businessType, configTabs: config.tabs, hasServicePackages: config.tabs.includes('service_packages') });
 
@@ -186,11 +187,13 @@ export default function Dashboard() {
     }
     if (orderSearchQuery) {
       const q = orderSearchQuery.toLowerCase();
-      result = result.filter(o => 
-        o.order_number?.toLowerCase().includes(q) || 
-        o.customer_name?.toLowerCase().includes(q) || 
-        o.customer_phone?.toLowerCase().includes(q) || 
-        extractCustomerRef(o).toLowerCase().includes(q)
+      result = result.filter(o =>
+        o.order_number?.toLowerCase().includes(q) ||
+        o.customer_name?.toLowerCase().includes(q) ||
+        o.customer_phone?.toLowerCase().includes(q) ||
+        o.customer_ref?.toLowerCase().includes(q) ||
+        extractCustomerRef(o).toLowerCase().includes(q) ||
+        o.notes?.toLowerCase().includes(q)
       );
     }
     return result;
@@ -317,7 +320,7 @@ export default function Dashboard() {
     }
   }, []);
 
-  const handleEditOrder = useCallback((order: any) => {
+  const handleEditOrder = useCallback(async (order: any) => {
     setEditingOrder(order);
     setEditOrderForm({
       customer_name: order.customer_name || '',
@@ -329,6 +332,13 @@ export default function Dashboard() {
       payment_method: order.payment_method || 'cash',
       notes: order.notes || ''
     });
+    // Fetch order items for editing
+    try {
+      const { data: items } = await supabase.from('order_items').select('*').eq('order_id', order.id);
+      setEditOrderItems(items || []);
+    } catch {
+      setEditOrderItems([]);
+    }
     setShowEditOrderModal(true);
   }, []);
 
@@ -361,15 +371,27 @@ export default function Dashboard() {
       }
       if (error) throw error;
 
+      // Update order items
+      for (const item of editOrderItems) {
+        if (item.id) {
+          await supabase.from('order_items').update({
+            menu_item_name: item.menu_item_name,
+            quantity: item.quantity,
+            price: item.price
+          }).eq('id', item.id);
+        }
+      }
+
       setOrders(prev => (prev || []).map(o => o.id === editingOrder.id ? { ...o, ...payload } as Order : o));
       toast.success('تم تحديث الطلب بنجاح ✅');
       setShowEditOrderModal(false);
       setEditingOrder(null);
+      setEditOrderItems([]);
       loadData();
     } catch (e: any) {
       toast.error('فشل تحديث الطلب: ' + (e?.message || 'خطأ غير معروف'));
     }
-  }, [editingOrder, editOrderForm, loadData]);
+  }, [editingOrder, editOrderForm, editOrderItems, loadData]);
 
   const performCheckout = async (sendToPrep: boolean = false) => {
     if (cart.length === 0) return;
@@ -685,6 +707,69 @@ export default function Dashboard() {
                   <Label>ملاحظات</Label>
                   <Input value={editOrderForm.notes} onChange={e => setEditOrderForm({...editOrderForm, notes: e.target.value})} />
                 </div>
+
+                {/* Editable Order Items */}
+                {editOrderItems.length > 0 && (
+                  <div>
+                    <Label className="text-base font-bold mb-2 block">بنود الطلب</Label>
+                    <div className="rounded-xl overflow-hidden border border-border">
+                      <table className="w-full text-sm">
+                        <thead className="bg-secondary">
+                          <tr>
+                            <th className="p-2 text-right">الصنف</th>
+                            <th className="p-2 text-center w-20">الكمية</th>
+                            <th className="p-2 text-center w-24">السعر</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {editOrderItems.map((item, idx) => (
+                            <tr key={item.id || idx} className="border-t border-border">
+                              <td className="p-2">
+                                <Input
+                                  className="h-8 text-sm"
+                                  value={item.menu_item_name || ''}
+                                  onChange={e => {
+                                    const updated = [...editOrderItems];
+                                    updated[idx] = { ...updated[idx], menu_item_name: e.target.value };
+                                    setEditOrderItems(updated);
+                                  }}
+                                />
+                              </td>
+                              <td className="p-2">
+                                <Input
+                                  className="h-8 text-sm text-center"
+                                  type="number"
+                                  min="1"
+                                  value={item.quantity || 1}
+                                  onChange={e => {
+                                    const updated = [...editOrderItems];
+                                    updated[idx] = { ...updated[idx], quantity: Number(e.target.value) };
+                                    setEditOrderItems(updated);
+                                  }}
+                                />
+                              </td>
+                              <td className="p-2">
+                                <Input
+                                  className="h-8 text-sm text-center"
+                                  type="number"
+                                  min="0"
+                                  step="0.01"
+                                  value={item.price || 0}
+                                  onChange={e => {
+                                    const updated = [...editOrderItems];
+                                    updated[idx] = { ...updated[idx], price: parseFloat(e.target.value) || 0 };
+                                    setEditOrderItems(updated);
+                                  }}
+                                />
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )}
+
                 <Button className="w-full h-12 gradient-bg border-0 text-white font-bold text-lg mt-4" onClick={handleUpdateOrder}>
                   تحديث الطلب
                 </Button>
