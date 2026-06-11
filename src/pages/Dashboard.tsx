@@ -78,9 +78,9 @@ import { useDarkMode } from '@/lib/useDarkMode';
 import { checkoutIntegration } from '@/lib/accounting';
 import { auditLogService } from '@/lib/auditLog';
 import type {
-  DashboardTab, OrderStatus, OrderType, MenuItem, Order, OrderItem, HeldInvoice, ChartOfAccount, extractCustomerRef
+  DashboardTab, OrderStatus, OrderType, MenuItem, Order, OrderItem, HeldInvoice, ChartOfAccount
 } from './dashboard/types';
-import { STATUS_CONFIG } from './dashboard/types';
+import { STATUS_CONFIG, extractCustomerRef } from './dashboard/types';
 
 export default function Dashboard() {
   const navigate = useNavigate();
