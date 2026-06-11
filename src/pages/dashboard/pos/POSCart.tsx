@@ -22,6 +22,8 @@ interface POSCartProps {
   setOrderType: (t: OrderType) => void;
   tableNumber: string;
   setTableNumber: (val: string) => void;
+  customOrderNumber: string; // New
+  setCustomOrderNumber: (val: string) => void; // New
   restaurant: Restaurant;
   customerName: string;
   setCustomerName: (val: string) => void;
@@ -67,6 +69,7 @@ interface POSCartProps {
 export const POSCart = memo(function POSCart({
   activeInvoiceId, invoiceTabs, cart, holdCurrentInvoice, setShowInvoiceTabs, clearCart,
   businessType, orderType, setOrderType, tableNumber, setTableNumber,
+  customOrderNumber, setCustomOrderNumber,
   restaurant, customerName, setCustomerName, customerPhone, setCustomerPhone,
   deliveryAddress, setDeliveryAddress, agents, selectedDeliveryAgent, setSelectedDeliveryAgent,
   orderNotes, setOrderNotes, discount, setDiscount, discountType, setDiscountType,
@@ -150,6 +153,10 @@ export const POSCart = memo(function POSCart({
       {/* Order Details */}
       <div className="p-3 space-y-2 border-b border-border bg-secondary/30">
         <div className="grid grid-cols-2 gap-2">
+          <div className="relative col-span-1">
+            <Hash className="w-3.5 h-3.5 absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
+            <Input value={customOrderNumber} onChange={e => setCustomOrderNumber(e.target.value)} placeholder="رقم الفاتورة (اختياري)" className="pr-8 h-9 text-xs" />
+          </div>
           {orderType === 'dine_in' && (
             <div className="relative col-span-1">
               <Hash className="w-3.5 h-3.5 absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground" />

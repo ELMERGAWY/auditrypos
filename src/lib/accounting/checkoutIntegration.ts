@@ -53,6 +53,7 @@ class CheckoutIntegration {
       discountType?: 'fixed' | 'percentage';
       notes?: string;
       destinationAccountId?: string | null;
+      customOrderNumber?: string;
     }
   ): Promise<CheckoutResult> {
     try {
@@ -130,7 +131,7 @@ class CheckoutIntegration {
 
       // 7. Prepare order data
       const paidAmount = orderData.paidAmount ?? finalTotal;
-      const orderNum = `ORD-${Date.now().toString().slice(-6)}`;
+      const orderNum = orderData.customOrderNumber || `ORD-${Date.now().toString().slice(-6)}`;
       const clientOrderId = `${context.restaurantId}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 
 

@@ -9,7 +9,7 @@ import { Badge } from '@/components/ui/badge';
 import { Label } from '@/components/ui/label';
 import { 
   FileText, Search, Calendar, Printer, Download, 
-  RotateCcw, Eye, RefreshCcw, DollarSign, Users, Plus, X, Trash2
+  RotateCcw, Eye, RefreshCcw, DollarSign, Users, Plus, X, Trash2, Edit
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { journalService } from '@/lib/accounting/journalService';
@@ -37,6 +37,7 @@ export function SalesInvoices({ restaurantId, currency }: Props) {
   const [searchQuery, setSearchQuery] = useState('');
   const [showManualForm, setShowManualForm] = useState(false);
   const [viewingId, setViewingId] = useState<string | null>(null);
+  const [editingInvoice, setEditingInvoice] = useState<Invoice | null>(null);
   const [form, setForm] = useState({
     customer_name: '',
     amount: '',
@@ -109,6 +110,50 @@ export function SalesInvoices({ restaurantId, currency }: Props) {
       loadInvoices();
     } catch (e: any) {
       toast.error('فشل إنشاء الفاتورة: ' + e.message);
+    }
+  };
+
+  const handleEditInvoice = (invoice: Invoice) => {
+    setEditingInvoice(invoice);
+    setForm({
+      customer_name: invoice.customer_name || '',
+      amount: String(invoice.total || ''),
+      description: '',
+      payment_method: invoice.payment_method || 'cash'
+    });
+    setShowManualForm(true);
+  };
+
+  const handleUpdateInvoice = async () => {
+    if (!form.amount || !form.customer_name || !editingInvoice) {
+      toast.error('يرجى إدخال اسم العميل والمبلغ');
+      return;
+    }
+
+    try {
+      const amount = parseFloat(form.amount);
+      
+      // 1. Update the order record
+      const { data: order, error: orderError } = await supabase
+        .from('orders')
+        .update({
+          customer_name: form.customer_name,
+          total: amount,
+          payment_method: form.payment_method
+        })
+        .eq('id', editingInvoice.id)
+        .select()
+        .single();
+
+      if (orderError) throw orderError;
+
+      toast.success('تم تحديث الفاتورة بنجاح ✅');
+      setShowManualForm(false);
+      setEditingInvoice(null);
+      setForm({ customer_name: '', amount: '', description: '', payment_method: 'cash' });
+      loadInvoices();
+    } catch (e: any) {
+      toast.error('فشل تحديث الفاتورة: ' + e.message);
     }
   };
 
@@ -201,6 +246,9 @@ export function SalesInvoices({ restaurantId, currency }: Props) {
                 <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => setViewingId(inv.id)} title="عرض الفاتورة">
                   <Eye className="w-4 h-4" />
                 </Button>
+                <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => handleEditInvoice(inv)} title="تعديل الفاتورة">
+                  <Edit className="w-4 h-4" />
+                </Button>
                 <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => setViewingId(inv.id)} title="طباعة">
                   <Printer className="w-4 h-4" />
                 </Button>
@@ -221,10 +269,10 @@ export function SalesInvoices({ restaurantId, currency }: Props) {
         {showManualForm && (
           <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
             <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="glass-card p-8 max-w-md w-full relative">
-              <button onClick={() => setShowManualForm(false)} className="absolute left-4 top-4 text-muted-foreground hover:text-foreground">
+              <button onClick={() => { setShowManualForm(false); setEditingInvoice(null); }} className="absolute left-4 top-4 text-muted-foreground hover:text-foreground">
                 <X className="w-5 h-5" />
               </button>
-              <h3 className="text-2xl font-black mb-6">إنشاء فاتورة يدوية</h3>
+              <h3 className="text-2xl font-black mb-6">{editingInvoice ? 'تعديل الفاتورة' : 'إنشاء فاتورة يدوية'}</h3>
               
               <div className="space-y-4">
                 <div>
@@ -251,8 +299,8 @@ export function SalesInvoices({ restaurantId, currency }: Props) {
                   </select>
                 </div>
 
-                <Button className="w-full h-12 gradient-bg border-0 text-white font-bold text-lg mt-4" onClick={handleCreateManual}>
-                  حفظ وترحيل الفاتورة
+                <Button className="w-full h-12 gradient-bg border-0 text-white font-bold text-lg mt-4" onClick={editingInvoice ? handleUpdateInvoice : handleCreateManual}>
+                  {editingInvoice ? 'تحديث الفاتورة' : 'حفظ وترحيل الفاتورة'}
                 </Button>
               </div>
             </motion.div>

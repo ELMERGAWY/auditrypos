@@ -33,6 +33,7 @@ export function useDashboardData() {
 
   const [restaurant, setRestaurant] = useState<Restaurant | null>(null);
   const [menuItems, setMenuItems] = useState<MenuItem[]>([]);
+  const [servicePackages, setServicePackages] = useState<any[]>([]);
   const [orders, setOrders] = useState<Order[]>([]);
   const [waiterCalls, setWaiterCalls] = useState<WaiterCall[]>([]);
   const [agents, setAgents] = useState<DeliveryAgent[]>([]);
@@ -48,6 +49,7 @@ export function useDashboardData() {
     const cached = await getCachedData<{
       restaurant: Restaurant | null;
       menuItems: MenuItem[];
+      servicePackages: any[];
       orders: Order[];
       waiterCalls: WaiterCall[];
       agents: DeliveryAgent[];
@@ -64,6 +66,7 @@ export function useDashboardData() {
         localStorage.setItem('current_business_name', cached.restaurant.name);
       }
       if (cached.menuItems?.length) setMenuItems(cached.menuItems);
+      if (cached.servicePackages?.length) setServicePackages(cached.servicePackages);
       if (cached.orders?.length) setOrders(cached.orders);
       if (cached.waiterCalls?.length) setWaiterCalls(cached.waiterCalls);
       if (cached.agents?.length) setAgents(cached.agents);
@@ -179,7 +182,12 @@ export function useDashboardData() {
     const loadedShift = shiftRes.data as unknown as Shift | null;
     const loadedCalls = (callsRes.data || []) as WaiterCall[];
 
+    // Load service packages from localStorage
+    const savedPackages = localStorage.getItem(`service_packages_${rest.id}`);
+    const loadedServicePackages = savedPackages ? JSON.parse(savedPackages) : [];
+
     setMenuItems(loadedMenuItems);
+    setServicePackages(loadedServicePackages);
     setAgents(loadedAgents);
     setTaxes(loadedTaxes);
     setCurrentShift(loadedShift);
@@ -203,6 +211,7 @@ export function useDashboardData() {
     await cacheData(CACHE_KEY_PREFIX + user.id, {
       restaurant: rest,
       menuItems: loadedMenuItems,
+      servicePackages: loadedServicePackages,
       orders: ordersWithItems,
       waiterCalls: loadedCalls,
       agents: loadedAgents,
@@ -328,6 +337,7 @@ export function useDashboardData() {
 
   return {
     user, authLoading, isOnline, restaurant, menuItems, setMenuItems,
+    servicePackages, setServicePackages,
     orders, setOrders, waiterCalls, setWaiterCalls, agents, setAgents, taxes,
     currentShift, setCurrentShift, profileName, dataLoaded, loadData, handleLogout,
     soundEnabled, setSoundEnabled, isSuspended

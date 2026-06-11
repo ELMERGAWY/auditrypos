@@ -12,12 +12,13 @@ import {
   Timer, StickyNote, DollarSign, Truck, CalendarClock, MapPin, Phone, Lock, CreditCard,
   Volume2, VolumeX, Package, Wallet, Store, UsersRound, Camera, Sun, Moon, Send,
   FileText, RotateCcw, Heart, Landmark, RefreshCcw, Filter, Construction, ArrowRightLeft, Network, Settings2,
-  Scale, Shield, Building2, RefreshCw, Calendar, Layout, Store as StoreIcon, Wallet2, History, ChevronRight, User, Search, Map
+  Scale, Shield, Building2, RefreshCw, Calendar, Layout, Store as StoreIcon, Wallet2, History, ChevronRight, User, Search, Map, Edit
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Card } from '@/components/ui/card';
+import { Label } from '@/components/ui/label';
 import { QRCodeSVG } from 'qrcode.react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
@@ -68,6 +69,7 @@ const KitchenDisplay = lazy(() => import('./dashboard/KitchenDisplay').then(m =>
 const LoyaltyPoints = lazy(() => import('./dashboard/LoyaltyPoints').then(m => ({ default: m.default || m.LoyaltyPoints })));
 const GiftCards = lazy(() => import('./dashboard/GiftCards').then(m => ({ default: m.default || m.GiftCards })));
 const BranchManager = lazy(() => import('./dashboard/BranchManager').then(m => ({ default: m.default || m.BranchManager })));
+const ServicePackages = lazy(() => import('./dashboard/ServicePackages').then(m => ({ default: m.ServicePackages })));
 
 import { BUSINESS_TYPES, BUSINESS_TABS, getDefaultOrderType, isFoodSector, isInventoryDrivenBusiness, type BusinessType } from '@/lib/businessTypes';
 import { useAuth } from '@/lib/AuthContext';
@@ -85,6 +87,7 @@ export default function Dashboard() {
   const { isDark, toggleDarkMode } = useDarkMode(true);
   const {
     user, authLoading, isOnline, restaurant, menuItems, setMenuItems,
+    servicePackages,
     orders, setOrders, waiterCalls, setWaiterCalls, agents, setAgents,
     currentShift, setCurrentShift, profileName, dataLoaded, loadData, handleLogout,
     soundEnabled, setSoundEnabled, taxes, isSuspended
@@ -94,20 +97,33 @@ export default function Dashboard() {
   const [activeTab, setActiveTab] = useState<SidebarTab>('home');
   const [activeSubView, setActiveSubView] = useState<'stock' | 'bom'>('stock');
   const [orderFilter, setOrderFilter] = useState<'all' | OrderStatus>('all');
+  const [orderSearchQuery, setOrderSearchQuery] = useState('');
   const [dateRange, setDateRange] = useState({ from: startOfMonth(new Date()), to: endOfDay(new Date()) });
   const [counts, setCounts] = useState({ orders: 0, salesInvoices: 0, purchaseInvoices: 0, expenses: 0, returns: 0, inventoryReceipts: 0, customers: 0, suppliers: 0, totalSales: 0, totalProfit: 0 });
+  const [editingOrder, setEditingOrder] = useState<any | null>(null);
+  const [showEditOrderModal, setShowEditOrderModal] = useState(false);
+  const [editOrderForm, setEditOrderForm] = useState({
+    customer_name: '',
+    customer_phone: '',
+    customer_ref: '',
+    total: '',
+    paid_amount: '',
+    status: '' as OrderStatus,
+    payment_method: 'cash',
+    notes: ''
+  });
 
   // POS State
   const [cart, setCart] = useState<{ item: MenuItem; qty: number; qtyText: string; unitMode: string; price: number }[]>([]);
   const [tableNumber, setTableNumber] = useState('');
+  const [customOrderNumber, setCustomOrderNumber] = useState(''); // New state for manual invoice number
   const [customerName, setCustomerName] = useState('');
   const [customerPhone, setCustomerPhone] = useState('');
   const [customerRef, setCustomerRef] = useState('');
-  const [orderNotes, setOrderNotes] = useState('');
+  const [deliveryAddress, setDeliveryAddress] = useState('');
   const [discount, setDiscount] = useState('');
   const [discountType, setDiscountType] = useState<'percent' | 'fixed'>('percent');
   const [orderType, setOrderType] = useState<OrderType>('pickup');
-  const [deliveryAddress, setDeliveryAddress] = useState('');
   const [selectedDeliveryAgent, setSelectedDeliveryAgent] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
@@ -132,6 +148,8 @@ export default function Dashboard() {
   const businessType = (restaurant?.business_type || 'restaurant') as BusinessType;
   const currency = restaurant?.currency || 'ج.م';
   const config = BUSINESS_TYPES[businessType] || BUSINESS_TYPES.other;
+  
+  console.log('🔍 Debug:', { businessType, configTabs: config.tabs, hasServicePackages: config.tabs.includes('service_packages') });
 
   const getUnitOptions = useCallback((item: MenuItem) => {
     const product = (item as any);
@@ -159,7 +177,22 @@ export default function Dashboard() {
 
   const pendingOrders = (orders || []).filter(o => o && (o.status === 'pending' || o.status === 'preparing'));
   const deliveryOrders = (orders || []).filter(o => o && (o.order_type === 'delivery' || o.delivery_agent_id) && o.status !== 'completed' && o.status !== 'cancelled');
-  const filteredOrders = useMemo(() => orderFilter === 'all' ? (orders || []).filter(o => !!o) : (orders || []).filter(o => o && o.status === orderFilter), [orders, orderFilter]);
+  const filteredOrders = useMemo(() => {
+    let result = (orders || []).filter(o => !!o);
+    if (orderFilter !== 'all') {
+      result = result.filter(o => o && o.status === orderFilter);
+    }
+    if (orderSearchQuery) {
+      const q = orderSearchQuery.toLowerCase();
+      result = result.filter(o => 
+        o.order_number?.toLowerCase().includes(q) || 
+        o.customer_name?.toLowerCase().includes(q) || 
+        o.customer_phone?.toLowerCase().includes(q) || 
+        o.customer_ref?.toLowerCase().includes(q)
+      );
+    }
+    return result;
+  }, [orders, orderFilter, orderSearchQuery]);
   const categories = useMemo(() => ['all', ...new Set((menuItems || []).filter(i => i && i.category).map(item => item.category))], [menuItems]);
   const filteredItems = useMemo(() => (menuItems || []).filter(item => {
     if (!item) return false;
@@ -197,6 +230,43 @@ export default function Dashboard() {
       return [...prev, { item, qty: 1, qtyText: '1', unitMode: getUnitOptions(item)[0]?.label || 'قطعة', price: Number(item.price) || 0 }];
     });
   }, [getUnitOptions]);
+
+  const addPackageToCart = useCallback((pkg: any) => {
+    setCart(prev => {
+      let newCart = [...prev];
+      // Add each item in the package
+      for (const pkgItem of pkg.items) {
+        const menuItem = menuItems.find(i => i.id === pkgItem.id);
+        if (menuItem) {
+          const existing = newCart.find(c => c.item.id === menuItem.id);
+          if (existing) {
+            newCart = newCart.map(c => c.item.id === menuItem.id ? { ...c, qty: c.qty + pkgItem.quantity, qtyText: String(c.qty + pkgItem.quantity) } : c);
+          } else {
+            newCart.push({ 
+              item: menuItem, 
+              qty: pkgItem.quantity, 
+              qtyText: String(pkgItem.quantity), 
+              unitMode: getUnitOptions(menuItem)[0]?.label || 'قطعة', 
+              price: Number(menuItem.price) || 0 
+            });
+          }
+        }
+      }
+      // Now adjust the total price to match the package price
+      // Calculate the current total of the package items
+      const packageItemsTotal = pkg.items.reduce((sum: number, pkgItem: any) => {
+        const menuItem = menuItems.find(i => i.id === pkgItem.id);
+        return sum + (menuItem ? Number(menuItem.price) * pkgItem.quantity : 0);
+      }, 0);
+      const discount = packageItemsTotal - Number(pkg.price);
+      if (discount > 0) {
+        // Apply a fixed discount
+        setDiscount(String(discount));
+        setDiscountType('fixed');
+      }
+      return newCart;
+    });
+  }, [menuItems, getUnitOptions]);
 
   const updateQty = useCallback((id: string, d: number) => setCart(prev => prev.map(c => c.item.id === id ? { ...c, qty: Math.max(0, Math.round((c.qty + d) * 100) / 100), qtyText: String(Math.max(0, Math.round((c.qty + d) * 100) / 100)) } : c).filter(c => c.qty > 0)), []);
 
@@ -245,6 +315,49 @@ export default function Dashboard() {
     }
   };
 
+  const handleEditOrder = (order: any) => {
+    setEditingOrder(order);
+    setEditOrderForm({
+      customer_name: order.customer_name || '',
+      customer_phone: order.customer_phone || '',
+      customer_ref: order.customer_ref || '',
+      total: String(order.total || ''),
+      paid_amount: String(order.paid_amount || ''),
+      status: order.status as OrderStatus,
+      payment_method: order.payment_method || 'cash',
+      notes: order.notes || ''
+    });
+    setShowEditOrderModal(true);
+  };
+
+  const handleUpdateOrder = async () => {
+    if (!editingOrder) return;
+    try {
+      const { error } = await supabase
+        .from('orders')
+        .update({
+          customer_name: editOrderForm.customer_name,
+          customer_phone: editOrderForm.customer_phone,
+          customer_ref: editOrderForm.customer_ref,
+          total: parseFloat(editOrderForm.total) || 0,
+          paid_amount: parseFloat(editOrderForm.paid_amount) || 0,
+          status: editOrderForm.status,
+          payment_method: editOrderForm.payment_method,
+          notes: editOrderForm.notes
+        })
+        .eq('id', editingOrder.id);
+      
+      if (error) throw error;
+      
+      toast.success('تم تحديث الطلب بنجاح ✅');
+      setShowEditOrderModal(false);
+      setEditingOrder(null);
+      loadData(); // Refresh orders
+    } catch (e) {
+      toast.error('فشل تحديث الطلب');
+    }
+  };
+
   const performCheckout = async (sendToPrep: boolean = false) => {
     if (cart.length === 0) return;
     setIsProcessingCheckout(true);
@@ -258,7 +371,7 @@ export default function Dashboard() {
             unitMode: c.unitMode, 
             unitFactor: getUnitOptions(c.item).find(u => u.label === c.unitMode)?.factor || 1 
           })), 
-          customerName, customerPhone, customerRef, orderType: orderType as any, deliveryAddress, deliveryAgentId: selectedDeliveryAgent, paymentMethod: paymentMethod as any, paidAmount: paidNum, discount: discountAmount, discountType: discountType === 'percent' ? 'percentage' : 'fixed', notes: orderNotes, destinationAccountId: selectedAccountId }
+          customerName, customerPhone, customerRef, orderType: orderType as any, deliveryAddress, deliveryAgentId: selectedDeliveryAgent, paymentMethod: paymentMethod as any, paidAmount: paidNum, discount: discountAmount, discountType: discountType === 'percent' ? 'percentage' : 'fixed', notes: orderNotes, destinationAccountId: selectedAccountId, customOrderNumber: customOrderNumber || undefined }
       );
       if (result.success && result.order) {
         const completeOrder = {
@@ -288,13 +401,13 @@ export default function Dashboard() {
     const newTab: HeldInvoice = {
       id: activeInvoiceId || crypto.randomUUID(),
       label: activeInvoiceId ? (invoiceTabs.find(t => t.id === activeInvoiceId)?.label || `فاتورة ${invoiceTabs.length + 1}`) : `فاتورة ${invoiceTabs.length + 1}`,
-      cart, tableNumber, customerName, notes: orderNotes, discount, discountType, orderType, deliveryAddress, customerPhone, deliveryAgentId: selectedDeliveryAgent, timestamp: Date.now(), paymentMethod, selectedAccountId: selectedAccountId || undefined
+      cart, tableNumber, customerName, notes: orderNotes, discount, discountType, orderType, deliveryAddress, customerPhone, deliveryAgentId: selectedDeliveryAgent, timestamp: Date.now(), paymentMethod, selectedAccountId: selectedAccountId || undefined, customOrderNumber
     };
     if (activeInvoiceId) setInvoiceTabs(prev => prev.map(t => t.id === activeInvoiceId ? newTab : t));
     else setInvoiceTabs(prev => [...prev, newTab]);
     clearCart();
     toast.success('تم تعليق الفاتورة');
-  }, [cart, activeInvoiceId, invoiceTabs, tableNumber, customerName, orderNotes, discount, discountType, orderType, deliveryAddress, customerPhone, selectedDeliveryAgent, paymentMethod, selectedAccountId, clearCart]);
+  }, [cart, activeInvoiceId, invoiceTabs, tableNumber, customerName, orderNotes, discount, discountType, orderType, deliveryAddress, customerPhone, selectedDeliveryAgent, paymentMethod, selectedAccountId, clearCart, customOrderNumber]);
 
   // Performance Optimization: Memoize the active tab content
   const activeTabContent = useMemo(() => {
@@ -311,13 +424,33 @@ export default function Dashboard() {
         {activeTab === 'home' && <HomeDashboard {...commonProps} userId={user?.id || ''} onNavigate={setActiveTab} />}
         {activeTab === 'pos' && (
           <div className="flex flex-col lg:flex-row h-full gap-4 overflow-hidden">
-            <POSGrid restaurant={restaurant} currency={currency} categories={categories} selectedCategory={selectedCategory} setSelectedCategory={setSelectedCategory} searchQuery={searchQuery} setSearchQuery={setSearchQuery} filteredItems={filteredItems} addToCart={addToCart} businessType={businessType} todayRevenue={todayRevenue} todayOrders={todayOrdersList} avgOrderValue={avgOrderValue} pendingOrders={pendingOrders} orderType={orderType} orders={orders} tableNumber={tableNumber} setTableNumber={setTableNumber} />
-            <POSCart activeInvoiceId={activeInvoiceId} invoiceTabs={invoiceTabs} cart={cart} holdCurrentInvoice={holdCurrentInvoice} setShowInvoiceTabs={setShowInvoiceTabs} clearCart={clearCart} businessType={businessType} orderType={orderType} setOrderType={setOrderType} tableNumber={tableNumber} setTableNumber={setTableNumber} restaurant={restaurant} customerName={customerName} setCustomerName={selectCustomerFromSearch} customerPhone={customerPhone} setCustomerPhone={setCustomerPhone} customerRef={customerRef} setCustomerRef={setCustomerRef} deliveryAddress={deliveryAddress} setDeliveryAddress={setDeliveryAddress} agents={agents} selectedDeliveryAgent={selectedDeliveryAgent} setSelectedDeliveryAgent={setSelectedDeliveryAgent} orderNotes={orderNotes} setOrderNotes={setOrderNotes} discount={discount} setDiscount={setDiscount} discountType={discountType} setDiscountType={setDiscountType} currency={currency} getUnitOptions={getUnitOptions} updateQty={updateQty} setCartItemQty={setCartItemQty} setCartItemUnit={setCartItemUnit} updateValue={updateValue} updatePrice={updatePrice} discountAmount={discountAmount} taxAmount={totalTax} cartSubtotal={cartSubtotal} cartTotal={cartTotal} paymentMethod={paymentMethod} setPaymentMethod={setPaymentMethod} paidAmount={paidAmount} setPaidAmount={setPaidAmount} remaining={remaining} checkout={performCheckout} previewInvoice={() => { setLastReceipt({ total: cartTotal, items: cart.map(c => ({ menu_item_name: c.item.name, quantity: c.qty, price: Number(c.price) })) } as any); setShowReceipt(true); }} removeFromCart={(id) => setCart(prev => prev.filter(c => c.item.id !== id))} accountingAccounts={accountingAccounts} selectedAccountId={selectedAccountId} setSelectedAccountId={setSelectedAccountId} isProcessing={isProcessingCheckout} />
+            <POSGrid restaurant={restaurant} currency={currency} categories={categories} selectedCategory={selectedCategory} setSelectedCategory={setSelectedCategory} searchQuery={searchQuery} setSearchQuery={setSearchQuery} filteredItems={filteredItems} addToCart={addToCart} servicePackages={servicePackages} addPackageToCart={addPackageToCart} businessType={businessType} todayRevenue={todayRevenue} todayOrders={todayOrdersList} avgOrderValue={avgOrderValue} pendingOrders={pendingOrders} orderType={orderType} orders={orders} tableNumber={tableNumber} setTableNumber={setTableNumber} />
+            <POSCart activeInvoiceId={activeInvoiceId} invoiceTabs={invoiceTabs} cart={cart} holdCurrentInvoice={holdCurrentInvoice} setShowInvoiceTabs={setShowInvoiceTabs} clearCart={clearCart} businessType={businessType} orderType={orderType} setOrderType={setOrderType} tableNumber={tableNumber} setTableNumber={setTableNumber} customOrderNumber={customOrderNumber} setCustomOrderNumber={setCustomOrderNumber} restaurant={restaurant} customerName={customerName} setCustomerName={selectCustomerFromSearch} customerPhone={customerPhone} setCustomerPhone={setCustomerPhone} customerRef={customerRef} setCustomerRef={setCustomerRef} deliveryAddress={deliveryAddress} setDeliveryAddress={setDeliveryAddress} agents={agents} selectedDeliveryAgent={selectedDeliveryAgent} setSelectedDeliveryAgent={setSelectedDeliveryAgent} orderNotes={orderNotes} setOrderNotes={setOrderNotes} discount={discount} setDiscount={setDiscount} discountType={discountType} setDiscountType={setDiscountType} currency={currency} getUnitOptions={getUnitOptions} updateQty={updateQty} setCartItemQty={setCartItemQty} setCartItemUnit={setCartItemUnit} updateValue={updateValue} updatePrice={updatePrice} discountAmount={discountAmount} taxAmount={totalTax} cartSubtotal={cartSubtotal} cartTotal={cartTotal} paymentMethod={paymentMethod} setPaymentMethod={setPaymentMethod} paidAmount={paidAmount} setPaidAmount={setPaidAmount} remaining={remaining} checkout={performCheckout} previewInvoice={() => { setLastReceipt({ total: cartTotal, items: cart.map(c => ({ menu_item_name: c.item.name, quantity: c.qty, price: Number(c.price) })) } as any); setShowReceipt(true); }} removeFromCart={(id) => setCart(prev => prev.filter(c => c.item.id !== id))} accountingAccounts={accountingAccounts} selectedAccountId={selectedAccountId} setSelectedAccountId={setSelectedAccountId} isProcessing={isProcessingCheckout} />
           </div>
         )}
         {activeTab === 'orders' && (
           <div className="p-4 space-y-4 h-full overflow-auto">
-            <div className="flex justify-between items-center"><h2 className="text-2xl font-black">{config.labels.orders}</h2><div className="flex gap-2">{(['all', 'pending', 'completed', 'cancelled'] as const).map(s => <Button key={s} size="sm" variant={orderFilter === s ? 'default' : 'outline'} onClick={() => setOrderFilter(s)}>{s === 'all' ? 'الكل' : STATUS_CONFIG[s]?.label || s}</Button>)}</div></div>
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
+              <h2 className="text-2xl font-black">{config.labels.orders}</h2>
+              <div className="flex gap-2 w-full sm:w-auto">
+                <div className="relative flex-1 sm:flex-none">
+                  <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                  <Input 
+                    placeholder="بحث برقم الطلب أو اسم العميل أو الرقم المرجعي..." 
+                    className="pr-10 h-10 w-full sm:w-80"
+                    value={orderSearchQuery}
+                    onChange={e => setOrderSearchQuery(e.target.value)}
+                  />
+                </div>
+                <div className="flex gap-2">
+                  {(['all', 'pending', 'completed', 'cancelled'] as const).map(s => 
+                    <Button key={s} size="sm" variant={orderFilter === s ? 'default' : 'outline'} onClick={() => setOrderFilter(s)}>
+                      {s === 'all' ? 'الكل' : STATUS_CONFIG[s]?.label || s}
+                    </Button>
+                  )}
+                </div>
+              </div>
+            </div>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">{filteredOrders.map(o => (
               <Card key={o.id} className="p-4 hover:shadow-md transition-shadow border-primary/10">
                 <div className="flex justify-between items-start font-bold mb-3">
@@ -367,13 +500,16 @@ export default function Dashboard() {
                 </div>
 
                 <div className="flex gap-2 mt-auto">
-                  <Button className="flex-1 gradient-bg border-0 text-white" size="sm" onClick={() => { setLastReceipt(o); setShowReceipt(true); }}>
-                    <FileText className="w-4 h-4 ml-1" /> تفاصيل
-                  </Button>
-                  <Button variant="ghost" size="sm" className="text-destructive hover:bg-destructive/10" onClick={() => handleDeleteOrder(o.id)}>
-                    <Trash2 className="w-4 h-4" />
-                  </Button>
-                </div>
+                <Button className="flex-1 gradient-bg border-0 text-white" size="sm" onClick={() => { setLastReceipt(o); setShowReceipt(true); }}>
+                  <FileText className="w-4 h-4 ml-1" /> تفاصيل
+                </Button>
+                <Button variant="ghost" size="sm" onClick={() => handleEditOrder(o)}>
+                  <Edit className="w-4 h-4" />
+                </Button>
+                <Button variant="ghost" size="sm" className="text-destructive hover:bg-destructive/10" onClick={() => handleDeleteOrder(o.id)}>
+                  <Trash2 className="w-4 h-4" />
+                </Button>
+              </div>
               </Card>
             ))}</div>
           </div>
@@ -384,6 +520,7 @@ export default function Dashboard() {
         {activeTab === 'inventory' && <InventoryTab {...commonProps} businessType={businessType} />}
         {activeTab === 'inventory_receipts' && <InventoryReceiptsManager {...commonProps} />}
         {activeTab === 'bom' && <BOMManager {...commonProps} />}
+        {activeTab === 'service_packages' && <ServicePackages />}
         {activeTab === 'customers' && <CustomerManager {...commonProps} />}
         {activeTab === 'suppliers' && <SupplierManager {...commonProps} />}
         {activeTab === 'sales_orders' && <SalesOrders {...commonProps} />}
@@ -479,6 +616,68 @@ export default function Dashboard() {
           </div>
         </main>
         {showReceipt && lastReceipt && <ReceiptModalWrapper isOpen={showReceipt} onClose={() => setShowReceipt(false)} order={lastReceipt} restaurant={restaurant} />}
+        
+        {/* Edit Order Modal */}
+        {showEditOrderModal && (
+          <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+            <div className="glass-card p-6 max-w-lg w-full relative max-h-[90vh] overflow-y-auto">
+              <button onClick={() => { setShowEditOrderModal(false); setEditingOrder(null); }} className="absolute left-4 top-4 text-muted-foreground hover:text-foreground">
+                <X className="w-5 h-5" />
+              </button>
+              <h3 className="text-2xl font-black mb-6">تعديل الطلب</h3>
+              
+              <div className="space-y-4">
+                <div>
+                  <Label>اسم العميل</Label>
+                  <Input value={editOrderForm.customer_name} onChange={e => setEditOrderForm({...editOrderForm, customer_name: e.target.value})} />
+                </div>
+                <div>
+                  <Label>رقم هاتف العميل</Label>
+                  <Input value={editOrderForm.customer_phone} onChange={e => setEditOrderForm({...editOrderForm, customer_phone: e.target.value})} />
+                </div>
+                <div>
+                  <Label>الرقم المرجعي للعميل</Label>
+                  <Input value={editOrderForm.customer_ref} onChange={e => setEditOrderForm({...editOrderForm, customer_ref: e.target.value})} />
+                </div>
+                <div>
+                  <Label>الإجمالي</Label>
+                  <Input type="number" value={editOrderForm.total} onChange={e => setEditOrderForm({...editOrderForm, total: e.target.value})} />
+                </div>
+                <div>
+                  <Label>المدفوع</Label>
+                  <Input type="number" value={editOrderForm.paid_amount} onChange={e => setEditOrderForm({...editOrderForm, paid_amount: e.target.value})} />
+                </div>
+                <div>
+                  <Label>حالة الطلب</Label>
+                  <select className="w-full bg-secondary p-2 rounded-lg" value={editOrderForm.status} onChange={e => setEditOrderForm({...editOrderForm, status: e.target.value as OrderStatus})}>
+                    <option value="pending">قيد الانتظار</option>
+                    <option value="preparing">قيد التحضير</option>
+                    <option value="ready">جاهز</option>
+                    <option value="delivering">قيد التوصيل</option>
+                    <option value="completed">مكتمل</option>
+                    <option value="cancelled">ملغى</option>
+                  </select>
+                </div>
+                <div>
+                  <Label>طريقة الدفع</Label>
+                  <select className="w-full bg-secondary p-2 rounded-lg" value={editOrderForm.payment_method} onChange={e => setEditOrderForm({...editOrderForm, payment_method: e.target.value})}>
+                    <option value="cash">نقدي</option>
+                    <option value="card">بطاقة</option>
+                    <option value="credit">آجل</option>
+                    <option value="bank">تحويل بنكي</option>
+                  </select>
+                </div>
+                <div>
+                  <Label>ملاحظات</Label>
+                  <Input value={editOrderForm.notes} onChange={e => setEditOrderForm({...editOrderForm, notes: e.target.value})} />
+                </div>
+                <Button className="w-full h-12 gradient-bg border-0 text-white font-bold text-lg mt-4" onClick={handleUpdateOrder}>
+                  تحديث الطلب
+                </Button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </DashboardErrorBoundary>
   );

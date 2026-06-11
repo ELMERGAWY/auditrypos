@@ -91,6 +91,7 @@ export interface Restaurant {
     timestamp: number;
     paymentMethod?: string;
     selectedAccountId?: string;
+    customOrderNumber?: string;
   }
 
 export interface DeliveryAgent {

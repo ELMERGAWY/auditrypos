@@ -55,12 +55,27 @@ interface SupplierPurchaseReturn {
   refund_method: string;
 }
 
+interface PaymentVoucher {
+  id: string;
+  voucher_number: string;
+  voucher_date: string;
+  supplier_id: string;
+  supplier_name: string;
+  amount: number;
+  payment_method: string;
+  reference_number: string | null;
+  notes: string | null;
+  account_id: string | null;
+  created_at: string;
+}
+
 interface Props {
   restaurantId: string;
   currency: string;
 }
 
 export function SupplierManager({ restaurantId, currency }: Props) {
+  const [activeTab, setActiveTab] = useState('suppliers');
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [loading, setLoading] = useState(false);
@@ -71,6 +86,21 @@ export function SupplierManager({ restaurantId, currency }: Props) {
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [transactions, setTransactions] = useState<SupplierTransaction[]>([]);
   const [returns, setReturns] = useState<SupplierPurchaseReturn[]>([]);
+
+  // Payment Vouchers
+  const [paymentVouchers, setPaymentVouchers] = useState<PaymentVoucher[]>([]);
+  const [showVoucherModal, setShowVoucherModal] = useState(false);
+  const [editingVoucher, setEditingVoucher] = useState<PaymentVoucher | null>(null);
+  const [voucherForm, setVoucherForm] = useState({
+    supplier_id: '',
+    amount: '',
+    payment_method: 'cash',
+    reference_number: '',
+    notes: '',
+    account_id: '',
+    voucher_date: new Date().toISOString().split('T')[0]
+  });
+  const [accounts, setAccounts] = useState<any[]>([]);
   
   // Payment form state
   const [paymentForm, setPaymentForm] = useState({
@@ -96,7 +126,55 @@ export function SupplierManager({ restaurantId, currency }: Props) {
 
   useEffect(() => {
     loadSuppliers();
+    loadAccounts();
+    loadPaymentVouchers();
   }, [restaurantId]);
+
+  const loadAccounts = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('chart_of_accounts')
+        .select('id, name, code, is_cash_account, is_bank_account')
+        .eq('restaurant_id', restaurantId)
+        .order('code');
+      if (error) throw error;
+      setAccounts(data || []);
+    } catch (error: any) {
+      toast.error('فشل تحميل الحسابات: ' + error.message);
+    }
+  };
+
+  const loadPaymentVouchers = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('payment_vouchers')
+        .select(`
+          id, voucher_number, voucher_date, supplier_id, amount, payment_method, 
+          reference_number, notes, account_id, created_at,
+          suppliers(name)
+        `)
+        .eq('restaurant_id', restaurantId)
+        .order('voucher_date', { ascending: false });
+
+      if (error) throw error;
+      const formatted = (data || []).map((v: any) => ({
+        id: v.id,
+        voucher_number: v.voucher_number,
+        voucher_date: v.voucher_date,
+        supplier_id: v.supplier_id,
+        supplier_name: v.suppliers?.name || 'غير معروف',
+        amount: Number(v.amount),
+        payment_method: v.payment_method,
+        reference_number: v.reference_number,
+        notes: v.notes,
+        account_id: v.account_id,
+        created_at: v.created_at
+      }));
+      setPaymentVouchers(formatted);
+    } catch (error: any) {
+      toast.error('فشل تحميل أذون الدفع: ' + error.message);
+    }
+  };
 
   const loadSuppliers = async () => {
     try {
@@ -328,6 +406,117 @@ export function SupplierManager({ restaurantId, currency }: Props) {
     }
   };
 
+  const handleSaveVoucher = async () => {
+    if (!voucherForm.supplier_id) {
+      toast.error('يرجى اختيار المورد');
+      return;
+    }
+    const amount = Number(voucherForm.amount);
+    if (!amount || amount <= 0) {
+      toast.error('يرجى إدخال مبلغ صحيح');
+      return;
+    }
+
+    try {
+      const supplier = suppliers.find(s => s.id === voucherForm.supplier_id);
+      if (!supplier) {
+        toast.error('المورد غير موجود');
+        return;
+      }
+
+      if (editingVoucher) {
+        // Update existing voucher
+        const { error } = await supabase
+          .from('payment_vouchers')
+          .update({
+            supplier_id: voucherForm.supplier_id,
+            amount: amount,
+            payment_method: voucherForm.payment_method,
+            reference_number: voucherForm.reference_number || null,
+            notes: voucherForm.notes || null,
+            account_id: voucherForm.account_id || null,
+            voucher_date: voucherForm.voucher_date
+          })
+          .eq('id', editingVoucher.id);
+
+        if (error) throw error;
+
+        // Adjust supplier balance
+        const oldAmount = editingVoucher.amount;
+        const balanceChange = amount - oldAmount;
+        const newBalance = supplier.balance - balanceChange;
+        await supabase.from('suppliers').update({ balance: newBalance }).eq('id', supplier.id);
+
+        toast.success('تم تحديث إذن الدفع');
+      } else {
+        // Create new voucher
+        const voucherNumber = `PV-${Date.now().toString().slice(-6)}`;
+        const { error } = await supabase
+          .from('payment_vouchers')
+          .insert({
+            restaurant_id: restaurantId,
+            voucher_number: voucherNumber,
+            supplier_id: voucherForm.supplier_id,
+            amount: amount,
+            payment_method: voucherForm.payment_method,
+            reference_number: voucherForm.reference_number || null,
+            notes: voucherForm.notes || null,
+            account_id: voucherForm.account_id || null,
+            voucher_date: voucherForm.voucher_date
+          } as any);
+
+        if (error) throw error;
+
+        // Update supplier balance and add transaction
+        const newBalance = supplier.balance - amount;
+        await supabase.from('suppliers').update({ balance: newBalance }).eq('id', supplier.id);
+        await supabase.from('supplier_transactions').insert({
+          supplier_id: voucherForm.supplier_id,
+          restaurant_id: restaurantId,
+          type: 'payment',
+          amount: amount,
+          description: voucherForm.notes || 'إذن دفع',
+          payment_method: voucherForm.payment_method
+        } as any);
+
+        toast.success('تم إضافة إذن الدفع');
+      }
+
+      setShowVoucherModal(false);
+      setEditingVoucher(null);
+      setVoucherForm({
+        supplier_id: '',
+        amount: '',
+        payment_method: 'cash',
+        reference_number: '',
+        notes: '',
+        account_id: '',
+        voucher_date: new Date().toISOString().split('T')[0]
+      });
+      loadPaymentVouchers();
+      loadSuppliers();
+    } catch (error: any) {
+      toast.error('فشل حفظ إذن الدفع: ' + error.message);
+    }
+  };
+
+  const handleDeleteVoucher = async (voucher: PaymentVoucher) => {
+    if (!confirm('حذف إذن الدفع هذا؟')) return;
+    try {
+      const supplier = suppliers.find(s => s.id === voucher.supplier_id);
+      await supabase.from('payment_vouchers').delete().eq('id', voucher.id);
+      if (supplier) {
+        const newBalance = supplier.balance + voucher.amount;
+        await supabase.from('suppliers').update({ balance: newBalance }).eq('id', supplier.id);
+      }
+      toast.success('تم حذف إذن الدفع');
+      loadPaymentVouchers();
+      loadSuppliers();
+    } catch (error: any) {
+      toast.error('فشل الحذف: ' + error.message);
+    }
+  };
+
   const exportStatement = () => {
     const worksheet = XLSX.utils.json_to_sheet(transactions.map(t => ({
       'التاريخ': new Date(t.date).toLocaleDateString('ar-EG'),
@@ -455,21 +644,28 @@ export function SupplierManager({ restaurantId, currency }: Props) {
 
   return (
     <div className="space-y-4">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
-            <Truck className="w-5 h-5 text-primary" />
+      <Tabs value={activeTab} onValueChange={setActiveTab}>
+        <TabsList>
+          <TabsTrigger value="suppliers">الموردين</TabsTrigger>
+          <TabsTrigger value="payment-vouchers">أذون الدفع</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="suppliers" className="space-y-4 mt-4">
+          {/* Header */}
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
+                <Truck className="w-5 h-5 text-primary" />
+              </div>
+              <div>
+                <h2 className="font-display font-bold text-lg">الموردين وحساباتهم</h2>
+                <p className="text-xs text-muted-foreground">{suppliers.length} مورد | إجمالي المستحقات: {totalPayables.toFixed(2)} {currency}</p>
+              </div>
+            </div>
+            <Button onClick={() => { setSelectedSupplier(null); setFormData({ name: '', phone: '', email: '', address: '', contact_person: '', credit_limit: '', payment_terms: '', tax_number: '' }); setShowAddModal(true); }}>
+              <Plus className="w-4 h-4 ml-1" /> مورد جديد
+            </Button>
           </div>
-          <div>
-            <h2 className="font-display font-bold text-lg">الموردين وحساباتهم</h2>
-            <p className="text-xs text-muted-foreground">{suppliers.length} مورد | إجمالي المستحقات: {totalPayables.toFixed(2)} {currency}</p>
-          </div>
-        </div>
-        <Button onClick={() => { setSelectedSupplier(null); setFormData({ name: '', phone: '', email: '', address: '', contact_person: '', credit_limit: '', payment_terms: '', tax_number: '' }); setShowAddModal(true); }}>
-          <Plus className="w-4 h-4 ml-1" /> مورد جديد
-        </Button>
-      </div>
 
       {/* Summary Cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
@@ -981,6 +1177,208 @@ export function SupplierManager({ restaurantId, currency }: Props) {
                 )}
               </Button>
               <Button variant="outline" onClick={() => setShowPaymentModal(false)}>
+                إلغاء
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+        </TabsContent>
+
+        <TabsContent value="payment-vouchers" className="space-y-4 mt-4">
+          {/* Header */}
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
+                <FileText className="w-5 h-5 text-primary" />
+              </div>
+              <div>
+                <h2 className="font-display font-bold text-lg">أذون الدفع</h2>
+                <p className="text-xs text-muted-foreground">{paymentVouchers.length} إذن</p>
+              </div>
+            </div>
+            <Button onClick={() => {
+              setEditingVoucher(null);
+              setVoucherForm({
+                supplier_id: '',
+                amount: '',
+                payment_method: 'cash',
+                reference_number: '',
+                notes: '',
+                account_id: '',
+                voucher_date: new Date().toISOString().split('T')[0]
+              });
+              setShowVoucherModal(true);
+            }}>
+              <Plus className="w-4 h-4 ml-1" /> إذن جديد
+            </Button>
+          </div>
+
+          {/* Payment Vouchers Table */}
+          <div className="glass-card overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead className="bg-primary/5 border-b border-border">
+                  <tr>
+                    <th className="px-4 py-3 text-right text-sm font-medium">رقم الإذن</th>
+                    <th className="px-4 py-3 text-right text-sm font-medium">التاريخ</th>
+                    <th className="px-4 py-3 text-right text-sm font-medium">المورد</th>
+                    <th className="px-4 py-3 text-right text-sm font-medium">المبلغ</th>
+                    <th className="px-4 py-3 text-right text-sm font-medium">طريقة الدفع</th>
+                    <th className="px-4 py-3 text-right text-sm font-medium">المرجع</th>
+                    <th className="px-4 py-3 text-right text-sm font-medium">الإجراءات</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {paymentVouchers.length === 0 ? (
+                    <tr>
+                      <td colSpan={7} className="px-4 py-12 text-center text-muted-foreground">لا توجد أذون دفع</td>
+                    </tr>
+                  ) : (
+                    paymentVouchers.map((voucher) => (
+                      <tr key={voucher.id} className="border-b border-border/50 hover:bg-primary/5">
+                        <td className="px-4 py-3 font-medium">{voucher.voucher_number}</td>
+                        <td className="px-4 py-3">{new Date(voucher.voucher_date).toLocaleDateString('ar-EG')}</td>
+                        <td className="px-4 py-3">{voucher.supplier_name}</td>
+                        <td className="px-4 py-3 font-bold">{voucher.amount.toFixed(2)} {currency}</td>
+                        <td className="px-4 py-3">
+                          {voucher.payment_method === 'cash' ? 'نقدي' :
+                           voucher.payment_method === 'bank' ? 'تحويل بنكي' :
+                           voucher.payment_method === 'check' ? 'شيك' : voucher.payment_method}
+                        </td>
+                        <td className="px-4 py-3 text-xs text-muted-foreground">{voucher.reference_number || '-'}</td>
+                        <td className="px-4 py-3">
+                          <div className="flex gap-1">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => {
+                                setEditingVoucher(voucher);
+                                setVoucherForm({
+                                  supplier_id: voucher.supplier_id,
+                                  amount: voucher.amount.toString(),
+                                  payment_method: voucher.payment_method,
+                                  reference_number: voucher.reference_number || '',
+                                  notes: voucher.notes || '',
+                                  account_id: voucher.account_id || '',
+                                  voucher_date: voucher.voucher_date.split('T')[0]
+                                });
+                                setShowVoucherModal(true);
+                              }}
+                            >
+                              <Eye className="w-4 h-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="text-destructive"
+                              onClick={() => handleDeleteVoucher(voucher)}
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </Button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </TabsContent>
+      </Tabs>
+
+      {/* Payment Voucher Modal */}
+      <Dialog open={showVoucherModal} onOpenChange={setShowVoucherModal}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>{editingVoucher ? 'تعديل إذن دفع' : 'إذن دفع جديد'}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 mt-4">
+            <div>
+              <Label>المورد *</Label>
+              <select
+                value={voucherForm.supplier_id}
+                onChange={(e) => setVoucherForm({ ...voucherForm, supplier_id: e.target.value })}
+                className="w-full h-10 rounded-md border border-input bg-background px-3"
+              >
+                <option value="">اختر المورد</option>
+                {suppliers.map((s) => (
+                  <option key={s.id} value={s.id}>
+                    {s.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label>المبلغ *</Label>
+                <Input
+                  type="number"
+                  value={voucherForm.amount}
+                  onChange={(e) => setVoucherForm({ ...voucherForm, amount: e.target.value })}
+                  placeholder="0.00"
+                />
+              </div>
+              <div>
+                <Label>التاريخ</Label>
+                <Input
+                  type="date"
+                  value={voucherForm.voucher_date}
+                  onChange={(e) => setVoucherForm({ ...voucherForm, voucher_date: e.target.value })}
+                />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label>طريقة الدفع</Label>
+                <select
+                  value={voucherForm.payment_method}
+                  onChange={(e) => setVoucherForm({ ...voucherForm, payment_method: e.target.value })}
+                  className="w-full h-10 rounded-md border border-input bg-background px-3"
+                >
+                  <option value="cash">نقدي</option>
+                  <option value="bank">تحويل بنكي</option>
+                  <option value="check">شيك</option>
+                </select>
+              </div>
+              <div>
+                <Label>الحساب (اختياري)</Label>
+                <select
+                  value={voucherForm.account_id}
+                  onChange={(e) => setVoucherForm({ ...voucherForm, account_id: e.target.value })}
+                  className="w-full h-10 rounded-md border border-input bg-background px-3"
+                >
+                  <option value="">اختر الحساب</option>
+                  {accounts.map((acc) => (
+                    <option key={acc.id} value={acc.id}>
+                      {acc.code} - {acc.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+            <div>
+              <Label>رقم المرجع (اختياري)</Label>
+              <Input
+                value={voucherForm.reference_number}
+                onChange={(e) => setVoucherForm({ ...voucherForm, reference_number: e.target.value })}
+                placeholder="رقم الشيك أو الإيصال"
+              />
+            </div>
+            <div>
+              <Label>ملاحظات</Label>
+              <Input
+                value={voucherForm.notes}
+                onChange={(e) => setVoucherForm({ ...voucherForm, notes: e.target.value })}
+                placeholder="ملاحظات إضافية"
+              />
+            </div>
+            <div className="flex gap-2 pt-2">
+              <Button className="flex-1" onClick={handleSaveVoucher}>
+                {editingVoucher ? 'تحديث' : 'إضافة'}
+              </Button>
+              <Button variant="outline" onClick={() => setShowVoucherModal(false)}>
                 إلغاء
               </Button>
             </div>
