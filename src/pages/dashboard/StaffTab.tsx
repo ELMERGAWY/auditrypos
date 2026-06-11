@@ -1,10 +1,13 @@
 // @ts-nocheck
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Users, Plus, Edit2, Trash2, Shield, Eye, EyeOff, X, DollarSign } from 'lucide-react';
+import { Users, Plus, Edit2, Trash2, Shield, Eye, EyeOff, X, DollarSign, Building2, Calendar, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
+import { Label } from '@/components/ui/label';
+import { Card } from '@/components/ui/card';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 
@@ -18,6 +21,7 @@ interface StaffMember {
   base_salary?: number;
   payment_cycle?: 'monthly' | 'weekly' | 'daily';
   created_at: string;
+  profile?: any; // staff_profiles linked record
 }
 
 interface CustomRole {
@@ -43,27 +47,79 @@ interface Props {
 export function StaffTab({ restaurantId, currency }: Props) {
   const [staff, setStaff] = useState<StaffMember[]>([]);
   const [customRoles, setCustomRoles] = useState<CustomRole[]>([]);
+  const [departments, setDepartments] = useState<any[]>([]);
+  const [accounts, setAccounts] = useState<any[]>([]);
+  
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState<StaffMember | null>(null);
+  const [loading, setLoading] = useState(false);
+  
   const [form, setForm] = useState({ 
     name: '', role: 'cashier', phone: '', pin: '0000',
-    base_salary: '', payment_cycle: 'monthly' as 'monthly' | 'weekly' | 'daily'
+    base_salary: '', payment_cycle: 'monthly' as 'monthly' | 'weekly' | 'daily',
+    department_id: '', expense_account_id: '', allowances: '0', deductions: '0',
+    email: '', hire_date: ''
   });
+  
   const [showPin, setShowPin] = useState<string | null>(null);
+  
+  // Payroll transaction modal state
   const [showPayroll, setShowPayroll] = useState<StaffMember | null>(null);
-  const [payrollAmount, setPayrollAmount] = useState('');
+  const [payrollForm, setPayrollForm] = useState({
+    month: String(new Date().getMonth() + 1),
+    year: String(new Date().getFullYear()),
+    allowances: '0',
+    deductions: '0',
+    net_salary: '0',
+    expense_account_id: '',
+    payment_account_id: '',
+    notes: ''
+  });
 
   const load = async () => {
-    const [staffRes, rolesRes] = await Promise.all([
-      supabase.from('restaurant_staff').select('*').eq('restaurant_id', restaurantId).order('created_at', { ascending: false }),
-      supabase.from('restaurant_custom_roles').select('*').eq('restaurant_id', restaurantId)
-    ]);
-    
-    setStaff((staffRes.data || []) as StaffMember[]);
-    setCustomRoles((rolesRes.data || []) as CustomRole[]);
+    setLoading(true);
+    try {
+      const [staffRes, rolesRes, profilesRes, deptRes, accountsRes] = await Promise.all([
+        supabase.from('restaurant_staff').select('*').eq('restaurant_id', restaurantId).order('created_at', { ascending: false }),
+        supabase.from('restaurant_custom_roles').select('*').eq('restaurant_id', restaurantId),
+        supabase.from('staff_profiles').select('*').eq('restaurant_id', restaurantId),
+        supabase.from('staff_departments').select('*').eq('restaurant_id', restaurantId).order('name'),
+        supabase.from('chart_of_accounts').select('id, code, name, account_type, is_cash_account, is_bank_account').eq('restaurant_id', restaurantId).eq('is_active', true).order('code')
+      ]);
+      
+      const profilesMap = new Map((profilesRes.data || []).map(p => [p.restaurant_staff_id || p.full_name, p]));
+      
+      const mappedStaff = (staffRes.data || []).map((s: any) => {
+        // Try linking by restaurant_staff_id, fallback to name
+        const profile = profilesMap.get(s.id) || profilesMap.get(s.name);
+        return {
+          ...s,
+          profile
+        };
+      });
+
+      setStaff(mappedStaff);
+      setCustomRoles((rolesRes.data || []) as CustomRole[]);
+      setDepartments(deptRes.data || []);
+      setAccounts(accountsRes.data || []);
+    } catch (e: any) {
+      toast.error('حدث خطأ في تحميل البيانات: ' + e.message);
+    } finally {
+      setLoading(false);
+    }
   };
 
   useEffect(() => { load(); }, [restaurantId]);
+
+  const expenseAccounts = useMemo(() =>
+    accounts.filter(a => a.code?.startsWith('6') || a.account_type === 'expense' || a.name?.includes('مصروف') || a.name?.includes('رواتب')),
+    [accounts]
+  );
+  
+  const paymentAccounts = useMemo(() =>
+    accounts.filter(a => a.code?.startsWith('11') || a.code?.startsWith('14') || a.is_cash_account || a.is_bank_account),
+    [accounts]
+  );
 
   const getRoleDisplay = (roleKey: string) => {
     if (STANDARD_ROLES[roleKey]) return STANDARD_ROLES[roleKey];
@@ -74,37 +130,92 @@ export function StaffTab({ restaurantId, currency }: Props) {
 
   const handleSave = async () => {
     if (!form.name.trim()) { toast.error('أدخل اسم الموظف'); return; }
-    const payload = { 
-      restaurant_id: restaurantId, 
-      name: form.name, 
-      role: form.role, 
-      phone: form.phone, 
-      pin: form.pin,
-      base_salary: Number(form.base_salary) || 0,
-      payment_cycle: form.payment_cycle
-    };
-    if (editing) {
-      const { error } = await (supabase.from as any)('restaurant_staff').update(payload).eq('id', editing.id);
-      if (error) { toast.error('خطأ في تحديث الموظف: ' + error.message); return; }
-      toast.success('تم تحديث الموظف');
-    } else {
-      const { error } = await (supabase.from as any)('restaurant_staff').insert(payload);
-      if (error) { toast.error('خطأ في إضافة الموظف: ' + error.message); return; }
-      toast.success('تم إضافة الموظف');
+    
+    setLoading(true);
+    try {
+      const staffPayload = { 
+        restaurant_id: restaurantId, 
+        name: form.name, 
+        role: form.role, 
+        phone: form.phone, 
+        pin: form.pin,
+        base_salary: Number(form.base_salary) || 0,
+        payment_cycle: form.payment_cycle
+      };
+
+      let staffId = '';
+      if (editing) {
+        staffId = editing.id;
+        const { error } = await supabase.from('restaurant_staff').update(staffPayload).eq('id', editing.id);
+        if (error) throw error;
+      } else {
+        const { data, error } = await supabase.from('restaurant_staff').insert(staffPayload).select('id').single();
+        if (error) throw error;
+        staffId = data.id;
+      }
+
+      // Sync/Create related staff_profile
+      const profilePayload = {
+        restaurant_id: restaurantId,
+        restaurant_staff_id: staffId,
+        full_name: form.name,
+        position: getRoleDisplay(form.role).label || form.role,
+        basic_salary: Number(form.base_salary) || 0,
+        allowances: Number(form.allowances) || 0,
+        deductions: Number(form.deductions) || 0,
+        department_id: form.department_id || null,
+        expense_account_id: form.expense_account_id || null,
+        phone: form.phone || null,
+        email: form.email || null,
+        hire_date: form.hire_date || null,
+        status: 'active'
+      };
+
+      // Check if profile exists
+      let existingProfile = editing?.profile;
+      if (!existingProfile && editing) {
+        // Fallback check by name or id if profile wasn't pre-loaded
+        const { data } = await supabase.from('staff_profiles').select('id').eq('restaurant_staff_id', staffId).maybeSingle();
+        existingProfile = data;
+      }
+
+      if (existingProfile) {
+        const { error } = await supabase.from('staff_profiles').update(profilePayload).eq('id', existingProfile.id);
+        if (error) throw error;
+      } else {
+        const { error } = await supabase.from('staff_profiles').insert(profilePayload as any);
+        if (error) throw error;
+      }
+
+      toast.success(editing ? 'تم تحديث بيانات الموظف بنجاح ✅' : 'تم إضافة الموظف بنجاح ✅');
+      resetForm();
+      load();
+    } catch (e: any) {
+      toast.error('فشل حفظ الموظف: ' + e.message);
+    } finally {
+      setLoading(false);
     }
-    resetForm();
-    load();
   };
 
-  const handleDelete = async (id: string) => {
-    if (!confirm('حذف هذا الموظف؟')) return;
-    await (supabase.from as any)('restaurant_staff').delete().eq('id', id);
-    toast.success('تم الحذف');
-    load();
+  const handleDelete = async (member: StaffMember) => {
+    if (!confirm(`هل أنت متأكد من حذف الموظف: ${member.name}؟`)) return;
+    try {
+      if (member.profile?.id) {
+        await supabase.from('staff_profiles').delete().eq('id', member.profile.id);
+      }
+      await supabase.from('restaurant_staff').delete().eq('id', member.id);
+      toast.success('تم حذف الموظف');
+      load();
+    } catch (e: any) {
+      toast.error('خطأ في الحذف: ' + e.message);
+    }
   };
 
   const handleToggle = async (s: StaffMember) => {
-    await (supabase.from as any)('restaurant_staff').update({ is_active: !s.is_active }).eq('id', s.id);
+    await supabase.from('restaurant_staff').update({ is_active: !s.is_active }).eq('id', s.id);
+    if (s.profile?.id) {
+      await supabase.from('staff_profiles').update({ status: !s.is_active ? 'active' : 'inactive' }).eq('id', s.profile.id);
+    }
     load();
   };
 
@@ -113,47 +224,88 @@ export function StaffTab({ restaurantId, currency }: Props) {
     setEditing(null); 
     setForm({ 
       name: '', role: 'cashier', phone: '', pin: '0000', 
-      base_salary: '', payment_cycle: 'monthly' 
+      base_salary: '', payment_cycle: 'monthly',
+      department_id: '', expense_account_id: '', allowances: '0', deductions: '0',
+      email: '', hire_date: ''
     }); 
   };
 
   const startEdit = (s: StaffMember) => {
     setEditing(s);
     setForm({ 
-      name: s.name, role: s.role, phone: s.phone, pin: s.pin,
-      base_salary: String(s.base_salary || ''),
-      payment_cycle: s.payment_cycle || 'monthly'
+      name: s.name, 
+      role: s.role, 
+      phone: s.phone || '', 
+      pin: s.pin || '0000',
+      base_salary: String(s.base_salary || s.profile?.basic_salary || ''),
+      payment_cycle: s.payment_cycle || s.profile?.payment_cycle || 'monthly',
+      department_id: s.profile?.department_id || '',
+      expense_account_id: s.profile?.expense_account_id || '',
+      allowances: String(s.profile?.allowances || 0),
+      deductions: String(s.profile?.deductions || 0),
+      email: s.profile?.email || '',
+      hire_date: s.profile?.hire_date ? s.profile.hire_date.split('T')[0] : ''
     });
     setShowForm(true);
   };
 
-  const handlePayroll = async () => {
-    if (!showPayroll || !payrollAmount) return;
-    const amount = Number(payrollAmount);
-    if (amount <= 0) return;
+  const openPayrollModal = (s: StaffMember) => {
+    const basic = Number(s.base_salary || s.profile?.basic_salary || 0);
+    const allowances = Number(s.profile?.allowances || 0);
+    const deductions = Number(s.profile?.deductions || 0);
+    const net = basic + allowances - deductions;
 
-    const { journalService } = await import('@/lib/accounting/journalService');
-    
-    // Create Journal Entry for Salary Expense
-    const description = `صرف راتب الموظف: ${showPayroll.name}`;
-    const { error } = await journalService.createJournalEntry(restaurantId, {
-      entry_date: new Date(),
-      description,
-      source: 'hr',
-      lines: [
-        { account_id: (await journalService.getAccountByCode(restaurantId, '5100'))?.id, debit: amount, credit: 0, description }, // Salary Expense
-        { account_id: (await journalService.getAccountByCode(restaurantId, '1100'))?.id, debit: 0, credit: amount, description: 'صرف من الخزينة' } // Treasury
-      ]
+    setPayrollForm({
+      month: String(new Date().getMonth() + 1),
+      year: String(new Date().getFullYear()),
+      allowances: String(allowances),
+      deductions: String(deductions),
+      net_salary: String(net),
+      expense_account_id: s.profile?.expense_account_id || s.profile?.staff_departments?.expense_account_id || '',
+      payment_account_id: accounts.find(a => a.code === '1100')?.id || '',
+      notes: ''
     });
+    setShowPayroll(s);
+  };
 
-    if (error) {
-      toast.error('خطأ في معالجة الراتب محاسبياً: ' + error.message);
+  const handlePayroll = async () => {
+    if (!showPayroll || !showPayroll.profile?.id) {
+      toast.error('لا يمكن صرف الراتب: لم يتم العثور على ملف مالي مرتبط للموظف.');
       return;
     }
 
-    toast.success(`تم صرف ${amount} ${currency} للموظف ${showPayroll.name} وتسجيلها محاسبياً`);
-    setShowPayroll(null);
-    setPayrollAmount('');
+    const net = Number(payrollForm.net_salary);
+    if (net <= 0) {
+      toast.error('صافي الراتب يجب أن يكون أكبر من صفر');
+      return;
+    }
+
+    try {
+      setLoading(true);
+      const { error } = await supabase.rpc('record_payroll_payment', {
+        p_restaurant_id: restaurantId,
+        p_staff_id: showPayroll.profile.id,
+        p_net_salary: net,
+        p_month: Number(payrollForm.month),
+        p_year: Number(payrollForm.year),
+        p_expense_account_id: payrollForm.expense_account_id || null,
+        p_payment_account_id: payrollForm.payment_account_id || null,
+        p_department_id: showPayroll.profile.department_id || null,
+        p_allowances: Number(payrollForm.allowances) || 0,
+        p_deductions: Number(payrollForm.deductions) || 0,
+        p_notes: payrollForm.notes || null
+      });
+
+      if (error) throw error;
+
+      toast.success(`تم صرف الراتب للموظف ${showPayroll.name} وترحيله بنجاح ✅`);
+      setShowPayroll(null);
+      load();
+    } catch (e: any) {
+      toast.error('خطأ في ترحيل الراتب محاسبياً: ' + e.message);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const activeStaff = staff.filter(s => s.is_active);
@@ -163,7 +315,7 @@ export function StaffTab({ restaurantId, currency }: Props) {
     <div className="p-4 space-y-4">
       {/* Stats */}
       <div className="grid grid-cols-2 md:grid-cols-6 gap-3">
-        <div className="glass-card p-3 flex items-center gap-3">
+        <div className="glass-card p-3 flex items-center gap-3 border border-primary/10">
           <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
             <Users className="w-5 h-5 text-primary" />
           </div>
@@ -173,7 +325,7 @@ export function StaffTab({ restaurantId, currency }: Props) {
           </div>
         </div>
         {Object.entries(STANDARD_ROLES).slice(0, 5).map(([key, r]) => (
-          <div key={key} className="glass-card p-3 flex items-center gap-3">
+          <div key={key} className="glass-card p-3 flex items-center gap-3 border border-border/50">
             <span className="text-xl">{r.icon}</span>
             <div>
               <p className="text-[10px] text-muted-foreground">{r.label}</p>
@@ -185,7 +337,13 @@ export function StaffTab({ restaurantId, currency }: Props) {
 
       {/* Toolbar */}
       <div className="flex items-center justify-between">
-        <h2 className="font-display text-xl font-bold">إدارة الموظفين ({activeStaff.length} نشط)</h2>
+        <div>
+          <h2 className="font-display text-xl font-bold flex items-center gap-2">
+            إدارة تيم العمل والموظفين ({activeStaff.length} نشط)
+            {loading && <RefreshCw className="w-4 h-4 animate-spin text-muted-foreground" />}
+          </h2>
+          <p className="text-xs text-muted-foreground">إدارة الموظفين والوظائف والرواتب مع التوجيه التلقائي للحسابات</p>
+        </div>
         <Button onClick={() => { resetForm(); setShowForm(true); }} className="gradient-bg text-primary-foreground border-0" size="sm">
           <Plus className="w-4 h-4 ml-1" /> إضافة موظف
         </Button>
@@ -197,65 +355,113 @@ export function StaffTab({ restaurantId, currency }: Props) {
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
             className="fixed inset-0 z-50 bg-background/80 backdrop-blur-sm flex items-center justify-center p-4" onClick={() => resetForm()}>
             <motion.div initial={{ scale: 0.9 }} animate={{ scale: 1 }} exit={{ scale: 0.9 }}
-              className="glass-card p-6 max-w-md w-full space-y-4" onClick={e => e.stopPropagation()}>
-              <div className="flex items-center justify-between">
-                <h3 className="font-display font-bold text-lg flex items-center gap-2">
+              className="glass-card p-6 max-w-lg w-full space-y-4 max-h-[95vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+              
+              <div className="flex items-center justify-between border-b pb-2">
+                <h3 className="font-display font-bold text-lg flex items-center gap-2 text-primary">
                   <Shield className="w-5 h-5 text-primary" />
-                  {editing ? 'تعديل موظف' : 'إضافة موظف جديد'}
+                  {editing ? 'تعديل ملف الموظف' : 'إضافة موظف جديد للتيم'}
                 </h3>
                 <Button size="sm" variant="ghost" onClick={resetForm}><X className="w-4 h-4" /></Button>
               </div>
 
-              <Input placeholder="اسم الموظف *" value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} />
-
-              <div>
-                <label className="text-xs text-muted-foreground mb-2 block">الدور الوظيفي</label>
-                <div className="grid grid-cols-2 gap-2 max-h-[200px] overflow-auto p-1 custom-scrollbar">
-                  {Object.entries(STANDARD_ROLES).map(([key, r]) => (
-                    <button key={key} onClick={() => setForm(f => ({ ...f, role: key }))}
-                      className={`p-3 rounded-lg text-center transition-all text-sm border ${form.role === key ? 'gradient-bg text-primary-foreground border-transparent' : 'bg-secondary border-border'}`}>
-                      <span className="text-lg block mb-1">{r.icon}</span>
-                      {r.label}
-                    </button>
-                  ))}
-                  {customRoles.map(role => (
-                    <button key={role.id} onClick={() => setForm(f => ({ ...f, role: role.name_ar }))}
-                      className={`p-3 rounded-lg text-center transition-all text-sm border ${form.role === role.name_ar ? 'gradient-bg text-primary-foreground border-transparent' : 'bg-secondary border-border'}`}>
-                      <span className="text-lg block mb-1">👤</span>
-                      {role.name_ar}
-                    </button>
-                  ))}
+              <div className="space-y-3">
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <Label className="text-xs">اسم الموظف *</Label>
+                    <Input placeholder="الاسم الكامل" value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} />
+                  </div>
+                  <div>
+                    <Label className="text-xs">رقم الهاتف</Label>
+                    <Input placeholder="05xxxxxxxx" value={form.phone} onChange={e => setForm(f => ({ ...f, phone: e.target.value }))} />
+                  </div>
                 </div>
-              </div>
 
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-1">
-                  <label className="text-xs text-muted-foreground">الراتب الأساسي</label>
-                  <Input type="number" value={form.base_salary} onChange={e => setForm(f => ({ ...f, base_salary: e.target.value }))} placeholder="0.00" />
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <Label className="text-xs">الدور الوظيفي</Label>
+                    <select value={form.role} onChange={e => setForm(f => ({ ...f, role: e.target.value }))}
+                      className="w-full h-10 rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
+                      {Object.entries(STANDARD_ROLES).map(([key, r]) => (
+                        <option key={key} value={key}>{r.icon} {r.label}</option>
+                      ))}
+                      {customRoles.map(role => (
+                        <option key={role.id} value={role.name_ar}>👤 {role.name_ar}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <Label className="text-xs">القسم الإداري</Label>
+                    <select value={form.department_id} onChange={e => setForm(f => ({ ...f, department_id: e.target.value }))}
+                      className="w-full h-10 rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
+                      <option value="">بدون قسم</option>
+                      {departments.map(d => (
+                        <option key={d.id} value={d.id}>{d.name}</option>
+                      ))}
+                    </select>
+                  </div>
                 </div>
-                <div className="space-y-1">
-                  <label className="text-xs text-muted-foreground">دورة الصرف</label>
-                  <select value={form.payment_cycle} onChange={e => setForm(f => ({ ...f, payment_cycle: e.target.value as any }))}
-                    className="w-full h-9 rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
-                    <option value="monthly">شهري</option>
-                    <option value="weekly">أسبوعي</option>
-                    <option value="daily">يومي</option>
+
+                <div className="grid grid-cols-3 gap-3">
+                  <div>
+                    <Label className="text-xs">الراتب الأساسي</Label>
+                    <Input type="number" value={form.base_salary} onChange={e => setForm(f => ({ ...f, base_salary: e.target.value }))} placeholder="0.00" />
+                  </div>
+                  <div>
+                    <Label className="text-xs">البدلات الافتراضية</Label>
+                    <Input type="number" value={form.allowances} onChange={e => setForm(f => ({ ...f, allowances: e.target.value }))} placeholder="0.00" />
+                  </div>
+                  <div>
+                    <Label className="text-xs">الخصومات الافتراضية</Label>
+                    <Input type="number" value={form.deductions} onChange={e => setForm(f => ({ ...f, deductions: e.target.value }))} placeholder="0.00" />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <Label className="text-xs">دورة الصرف</Label>
+                    <select value={form.payment_cycle} onChange={e => setForm(f => ({ ...f, payment_cycle: e.target.value as any }))}
+                      className="w-full h-10 rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
+                      <option value="monthly">شهري</option>
+                      <option value="weekly">أسبوعي</option>
+                      <option value="daily">يومي</option>
+                    </select>
+                  </div>
+                  <div>
+                    <Label className="text-xs">رمز PIN (لورديات الموظفين)</Label>
+                    <Input type="text" maxLength={6} placeholder="0000" value={form.pin} onChange={e => setForm(f => ({ ...f, pin: e.target.value }))} />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <Label className="text-xs">البريد الإلكتروني</Label>
+                    <Input type="email" placeholder="name@domain.com" value={form.email} onChange={e => setForm(f => ({ ...f, email: e.target.value }))} />
+                  </div>
+                  <div>
+                    <Label className="text-xs">تاريخ التعيين</Label>
+                    <Input type="date" value={form.hire_date} onChange={e => setForm(f => ({ ...f, hire_date: e.target.value }))} />
+                  </div>
+                </div>
+
+                <div className="border-t pt-2 mt-2">
+                  <Label className="text-xs font-bold text-primary">التوجيه المحاسبي للموظف (دليل الحسابات)</Label>
+                  <select value={form.expense_account_id} onChange={e => setForm(f => ({ ...f, expense_account_id: e.target.value }))}
+                    className="w-full h-10 rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring mt-1">
+                    <option value="">6100 رواتب (الافتراضي)</option>
+                    {expenseAccounts.map(a => (
+                      <option key={a.id} value={a.id}>{a.code} - {a.name}</option>
+                    ))}
                   </select>
+                  <p className="text-[10px] text-muted-foreground mt-1">توجيه مصروف هذا الموظف على الحساب المحدد في قيود اليومية التلقائية.</p>
                 </div>
               </div>
 
-              <Input placeholder="رقم الهاتف" value={form.phone} onChange={e => setForm(f => ({ ...f, phone: e.target.value }))} />
-              
-              <div>
-                <label className="text-xs text-muted-foreground mb-1 block">رمز PIN (للشفتات)</label>
-                <Input type="text" maxLength={6} placeholder="0000" value={form.pin} onChange={e => setForm(f => ({ ...f, pin: e.target.value }))} />
-              </div>
-
-              <div className="flex gap-2">
-                <Button onClick={handleSave} className="flex-1 gradient-bg text-primary-foreground border-0">
-                  {editing ? 'حفظ التعديلات' : 'إضافة'}
+              <div className="flex gap-2 pt-2 border-t">
+                <Button onClick={handleSave} disabled={loading} className="flex-1 gradient-bg text-primary-foreground border-0">
+                  {loading ? 'جاري الحفظ...' : editing ? 'حفظ التعديلات' : 'إضافة الموظف'}
                 </Button>
-                <Button variant="outline" onClick={resetForm} className="flex-1">إلغاء</Button>
+                <Button variant="outline" onClick={resetForm} className="flex-1" disabled={loading}>إلغاء</Button>
               </div>
             </motion.div>
           </motion.div>
@@ -268,18 +474,90 @@ export function StaffTab({ restaurantId, currency }: Props) {
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
             className="fixed inset-0 z-50 bg-background/80 backdrop-blur-sm flex items-center justify-center p-4" onClick={() => setShowPayroll(null)}>
             <motion.div initial={{ scale: 0.9 }} animate={{ scale: 1 }} exit={{ scale: 0.9 }}
-              className="glass-card p-6 max-w-sm w-full space-y-4" onClick={e => e.stopPropagation()}>
-              <h3 className="font-display font-bold text-lg flex items-center gap-2">
-                <DollarSign className="w-5 h-5 text-primary" />
-                صرف راتب: {showPayroll.name}
-              </h3>
-              <div className="space-y-2">
-                <label className="text-xs text-muted-foreground">المبلغ المراد صرفه ({currency})</label>
-                <Input type="number" value={payrollAmount} onChange={e => setPayrollAmount(e.target.value)} />
+              className="glass-card p-6 max-w-md w-full space-y-4" onClick={e => e.stopPropagation()}>
+              
+              <div className="flex items-center justify-between border-b pb-2">
+                <h3 className="font-display font-bold text-lg flex items-center gap-2 text-primary">
+                  <DollarSign className="w-5 h-5 text-primary" />
+                  صرف راتب الموظف: {showPayroll.name}
+                </h3>
+                <Button size="sm" variant="ghost" onClick={() => setShowPayroll(null)}><X className="w-4 h-4" /></Button>
               </div>
-              <div className="flex gap-2 pt-2">
-                <Button onClick={handlePayroll} className="flex-1 gradient-bg text-primary-foreground border-0">تأكيد الصرف</Button>
-                <Button variant="outline" onClick={() => setShowPayroll(null)} className="flex-1">إلغاء</Button>
+
+              <div className="space-y-3">
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <Label className="text-xs">الشهر</Label>
+                    <select className="w-full h-10 rounded-md border px-3 bg-background" value={payrollForm.month} 
+                      onChange={e => {
+                        const newMonth = e.target.value;
+                        setPayrollForm(prev => ({ ...prev, month: newMonth }));
+                      }}>
+                      {Array.from({ length: 12 }, (_, i) => (
+                        <option key={i + 1} value={String(i + 1)}>{i + 1}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <Label className="text-xs">السنة</Label>
+                    <Input type="number" value={payrollForm.year} onChange={e => setPayrollForm(prev => ({ ...prev, year: e.target.value }))} />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-3 gap-3">
+                  <div>
+                    <Label className="text-xs">البدلات</Label>
+                    <Input type="number" value={payrollForm.allowances} 
+                      onChange={e => {
+                        const val = e.target.value;
+                        const basic = Number(showPayroll.base_salary || 0);
+                        const net = basic + Number(val || 0) - Number(payrollForm.deductions || 0);
+                        setPayrollForm(prev => ({ ...prev, allowances: val, net_salary: String(net) }));
+                      }} />
+                  </div>
+                  <div>
+                    <Label className="text-xs">الخصومات</Label>
+                    <Input type="number" value={payrollForm.deductions} 
+                      onChange={e => {
+                        const val = e.target.value;
+                        const basic = Number(showPayroll.base_salary || 0);
+                        const net = basic + Number(payrollForm.allowances || 0) - Number(val || 0);
+                        setPayrollForm(prev => ({ ...prev, deductions: val, net_salary: String(net) }));
+                      }} />
+                  </div>
+                  <div>
+                    <Label className="text-xs">الصافي *</Label>
+                    <Input type="number" value={payrollForm.net_salary} onChange={e => setPayrollForm(prev => ({ ...prev, net_salary: e.target.value }))} />
+                  </div>
+                </div>
+
+                <div>
+                  <Label className="text-xs">حساب مصروف الرواتب (المدين)</Label>
+                  <select className="w-full h-10 rounded-md border px-3 bg-background" value={payrollForm.expense_account_id} onChange={e => setPayrollForm(prev => ({ ...prev, expense_account_id: e.target.value }))}>
+                    <option value="">6100 رواتب (الافتراضي)</option>
+                    {expenseAccounts.map(a => <option key={a.id} value={a.id}>{a.code} - {a.name}</option>)}
+                  </select>
+                </div>
+
+                <div>
+                  <Label className="text-xs">حساب الدفع (الدائن — الخزينة/البنك)</Label>
+                  <select className="w-full h-10 rounded-md border px-3 bg-background" value={payrollForm.payment_account_id} onChange={e => setPayrollForm(prev => ({ ...prev, payment_account_id: e.target.value }))}>
+                    <option value="">1100 الخزينة (الافتراضي)</option>
+                    {paymentAccounts.map(a => <option key={a.id} value={a.id}>{a.code} - {a.name}</option>)}
+                  </select>
+                </div>
+
+                <div>
+                  <Label className="text-xs">ملاحظات</Label>
+                  <Input placeholder="تفاصيل إضافية عن صرف الراتب..." value={payrollForm.notes} onChange={e => setPayrollForm(prev => ({ ...prev, notes: e.target.value }))} />
+                </div>
+              </div>
+
+              <div className="flex gap-2 pt-2 border-t">
+                <Button onClick={handlePayroll} disabled={loading} className="flex-1 gradient-bg text-primary-foreground border-0 gap-2">
+                  <Calendar className="w-4 h-4" /> صرف وترحيل محاسبي
+                </Button>
+                <Button variant="outline" onClick={() => setShowPayroll(null)} className="flex-1" disabled={loading}>إلغاء</Button>
               </div>
             </motion.div>
           </motion.div>
@@ -290,51 +568,67 @@ export function StaffTab({ restaurantId, currency }: Props) {
       <div className="space-y-2">
         {staff.map(s => {
           const roleInfo = getRoleDisplay(s.role);
+          const basicSalary = s.base_salary || s.profile?.basic_salary || 0;
           return (
             <motion.div key={s.id} initial={{ opacity: 0 }} animate={{ opacity: 1 }}
-              className={`glass-card p-4 flex items-center gap-4 ${!s.is_active ? 'opacity-50' : ''}`}>
-              <div className="w-12 h-12 rounded-full bg-secondary flex items-center justify-center text-xl">
-                {roleInfo.icon}
-              </div>
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2 flex-wrap">
-                  <p className="font-bold text-sm">{s.name}</p>
-                  <Badge className={`text-[10px] border ${roleInfo.color}`}>{roleInfo.label}</Badge>
-                  {!s.is_active && <Badge variant="outline" className="text-[10px] text-muted-foreground">معطّل</Badge>}
+              className={`glass-card p-4 flex items-center justify-between gap-4 border border-border/50 hover:border-primary/20 transition-all ${!s.is_active ? 'opacity-50 bg-secondary/50' : ''}`}>
+              <div className="flex items-center gap-4 flex-1 min-w-0">
+                <div className="w-12 h-12 rounded-full bg-secondary flex items-center justify-center text-xl shrink-0">
+                  {roleInfo.icon}
                 </div>
-                <div className="flex items-center gap-3 text-xs text-muted-foreground mt-1">
-                  {s.phone && <span>📱 {s.phone}</span>}
-                  <span>PIN: {showPin === s.id ? s.pin : '••••'}</span>
-                  <button onClick={() => setShowPin(showPin === s.id ? null : s.id)} className="text-primary">
-                    {showPin === s.id ? <EyeOff className="w-3 h-3 inline" /> : <Eye className="w-3 h-3 inline" />}
-                  </button>
-                  <span>{new Date(s.created_at).toLocaleDateString('ar-EG')}</span>
-                </div>
-                {s.base_salary && (
-                  <div className="mt-2 flex items-center gap-2">
-                    <Badge variant="secondary" className="text-[10px] bg-primary/5 text-primary">
-                      الراتب: {s.base_salary} {currency} / {s.payment_cycle === 'monthly' ? 'شهر' : s.payment_cycle === 'weekly' ? 'أسبوع' : 'يوم'}
-                    </Badge>
-                    <Button size="xs" variant="outline" className="h-6 text-[10px]" onClick={() => { setShowPayroll(s); setPayrollAmount(String(s.base_salary)); }}>
-                      صرف راتب
-                    </Button>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <p className="font-bold text-sm truncate">{s.name}</p>
+                    <Badge className={`text-[10px] border ${roleInfo.color}`}>{roleInfo.label}</Badge>
+                    {s.profile?.staff_departments?.name && (
+                      <Badge variant="outline" className="text-[10px] border-primary/20 text-primary">
+                        <Building2 className="w-2.5 h-2.5 ml-1" /> {s.profile.staff_departments.name}
+                      </Badge>
+                    )}
+                    {!s.is_active && <Badge variant="outline" className="text-[10px] text-muted-foreground">معطّل</Badge>}
                   </div>
-                )}
+                  <div className="flex items-center gap-3 text-xs text-muted-foreground mt-1 flex-wrap">
+                    {s.phone && <span>📱 {s.phone}</span>}
+                    {s.profile?.email && <span>📧 {s.profile.email}</span>}
+                    <span>PIN: {showPin === s.id ? s.pin : '••••'}</span>
+                    <button onClick={() => setShowPin(showPin === s.id ? null : s.id)} className="text-primary hover:underline">
+                      {showPin === s.id ? <EyeOff className="w-3 h-3 inline" /> : <Eye className="w-3 h-3 inline" />}
+                    </button>
+                    {s.profile?.expense_account_id && (
+                      <span className="text-primary-foreground bg-primary/10 px-1.5 py-0.5 rounded text-[10px]">
+                        🎯 موجه: {accounts.find(a => a.id === s.profile.expense_account_id)?.name}
+                      </span>
+                    )}
+                  </div>
+                  {basicSalary > 0 && (
+                    <div className="mt-2 flex items-center gap-2 flex-wrap">
+                      <Badge variant="secondary" className="text-[10px] bg-emerald-500/10 text-emerald-600">
+                        الراتب: {basicSalary.toLocaleString()} {currency} / {s.payment_cycle === 'monthly' ? 'شهر' : s.payment_cycle === 'weekly' ? 'أسبوع' : 'يوم'}
+                      </Badge>
+                      {s.profile?.allowances > 0 && <span className="text-[10px] text-emerald-600 font-bold">+ {Number(s.profile.allowances).toLocaleString()} بدلات</span>}
+                      {s.profile?.deductions > 0 && <span className="text-[10px] text-destructive font-bold">- {Number(s.profile.deductions).toLocaleString()} خصومات</span>}
+                      
+                      <Button size="xs" variant="outline" className="h-6 text-[10px]" onClick={() => openPayrollModal(s)}>
+                        <DollarSign className="w-3.5 h-3.5 ml-0.5" /> صرف راتب
+                      </Button>
+                    </div>
+                  )}
+                </div>
               </div>
-              <div className="flex gap-1">
+              <div className="flex gap-1 shrink-0">
                 <Button size="sm" variant="ghost" onClick={() => handleToggle(s)}>
-                  {s.is_active ? <EyeOff className="w-3 h-3" /> : <Eye className="w-3 h-3" />}
+                  {s.is_active ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
                 </Button>
-                <Button size="sm" variant="ghost" onClick={() => startEdit(s)}><Edit2 className="w-3 h-3" /></Button>
-                <Button size="sm" variant="ghost" className="text-destructive" onClick={() => handleDelete(s.id)}><Trash2 className="w-3 h-3" /></Button>
+                <Button size="sm" variant="ghost" onClick={() => startEdit(s)}><Edit2 className="w-3.5 h-3.5" /></Button>
+                <Button size="sm" variant="ghost" className="text-destructive" onClick={() => handleDelete(s)}><Trash2 className="w-3.5 h-3.5" /></Button>
               </div>
             </motion.div>
           );
         })}
-        {staff.length === 0 && (
-          <div className="text-center py-12 text-muted-foreground">
+        {staff.length === 0 && !loading && (
+          <div className="text-center py-12 text-muted-foreground border border-dashed rounded-xl">
             <Users className="w-12 h-12 mx-auto mb-3 opacity-30" />
-            <p>لا يوجد موظفين. أضف أول موظف الآن!</p>
+            <p>لا يوجد موظفين حالياً. أضف موظفاً جديداً للبدء!</p>
           </div>
         )}
       </div>
