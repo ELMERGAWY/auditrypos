@@ -61,6 +61,8 @@ interface ReceiptVoucher {
   amount: number;
   payment_method: string;
   notes: string | null;
+  account_id: string | null;
+  counter_account_id: string | null;
   created_at: string;
 }
 
@@ -94,8 +96,11 @@ export function CustomerManager({ restaurantId, currency }: Props) {
     amount: '',
     payment_method: 'cash',
     notes: '',
-    voucher_date: new Date().toISOString().split('T')[0]
+    voucher_date: new Date().toISOString().split('T')[0],
+    account_id: '',
+    counter_account_id: ''
   });
+  const [accounts, setAccounts] = useState<any[]>([]);
 
   // Form state
   const [formData, setFormData] = useState({
@@ -112,14 +117,44 @@ export function CustomerManager({ restaurantId, currency }: Props) {
   useEffect(() => {
     loadCustomers();
     loadReceiptVouchers();
+    loadAccounts();
   }, [restaurantId]);
+
+  const loadAccounts = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('chart_of_accounts')
+        .select('id, name, code, account_type')
+        .eq('restaurant_id', restaurantId)
+        .eq('is_active', true)
+        .order('code');
+      if (error) throw error;
+      setAccounts(data || []);
+    } catch (error: any) {
+      toast.error('فشل تحميل الحسابات: ' + error.message);
+    }
+  };
+
+  const isReceivableAccount = (accountId: string) => {
+    const acc = accounts.find(a => a.id === accountId);
+    return acc && (acc.code?.startsWith('12') || acc.name?.includes('عملاء') || acc.name?.includes('مدينة'));
+  };
+
+  const handleReceiptAccountChange = (accountId: string) => {
+    setReceiptVoucherForm(prev => ({
+      ...prev,
+      account_id: accountId,
+      counter_account_id: isReceivableAccount(accountId) ? accountId : prev.counter_account_id
+    }));
+  };
 
   const loadReceiptVouchers = async () => {
     try {
       const { data, error } = await supabase
         .from('receipt_vouchers')
         .select(`
-          id, voucher_number, voucher_date, customer_id, amount, payment_method, notes, created_at,
+          id, voucher_number, voucher_date, customer_id, amount, payment_method, notes,
+          account_id, counter_account_id, created_at,
           customers(name)
         `)
         .eq('restaurant_id', restaurantId)
@@ -136,6 +171,8 @@ export function CustomerManager({ restaurantId, currency }: Props) {
         amount: Number(rv.amount),
         payment_method: rv.payment_method,
         notes: rv.notes,
+        account_id: rv.account_id,
+        counter_account_id: rv.counter_account_id,
         created_at: rv.created_at
       }));
 
@@ -387,63 +424,20 @@ export function CustomerManager({ restaurantId, currency }: Props) {
     }
 
     try {
-      const customer = customers.find(c => c.id === receiptVoucherForm.customer_id);
-      if (!customer) {
-        toast.error('العميل غير موجود');
-        return;
-      }
+      const { error } = await supabase.rpc('save_receipt_voucher', {
+        p_restaurant_id: restaurantId,
+        p_customer_id: receiptVoucherForm.customer_id,
+        p_amount: amount,
+        p_payment_method: receiptVoucherForm.payment_method,
+        p_voucher_date: receiptVoucherForm.voucher_date,
+        p_notes: receiptVoucherForm.notes || null,
+        p_account_id: receiptVoucherForm.account_id || null,
+        p_counter_account_id: receiptVoucherForm.counter_account_id || null,
+        p_voucher_id: editingReceiptVoucher?.id || null
+      });
+      if (error) throw error;
 
-      if (editingReceiptVoucher) {
-        // Update existing
-        const { error } = await supabase
-          .from('receipt_vouchers')
-          .update({
-            customer_id: receiptVoucherForm.customer_id,
-            amount: amount,
-            payment_method: receiptVoucherForm.payment_method,
-            notes: receiptVoucherForm.notes || null,
-            voucher_date: receiptVoucherForm.voucher_date
-          })
-          .eq('id', editingReceiptVoucher.id);
-        if (error) throw error;
-
-        // Update customer balance
-        const oldAmount = editingReceiptVoucher.amount;
-        const balanceChange = oldAmount - amount;
-        const newBalance = customer.balance + balanceChange;
-        await supabase.from('customers').update({ balance: newBalance }).eq('id', customer.id);
-
-        toast.success('تم تحديث سند القبض');
-      } else {
-        // Add new
-        const voucherNumber = `RV-${Date.now().toString().slice(-6)}`;
-        const { error } = await supabase
-          .from('receipt_vouchers')
-          .insert({
-            restaurant_id: restaurantId,
-            voucher_number: voucherNumber,
-            customer_id: receiptVoucherForm.customer_id,
-            amount: amount,
-            payment_method: receiptVoucherForm.payment_method,
-            notes: receiptVoucherForm.notes || null,
-            voucher_date: receiptVoucherForm.voucher_date
-          } as any);
-        if (error) throw error;
-
-        // Update customer balance
-        const newBalance = customer.balance - amount;
-        await supabase.from('customers').update({ balance: newBalance }).eq('id', customer.id);
-        await supabase.from('customer_transactions').insert({
-          customer_id: receiptVoucherForm.customer_id,
-          restaurant_id: restaurantId,
-          type: 'payment',
-          amount: -amount,
-          description: receiptVoucherForm.notes || 'سند قبض',
-          payment_method: receiptVoucherForm.payment_method,
-        } as any);
-
-        toast.success('تم إضافة سند القبض');
-      }
+      toast.success(editingReceiptVoucher ? 'تم تحديث سند القبض' : 'تم إضافة سند القبض');
 
       setShowReceiptVoucherModal(false);
       setEditingReceiptVoucher(null);
@@ -452,7 +446,9 @@ export function CustomerManager({ restaurantId, currency }: Props) {
         amount: '',
         payment_method: 'cash',
         notes: '',
-        voucher_date: new Date().toISOString().split('T')[0]
+        voucher_date: new Date().toISOString().split('T')[0],
+        account_id: '',
+        counter_account_id: ''
       });
       loadReceiptVouchers();
       loadCustomers();
@@ -464,12 +460,8 @@ export function CustomerManager({ restaurantId, currency }: Props) {
   const handleDeleteReceiptVoucher = async (voucher: ReceiptVoucher) => {
     if (!confirm('حذف سند القبض هذا؟')) return;
     try {
-      const customer = customers.find(c => c.id === voucher.customer_id);
-      await supabase.from('receipt_vouchers').delete().eq('id', voucher.id);
-      if (customer) {
-        const newBalance = customer.balance + voucher.amount;
-        await supabase.from('customers').update({ balance: newBalance }).eq('id', customer.id);
-      }
+      const { error } = await supabase.rpc('delete_receipt_voucher', { p_voucher_id: voucher.id });
+      if (error) throw error;
       toast.success('تم حذف سند القبض');
       loadReceiptVouchers();
       loadCustomers();
@@ -1152,7 +1144,9 @@ export function CustomerManager({ restaurantId, currency }: Props) {
                 amount: '',
                 payment_method: 'cash',
                 notes: '',
-                voucher_date: new Date().toISOString().split('T')[0]
+                voucher_date: new Date().toISOString().split('T')[0],
+                account_id: '',
+                counter_account_id: ''
               });
               setShowReceiptVoucherModal(true);
             }}>
@@ -1206,7 +1200,9 @@ export function CustomerManager({ restaurantId, currency }: Props) {
                                   amount: voucher.amount.toString(),
                                   payment_method: voucher.payment_method,
                                   notes: voucher.notes || '',
-                                  voucher_date: voucher.voucher_date.split('T')[0]
+                                  voucher_date: voucher.voucher_date.split('T')[0],
+                                  account_id: voucher.account_id || '',
+                                  counter_account_id: voucher.counter_account_id || ''
                                 });
                                 setShowReceiptVoucherModal(true);
                               }}
@@ -1274,19 +1270,39 @@ export function CustomerManager({ restaurantId, currency }: Props) {
                 />
               </div>
             </div>
-            <div>
-              <Label>طريقة الدفع</Label>
-              <select
-                value={receiptVoucherForm.payment_method}
-                onChange={(e) => setReceiptVoucherForm({ ...receiptVoucherForm, payment_method: e.target.value })}
-                className="w-full px-3 py-2 rounded-md bg-background border border-input text-sm"
-              >
-                <option value="cash">💵 نقدي</option>
-                <option value="instapay">📱 إنستاباي</option>
-                <option value="vodafone_cash">📲 فودافون كاش</option>
-                <option value="bank">🏦 تحويل بنكي</option>
-              </select>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label>طريقة الدفع</Label>
+                <select
+                  value={receiptVoucherForm.payment_method}
+                  onChange={(e) => setReceiptVoucherForm({ ...receiptVoucherForm, payment_method: e.target.value })}
+                  className="w-full px-3 py-2 rounded-md bg-background border border-input text-sm"
+                >
+                  <option value="cash">💵 نقدي</option>
+                  <option value="instapay">📱 إنستاباي</option>
+                  <option value="vodafone_cash">📲 فودافون كاش</option>
+                  <option value="bank">🏦 تحويل بنكي</option>
+                </select>
+              </div>
+              <div>
+                <Label>توجيه على حساب</Label>
+                <select
+                  value={receiptVoucherForm.account_id}
+                  onChange={(e) => handleReceiptAccountChange(e.target.value)}
+                  className="w-full px-3 py-2 rounded-md bg-background border border-input text-sm"
+                >
+                  <option value="">تلقائي (نقدية/بنك)</option>
+                  {accounts.map(acc => (
+                    <option key={acc.id} value={acc.id}>{acc.code} - {acc.name}</option>
+                  ))}
+                </select>
+              </div>
             </div>
+            {isReceivableAccount(receiptVoucherForm.account_id) && receiptVoucherForm.customer_id && (
+              <p className="text-xs text-primary bg-primary/5 p-2 rounded">
+                تم ربط حساب العملاء بالعميل المختار أعلاه تلقائياً
+              </p>
+            )}
             <div>
               <Label>ملاحظات</Label>
               <Input

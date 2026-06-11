@@ -41,6 +41,7 @@ const SalesReturnsManager = lazy(() => import('./dashboard/SalesReturns').then(m
 const InventoryReceiptsManager = lazy(() => import('./dashboard/InventoryReceipts').then(m => ({ default: m.InventoryReceiptsManager })));
 const ExpensesTab = lazy(() => import('./dashboard/ExpensesTab').then(m => ({ default: m.ExpensesTab })));
 const StaffTab = lazy(() => import('./dashboard/StaffTab').then(m => ({ default: m.StaffTab })));
+const PayrollTab = lazy(() => import('./dashboard/PayrollTab').then(m => ({ default: m.PayrollTab })));
 const NotificationsTab = lazy(() => import('./dashboard/NotificationsTab').then(m => ({ default: m.NotificationsTab })));
 const FinancialsTab = lazy(() => import('./dashboard/FinancialsTab').then(m => ({ default: m.FinancialsTab })));
 const OverheadManager = lazy(() => import('./dashboard/OverheadManager').then(m => ({ default: m.OverheadManager })));
@@ -77,7 +78,7 @@ import { useDarkMode } from '@/lib/useDarkMode';
 import { checkoutIntegration } from '@/lib/accounting';
 import { auditLogService } from '@/lib/auditLog';
 import type {
-  DashboardTab, OrderStatus, OrderType, MenuItem, Order, OrderItem, HeldInvoice, ChartOfAccount
+  DashboardTab, OrderStatus, OrderType, MenuItem, Order, OrderItem, HeldInvoice, ChartOfAccount, extractCustomerRef
 } from './dashboard/types';
 import { STATUS_CONFIG } from './dashboard/types';
 
@@ -188,7 +189,7 @@ export default function Dashboard() {
         o.order_number?.toLowerCase().includes(q) || 
         o.customer_name?.toLowerCase().includes(q) || 
         o.customer_phone?.toLowerCase().includes(q) || 
-        o.customer_ref?.toLowerCase().includes(q)
+        extractCustomerRef(o).toLowerCase().includes(q)
       );
     }
     return result;
@@ -320,7 +321,7 @@ export default function Dashboard() {
     setEditOrderForm({
       customer_name: order.customer_name || '',
       customer_phone: order.customer_phone || '',
-      customer_ref: order.customer_ref || '',
+      customer_ref: extractCustomerRef(order),
       total: String(order.total || ''),
       paid_amount: String(order.paid_amount || ''),
       status: order.status as OrderStatus,
@@ -470,7 +471,7 @@ export default function Dashboard() {
                       {(() => {
                         try {
                           if (!o) return null;
-                          const ref = o.customer_ref || o.customer_phone || (o.notes?.includes('المرجع:') ? o.notes.split('المرجع:')[1]?.split('|')[0]?.trim() : '');
+                          const ref = extractCustomerRef(o) || o.customer_phone;
                           return ref ? (
                             <span className="text-primary font-black">
                               ({ref})
@@ -557,6 +558,7 @@ export default function Dashboard() {
         
         {/* System Tabs */}
         {activeTab === 'staff' && <StaffTab {...commonProps} />}
+        {activeTab === 'payroll' && <PayrollTab {...commonProps} businessType={businessType} />}
         {activeTab === 'settings' && <SettingsTab restaurant={restaurant} businessType={businessType} profileName={profileName} user={user} agents={agents} isSuspended={isSuspended} isSuperAdmin={isSuperAdmin} loadData={loadData} />}
         {activeTab === 'notifications' && <NotificationsTab {...commonProps} />}
         {activeTab === 'qr' && (

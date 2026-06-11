@@ -2,7 +2,7 @@ import { useRef, useState } from 'react';
 import { Printer } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import type { Order, Restaurant } from './types';
-import { ORDER_TYPE_CONFIG } from './types';
+import { ORDER_TYPE_CONFIG, extractCustomerRef } from './types';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 
@@ -99,9 +99,9 @@ function ReceiptContent({ order, restaurant }: { order: Order; restaurant: Resta
           <span className="info-label">التليفون / <span dir="ltr">{order.customer_phone}</span></span>
         </div>
       )}
-      {order.customer_ref && (
+      {extractCustomerRef(order) && (
         <div className="row">
-          <span className="info-label">مرجع العميل / <span className="bold">{order.customer_ref}</span></span>
+          <span className="info-label">مرجع العميل / <span className="bold">{extractCustomerRef(order)}</span></span>
         </div>
       )}
       {order.delivery_address && (

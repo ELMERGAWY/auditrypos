@@ -140,7 +140,7 @@ class CheckoutIntegration {
       const isDirectSell = context.skipPreparation || 
         ['retail', 'grocery', 'pharmacy', 'wholesale', 'warehouse'].includes(context.businessType);
       
-      // Merge customer reference into notes if provided
+      // Merge customer reference into notes if provided (legacy compat)
       let finalNotes = orderData.notes || '';
       if (orderData.customerRef) {
         finalNotes = finalNotes 
@@ -148,7 +148,7 @@ class CheckoutIntegration {
           : `المرجع: ${orderData.customerRef}`;
       }
 
-      const orderPayload = {
+      const orderPayload: Record<string, unknown> = {
         restaurant_id: context.restaurantId,
         order_number: orderNum,
         total: finalTotal,
@@ -158,6 +158,7 @@ class CheckoutIntegration {
         order_type: orderData.orderType,
         customer_name: orderData.customerName || 'عميل نقدي',
         customer_phone: orderData.customerPhone || '',
+        customer_ref: orderData.customerRef || null,
         delivery_address: orderData.deliveryAddress || '',
         delivery_agent_id: orderData.deliveryAgentId || null,
         payment_method: orderData.paymentMethod,

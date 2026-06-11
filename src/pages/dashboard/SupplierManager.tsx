@@ -66,6 +66,7 @@ interface PaymentVoucher {
   reference_number: string | null;
   notes: string | null;
   account_id: string | null;
+  counter_account_id: string | null;
   created_at: string;
 }
 
@@ -98,6 +99,7 @@ export function SupplierManager({ restaurantId, currency }: Props) {
     reference_number: '',
     notes: '',
     account_id: '',
+    counter_account_id: '',
     voucher_date: new Date().toISOString().split('T')[0]
   });
   const [accounts, setAccounts] = useState<any[]>([]);
@@ -134,14 +136,28 @@ export function SupplierManager({ restaurantId, currency }: Props) {
     try {
       const { data, error } = await supabase
         .from('chart_of_accounts')
-        .select('id, name, code, is_cash_account, is_bank_account')
+        .select('id, name, code, is_cash_account, is_bank_account, account_type')
         .eq('restaurant_id', restaurantId)
+        .eq('is_active', true)
         .order('code');
       if (error) throw error;
       setAccounts(data || []);
     } catch (error: any) {
       toast.error('فشل تحميل الحسابات: ' + error.message);
     }
+  };
+
+  const isPayableAccount = (accountId: string) => {
+    const acc = accounts.find(a => a.id === accountId);
+    return acc && (acc.code?.startsWith('21') || acc.name?.includes('مورد') || acc.name?.includes('دائنة'));
+  };
+
+  const handleVoucherAccountChange = (accountId: string) => {
+    setVoucherForm(prev => ({
+      ...prev,
+      account_id: accountId,
+      counter_account_id: isPayableAccount(accountId) ? accountId : prev.counter_account_id
+    }));
   };
 
   const loadPaymentVouchers = async () => {
@@ -418,69 +434,21 @@ export function SupplierManager({ restaurantId, currency }: Props) {
     }
 
     try {
-      const supplier = suppliers.find(s => s.id === voucherForm.supplier_id);
-      if (!supplier) {
-        toast.error('المورد غير موجود');
-        return;
-      }
+      const { error } = await supabase.rpc('save_payment_voucher', {
+        p_restaurant_id: restaurantId,
+        p_supplier_id: voucherForm.supplier_id,
+        p_amount: amount,
+        p_payment_method: voucherForm.payment_method,
+        p_voucher_date: voucherForm.voucher_date,
+        p_reference_number: voucherForm.reference_number || null,
+        p_notes: voucherForm.notes || null,
+        p_account_id: voucherForm.account_id || null,
+        p_counter_account_id: voucherForm.counter_account_id || null,
+        p_voucher_id: editingVoucher?.id || null
+      });
+      if (error) throw error;
 
-      if (editingVoucher) {
-        // Update existing voucher
-        const { error } = await supabase
-          .from('payment_vouchers')
-          .update({
-            supplier_id: voucherForm.supplier_id,
-            amount: amount,
-            payment_method: voucherForm.payment_method,
-            reference_number: voucherForm.reference_number || null,
-            notes: voucherForm.notes || null,
-            account_id: voucherForm.account_id || null,
-            voucher_date: voucherForm.voucher_date
-          })
-          .eq('id', editingVoucher.id);
-
-        if (error) throw error;
-
-        // Adjust supplier balance
-        const oldAmount = editingVoucher.amount;
-        const balanceChange = amount - oldAmount;
-        const newBalance = supplier.balance - balanceChange;
-        await supabase.from('suppliers').update({ balance: newBalance }).eq('id', supplier.id);
-
-        toast.success('تم تحديث إذن الدفع');
-      } else {
-        // Create new voucher
-        const voucherNumber = `PV-${Date.now().toString().slice(-6)}`;
-        const { error } = await supabase
-          .from('payment_vouchers')
-          .insert({
-            restaurant_id: restaurantId,
-            voucher_number: voucherNumber,
-            supplier_id: voucherForm.supplier_id,
-            amount: amount,
-            payment_method: voucherForm.payment_method,
-            reference_number: voucherForm.reference_number || null,
-            notes: voucherForm.notes || null,
-            account_id: voucherForm.account_id || null,
-            voucher_date: voucherForm.voucher_date
-          } as any);
-
-        if (error) throw error;
-
-        // Update supplier balance and add transaction
-        const newBalance = supplier.balance - amount;
-        await supabase.from('suppliers').update({ balance: newBalance }).eq('id', supplier.id);
-        await supabase.from('supplier_transactions').insert({
-          supplier_id: voucherForm.supplier_id,
-          restaurant_id: restaurantId,
-          type: 'payment',
-          amount: amount,
-          description: voucherForm.notes || 'إذن دفع',
-          payment_method: voucherForm.payment_method
-        } as any);
-
-        toast.success('تم إضافة إذن الدفع');
-      }
+      toast.success(editingVoucher ? 'تم تحديث إذن الدفع' : 'تم إضافة إذن الدفع');
 
       setShowVoucherModal(false);
       setEditingVoucher(null);
@@ -491,6 +459,7 @@ export function SupplierManager({ restaurantId, currency }: Props) {
         reference_number: '',
         notes: '',
         account_id: '',
+        counter_account_id: '',
         voucher_date: new Date().toISOString().split('T')[0]
       });
       loadPaymentVouchers();
@@ -503,12 +472,8 @@ export function SupplierManager({ restaurantId, currency }: Props) {
   const handleDeleteVoucher = async (voucher: PaymentVoucher) => {
     if (!confirm('حذف إذن الدفع هذا؟')) return;
     try {
-      const supplier = suppliers.find(s => s.id === voucher.supplier_id);
-      await supabase.from('payment_vouchers').delete().eq('id', voucher.id);
-      if (supplier) {
-        const newBalance = supplier.balance + voucher.amount;
-        await supabase.from('suppliers').update({ balance: newBalance }).eq('id', supplier.id);
-      }
+      const { error } = await supabase.rpc('delete_payment_voucher', { p_voucher_id: voucher.id });
+      if (error) throw error;
       toast.success('تم حذف إذن الدفع');
       loadPaymentVouchers();
       loadSuppliers();
@@ -1206,6 +1171,7 @@ export function SupplierManager({ restaurantId, currency }: Props) {
                 reference_number: '',
                 notes: '',
                 account_id: '',
+                counter_account_id: '',
                 voucher_date: new Date().toISOString().split('T')[0]
               });
               setShowVoucherModal(true);
@@ -1261,6 +1227,7 @@ export function SupplierManager({ restaurantId, currency }: Props) {
                                   reference_number: voucher.reference_number || '',
                                   notes: voucher.notes || '',
                                   account_id: voucher.account_id || '',
+                                  counter_account_id: voucher.counter_account_id || '',
                                   voucher_date: voucher.voucher_date.split('T')[0]
                                 });
                                 setShowVoucherModal(true);
@@ -1343,13 +1310,13 @@ export function SupplierManager({ restaurantId, currency }: Props) {
                 </select>
               </div>
               <div>
-                <Label>الحساب (اختياري)</Label>
+                <Label>توجيه على حساب</Label>
                 <select
                   value={voucherForm.account_id}
-                  onChange={(e) => setVoucherForm({ ...voucherForm, account_id: e.target.value })}
+                  onChange={(e) => handleVoucherAccountChange(e.target.value)}
                   className="w-full h-10 rounded-md border border-input bg-background px-3"
                 >
-                  <option value="">اختر الحساب</option>
+                  <option value="">تلقائي (نقدية/بنك)</option>
                   {accounts.map((acc) => (
                     <option key={acc.id} value={acc.id}>
                       {acc.code} - {acc.name}
@@ -1358,6 +1325,11 @@ export function SupplierManager({ restaurantId, currency }: Props) {
                 </select>
               </div>
             </div>
+            {isPayableAccount(voucherForm.account_id) && voucherForm.supplier_id && (
+              <p className="text-xs text-primary bg-primary/5 p-2 rounded">
+                تم ربط حساب الموردين بالمورد المختار أعلاه تلقائياً
+              </p>
+            )}
             <div>
               <Label>رقم المرجع (اختياري)</Label>
               <Input

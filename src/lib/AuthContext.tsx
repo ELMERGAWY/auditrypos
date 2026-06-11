@@ -23,8 +23,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [isSuperAdmin, setIsSuperAdmin] = useState(false);
   const [adminChecked, setAdminChecked] = useState(false);
   const [lastKnownUser, setLastKnownUser] = useState<User | null>(() => {
-    const saved = localStorage.getItem('last_known_user');
-    return saved ? JSON.parse(saved) : null;
+    try {
+      const saved = localStorage.getItem('last_known_user');
+      return saved ? JSON.parse(saved) : null;
+    } catch {
+      localStorage.removeItem('last_known_user');
+      return null;
+    }
   });
 
   useEffect(() => {

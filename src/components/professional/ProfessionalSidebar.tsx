@@ -29,7 +29,7 @@ export type SidebarTab =
   | 'ai_assistant' | 'treasury' | 'users' | 'sales_invoices' | 'purchase_invoices'
   | 'sales_orders' | 'purchase_orders' | 'projects' | 'manual_journal'
   | 'chart_of_accounts' | 'accounting_mapping' | 'fixed_assets'
-  | 'loyalty' | 'gift_cards' | 'branches' | 'contracting' | 'bom' | 'service_packages';
+  | 'loyalty' | 'gift_cards' | 'branches' | 'contracting' | 'bom' | 'service_packages' | 'payroll';
 
 interface NavItem {
   id: SidebarTab;
@@ -169,6 +169,7 @@ export const ProfessionalSidebar = memo(function ProfessionalSidebar({
     ai_assistant: { label: 'الذكاء الاصطناعي', icon: Sparkles, section: 'analytics' },
     
     staff: { label: 'الموظفين', icon: Users, section: 'system' },
+    payroll: { label: 'الرواتب الشهرية', icon: DollarSign, section: 'system' },
     users: { label: 'الصلاحيات', icon: Shield, section: 'system' },
     super_admin: { label: 'لوحة التحكم الشاملة', icon: Shield, section: 'system' },
     settings: { label: 'إعدادات النظام', icon: Settings, section: 'system' },

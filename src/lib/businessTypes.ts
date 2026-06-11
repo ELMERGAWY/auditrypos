@@ -1769,7 +1769,14 @@ export function isFoodSector(type: BusinessType): boolean {
 }
 
 export function getBusinessConfig(type: BusinessType): BusinessTypeConfig {
-  return BUSINESS_TYPES[type] || BUSINESS_TYPES.other;
+  const config = BUSINESS_TYPES[type] || BUSINESS_TYPES.other;
+  if (config.tabs.includes('staff') && !config.tabs.includes('payroll')) {
+    const staffIdx = config.tabs.indexOf('staff');
+    const tabs = [...config.tabs];
+    tabs.splice(staffIdx + 1, 0, 'payroll');
+    return { ...config, tabs };
+  }
+  return config;
 }
 
 export function getBusinessLabel(type: BusinessType): string {

@@ -183,8 +183,13 @@ export function useDashboardData() {
     const loadedCalls = (callsRes.data || []) as WaiterCall[];
 
     // Load service packages from localStorage
-    const savedPackages = localStorage.getItem(`service_packages_${rest.id}`);
-    const loadedServicePackages = savedPackages ? JSON.parse(savedPackages) : [];
+    let loadedServicePackages: any[] = [];
+    try {
+      const savedPackages = localStorage.getItem(`service_packages_${rest.id}`);
+      loadedServicePackages = savedPackages ? JSON.parse(savedPackages) : [];
+    } catch {
+      loadedServicePackages = [];
+    }
 
     setMenuItems(loadedMenuItems);
     setServicePackages(loadedServicePackages);
@@ -245,6 +250,7 @@ export function useDashboardData() {
       // If we are offline, NEVER redirect to login. Stay in dashboard with cached data.
       if (!isOnline) {
         console.log("Offline mode: No active session but staying in dashboard due to offline-first policy.");
+        setDataLoaded(true);
         return;
       }
 

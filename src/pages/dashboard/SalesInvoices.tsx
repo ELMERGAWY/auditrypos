@@ -15,15 +15,22 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { journalService } from '@/lib/accounting/journalService';
 import { CustomerSearch } from './CustomerSearch';
 import { InvoiceViewer } from '@/components/InvoiceViewer';
+import { extractCustomerRef } from './types';
 
 interface Invoice {
   id: string;
   order_number: string;
   created_at: string;
   customer_name: string | null;
+  customer_ref?: string | null;
+  customer_phone?: string | null;
   total: number;
+  paid_amount?: number;
+  discount?: number;
+  notes?: string;
   status: string;
   payment_method: string;
+  journal_entry_id?: string | null;
 }
 
 interface Props {
@@ -42,8 +49,13 @@ export function SalesInvoices({ restaurantId, currency }: Props) {
     customer_name: '',
     amount: '',
     description: '',
-    payment_method: 'cash'
+    payment_method: 'cash',
+    customer_ref: '',
+    paid_amount: '',
+    discount: '',
+    notes: ''
   });
+  const [editItems, setEditItems] = useState<any[]>([]);
 
   useEffect(() => {
     loadInvoices();
@@ -106,21 +118,27 @@ export function SalesInvoices({ restaurantId, currency }: Props) {
 
       toast.success('تم إنشاء الفاتورة وترحيلها محاسبياً ✅');
       setShowManualForm(false);
-      setForm({ customer_name: '', amount: '', description: '', payment_method: 'cash' });
+      setForm({ customer_name: '', amount: '', description: '', payment_method: 'cash', customer_ref: '', paid_amount: '', discount: '', notes: '' });
       loadInvoices();
     } catch (e: any) {
       toast.error('فشل إنشاء الفاتورة: ' + e.message);
     }
   };
 
-  const handleEditInvoice = (invoice: Invoice) => {
+  const handleEditInvoice = async (invoice: Invoice) => {
     setEditingInvoice(invoice);
     setForm({
       customer_name: invoice.customer_name || '',
       amount: String(invoice.total || ''),
       description: '',
-      payment_method: invoice.payment_method || 'cash'
+      payment_method: invoice.payment_method || 'cash',
+      customer_ref: extractCustomerRef(invoice),
+      paid_amount: String(invoice.paid_amount ?? invoice.total ?? ''),
+      discount: String(invoice.discount || 0),
+      notes: invoice.notes || ''
     });
+    const { data: items } = await supabase.from('order_items').select('*').eq('order_id', invoice.id);
+    setEditItems(items || []);
     setShowManualForm(true);
   };
 
@@ -132,25 +150,37 @@ export function SalesInvoices({ restaurantId, currency }: Props) {
 
     try {
       const amount = parseFloat(form.amount);
-      
-      // 1. Update the order record
-      const { data: order, error: orderError } = await supabase
+      const paidAmount = parseFloat(form.paid_amount) || amount;
+      const discount = parseFloat(form.discount) || 0;
+
+      const { error: orderError } = await supabase
         .from('orders')
         .update({
           customer_name: form.customer_name,
+          customer_ref: form.customer_ref || null,
           total: amount,
+          paid_amount: paidAmount,
+          discount,
+          notes: form.notes || '',
           payment_method: form.payment_method
-        })
-        .eq('id', editingInvoice.id)
-        .select()
-        .single();
+        } as any)
+        .eq('id', editingInvoice.id);
 
       if (orderError) throw orderError;
+
+      for (const item of editItems) {
+        await supabase.from('order_items').update({
+          quantity: item.quantity,
+          price: item.price,
+          menu_item_name: item.menu_item_name
+        }).eq('id', item.id);
+      }
 
       toast.success('تم تحديث الفاتورة بنجاح ✅');
       setShowManualForm(false);
       setEditingInvoice(null);
-      setForm({ customer_name: '', amount: '', description: '', payment_method: 'cash' });
+      setEditItems([]);
+      setForm({ customer_name: '', amount: '', description: '', payment_method: 'cash', customer_ref: '', paid_amount: '', discount: '', notes: '' });
       loadInvoices();
     } catch (e: any) {
       toast.error('فشل تحديث الفاتورة: ' + e.message);
@@ -173,10 +203,12 @@ export function SalesInvoices({ restaurantId, currency }: Props) {
     }
   };
 
-  const filteredInvoices = invoices.filter(inv => 
-    inv.order_number.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    inv.customer_name?.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const filteredInvoices = invoices.filter(inv => {
+    const q = searchQuery.toLowerCase();
+    return inv.order_number.toLowerCase().includes(q) ||
+      inv.customer_name?.toLowerCase().includes(q) ||
+      extractCustomerRef(inv).toLowerCase().includes(q);
+  });
 
   return (
     <div className="space-y-6 fade-in p-4">
@@ -215,7 +247,7 @@ export function SalesInvoices({ restaurantId, currency }: Props) {
       <div className="relative">
         <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
         <Input 
-          placeholder="البحث برقم الفاتورة أو العميل..." 
+          placeholder="البحث برقم الفاتورة أو العميل أو الرقم المرجعي..." 
           className="pr-10 h-11 bg-card/50" 
           value={searchQuery}
           onChange={e => setSearchQuery(e.target.value)}
@@ -285,10 +317,57 @@ export function SalesInvoices({ restaurantId, currency }: Props) {
                   />
                 </div>
 
-                <div>
-                  <Label>المبلغ الإجمالي</Label>
-                  <Input type="number" placeholder="0.00" value={form.amount} onChange={e => setForm({...form, amount: e.target.value})} />
+                {editingInvoice && (
+                  <div>
+                    <Label>الرقم المرجعي</Label>
+                    <Input value={form.customer_ref} onChange={e => setForm({ ...form, customer_ref: e.target.value })} />
+                  </div>
+                )}
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <Label>المبلغ الإجمالي</Label>
+                    <Input type="number" placeholder="0.00" value={form.amount} onChange={e => setForm({...form, amount: e.target.value})} />
+                  </div>
+                  {editingInvoice && (
+                    <div>
+                      <Label>المدفوع</Label>
+                      <Input type="number" value={form.paid_amount} onChange={e => setForm({ ...form, paid_amount: e.target.value })} />
+                    </div>
+                  )}
                 </div>
+
+                {editingInvoice && editItems.length > 0 && (
+                  <div className="space-y-2 max-h-40 overflow-y-auto border rounded-lg p-2">
+                    <Label>بنود الفاتورة</Label>
+                    {editItems.map((item, idx) => (
+                      <div key={item.id} className="grid grid-cols-3 gap-2 text-sm">
+                        <Input value={item.menu_item_name} onChange={e => {
+                          const next = [...editItems];
+                          next[idx] = { ...item, menu_item_name: e.target.value };
+                          setEditItems(next);
+                        }} />
+                        <Input type="number" value={item.quantity} onChange={e => {
+                          const next = [...editItems];
+                          next[idx] = { ...item, quantity: Number(e.target.value) };
+                          setEditItems(next);
+                        }} />
+                        <Input type="number" value={item.price} onChange={e => {
+                          const next = [...editItems];
+                          next[idx] = { ...item, price: Number(e.target.value) };
+                          setEditItems(next);
+                        }} />
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {editingInvoice && (
+                  <div>
+                    <Label>ملاحظات</Label>
+                    <Input value={form.notes} onChange={e => setForm({ ...form, notes: e.target.value })} />
+                  </div>
+                )}
 
                 <div>
                   <Label>طريقة الدفع</Label>
