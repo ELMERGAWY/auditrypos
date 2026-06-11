@@ -9,8 +9,9 @@ import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { 
   ShoppingCart, Plus, Search, Calendar, Package, DollarSign, 
-  CheckCircle, Clock, Eye, RefreshCcw, Truck, Users
+  CheckCircle, Clock, Eye, RefreshCcw, Truck, Users, Edit, Trash2, X
 } from 'lucide-react';
+import { Label } from '@/components/ui/label';
 
 interface PurchaseOrder {
   id: string;
@@ -33,6 +34,17 @@ export function PurchaseOrders({ restaurantId, currency }: Props) {
   const [loading, setLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [showAddModal, setShowAddModal] = useState(false);
+
+  // Edit state
+  const [editingOrder, setEditingOrder] = useState<PurchaseOrder | null>(null);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [editForm, setEditForm] = useState({
+    supplier_name: '',
+    total_amount: '',
+    status: 'draft' as PurchaseOrder['status'],
+    expected_arrival: ''
+  });
+  const [editOrderItems, setEditOrderItems] = useState<any[]>([]);
 
   useEffect(() => {
     loadOrders();
@@ -67,6 +79,68 @@ export function PurchaseOrders({ restaurantId, currency }: Props) {
     o.po_number.toLowerCase().includes(searchQuery.toLowerCase()) ||
     o.supplier_name?.toLowerCase().includes(searchQuery.toLowerCase())
   );
+
+  const handleDelete = async (order: PurchaseOrder) => {
+    if (!confirm(`هل أنت متأكد من حذف طلب الشراء ${order.po_number}؟`)) return;
+    try {
+      await supabase.from('purchase_order_items').delete().eq('purchase_order_id', order.id);
+      const { error } = await supabase.from('purchase_orders').delete().eq('id', order.id);
+      if (error) throw error;
+      toast.success('تم حذف طلب الشراء');
+      loadOrders();
+    } catch (e: any) {
+      toast.error('فشل الحذف: ' + e.message);
+    }
+  };
+
+  const handleEditOrder = async (order: PurchaseOrder) => {
+    setEditingOrder(order);
+    setEditForm({
+      supplier_name: order.supplier_name || '',
+      total_amount: String(order.total_amount || 0),
+      status: order.status,
+      expected_arrival: order.expected_arrival || ''
+    });
+    try {
+      const { data: items } = await supabase.from('purchase_order_items').select('*').eq('purchase_order_id', order.id);
+      setEditOrderItems(items || []);
+    } catch {
+      setEditOrderItems([]);
+    }
+    setShowEditModal(true);
+  };
+
+  const handleUpdateOrder = async () => {
+    if (!editingOrder) return;
+    try {
+      const total = parseFloat(editForm.total_amount) || 0;
+      const { error } = await supabase.from('purchase_orders').update({
+        supplier_name: editForm.supplier_name,
+        total_amount: total,
+        status: editForm.status,
+        expected_arrival: editForm.expected_arrival || null
+      }).eq('id', editingOrder.id);
+      if (error) throw error;
+
+      for (const item of editOrderItems) {
+        if (item.id) {
+          await supabase.from('purchase_order_items').update({
+            item_name: item.item_name,
+            quantity: item.quantity,
+            unit_price: item.unit_price
+          }).eq('id', item.id);
+        }
+      }
+
+      toast.success('تم تحديث طلب الشراء بنجاح ✅');
+      setShowEditModal(false);
+      setEditingOrder(null);
+      setEditOrderItems([]);
+      loadOrders();
+    } catch (e: any) {
+      toast.error('فشل تحديث الطلب: ' + e.message);
+    }
+  };
 
   return (
     <div className="space-y-6 fade-in p-4">
@@ -139,8 +213,9 @@ export function PurchaseOrders({ restaurantId, currency }: Props) {
                         {order.status === 'draft' ? 'مسودة' : order.status === 'ordered' ? 'بانتظار التوريد' : order.status === 'received' ? 'تم الاستلام' : 'ملغي'}
                       </Badge>
                     </td>
-                    <td className="px-6 py-4">
-                      <Button variant="ghost" size="sm"><Eye className="w-4 h-4" /></Button>
+                    <td className="px-6 py-4 flex gap-1">
+                      <Button variant="ghost" size="sm" title="تعديل" onClick={() => handleEditOrder(order)}><Edit className="w-4 h-4" /></Button>
+                      <Button variant="ghost" size="sm" title="حذف" className="text-destructive hover:bg-destructive/10" onClick={() => handleDelete(order)}><Trash2 className="w-4 h-4" /></Button>
                     </td>
                   </tr>
                 ))
@@ -159,6 +234,72 @@ export function PurchaseOrders({ restaurantId, currency }: Props) {
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Edit Order Modal */}
+      {showEditModal && editingOrder && (
+        <div className="fixed inset-0 z-[100] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="glass-card p-6 max-w-lg w-full relative max-h-[90vh] overflow-y-auto">
+            <button onClick={() => { setShowEditModal(false); setEditingOrder(null); }} className="absolute left-4 top-4 text-muted-foreground hover:text-foreground">
+              <X className="w-5 h-5" />
+            </button>
+            <h3 className="text-2xl font-black mb-6">تعديل طلب الشراء #{editingOrder.po_number}</h3>
+
+            <div className="space-y-4">
+              <div>
+                <Label>المورد</Label>
+                <Input value={editForm.supplier_name} onChange={e => setEditForm({ ...editForm, supplier_name: e.target.value })} />
+              </div>
+              <div>
+                <Label>الإجمالي</Label>
+                <Input type="number" value={editForm.total_amount} onChange={e => setEditForm({ ...editForm, total_amount: e.target.value })} />
+              </div>
+              <div>
+                <Label>حالة الطلب</Label>
+                <select className="w-full h-10 rounded-md border border-input bg-background px-3" value={editForm.status} onChange={e => setEditForm({ ...editForm, status: e.target.value as PurchaseOrder['status'] })}>
+                  <option value="draft">مسودة</option>
+                  <option value="ordered">بانتظار التوريد</option>
+                  <option value="received">تم الاستلام</option>
+                  <option value="cancelled">ملغي</option>
+                </select>
+              </div>
+              <div>
+                <Label>تاريخ الوصول المتوقع</Label>
+                <Input type="date" value={editForm.expected_arrival} onChange={e => setEditForm({ ...editForm, expected_arrival: e.target.value })} />
+              </div>
+
+              {editOrderItems.length > 0 && (
+                <div>
+                  <Label className="text-base font-bold mb-2 block">بنود الطلب</Label>
+                  <div className="rounded-xl overflow-hidden border border-border">
+                    <table className="w-full text-sm">
+                      <thead className="bg-secondary">
+                        <tr>
+                          <th className="p-2 text-right">الصنف</th>
+                          <th className="p-2 text-center w-20">الكمية</th>
+                          <th className="p-2 text-center w-24">السعر</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {editOrderItems.map((item, idx) => (
+                          <tr key={item.id || idx} className="border-t border-border">
+                            <td className="p-2"><Input className="h-8 text-sm" value={item.item_name || ''} onChange={e => { const u=[...editOrderItems]; u[idx]={...u[idx], item_name: e.target.value}; setEditOrderItems(u); }} /></td>
+                            <td className="p-2"><Input className="h-8 text-sm text-center" type="number" min="1" value={item.quantity||1} onChange={e => { const u=[...editOrderItems]; u[idx]={...u[idx], quantity: Number(e.target.value)}; setEditOrderItems(u); const t=u.reduce((s,it)=>s+(Number(it.unit_price||0)*Number(it.quantity||0)),0); setEditForm(f=>({...f,total_amount:String(t)})); }} /></td>
+                            <td className="p-2"><Input className="h-8 text-sm text-center" type="number" min="0" step="0.01" value={item.unit_price||0} onChange={e => { const u=[...editOrderItems]; u[idx]={...u[idx], unit_price: parseFloat(e.target.value)||0}; setEditOrderItems(u); const t=u.reduce((s,it)=>s+(Number(it.unit_price||0)*Number(it.quantity||0)),0); setEditForm(f=>({...f,total_amount:String(t)})); }} /></td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+
+              <Button className="w-full h-12 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-lg mt-4" onClick={handleUpdateOrder}>
+                تحديث طلب الشراء
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

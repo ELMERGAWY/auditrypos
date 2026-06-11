@@ -9,8 +9,9 @@ import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { 
   FileText, Plus, Search, Calendar, Package, DollarSign, 
-  CheckCircle, Clock, Eye, RefreshCcw, ShoppingBag, Users, Trash2
+  CheckCircle, Clock, Eye, RefreshCcw, ShoppingBag, Users, Trash2, Edit, X
 } from 'lucide-react';
+import { Label } from '@/components/ui/label';
 import { InvoiceViewer } from '@/components/InvoiceViewer';
 
 interface SalesOrder {
@@ -42,6 +43,18 @@ export function SalesOrders({ restaurantId, currency }: Props) {
   const [selectedCustomerId, setSelectedCustomerId] = useState<string>('');
   const [newOrderLoading, setNewOrderLoading] = useState(false);
 
+  // Edit order state
+  const [editingOrder, setEditingOrder] = useState<SalesOrder | null>(null);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [editForm, setEditForm] = useState({
+    customer_name: '',
+    total_amount: '',
+    status: 'draft' as SalesOrder['status'],
+    expected_delivery: '',
+    customer_id: ''
+  });
+  const [editOrderItems, setEditOrderItems] = useState<any[]>([]);
+
   const handleDelete = async (order: SalesOrder) => {
     if (!confirm(`هل أنت متأكد من حذف الأمر ${order.order_number}؟`)) return;
     try {
@@ -52,6 +65,60 @@ export function SalesOrders({ restaurantId, currency }: Props) {
       loadOrders();
     } catch (e: any) {
       toast.error('فشل الحذف: ' + e.message);
+    }
+  };
+
+  const handleEditOrder = async (order: SalesOrder) => {
+    setEditingOrder(order);
+    setEditForm({
+      customer_name: order.customer_name || '',
+      total_amount: String(order.total_amount || 0),
+      status: order.status,
+      expected_delivery: order.expected_delivery || '',
+      customer_id: ''
+    });
+    try {
+      const { data: items } = await supabase.from('sales_order_items').select('*').eq('sales_order_id', order.id);
+      setEditOrderItems(items || []);
+    } catch {
+      setEditOrderItems([]);
+    }
+    setShowEditModal(true);
+  };
+
+  const handleUpdateOrder = async () => {
+    if (!editingOrder) return;
+    try {
+      const total = parseFloat(editForm.total_amount) || 0;
+      const payload: any = {
+        customer_name: editForm.customer_name,
+        total_amount: total,
+        status: editForm.status,
+        expected_delivery: editForm.expected_delivery || null
+      };
+      if (editForm.customer_id) payload.customer_id = editForm.customer_id;
+
+      const { error } = await supabase.from('sales_orders').update(payload).eq('id', editingOrder.id);
+      if (error) throw error;
+
+      // Update items
+      for (const item of editOrderItems) {
+        if (item.id) {
+          await supabase.from('sales_order_items').update({
+            item_name: item.item_name,
+            quantity: item.quantity,
+            unit_price: item.unit_price
+          }).eq('id', item.id);
+        }
+      }
+
+      toast.success('تم تحديث أمر البيع بنجاح ✅');
+      setShowEditModal(false);
+      setEditingOrder(null);
+      setEditOrderItems([]);
+      loadOrders();
+    } catch (e: any) {
+      toast.error('فشل تحديث الأمر: ' + e.message);
     }
   };
 
@@ -222,6 +289,9 @@ export function SalesOrders({ restaurantId, currency }: Props) {
                       <Button variant="ghost" size="sm" title="عرض التفاصيل" onClick={() => setViewingId(order.id)}>
                         <Eye className="w-4 h-4" />
                       </Button>
+                      <Button variant="ghost" size="sm" title="تعديل الأمر" onClick={() => handleEditOrder(order)}>
+                        <Edit className="w-4 h-4" />
+                      </Button>
                       <Button variant="ghost" size="sm" title="حذف" className="text-destructive hover:bg-destructive/10" onClick={() => handleDelete(order)}>
                         <Trash2 className="w-4 h-4" />
                       </Button>
@@ -319,6 +389,126 @@ export function SalesOrders({ restaurantId, currency }: Props) {
           recordId={viewingId}
           currency={currency}
         />
+      )}
+
+      {/* Edit Order Modal */}
+      {showEditModal && editingOrder && (
+        <div className="fixed inset-0 z-[100] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="glass-card p-6 max-w-lg w-full relative max-h-[90vh] overflow-y-auto">
+            <button onClick={() => { setShowEditModal(false); setEditingOrder(null); }} className="absolute left-4 top-4 text-muted-foreground hover:text-foreground">
+              <X className="w-5 h-5" />
+            </button>
+            <h3 className="text-2xl font-black mb-6">تعديل أمر البيع #{editingOrder.order_number}</h3>
+
+            <div className="space-y-4">
+              <div>
+                <Label>العميل</Label>
+                <select
+                  className="w-full h-10 rounded-md border border-input bg-background px-3"
+                  value={editForm.customer_id}
+                  onChange={e => {
+                    const cust = customers.find(c => c.id === e.target.value);
+                    setEditForm({ ...editForm, customer_id: e.target.value, customer_name: cust?.name || editForm.customer_name });
+                  }}
+                >
+                  <option value="">{editForm.customer_name || 'عميل نقدي'}</option>
+                  {customers.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                </select>
+              </div>
+              <div>
+                <Label>اسم العميل</Label>
+                <Input value={editForm.customer_name} onChange={e => setEditForm({ ...editForm, customer_name: e.target.value })} />
+              </div>
+              <div>
+                <Label>الإجمالي</Label>
+                <Input type="number" value={editForm.total_amount} onChange={e => setEditForm({ ...editForm, total_amount: e.target.value })} />
+              </div>
+              <div>
+                <Label>حالة الأمر</Label>
+                <select className="w-full h-10 rounded-md border border-input bg-background px-3" value={editForm.status} onChange={e => setEditForm({ ...editForm, status: e.target.value as SalesOrder['status'] })}>
+                  <option value="draft">مسودة</option>
+                  <option value="confirmed">مؤكد</option>
+                  <option value="delivered">تم التسليم</option>
+                  <option value="cancelled">ملغي</option>
+                </select>
+              </div>
+              <div>
+                <Label>تاريخ التسليم المتوقع</Label>
+                <Input type="date" value={editForm.expected_delivery} onChange={e => setEditForm({ ...editForm, expected_delivery: e.target.value })} />
+              </div>
+
+              {/* Editable Order Items */}
+              {editOrderItems.length > 0 && (
+                <div>
+                  <Label className="text-base font-bold mb-2 block">بنود الأمر</Label>
+                  <div className="rounded-xl overflow-hidden border border-border">
+                    <table className="w-full text-sm">
+                      <thead className="bg-secondary">
+                        <tr>
+                          <th className="p-2 text-right">الصنف</th>
+                          <th className="p-2 text-center w-20">الكمية</th>
+                          <th className="p-2 text-center w-24">السعر</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {editOrderItems.map((item, idx) => (
+                          <tr key={item.id || idx} className="border-t border-border">
+                            <td className="p-2">
+                              <Input
+                                className="h-8 text-sm"
+                                value={item.item_name || item.menu_item_name || ''}
+                                onChange={e => {
+                                  const updated = [...editOrderItems];
+                                  updated[idx] = { ...updated[idx], item_name: e.target.value };
+                                  setEditOrderItems(updated);
+                                }}
+                              />
+                            </td>
+                            <td className="p-2">
+                              <Input
+                                className="h-8 text-sm text-center"
+                                type="number"
+                                min="1"
+                                value={item.quantity || 1}
+                                onChange={e => {
+                                  const updated = [...editOrderItems];
+                                  updated[idx] = { ...updated[idx], quantity: Number(e.target.value) };
+                                  setEditOrderItems(updated);
+                                  const newTotal = updated.reduce((sum, it) => sum + (Number(it.unit_price || it.price || 0) * Number(it.quantity || 0)), 0);
+                                  setEditForm(f => ({ ...f, total_amount: String(newTotal) }));
+                                }}
+                              />
+                            </td>
+                            <td className="p-2">
+                              <Input
+                                className="h-8 text-sm text-center"
+                                type="number"
+                                min="0"
+                                step="0.01"
+                                value={item.unit_price || item.price || 0}
+                                onChange={e => {
+                                  const updated = [...editOrderItems];
+                                  updated[idx] = { ...updated[idx], unit_price: parseFloat(e.target.value) || 0 };
+                                  setEditOrderItems(updated);
+                                  const newTotal = updated.reduce((sum, it) => sum + (Number(it.unit_price || it.price || 0) * Number(it.quantity || 0)), 0);
+                                  setEditForm(f => ({ ...f, total_amount: String(newTotal) }));
+                                }}
+                              />
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+
+              <Button className="w-full h-12 gradient-bg border-0 text-white font-bold text-lg mt-4" onClick={handleUpdateOrder}>
+                تحديث أمر البيع
+              </Button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
