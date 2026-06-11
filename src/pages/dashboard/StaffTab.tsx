@@ -45,6 +45,7 @@ interface Props {
 }
 
 export function StaffTab({ restaurantId, currency }: Props) {
+  const [activeSubView, setActiveSubView] = useState<'staff' | 'departments'>('staff');
   const [staff, setStaff] = useState<StaffMember[]>([]);
   const [customRoles, setCustomRoles] = useState<CustomRole[]>([]);
   const [departments, setDepartments] = useState<any[]>([]);
@@ -62,6 +63,13 @@ export function StaffTab({ restaurantId, currency }: Props) {
   });
   
   const [showPin, setShowPin] = useState<string | null>(null);
+
+  // Department Modal & Form State
+  const [showDeptForm, setShowDeptForm] = useState(false);
+  const [editingDept, setEditingDept] = useState<any | null>(null);
+  const [deptForm, setDeptForm] = useState({
+    name: '', code: '', expense_account_id: '', manager_id: ''
+  });
   
   // Payroll transaction modal state
   const [showPayroll, setShowPayroll] = useState<StaffMember | null>(null);
@@ -82,7 +90,7 @@ export function StaffTab({ restaurantId, currency }: Props) {
       const [staffRes, rolesRes, profilesRes, deptRes, accountsRes] = await Promise.all([
         supabase.from('restaurant_staff').select('*').eq('restaurant_id', restaurantId).order('created_at', { ascending: false }),
         supabase.from('restaurant_custom_roles').select('*').eq('restaurant_id', restaurantId),
-        supabase.from('staff_profiles').select('*').eq('restaurant_id', restaurantId),
+        supabase.from('staff_profiles').select('*, staff_departments(*)').eq('restaurant_id', restaurantId),
         supabase.from('staff_departments').select('*').eq('restaurant_id', restaurantId).order('name'),
         supabase.from('chart_of_accounts').select('id, code, name, account_type, is_cash_account, is_bank_account').eq('restaurant_id', restaurantId).eq('is_active', true).order('code')
       ]);
@@ -230,6 +238,70 @@ export function StaffTab({ restaurantId, currency }: Props) {
     }); 
   };
 
+  const resetDeptForm = () => {
+    setShowDeptForm(false);
+    setEditingDept(null);
+    setDeptForm({
+      name: '', code: '', expense_account_id: '', manager_id: ''
+    });
+  };
+
+  const startEditDept = (dept: any) => {
+    setEditingDept(dept);
+    setDeptForm({
+      name: dept.name,
+      code: dept.code || '',
+      expense_account_id: dept.expense_account_id || '',
+      manager_id: dept.manager_id || ''
+    });
+    setShowDeptForm(true);
+  };
+
+  const handleSaveDept = async () => {
+    if (!deptForm.name.trim()) { toast.error('أدخل اسم القسم'); return; }
+    setLoading(true);
+    try {
+      const payload = {
+        restaurant_id: restaurantId,
+        name: deptForm.name.trim(),
+        code: deptForm.code.trim() || null,
+        expense_account_id: deptForm.expense_account_id || null,
+        manager_id: deptForm.manager_id || null
+      };
+
+      if (editingDept) {
+        const { error } = await supabase.from('staff_departments').update(payload).eq('id', editingDept.id);
+        if (error) throw error;
+        toast.success('تم تحديث القسم بنجاح ✅');
+      } else {
+        const { error } = await supabase.from('staff_departments').insert(payload);
+        if (error) throw error;
+        toast.success('تم إضافة القسم بنجاح ✅');
+      }
+      resetDeptForm();
+      load();
+    } catch (e: any) {
+      toast.error('حدث خطأ أثناء حفظ القسم: ' + e.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleDeleteDept = async (id: string) => {
+    if (!confirm('هل أنت متأكد من حذف هذا القسم؟ قد يؤثر هذا على الموظفين والمهام المرتبطة.')) return;
+    setLoading(true);
+    try {
+      const { error } = await supabase.from('staff_departments').delete().eq('id', id);
+      if (error) throw error;
+      toast.success('تم حذف القسم بنجاح');
+      load();
+    } catch (e: any) {
+      toast.error('فشل حذف القسم: ' + e.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const startEdit = (s: StaffMember) => {
     setEditing(s);
     setForm({ 
@@ -335,21 +407,58 @@ export function StaffTab({ restaurantId, currency }: Props) {
         ))}
       </div>
 
-      {/* Toolbar */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="font-display text-xl font-bold flex items-center gap-2">
-            إدارة تيم العمل والموظفين ({activeStaff.length} نشط)
-            {loading && <RefreshCw className="w-4 h-4 animate-spin text-muted-foreground" />}
-          </h2>
-          <p className="text-xs text-muted-foreground">إدارة الموظفين والوظائف والرواتب مع التوجيه التلقائي للحسابات</p>
-        </div>
-        <Button onClick={() => { resetForm(); setShowForm(true); }} className="gradient-bg text-primary-foreground border-0" size="sm">
-          <Plus className="w-4 h-4 ml-1" /> إضافة موظف
+      {/* Tab Switcher */}
+      <div className="flex gap-2 border-b pb-2 border-border/40">
+        <Button 
+          variant={activeSubView === 'staff' ? 'default' : 'outline'} 
+          size="sm"
+          onClick={() => setActiveSubView('staff')}
+          className={activeSubView === 'staff' ? 'gradient-bg text-primary-foreground border-0' : ''}
+        >
+          <Users className="w-4 h-4 ml-1" /> تيم العمل والموظفين
+        </Button>
+        <Button 
+          variant={activeSubView === 'departments' ? 'default' : 'outline'} 
+          size="sm"
+          onClick={() => setActiveSubView('departments')}
+          className={activeSubView === 'departments' ? 'gradient-bg text-primary-foreground border-0' : ''}
+        >
+          <Building2 className="w-4 h-4 ml-1" /> الأقسام والقطاعات الإدارية
         </Button>
       </div>
 
-      {/* Form Modal */}
+      {/* Toolbar */}
+      <div className="flex items-center justify-between">
+        {activeSubView === 'staff' ? (
+          <>
+            <div>
+              <h2 className="font-display text-xl font-bold flex items-center gap-2">
+                إدارة تيم العمل والموظفين ({activeStaff.length} نشط)
+                {loading && <RefreshCw className="w-4 h-4 animate-spin text-muted-foreground" />}
+              </h2>
+              <p className="text-xs text-muted-foreground">إدارة الموظفين والوظائف والرواتب مع التوجيه التلقائي للحسابات</p>
+            </div>
+            <Button onClick={() => { resetForm(); setShowForm(true); }} className="gradient-bg text-primary-foreground border-0" size="sm">
+              <Plus className="w-4 h-4 ml-1" /> إضافة موظف
+            </Button>
+          </>
+        ) : (
+          <>
+            <div>
+              <h2 className="font-display text-xl font-bold flex items-center gap-2">
+                الأقسام والقطاعات الإدارية ({departments.length} أقسام)
+                {loading && <RefreshCw className="w-4 h-4 animate-spin text-muted-foreground" />}
+              </h2>
+              <p className="text-xs text-muted-foreground">توزيع تيم العمل على قطاعات وتعيين مديرين لكل قسم لمراقبة أداء الموظفين</p>
+            </div>
+            <Button onClick={() => { resetDeptForm(); setShowDeptForm(true); }} className="gradient-bg text-primary-foreground border-0" size="sm">
+              <Plus className="w-4 h-4 ml-1" /> إضافة قسم جديد
+            </Button>
+          </>
+        )}
+      </div>
+
+      {/* Form Modal (Staff) */}
       <AnimatePresence>
         {showForm && (
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
@@ -468,6 +577,67 @@ export function StaffTab({ restaurantId, currency }: Props) {
         )}
       </AnimatePresence>
 
+      {/* Form Modal (Department) */}
+      <AnimatePresence>
+        {showDeptForm && (
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 bg-background/80 backdrop-blur-sm flex items-center justify-center p-4" onClick={() => resetDeptForm()}>
+            <motion.div initial={{ scale: 0.9 }} animate={{ scale: 1 }} exit={{ scale: 0.9 }}
+              className="glass-card p-6 max-w-md w-full space-y-4" onClick={e => e.stopPropagation()}>
+              
+              <div className="flex items-center justify-between border-b pb-2">
+                <h3 className="font-display font-bold text-lg flex items-center gap-2 text-primary">
+                  <Building2 className="w-5 h-5 text-primary" />
+                  {editingDept ? 'تعديل بيانات القسم' : 'إضافة قسم إداري جديد'}
+                </h3>
+                <Button size="sm" variant="ghost" onClick={resetDeptForm}><X className="w-4 h-4" /></Button>
+              </div>
+
+              <div className="space-y-3">
+                <div>
+                  <Label className="text-xs">اسم القسم *</Label>
+                  <Input placeholder="مثال: قسم التسويق والميديا باينج" value={deptForm.name} onChange={e => setDeptForm(f => ({ ...f, name: e.target.value }))} />
+                </div>
+                
+                <div>
+                  <Label className="text-xs">رمز كود القسم</Label>
+                  <Input placeholder="مثال: MKTG" value={deptForm.code} onChange={e => setDeptForm(f => ({ ...f, code: e.target.value }))} />
+                </div>
+
+                <div>
+                  <Label className="text-xs">مدير القسم</Label>
+                  <select value={deptForm.manager_id} onChange={e => setDeptForm(f => ({ ...f, manager_id: e.target.value }))}
+                    className="w-full h-10 rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
+                    <option value="">لا يوجد (غير محدد)</option>
+                    {staff.map(s => (
+                      <option key={s.profile?.id || s.id} value={s.profile?.id || s.id}>{s.name} ({getRoleDisplay(s.role).label})</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <Label className="text-xs">حساب مصروف القسم (دليل الحسابات)</Label>
+                  <select value={deptForm.expense_account_id} onChange={e => setDeptForm(f => ({ ...f, expense_account_id: e.target.value }))}
+                    className="w-full h-10 rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
+                    <option value="">حساب رواتب ومصروفات عامة</option>
+                    {expenseAccounts.map(a => (
+                      <option key={a.id} value={a.id}>{a.code} - {a.name}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              <div className="flex gap-2 pt-2 border-t">
+                <Button onClick={handleSaveDept} disabled={loading} className="flex-1 gradient-bg text-primary-foreground border-0">
+                  {loading ? 'جاري الحفظ...' : editingDept ? 'تحديث القسم' : 'حفظ القسم'}
+                </Button>
+                <Button variant="outline" onClick={resetDeptForm} className="flex-1" disabled={loading}>إلغاء</Button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {/* Payroll Modal */}
       <AnimatePresence>
         {showPayroll && (
@@ -479,7 +649,7 @@ export function StaffTab({ restaurantId, currency }: Props) {
               <div className="flex items-center justify-between border-b pb-2">
                 <h3 className="font-display font-bold text-lg flex items-center gap-2 text-primary">
                   <DollarSign className="w-5 h-5 text-primary" />
-                  صرف راتب الموظف: {showPayroll.name}
+                  صرف راتب: {showPayroll.name}
                 </h3>
                 <Button size="sm" variant="ghost" onClick={() => setShowPayroll(null)}><X className="w-4 h-4" /></Button>
               </div>
@@ -564,74 +734,171 @@ export function StaffTab({ restaurantId, currency }: Props) {
         )}
       </AnimatePresence>
 
-      {/* Staff List */}
-      <div className="space-y-2">
-        {staff.map(s => {
-          const roleInfo = getRoleDisplay(s.role);
-          const basicSalary = s.base_salary || s.profile?.basic_salary || 0;
-          return (
-            <motion.div key={s.id} initial={{ opacity: 0 }} animate={{ opacity: 1 }}
-              className={`glass-card p-4 flex items-center justify-between gap-4 border border-border/50 hover:border-primary/20 transition-all ${!s.is_active ? 'opacity-50 bg-secondary/50' : ''}`}>
-              <div className="flex items-center gap-4 flex-1 min-w-0">
-                <div className="w-12 h-12 rounded-full bg-secondary flex items-center justify-center text-xl shrink-0">
-                  {roleInfo.icon}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <p className="font-bold text-sm truncate">{s.name}</p>
-                    <Badge className={`text-[10px] border ${roleInfo.color}`}>{roleInfo.label}</Badge>
-                    {s.profile?.staff_departments?.name && (
-                      <Badge variant="outline" className="text-[10px] border-primary/20 text-primary">
-                        <Building2 className="w-2.5 h-2.5 ml-1" /> {s.profile.staff_departments.name}
-                      </Badge>
-                    )}
-                    {!s.is_active && <Badge variant="outline" className="text-[10px] text-muted-foreground">معطّل</Badge>}
+      {/* Conditional Rendering of Views */}
+      {activeSubView === 'staff' ? (
+        /* Staff List View */
+        <div className="space-y-2">
+          {staff.map(s => {
+            const roleInfo = getRoleDisplay(s.role);
+            const basicSalary = s.base_salary || s.profile?.basic_salary || 0;
+            // Check if this person is a department manager
+            const managedDept = departments.find(d => d.manager_id === s.profile?.id);
+
+            return (
+              <motion.div key={s.id} initial={{ opacity: 0 }} animate={{ opacity: 1 }}
+                className={`glass-card p-4 flex items-center justify-between gap-4 border border-border/50 hover:border-primary/20 transition-all ${!s.is_active ? 'opacity-50 bg-secondary/50' : ''}`}>
+                <div className="flex items-center gap-4 flex-1 min-w-0">
+                  <div className="w-12 h-12 rounded-full bg-secondary flex items-center justify-center text-xl shrink-0">
+                    {roleInfo.icon}
                   </div>
-                  <div className="flex items-center gap-3 text-xs text-muted-foreground mt-1 flex-wrap">
-                    {s.phone && <span>📱 {s.phone}</span>}
-                    {s.profile?.email && <span>📧 {s.profile.email}</span>}
-                    <span>PIN: {showPin === s.id ? s.pin : '••••'}</span>
-                    <button onClick={() => setShowPin(showPin === s.id ? null : s.id)} className="text-primary hover:underline">
-                      {showPin === s.id ? <EyeOff className="w-3 h-3 inline" /> : <Eye className="w-3 h-3 inline" />}
-                    </button>
-                    {s.profile?.expense_account_id && (
-                      <span className="text-primary-foreground bg-primary/10 px-1.5 py-0.5 rounded text-[10px]">
-                        🎯 موجه: {accounts.find(a => a.id === s.profile.expense_account_id)?.name}
-                      </span>
-                    )}
-                  </div>
-                  {basicSalary > 0 && (
-                    <div className="mt-2 flex items-center gap-2 flex-wrap">
-                      <Badge variant="secondary" className="text-[10px] bg-emerald-500/10 text-emerald-600">
-                        الراتب: {basicSalary.toLocaleString()} {currency} / {s.payment_cycle === 'monthly' ? 'شهر' : s.payment_cycle === 'weekly' ? 'أسبوع' : 'يوم'}
-                      </Badge>
-                      {s.profile?.allowances > 0 && <span className="text-[10px] text-emerald-600 font-bold">+ {Number(s.profile.allowances).toLocaleString()} بدلات</span>}
-                      {s.profile?.deductions > 0 && <span className="text-[10px] text-destructive font-bold">- {Number(s.profile.deductions).toLocaleString()} خصومات</span>}
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <p className="font-bold text-sm truncate">{s.name}</p>
+                      <Badge className={`text-[10px] border ${roleInfo.color}`}>{roleInfo.label}</Badge>
                       
-                      <Button size="xs" variant="outline" className="h-6 text-[10px]" onClick={() => openPayrollModal(s)}>
-                        <DollarSign className="w-3.5 h-3.5 ml-0.5" /> صرف راتب
-                      </Button>
+                      {s.profile?.staff_departments?.name && (
+                        <Badge variant="outline" className="text-[10px] border-primary/20 text-primary bg-primary/5">
+                          <Building2 className="w-2.5 h-2.5 ml-1" /> {s.profile.staff_departments.name}
+                        </Badge>
+                      )}
+
+                      {managedDept && (
+                        <Badge className="text-[10px] bg-amber-500/10 text-amber-500 border border-amber-500/20">
+                          👑 مدير قسم: {managedDept.name}
+                        </Badge>
+                      )}
+
+                      {!s.is_active && <Badge variant="outline" className="text-[10px] text-muted-foreground">معطّل</Badge>}
                     </div>
-                  )}
+                    <div className="flex items-center gap-3 text-xs text-muted-foreground mt-1 flex-wrap">
+                      {s.phone && <span>📱 {s.phone}</span>}
+                      {s.profile?.email && <span>📧 {s.profile.email}</span>}
+                      <span>PIN: {showPin === s.id ? s.pin : '••••'}</span>
+                      <button onClick={() => setShowPin(showPin === s.id ? null : s.id)} className="text-primary hover:underline">
+                        {showPin === s.id ? <EyeOff className="w-3 h-3 inline" /> : <Eye className="w-3 h-3 inline" />}
+                      </button>
+                      {s.profile?.expense_account_id && (
+                        <span className="text-primary-foreground bg-primary/10 px-1.5 py-0.5 rounded text-[10px]">
+                          🎯 موجه: {accounts.find(a => a.id === s.profile.expense_account_id)?.name}
+                        </span>
+                      )}
+                    </div>
+                    {basicSalary > 0 && (
+                      <div className="mt-2 flex items-center gap-2 flex-wrap">
+                        <Badge variant="secondary" className="text-[10px] bg-emerald-500/10 text-emerald-600">
+                          الراتب: {basicSalary.toLocaleString()} {currency} / {s.payment_cycle === 'monthly' ? 'شهر' : s.payment_cycle === 'weekly' ? 'أسبوع' : 'يوم'}
+                        </Badge>
+                        {s.profile?.allowances > 0 && <span className="text-[10px] text-emerald-600 font-bold">+ {Number(s.profile.allowances).toLocaleString()} بدلات</span>}
+                        {s.profile?.deductions > 0 && <span className="text-[10px] text-destructive font-bold">- {Number(s.profile.deductions).toLocaleString()} خصومات</span>}
+                        
+                        <Button size="xs" variant="outline" className="h-6 text-[10px]" onClick={() => openPayrollModal(s)}>
+                          <DollarSign className="w-3.5 h-3.5 ml-0.5" /> صرف راتب
+                        </Button>
+                      </div>
+                    )}
+                  </div>
                 </div>
-              </div>
-              <div className="flex gap-1 shrink-0">
-                <Button size="sm" variant="ghost" onClick={() => handleToggle(s)}>
-                  {s.is_active ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
-                </Button>
-                <Button size="sm" variant="ghost" onClick={() => startEdit(s)}><Edit2 className="w-3.5 h-3.5" /></Button>
-                <Button size="sm" variant="ghost" className="text-destructive" onClick={() => handleDelete(s)}><Trash2 className="w-3.5 h-3.5" /></Button>
-              </div>
-            </motion.div>
-          );
-        })}
-        {staff.length === 0 && !loading && (
-          <div className="text-center py-12 text-muted-foreground border border-dashed rounded-xl">
-            <Users className="w-12 h-12 mx-auto mb-3 opacity-30" />
-            <p>لا يوجد موظفين حالياً. أضف موظفاً جديداً للبدء!</p>
-          </div>
-        )}
-      </div>
+                <div className="flex gap-1 shrink-0">
+                  <Button size="sm" variant="ghost" onClick={() => handleToggle(s)}>
+                    {s.is_active ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                  </Button>
+                  <Button size="sm" variant="ghost" onClick={() => startEdit(s)}><Edit2 className="w-3.5 h-3.5" /></Button>
+                  <Button size="sm" variant="ghost" className="text-destructive" onClick={() => handleDelete(s)}><Trash2 className="w-3.5 h-3.5" /></Button>
+                </div>
+              </motion.div>
+            );
+          })}
+          {staff.length === 0 && !loading && (
+            <div className="text-center py-12 text-muted-foreground border border-dashed rounded-xl">
+              <Users className="w-12 h-12 mx-auto mb-3 opacity-30" />
+              <p>لا يوجد موظفين حالياً. أضف موظفاً جديداً للبدء!</p>
+            </div>
+          )}
+        </div>
+      ) : (
+        /* Departments List View */
+        <div className="grid md:grid-cols-2 gap-4">
+          {departments.map(d => {
+            // Find department employees
+            const deptEmployees = staff.filter(s => s.profile?.department_id === d.id);
+            // Calculate total salaries in department
+            const totalSalaries = deptEmployees.reduce((sum, s) => {
+              const basic = Number(s.base_salary || s.profile?.basic_salary || 0);
+              const allowances = Number(s.profile?.allowances || 0);
+              const deductions = Number(s.profile?.deductions || 0);
+              return sum + (basic + allowances - deductions);
+            }, 0);
+
+            // Find manager details
+            const manager = staff.find(s => s.profile?.id === d.manager_id || s.id === d.manager_id);
+
+            return (
+              <motion.div key={d.id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
+                className="glass-card p-5 border border-border hover:border-primary/20 transition-all flex flex-col justify-between space-y-4">
+                
+                <div>
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <h3 className="font-bold text-base text-primary flex items-center gap-2">
+                        <Building2 className="w-4.5 h-4.5" />
+                        {d.name}
+                      </h3>
+                      {d.code && <p className="text-[10px] text-muted-foreground mt-0.5">رمز القسم: {d.code}</p>}
+                    </div>
+                    
+                    <div className="flex gap-1">
+                      <Button size="sm" variant="ghost" onClick={() => startEditDept(d)}><Edit2 className="w-3.5 h-3.5" /></Button>
+                      <Button size="sm" variant="ghost" className="text-destructive" onClick={() => handleDeleteDept(d.id)}><Trash2 className="w-3.5 h-3.5" /></Button>
+                    </div>
+                  </div>
+
+                  <div className="mt-3 grid grid-cols-2 gap-2 text-xs border-y py-2.5 my-3 bg-secondary/5 rounded px-2">
+                    <div>
+                      <p className="text-[10px] text-muted-foreground">مدير القسم:</p>
+                      <p className="font-bold mt-0.5 text-foreground">{manager ? manager.name : 'غير معين'}</p>
+                    </div>
+                    <div>
+                      <p className="text-[10px] text-muted-foreground">التوجيه المالي:</p>
+                      <p className="font-bold mt-0.5 text-primary">
+                        {accounts.find(a => a.id === d.expense_account_id)?.name || 'افتراضي'}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <p className="text-[10px] text-muted-foreground font-bold">فريق العمل بالقسم ({deptEmployees.length} موظفين):</p>
+                    <div className="flex flex-wrap gap-1 max-h-24 overflow-y-auto custom-scrollbar">
+                      {deptEmployees.map(e => (
+                        <Badge key={e.id} variant="outline" className="text-[9px] bg-secondary/30">
+                          {e.name}
+                        </Badge>
+                      ))}
+                      {deptEmployees.length === 0 && (
+                        <p className="text-[10px] text-muted-foreground italic">لا يوجد موظفون معينون في هذا القسم حالياً.</p>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="pt-3 border-t border-dashed flex justify-between items-center text-xs">
+                  <span className="text-muted-foreground">التكلفة الشهرية للموظفين:</span>
+                  <span className="font-black text-emerald-600 bg-emerald-500/10 p-1 px-2.5 rounded-lg">
+                    {totalSalaries.toLocaleString()} {currency}
+                  </span>
+                </div>
+
+              </motion.div>
+            );
+          })}
+          
+          {departments.length === 0 && (
+            <div className="col-span-full text-center py-16 text-muted-foreground border border-dashed rounded-xl">
+              <Building2 className="w-12 h-12 mx-auto mb-3 opacity-30" />
+              <p>لا توجد أقسام مسجلة حتى الآن.</p>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }

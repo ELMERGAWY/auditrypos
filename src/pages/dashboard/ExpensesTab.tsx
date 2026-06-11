@@ -20,6 +20,10 @@ interface Expense {
   distribution_days?: number;
   distribution_type?: 'daily' | 'custom' | 'monthly';
   daily_cost?: number;
+  is_client_reimbursable?: boolean;
+  billing_amount?: number;
+  customer_id?: string;
+  revenue_account_id?: string;
 }
 
 interface DailyOverhead {
@@ -83,12 +87,18 @@ export function ExpensesTab({ restaurantId, currency }: Props) {
     account_code: '5200',
     payment_account_code: '1100',
     project_id: '',
-    block_id: ''
+    block_id: '',
+    is_client_reimbursable: false,
+    billing_amount: '',
+    customer_id: '',
+    revenue_account_id: ''
   });
   const [activeView, setActiveView] = useState<'expenses' | 'overheads' | 'calculator'>('expenses');
   const [selectedPeriod, setSelectedPeriod] = useState<'today' | 'week' | 'month'>('month');
   const [paymentAccounts, setPaymentAccounts] = useState<any[]>([]);
   const [expenseAccounts, setExpenseAccounts] = useState<any[]>([]);
+  const [revenueAccounts, setRevenueAccounts] = useState<any[]>([]);
+  const [customers, setCustomers] = useState<any[]>([]);
   const [projects, setProjects] = useState<any[]>([]);
   const [blocks, setBlocks] = useState<any[]>([]);
 
@@ -102,6 +112,7 @@ export function ExpensesTab({ restaurantId, currency }: Props) {
     if (coa) {
       setExpenseAccounts(coa.filter(a => a.account_type === 'expense'));
       setPaymentAccounts(coa.filter(a => a.is_cash_account || a.is_bank_account));
+      setRevenueAccounts(coa.filter(a => a.account_type === 'revenue'));
     }
 
     const { data: expensesData } = await supabase
@@ -136,6 +147,14 @@ export function ExpensesTab({ restaurantId, currency }: Props) {
       .select('*, project_blocks(*)')
       .eq('restaurant_id', restaurantId);
     setProjects(projectsData || []);
+
+    // Load Customers
+    const { data: customersData } = await supabase
+      .from('customers')
+      .select('id, name')
+      .eq('restaurant_id', restaurantId)
+      .order('name');
+    setCustomers(customersData || []);
   };
 
   useEffect(() => { load(); }, [restaurantId, selectedPeriod]);
@@ -219,38 +238,94 @@ export function ExpensesTab({ restaurantId, currency }: Props) {
         description: form.description, 
         date: form.date,
         project_id: form.project_id || null,
-        block_id: form.block_id || null
+        block_id: form.block_id || null,
+        is_client_reimbursable: form.is_client_reimbursable || false,
+        billing_amount: form.is_client_reimbursable ? (Number(form.billing_amount) || 0) : 0,
+        customer_id: form.is_client_reimbursable ? (form.customer_id || null) : null,
+        revenue_account_id: form.is_client_reimbursable ? (form.revenue_account_id || null) : null
       })
       .select()
       .single();
 
     if (expenseError || !expenseData) {
-      toast.error('فشل تسجيل المصروف');
+      toast.error('فشل تسجيل المصروف: ' + (expenseError?.message || ''));
       return;
     }
 
     // 1.1 Create Journal Entry for Accounting Link using specific accounts if selected
-    // Resolve UUIDs from codes
-    const debitAccObj = expenseAccounts.find(a => a.code === form.account_code || a.id === form.account_code);
-    const creditAccObj = paymentAccounts.find(a => a.code === form.payment_account_code || a.id === form.payment_account_code);
+    if (form.is_client_reimbursable) {
+      // Reimbursable logic:
+      // DR: AR Receivable Account (code 1200) = billing_amount
+      // CR: Cash/Bank Account (payment_account_code) = cost_amount
+      // CR: Revenue Account = billing_amount - cost_amount
+      const billing = Number(form.billing_amount) || 0;
+      const profit = billing - amount;
 
-    const debitAccountId = debitAccObj?.id;
-    const creditAccountId = creditAccObj?.id;
+      // Find AR Account (looking for 1200 or starting with 12)
+      const arAccObj = paymentAccounts.find(a => a.code?.startsWith('12') || a.code === '1200') || 
+                       expenseAccounts.find(a => a.code?.startsWith('12') || a.code === '1200');
+                       
+      const arAccountId = arAccObj?.id;
+      const creditAccountId = paymentAccounts.find(a => a.code === form.payment_account_code || a.id === form.payment_account_code)?.id;
+      const revAccountId = form.revenue_account_id || revenueAccounts.find(a => a.code?.startsWith('4') || a.code === '4100')?.id;
 
-    if (debitAccountId && creditAccountId) {
-      await journalService.createJournalEntry(restaurantId, {
-        entry_date: new Date(form.date),
-        description: form.description || `مصروف ${form.category}`,
-        source: 'expense',
-        is_posted: true,
-        lines: [
-          { account_id: debitAccountId, debit: amount, credit: 0, description: `مصروف - ${form.category}` },
-          { account_id: creditAccountId, debit: 0, credit: amount, description: `سداد مصروف - ${form.category}` }
-        ]
-      });
+      if (arAccountId && creditAccountId && revAccountId) {
+        await journalService.createJournalEntry(restaurantId, {
+          entry_date: new Date(form.date),
+          description: form.description || `مصروف مسترد للعميل: ${form.category}`,
+          source: 'expense',
+          is_posted: true,
+          lines: [
+            { account_id: arAccountId, debit: billing, credit: 0, description: `مديونية عميل - مصروف مسترد` },
+            { account_id: creditAccountId, debit: 0, credit: amount, description: `دفع تكلفة المصروف من الخزينة/البنك` },
+            { account_id: revAccountId, debit: 0, credit: profit, description: `هامش ربح تقديم الخدمة/المصروف` }
+          ]
+        });
+      } else {
+        console.warn('Could not resolve accounts for reimbursable expense', { arAccountId, creditAccountId, revAccountId });
+        toast.warning('تم حفظ المصروف ولكن فشل إنشاء القيد المحاسبي المتوازن لعدم تحديد كافة الحسابات بدقة');
+      }
+
+      // 1.2 Insert customer transaction and update customer balance
+      if (form.customer_id) {
+        const { error: txErr } = await supabase.from('customer_transactions').insert({
+          customer_id: form.customer_id,
+          restaurant_id: restaurantId,
+          type: 'sale',
+          amount: billing,
+          description: form.description || `مصروف مسترد: ${form.category} (تكلفة: ${amount})`
+        });
+        
+        if (!txErr) {
+          const { data: cust } = await supabase.from('customers').select('balance').eq('id', form.customer_id).maybeSingle();
+          if (cust) {
+            await supabase.from('customers').update({ balance: (cust.balance || 0) + billing }).eq('id', form.customer_id);
+          }
+        }
+      }
     } else {
-      console.warn('Could not resolve account UUIDs for expense journal entry', { debitAccountId, creditAccountId });
-      toast.warning('تم حفظ المصروف ولكن فشل إنشاء القيد المحاسبي لعدم تحديد الحسابات بدقة');
+      // Standard expense logic
+      const debitAccObj = expenseAccounts.find(a => a.code === form.account_code || a.id === form.account_code);
+      const creditAccObj = paymentAccounts.find(a => a.code === form.payment_account_code || a.id === form.payment_account_code);
+
+      const debitAccountId = debitAccObj?.id;
+      const creditAccountId = creditAccObj?.id;
+
+      if (debitAccountId && creditAccountId) {
+        await journalService.createJournalEntry(restaurantId, {
+          entry_date: new Date(form.date),
+          description: form.description || `مصروف ${form.category}`,
+          source: 'expense',
+          is_posted: true,
+          lines: [
+            { account_id: debitAccountId, debit: amount, credit: 0, description: `مصروف - ${form.category}` },
+            { account_id: creditAccountId, debit: 0, credit: amount, description: `سداد مصروف - ${form.category}` }
+          ]
+        });
+      } else {
+        console.warn('Could not resolve account UUIDs for expense journal entry', { debitAccountId, creditAccountId });
+        toast.warning('تم حفظ المصروف ولكن فشل إنشاء القيد المحاسبي لعدم تحديد الحسابات بدقة');
+      }
     }
 
     // 2. Create daily overheads distributed over working days
@@ -296,7 +371,16 @@ export function ExpensesTab({ restaurantId, currency }: Props) {
       date: new Date().toISOString().split('T')[0],
       distributionType: 'monthly',
       distributionDays: 30,
-      workingDays: [0, 1, 2, 3, 4, 5, 6]
+      workingDays: [0, 1, 2, 3, 4, 5, 6],
+      cost_center: 'admin',
+      account_code: '5200',
+      payment_account_code: '1100',
+      project_id: '',
+      block_id: '',
+      is_client_reimbursable: false,
+      billing_amount: '',
+      customer_id: '',
+      revenue_account_id: ''
     });
     load();
   };
@@ -431,20 +515,66 @@ export function ExpensesTab({ restaurantId, currency }: Props) {
               
               {/* Basic Info */}
               <div className="space-y-3">
-                <Label className="text-xs">حساب المصروف (من الدليل) *</Label>
-                <select value={form.account_code} onChange={e => {
-                    const acc = expenseAccounts.find(a => a.code === e.target.value);
-                    setForm(f => ({ ...f, account_code: e.target.value, category: acc?.name || f.category }));
-                  }}
-                  className="w-full px-3 py-2 rounded-lg bg-secondary text-secondary-foreground border border-border text-sm">
-                  <option value="">اختر الحساب...</option>
-                  {expenseAccounts.map(a => <option key={a.code} value={a.code}>[{a.code}] {a.name}</option>)}
-                </select>
+                {/* Reimbursable Toggle */}
+                <div className="flex items-center gap-2 p-2 rounded-lg bg-primary/5 border border-primary/10">
+                  <input 
+                    type="checkbox" 
+                    id="is_client_reimbursable"
+                    checked={form.is_client_reimbursable}
+                    onChange={e => setForm(f => ({ ...f, is_client_reimbursable: e.target.checked }))}
+                    className="w-4 h-4 rounded border-gray-300 text-primary focus:ring-primary"
+                  />
+                  <Label htmlFor="is_client_reimbursable" className="text-xs font-bold cursor-pointer text-primary">
+                    مصروف مسترد لصالح عميل (إعلانات، اشتراكات، إلخ)
+                  </Label>
+                </div>
+
+                {!form.is_client_reimbursable ? (
+                  <>
+                    <Label className="text-xs">حساب المصروف (من الدليل) *</Label>
+                    <select value={form.account_code} onChange={e => {
+                        const acc = expenseAccounts.find(a => a.code === e.target.value);
+                        setForm(f => ({ ...f, account_code: e.target.value, category: acc?.name || f.category }));
+                      }}
+                      className="w-full px-3 py-2 rounded-lg bg-secondary text-secondary-foreground border border-border text-sm">
+                      <option value="">اختر الحساب...</option>
+                      {expenseAccounts.map(a => <option key={a.code} value={a.code}>[{a.code}] {a.name}</option>)}
+                    </select>
+                  </>
+                ) : (
+                  <div className="p-3 border rounded-lg bg-secondary/20 space-y-3 border-dashed border-primary/20">
+                    <h4 className="text-xs font-bold text-primary">تفاصيل الحساب للعميل والربحية:</h4>
+                    
+                    <div>
+                      <Label className="text-xs block mb-1">العميل المرتبط *</Label>
+                      <select value={form.customer_id} onChange={e => setForm(f => ({ ...f, customer_id: e.target.value }))}
+                        className="w-full px-3 py-2 rounded-lg bg-secondary text-secondary-foreground border border-border text-sm">
+                        <option value="">اختر العميل...</option>
+                        {customers.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                      </select>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <Label className="text-xs block mb-1">سعر التحصيل من العميل *</Label>
+                        <Input placeholder="0.00" type="number" value={form.billing_amount} onChange={e => setForm(f => ({ ...f, billing_amount: e.target.value }))} />
+                      </div>
+                      <div>
+                        <Label className="text-xs block mb-1">حساب الإيراد (للفارق) *</Label>
+                        <select value={form.revenue_account_id} onChange={e => setForm(f => ({ ...f, revenue_account_id: e.target.value }))}
+                          className="w-full px-3 py-2 rounded-lg bg-secondary text-secondary-foreground border border-border text-sm">
+                          <option value="">اختر حساب الإيراد...</option>
+                          {revenueAccounts.map(a => <option key={a.id} value={a.id}>[{a.code}] {a.name}</option>)}
+                        </select>
+                      </div>
+                    </div>
+                  </div>
+                )}
                 
-                <Label className="text-xs">المبلغ *</Label>
+                <Label className="text-xs">المبلغ الفعلي المدفوع (التكلفة) *</Label>
                 <Input placeholder="0.00" type="number" value={form.amount} onChange={e => setForm(f => ({ ...f, amount: e.target.value }))} />
                 
-                <Label className="text-xs">الوصف (اختياري)</Label>
+                <Label className="text-xs">الوصف (مثلاً: إعلانات فيسبوك لشهر يونيو)</Label>
                 <Input placeholder="وصف المصروف" value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} />
                 
                 <Input type="date" value={form.date} onChange={e => setForm(f => ({ ...f, date: e.target.value }))} />
@@ -588,19 +718,35 @@ export function ExpensesTab({ restaurantId, currency }: Props) {
       {activeView === 'expenses' && (
         <div className="space-y-2">
           {expenses.map(e => (
-            <div key={e.id} className="glass-card p-3 flex items-center gap-3">
+            <div key={e.id} className="glass-card p-3.5 flex items-center gap-3 border border-border/50 hover:border-primary/10 transition-all">
               <div className="flex-1">
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 flex-wrap">
                   <Badge variant="outline" className="text-[10px]">{e.category}</Badge>
                   <span className="font-bold text-sm text-destructive">{e.amount.toLocaleString()} {currency}</span>
+                  {e.is_client_reimbursable && (
+                    <Badge className="text-[9px] bg-primary/10 text-primary border-primary/20">
+                      مسترد لصالح عميل
+                    </Badge>
+                  )}
                 </div>
                 {e.description && <p className="text-xs text-muted-foreground mt-1">{e.description}</p>}
-                <p className="text-[10px] text-muted-foreground">{new Date(e.date).toLocaleDateString('ar-EG')}</p>
+                
+                {e.is_client_reimbursable && (
+                  <div className="mt-1.5 flex items-center gap-2 flex-wrap text-[10px] text-muted-foreground bg-primary/5 p-1 px-2 rounded-md w-fit">
+                    <span>العميل: <strong className="text-foreground">{customers.find(c => c.id === e.customer_id)?.name || 'غير محدد'}</strong></span>
+                    <span className="opacity-50">|</span>
+                    <span>سعر التحصيل: <strong className="text-success">{e.billing_amount?.toLocaleString()} {currency}</strong></span>
+                    <span className="opacity-50">|</span>
+                    <span>الربح: <strong className="text-primary">{((e.billing_amount || 0) - e.amount).toLocaleString()} {currency}</strong></span>
+                  </div>
+                )}
+                
+                <p className="text-[9px] text-muted-foreground mt-1">{new Date(e.date).toLocaleDateString('ar-EG', { year: 'numeric', month: 'short', day: 'numeric' })}</p>
               </div>
-              <Button size="sm" variant="ghost" className="text-destructive" onClick={() => handleDelete(e.id)}><Trash2 className="w-3 h-3" /></Button>
+              <Button size="sm" variant="ghost" className="text-destructive shrink-0" onClick={() => handleDelete(e.id)}><Trash2 className="w-3.5 h-3.5" /></Button>
             </div>
           ))}
-          {expenses.length === 0 && <p className="text-muted-foreground text-center py-12">لا توجد مصروفات</p>}
+          {expenses.length === 0 && <p className="text-muted-foreground text-center py-12 text-xs">لا توجد مصروفات</p>}
         </div>
       )}
 
