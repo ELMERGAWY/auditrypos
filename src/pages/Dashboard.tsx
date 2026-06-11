@@ -122,6 +122,7 @@ export default function Dashboard() {
   const [customerPhone, setCustomerPhone] = useState('');
   const [customerRef, setCustomerRef] = useState('');
   const [deliveryAddress, setDeliveryAddress] = useState('');
+  const [orderNotes, setOrderNotes] = useState('');
   const [discount, setDiscount] = useState('');
   const [discountType, setDiscountType] = useState<'percent' | 'fixed'>('percent');
   const [orderType, setOrderType] = useState<OrderType>('pickup');
