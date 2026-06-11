@@ -71,6 +71,8 @@ const LoyaltyPoints = lazy(() => import('./dashboard/LoyaltyPoints').then(m => (
 const GiftCards = lazy(() => import('./dashboard/GiftCards').then(m => ({ default: m.default || m.GiftCards })));
 const BranchManager = lazy(() => import('./dashboard/BranchManager').then(m => ({ default: m.default || m.BranchManager })));
 const ServicePackages = lazy(() => import('./dashboard/ServicePackages').then(m => ({ default: m.ServicePackages })));
+const MarketingProjects = lazy(() => import('./dashboard/MarketingProjects').then(m => ({ default: m.MarketingProjects })));
+const EmployeeChat = lazy(() => import('./dashboard/EmployeeChat').then(m => ({ default: m.EmployeeChat })));
 
 import { BUSINESS_TYPES, BUSINESS_TABS, getBusinessConfig, getDefaultOrderType, isFoodSector, isInventoryDrivenBusiness, type BusinessType } from '@/lib/businessTypes';
 import { useAuth } from '@/lib/AuthContext';
@@ -565,7 +567,7 @@ export default function Dashboard() {
         {activeTab === 'purchase_invoices' && <PurchaseInvoices {...commonProps} />}
         {activeTab === 'super_admin' && <SuperAdmin />}
         {activeTab === 'contracting' && <ContractingDashboard {...commonProps} />}
-         {activeTab === 'projects' && <ContractingDashboard {...commonProps} />}
+         {activeTab === 'projects' && (businessType === 'marketing_agency' ? <MarketingProjects {...commonProps} /> : <ContractingDashboard {...commonProps} />)}
          {activeTab === 'expenses' && <ExpensesTab {...commonProps} />}
         {activeTab === 'overheads' && <OverheadManager {...commonProps} />}
         {activeTab === 'delivery' && <DeliveryTab {...commonProps} agents={agents} setAgents={setAgents} deliveryOrders={deliveryOrders} onAssignAgent={(oid, aid) => supabase.from('orders').update({ delivery_agent_id: aid }).eq('id', oid).then(loadData)} />}
@@ -593,6 +595,7 @@ export default function Dashboard() {
         {/* System Tabs */}
         {activeTab === 'staff' && <StaffTab {...commonProps} />}
         {activeTab === 'payroll' && <PayrollTab {...commonProps} businessType={businessType} />}
+        {activeTab === 'chat' && <EmployeeChat restaurantId={restaurant.id} />}
         {activeTab === 'settings' && <SettingsTab restaurant={restaurant} businessType={businessType} profileName={profileName} user={user} agents={agents} isSuspended={isSuspended} isSuperAdmin={isSuperAdmin} loadData={loadData} />}
         {activeTab === 'notifications' && <NotificationsTab {...commonProps} />}
         {activeTab === 'qr' && (

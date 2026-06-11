@@ -4,7 +4,7 @@ import { cn } from '@/lib/utils';
 import {
   BarChart3, Bell, Building2, CalendarClock, ChefHat, Construction,
   CreditCard, DollarSign, FileText, Gift, Heart, Landmark, Layers,
-  LayoutGrid, LogOut, Moon, Network, Package, QrCode, Receipt, RefreshCw,
+  LayoutGrid, LogOut, MessageSquare, Moon, Network, Package, QrCode, Receipt, RefreshCw,
   RotateCcw, Settings, Settings2, Shield, ShoppingCart, Sparkles, Sun,
   Truck, Users, UsersRound, Volume2, VolumeX, Wallet, Wifi, WifiOff,
   Search, User, ChevronDown
@@ -29,7 +29,7 @@ export type SidebarTab =
   | 'ai_assistant' | 'treasury' | 'users' | 'sales_invoices' | 'purchase_invoices'
   | 'sales_orders' | 'purchase_orders' | 'projects' | 'manual_journal'
   | 'chart_of_accounts' | 'accounting_mapping' | 'fixed_assets'
-  | 'loyalty' | 'gift_cards' | 'branches' | 'contracting' | 'bom' | 'service_packages' | 'payroll';
+  | 'loyalty' | 'gift_cards' | 'branches' | 'contracting' | 'bom' | 'service_packages' | 'payroll' | 'chat';
 
 interface NavItem {
   id: SidebarTab;
@@ -58,7 +58,7 @@ interface ProfessionalSidebarProps {
   stats: {
     pendingOrders: number;
     deliveryOrders: number;
-    unackCalls: number;
+    unackCalls?: number;
     todayRevenue: number;
     isOnline: boolean;
     salesInvoicesCount?: number;
@@ -170,6 +170,7 @@ export const ProfessionalSidebar = memo(function ProfessionalSidebar({
     
     staff: { label: 'الموظفين', icon: Users, section: 'system' },
     payroll: { label: 'الرواتب الشهرية', icon: DollarSign, section: 'system' },
+    chat: { label: 'دردشة التيم', icon: MessageSquare, section: 'system' },
     users: { label: 'الصلاحيات', icon: Shield, section: 'system' },
     super_admin: { label: 'لوحة التحكم الشاملة', icon: Shield, section: 'system' },
     settings: { label: 'إعدادات النظام', icon: Settings, section: 'system' },
