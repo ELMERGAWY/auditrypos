@@ -305,19 +305,19 @@ export default function Dashboard() {
     }));
   }, []);
 
-  const handleDeleteOrder = async (id: string) => {
+  const handleDeleteOrder = useCallback(async (id: string) => {
     if (!confirm('هل أنت متأكد من حذف هذا الطلب؟')) return;
     try {
       const { error } = await supabase.from('orders').delete().eq('id', id);
       if (error) throw error;
       setOrders(prev => (prev || []).filter(o => o.id !== id));
       toast.success('تم حذف الطلب بنجاح');
-    } catch (e) {
-      toast.error('فشل حذف الطلب');
+    } catch (e: any) {
+      toast.error('فشل حذف الطلب: ' + (e?.message || ''));
     }
-  };
+  }, []);
 
-  const handleEditOrder = (order: any) => {
+  const handleEditOrder = useCallback((order: any) => {
     setEditingOrder(order);
     setEditOrderForm({
       customer_name: order.customer_name || '',
@@ -330,35 +330,46 @@ export default function Dashboard() {
       notes: order.notes || ''
     });
     setShowEditOrderModal(true);
-  };
+  }, []);
 
-  const handleUpdateOrder = async () => {
+  const handleUpdateOrder = useCallback(async () => {
     if (!editingOrder) return;
     try {
-      const { error } = await supabase
-        .from('orders')
-        .update({
-          customer_name: editOrderForm.customer_name,
-          customer_phone: editOrderForm.customer_phone,
-          customer_ref: editOrderForm.customer_ref,
-          total: parseFloat(editOrderForm.total) || 0,
-          paid_amount: parseFloat(editOrderForm.paid_amount) || 0,
-          status: editOrderForm.status,
-          payment_method: editOrderForm.payment_method,
-          notes: editOrderForm.notes
-        })
-        .eq('id', editingOrder.id);
-      
+      const ref = editOrderForm.customer_ref?.trim();
+      let notes = editOrderForm.notes || '';
+      if (ref && !notes.includes('المرجع:')) {
+        notes = notes ? `${notes} | المرجع: ${ref}` : `المرجع: ${ref}`;
+      }
+
+      const payload: Record<string, unknown> = {
+        customer_name: editOrderForm.customer_name,
+        customer_phone: editOrderForm.customer_phone,
+        total: parseFloat(editOrderForm.total) || 0,
+        paid_amount: parseFloat(editOrderForm.paid_amount) || 0,
+        status: editOrderForm.status,
+        payment_method: editOrderForm.payment_method,
+        notes
+      };
+      if (ref) payload.customer_ref = ref;
+
+      let { error } = await supabase.from('orders').update(payload as any).eq('id', editingOrder.id);
+
+      // Fallback if customer_ref column not migrated yet
+      if (error?.message?.includes('customer_ref')) {
+        const { customer_ref: _ref, ...fallback } = payload;
+        ({ error } = await supabase.from('orders').update(fallback as any).eq('id', editingOrder.id));
+      }
       if (error) throw error;
-      
+
+      setOrders(prev => (prev || []).map(o => o.id === editingOrder.id ? { ...o, ...payload } as Order : o));
       toast.success('تم تحديث الطلب بنجاح ✅');
       setShowEditOrderModal(false);
       setEditingOrder(null);
-      loadData(); // Refresh orders
-    } catch (e) {
-      toast.error('فشل تحديث الطلب');
+      loadData();
+    } catch (e: any) {
+      toast.error('فشل تحديث الطلب: ' + (e?.message || 'خطأ غير معروف'));
     }
-  };
+  }, [editingOrder, editOrderForm, loadData]);
 
   const performCheckout = async (sendToPrep: boolean = false) => {
     if (cart.length === 0) return;
@@ -505,7 +516,7 @@ export default function Dashboard() {
                 <Button className="flex-1 gradient-bg border-0 text-white" size="sm" onClick={() => { setLastReceipt(o); setShowReceipt(true); }}>
                   <FileText className="w-4 h-4 ml-1" /> تفاصيل
                 </Button>
-                <Button variant="ghost" size="sm" onClick={() => handleEditOrder(o)}>
+                <Button type="button" variant="ghost" size="sm" onClick={(e) => { e.stopPropagation(); handleEditOrder(o); }}>
                   <Edit className="w-4 h-4" />
                 </Button>
                 <Button variant="ghost" size="sm" className="text-destructive hover:bg-destructive/10" onClick={() => handleDeleteOrder(o.id)}>
@@ -576,7 +587,7 @@ export default function Dashboard() {
         )}
       </Suspense>
     );
-  }, [activeTab, restaurant, currency, businessType, cart, orders, orderFilter, agents, currentShift, menuItems, taxes, selectedAccountId, customerName, customerPhone, customerRef, deliveryAddress, selectedDeliveryAgent, orderNotes, discount, discountType, paidAmount, isProcessingCheckout, categories, filteredItems, accountingAccounts, cartSubtotal, cartTotal, remaining, filteredOrders, holdCurrentInvoice, clearCart, selectCustomerFromSearch, updateQty, getUnitOptions, todayRevenue, todayOrdersList, avgOrderValue, pendingOrders, deliveryOrders]);
+  }, [activeTab, restaurant, currency, businessType, cart, orders, orderFilter, orderSearchQuery, agents, currentShift, menuItems, taxes, selectedAccountId, customerName, customerPhone, customerRef, deliveryAddress, selectedDeliveryAgent, orderNotes, discount, discountType, paidAmount, isProcessingCheckout, categories, filteredItems, accountingAccounts, cartSubtotal, cartTotal, remaining, filteredOrders, holdCurrentInvoice, clearCart, selectCustomerFromSearch, updateQty, getUnitOptions, todayRevenue, todayOrdersList, avgOrderValue, pendingOrders, deliveryOrders, handleEditOrder, handleDeleteOrder, user?.id, config]);
 
   // Effects
   useEffect(() => {
@@ -622,7 +633,7 @@ export default function Dashboard() {
         
         {/* Edit Order Modal */}
         {showEditOrderModal && (
-          <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="fixed inset-0 z-[100] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
             <div className="glass-card p-6 max-w-lg w-full relative max-h-[90vh] overflow-y-auto">
               <button onClick={() => { setShowEditOrderModal(false); setEditingOrder(null); }} className="absolute left-4 top-4 text-muted-foreground hover:text-foreground">
                 <X className="w-5 h-5" />

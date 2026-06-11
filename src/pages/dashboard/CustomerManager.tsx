@@ -64,6 +64,8 @@ interface ReceiptVoucher {
   account_id: string | null;
   counter_account_id: string | null;
   created_at: string;
+  isLegacy?: boolean;
+  transaction_id?: string;
 }
 
 interface Props {
@@ -150,6 +152,8 @@ export function CustomerManager({ restaurantId, currency }: Props) {
 
   const loadReceiptVouchers = async () => {
     try {
+      const vouchers: ReceiptVoucher[] = [];
+
       const { data, error } = await supabase
         .from('receipt_vouchers')
         .select(`
@@ -160,23 +164,49 @@ export function CustomerManager({ restaurantId, currency }: Props) {
         .eq('restaurant_id', restaurantId)
         .order('voucher_date', { ascending: false });
 
-      if (error) throw error;
-      
-      const formatted = (data || []).map((rv: any) => ({
-        id: rv.id,
-        voucher_number: rv.voucher_number,
-        voucher_date: rv.voucher_date,
-        customer_id: rv.customer_id,
-        customer_name: rv.customers?.name || 'غير معروف',
-        amount: Number(rv.amount),
-        payment_method: rv.payment_method,
-        notes: rv.notes,
-        account_id: rv.account_id,
-        counter_account_id: rv.counter_account_id,
-        created_at: rv.created_at
-      }));
+      if (!error && data) {
+        vouchers.push(...(data || []).map((rv: any) => ({
+          id: rv.id,
+          voucher_number: rv.voucher_number,
+          voucher_date: rv.voucher_date,
+          customer_id: rv.customer_id,
+          customer_name: rv.customers?.name || 'غير معروف',
+          amount: Number(rv.amount),
+          payment_method: rv.payment_method,
+          notes: rv.notes,
+          account_id: rv.account_id,
+          counter_account_id: rv.counter_account_id,
+          created_at: rv.created_at
+        })));
+      }
 
-      setReceiptVouchers(formatted);
+      // سندات قديمة من customer_transactions (قبل إنشاء جدول receipt_vouchers)
+      const { data: legacyTxs } = await supabase
+        .from('customer_transactions')
+        .select('id, customer_id, amount, description, payment_method, created_at, customers(name)')
+        .eq('restaurant_id', restaurantId)
+        .eq('type', 'payment')
+        .order('created_at', { ascending: false });
+
+      const legacyVouchers: ReceiptVoucher[] = (legacyTxs || [])
+        .filter((tx: any) => !vouchers.some(v => v.customer_id === tx.customer_id && v.amount === Math.abs(Number(tx.amount)) && v.created_at === tx.created_at))
+        .map((tx: any) => ({
+          id: `legacy-${tx.id}`,
+          voucher_number: `RV-LEG-${String(tx.id).slice(0, 6)}`,
+          voucher_date: tx.created_at,
+          customer_id: tx.customer_id,
+          customer_name: tx.customers?.name || 'غير معروف',
+          amount: Math.abs(Number(tx.amount)),
+          payment_method: tx.payment_method || 'cash',
+          notes: tx.description,
+          account_id: null,
+          counter_account_id: null,
+          created_at: tx.created_at,
+          isLegacy: true,
+          transaction_id: tx.id
+        }));
+
+      setReceiptVouchers([...vouchers, ...legacyVouchers]);
     } catch (error: any) {
       toast.error('فشل تحميل سندات القبض: ' + error.message);
     }
@@ -424,18 +454,34 @@ export function CustomerManager({ restaurantId, currency }: Props) {
     }
 
     try {
-      const { error } = await supabase.rpc('save_receipt_voucher', {
-        p_restaurant_id: restaurantId,
-        p_customer_id: receiptVoucherForm.customer_id,
-        p_amount: amount,
-        p_payment_method: receiptVoucherForm.payment_method,
-        p_voucher_date: receiptVoucherForm.voucher_date,
-        p_notes: receiptVoucherForm.notes || null,
-        p_account_id: receiptVoucherForm.account_id || null,
-        p_counter_account_id: receiptVoucherForm.counter_account_id || null,
-        p_voucher_id: editingReceiptVoucher?.id || null
-      });
-      if (error) throw error;
+      if (editingReceiptVoucher?.isLegacy && editingReceiptVoucher.transaction_id) {
+        const oldAmount = editingReceiptVoucher.amount;
+        const customer = customers.find(c => c.id === receiptVoucherForm.customer_id);
+        const { error: txError } = await supabase.from('customer_transactions').update({
+          amount: -amount,
+          description: receiptVoucherForm.notes || 'سند قبض',
+          payment_method: receiptVoucherForm.payment_method,
+        }).eq('id', editingReceiptVoucher.transaction_id);
+        if (txError) throw txError;
+        if (customer) {
+          await supabase.from('customers').update({
+            balance: customer.balance + (oldAmount - amount)
+          }).eq('id', customer.id);
+        }
+      } else {
+        const { error } = await supabase.rpc('save_receipt_voucher', {
+          p_restaurant_id: restaurantId,
+          p_customer_id: receiptVoucherForm.customer_id,
+          p_amount: amount,
+          p_payment_method: receiptVoucherForm.payment_method,
+          p_voucher_date: receiptVoucherForm.voucher_date,
+          p_notes: receiptVoucherForm.notes || null,
+          p_account_id: receiptVoucherForm.account_id || null,
+          p_counter_account_id: receiptVoucherForm.counter_account_id || null,
+          p_voucher_id: editingReceiptVoucher?.id || null
+        });
+        if (error) throw error;
+      }
 
       toast.success(editingReceiptVoucher ? 'تم تحديث سند القبض' : 'تم إضافة سند القبض');
 
@@ -460,8 +506,16 @@ export function CustomerManager({ restaurantId, currency }: Props) {
   const handleDeleteReceiptVoucher = async (voucher: ReceiptVoucher) => {
     if (!confirm('حذف سند القبض هذا؟')) return;
     try {
-      const { error } = await supabase.rpc('delete_receipt_voucher', { p_voucher_id: voucher.id });
-      if (error) throw error;
+      if (voucher.isLegacy && voucher.transaction_id) {
+        const customer = customers.find(c => c.id === voucher.customer_id);
+        await supabase.from('customer_transactions').delete().eq('id', voucher.transaction_id);
+        if (customer) {
+          await supabase.from('customers').update({ balance: customer.balance + voucher.amount }).eq('id', customer.id);
+        }
+      } else {
+        const { error } = await supabase.rpc('delete_receipt_voucher', { p_voucher_id: voucher.id });
+        if (error) throw error;
+      }
       toast.success('تم حذف سند القبض');
       loadReceiptVouchers();
       loadCustomers();
@@ -476,16 +530,29 @@ export function CustomerManager({ restaurantId, currency }: Props) {
     if (!amount || amount <= 0) { toast.error('أدخل مبلغ صحيح'); return; }
     setProcessingPayment(true);
     try {
+      const { error: rpcError } = await supabase.rpc('save_receipt_voucher', {
+        p_restaurant_id: restaurantId,
+        p_customer_id: selectedCustomer.id,
+        p_amount: amount,
+        p_payment_method: paymentForm.payment_method,
+        p_notes: paymentForm.notes || 'سند قبض',
+        p_voucher_id: null
+      });
+
+      if (rpcError) {
+        const newBalance = selectedCustomer.balance - amount;
+        await supabase.from('customers').update({ balance: newBalance }).eq('id', selectedCustomer.id);
+        await supabase.from('customer_transactions').insert({
+          customer_id: selectedCustomer.id,
+          restaurant_id: restaurantId,
+          type: 'payment',
+          amount: -amount,
+          description: paymentForm.notes || 'دفعة نقدية من العميل',
+          payment_method: paymentForm.payment_method,
+        } as any);
+      }
+
       const newBalance = selectedCustomer.balance - amount;
-      await supabase.from('customers').update({ balance: newBalance }).eq('id', selectedCustomer.id);
-      await supabase.from('customer_transactions').insert({
-        customer_id: selectedCustomer.id,
-        restaurant_id: restaurantId,
-        type: 'payment',
-        amount: -amount,
-        description: paymentForm.notes || 'دفعة نقدية من العميل',
-        payment_method: paymentForm.payment_method,
-      } as any);
 
       // Print payment receipt (سند قبض)
       const w = window.open('', '_blank', 'width=320,height=600');
@@ -520,6 +587,7 @@ export function CustomerManager({ restaurantId, currency }: Props) {
       setShowPaymentModal(false);
       setPaymentForm({ amount: '', payment_method: 'cash', notes: '' });
       loadCustomers();
+      loadReceiptVouchers();
     } catch (error: any) {
       toast.error('فشل تسجيل الدفعة: ' + error.message);
     } finally {
@@ -1177,7 +1245,10 @@ export function CustomerManager({ restaurantId, currency }: Props) {
                   ) : (
                     receiptVouchers.map((voucher) => (
                       <tr key={voucher.id} className="border-b border-border/50 hover:bg-primary/5">
-                        <td className="px-4 py-3 font-medium">{voucher.voucher_number}</td>
+                        <td className="px-4 py-3 font-medium">
+                          {voucher.voucher_number}
+                          {voucher.isLegacy && <Badge variant="outline" className="mr-1 text-[10px]">قديم</Badge>}
+                        </td>
                         <td className="px-4 py-3">{new Date(voucher.voucher_date).toLocaleDateString('ar-EG')}</td>
                         <td className="px-4 py-3">{voucher.customer_name}</td>
                         <td className="px-4 py-3 font-bold">{voucher.amount.toFixed(2)} {currency}</td>
