@@ -118,7 +118,7 @@ export default function Dashboard() {
   });
 
   // POS State
-  const [cart, setCart] = useState<{ item: MenuItem; qty: number; qtyText: string; unitMode: string; price: number }[]>([]);
+  const [cart, setCart] = useState<{ item: MenuItem; qty: number; qtyText: string; unitMode: string; unitFactor: number; price: number }[]>([]);
   const [tableNumber, setTableNumber] = useState('');
   const [customOrderNumber, setCustomOrderNumber] = useState(''); // New state for manual invoice number
   const [customerName, setCustomerName] = useState('');
@@ -168,10 +168,8 @@ export default function Dashboard() {
 
   const cartSubtotal = useMemo(() => (cart || []).reduce((s, c) => {
     if (!c || !c.item) return s;
-    const units = getUnitOptions(c.item);
-    const unitFactor = units.find(u => u && u.label === c.unitMode)?.factor || 1;
-    return s + (Number(c.price || 0) * unitFactor * (Number(c.qty) || 0));
-  }, 0), [cart, getUnitOptions]);
+    return s + (Number(c.price || 0) * (Number(c.qty) || 0));
+  }, 0), [cart]);
   
   const discountAmount = useMemo(() => discountType === 'percent' ? (cartSubtotal * Number(discount || 0)) / 100 : Number(discount || 0), [cartSubtotal, discount, discountType]);
   const taxableAmount = useMemo(() => Math.max(0, cartSubtotal - discountAmount), [cartSubtotal, discountAmount]);
@@ -234,7 +232,15 @@ export default function Dashboard() {
     setCart(prev => {
       const existing = prev.find(c => c.item.id === item.id);
       if (existing) return prev.map(c => c.item.id === item.id ? { ...c, qty: c.qty + 1, qtyText: String(c.qty + 1) } : c);
-      return [...prev, { item, qty: 1, qtyText: '1', unitMode: getUnitOptions(item)[0]?.label || 'قطعة', price: Number(item.price) || 0 }];
+      const defaultUnit = getUnitOptions(item)[0] || { label: 'قطعة', factor: 1 };
+      return [...prev, {
+        item,
+        qty: 1,
+        qtyText: '1',
+        unitMode: defaultUnit.label,
+        unitFactor: defaultUnit.factor,
+        price: (Number(item.price) || 0) * defaultUnit.factor
+      }];
     });
   }, [getUnitOptions]);
 
@@ -249,12 +255,14 @@ export default function Dashboard() {
           if (existing) {
             newCart = newCart.map(c => c.item.id === menuItem.id ? { ...c, qty: c.qty + pkgItem.quantity, qtyText: String(c.qty + pkgItem.quantity) } : c);
           } else {
+            const defaultUnit = getUnitOptions(menuItem)[0] || { label: 'قطعة', factor: 1 };
             newCart.push({ 
               item: menuItem, 
               qty: pkgItem.quantity, 
               qtyText: String(pkgItem.quantity), 
-              unitMode: getUnitOptions(menuItem)[0]?.label || 'قطعة', 
-              price: Number(menuItem.price) || 0 
+              unitMode: defaultUnit.label,
+              unitFactor: defaultUnit.factor,
+              price: (Number(menuItem.price) || 0) * defaultUnit.factor
             });
           }
         }
@@ -287,8 +295,17 @@ export default function Dashboard() {
   }, []);
 
   const setCartItemUnit = useCallback((id: string, label: string) => {
-    setCart(prev => prev.map(c => c.item.id === id ? { ...c, unitMode: label } : c));
-  }, []);
+    setCart(prev => prev.map(c => {
+      if (c.item.id !== id) return c;
+      const nextUnit = getUnitOptions(c.item).find(u => u.label === label) || { label, factor: 1 };
+      return {
+        ...c,
+        unitMode: nextUnit.label,
+        unitFactor: nextUnit.factor,
+        price: (Number(c.item.price) || 0) * nextUnit.factor
+      };
+    }));
+  }, [getUnitOptions]);
 
   // Bidirectional: editing the value (amount) field recomputes qty = value / unitPrice
   const updateValue = useCallback((id: string, value: number) => {
@@ -406,22 +423,18 @@ export default function Dashboard() {
             price: Number(c.price),
             quantity: c.qty, 
             unitMode: c.unitMode, 
-            unitFactor: getUnitOptions(c.item).find(u => u.label === c.unitMode)?.factor || 1 
+            unitFactor: c.unitFactor || 1
           })), 
           customerName, customerPhone, customerRef, orderType: orderType as any, deliveryAddress, deliveryAgentId: selectedDeliveryAgent, paymentMethod: paymentMethod as any, paidAmount: paidNum, discount: discountAmount, discountType: discountType === 'percent' ? 'percentage' : 'fixed', notes: orderNotes, destinationAccountId: selectedAccountId, customOrderNumber: customOrderNumber || undefined }
       );
       if (result.success && result.order) {
         const completeOrder = {
           ...result.order,
-          items: cart.map(c => {
-            const units = getUnitOptions(c.item);
-            const factor = units.find(u => u.label === c.unitMode)?.factor || 1;
-            return {
-              menu_item_name: c.item.name,
-              quantity: c.qty,
-              price: Number(c.price) * factor
-            };
-          })
+          items: cart.map(c => ({
+            menu_item_name: c.item.name,
+            quantity: c.qty,
+            price: Number(c.price)
+          }))
         };
         setOrders(prev => [completeOrder as Order, ...(Array.isArray(prev) ? prev : [])]);
         setLastReceipt(completeOrder as Order);

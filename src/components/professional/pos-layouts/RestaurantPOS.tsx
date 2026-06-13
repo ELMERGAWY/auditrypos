@@ -70,7 +70,7 @@ export function RestaurantPOS({
   // Filter items
   const filteredItems = useMemo(() => {
     return menuItems.filter(item => {
-      if (!item.available) return false;
+      if (item.available === false) return false;
       if (activeCategory !== 'all' && item.category !== activeCategory) return false;
       if (searchQuery && !item.name.toLowerCase().includes(searchQuery.toLowerCase())) return false;
       return true;

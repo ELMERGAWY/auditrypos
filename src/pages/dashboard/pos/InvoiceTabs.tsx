@@ -50,7 +50,7 @@ export function InvoiceTabs({
               </div>
               <p className="text-xs text-muted-foreground mb-2">{tab.cart.map(c => `${c.item.name} × ${c.qty}`).join('، ')}</p>
               <div className="flex justify-between items-center">
-                <span className="font-bold text-primary">{tab.cart.reduce((s, c) => s + c.item.price * c.qty, 0).toFixed(2)} {currency}</span>
+                <span className="font-bold text-primary">{tab.cart.reduce((s, c) => s + ((Number(c.price) || (Number(c.item.price) || 0) * (c.unitFactor || 1)) * c.qty), 0).toFixed(2)} {currency}</span>
                 <div className="flex gap-2">
                   <Button size="sm" className="gradient-bg text-primary-foreground border-0" onClick={() => recallInvoice(tab)}>
                     <Play className="w-3 h-3 ml-1" /> استعادة

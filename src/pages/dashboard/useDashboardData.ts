@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/lib/AuthContext';
 import { useDarkMode } from '@/lib/useDarkMode';
@@ -43,6 +43,7 @@ export function useDashboardData() {
   const [dataLoaded, setDataLoaded] = useState(false);
   const [soundEnabled, setSoundEnabled] = useState(true);
   const [isSuspended, setIsSuspended] = useState(false);
+  const lastSyncRunAtRef = useRef(0);
 
   // Load cached data first for instant display
   const loadCachedData = useCallback(async (userId: string) => {
@@ -65,12 +66,12 @@ export function useDashboardData() {
         localStorage.setItem('current_business_id', cached.restaurant.id);
         localStorage.setItem('current_business_name', cached.restaurant.name);
       }
-      if (cached.menuItems?.length) setMenuItems(cached.menuItems);
-      if (cached.servicePackages?.length) setServicePackages(cached.servicePackages);
-      if (cached.orders?.length) setOrders(cached.orders);
-      if (cached.waiterCalls?.length) setWaiterCalls(cached.waiterCalls);
-      if (cached.agents?.length) setAgents(cached.agents);
-      if ((cached as any).taxes?.length) setTaxes((cached as any).taxes);
+      if ('menuItems' in cached) setMenuItems(cached.menuItems || []);
+      if ('servicePackages' in cached) setServicePackages(cached.servicePackages || []);
+      if ('orders' in cached) setOrders(cached.orders || []);
+      if ('waiterCalls' in cached) setWaiterCalls(cached.waiterCalls || []);
+      if ('agents' in cached) setAgents(cached.agents || []);
+      if ('taxes' in (cached as any)) setTaxes((cached as any).taxes || []);
       if (cached.currentShift) setCurrentShift(cached.currentShift);
       if (cached.profileName) setProfileName(cached.profileName);
       if (cached.isSuspended !== undefined) setIsSuspended(cached.isSuspended);
@@ -204,9 +205,19 @@ export function useDashboardData() {
     if (ordersBatch.length > 0) {
       const orderIds = ordersBatch.map(o => o.id);
       const { data: allItems } = await supabase.from('order_items').select('*').in('order_id', orderIds);
+      const itemsByOrderId = new Map<string, OrderItem[]>();
+
+      for (const item of allItems || []) {
+        const list = itemsByOrderId.get(item.order_id) || [];
+        list.push(item as OrderItem);
+        itemsByOrderId.set(item.order_id, list);
+      }
+
       for (const o of ordersBatch) {
-        const oItems = (allItems || []).filter(i => i.order_id === o.id);
-        ordersWithItems.push({ ...o, items: oItems as OrderItem[] } as unknown as Order);
+        ordersWithItems.push({
+          ...o,
+          items: itemsByOrderId.get(o.id) || []
+        } as unknown as Order);
       }
     }
     setOrders(ordersWithItems);
@@ -223,27 +234,40 @@ export function useDashboardData() {
       taxes: loadedTaxes,
       currentShift: loadedShift,
       profileName: pName,
+      isSuspended: !!suspended,
     });
 
     return !!suspended;
   }, [user, loadCachedData]);
 
+  const runPendingSync = useCallback(async (shouldReload: boolean) => {
+    if (!user) return;
+
+    const now = Date.now();
+    if (now - lastSyncRunAtRef.current < 3000) {
+      return;
+    }
+    lastSyncRunAtRef.current = now;
+
+    const { synced, errors } = await syncPendingData();
+    if (synced > 0) {
+      toast.success(`✅ تمت مزامنة ${synced} عملية معلقة`);
+      if (shouldReload) {
+        setOrders(prev => prev.filter(o => !o.id.startsWith('offline-')));
+        loadData();
+      }
+    }
+    if (errors > 0) {
+      toast.error(`⚠️ فشلت ${errors} عمليات في المزامنة`);
+    }
+  }, [user, loadData]);
+
   // Sync pending data when coming back online
   useEffect(() => {
     if (isOnline && user && dataLoaded) {
-      syncPendingData().then(({ synced, errors }) => {
-        if (synced > 0) {
-          toast.success(`✅ تمت مزامنة ${synced} عملية معلقة`);
-          // Remove offline orders from state before reloading
-          setOrders(prev => prev.filter(o => !o.id.startsWith('offline-')));
-          loadData(); // Reload fresh data
-        }
-        if (errors > 0) {
-          toast.error(`⚠️ فشلت ${errors} عمليات في المزامنة`);
-        }
-      });
+      runPendingSync(true);
     }
-  }, [isOnline, user, dataLoaded]);
+  }, [isOnline, user, dataLoaded, runPendingSync]);
 
   useEffect(() => {
     if (!authLoading && !user) { 
@@ -334,12 +358,9 @@ export function useDashboardData() {
   useEffect(() => {
     if (justBack && user) {
       toast.info('🔄 تم استعادة الاتصال - جاري المزامنة...');
-      syncPendingData().then(({ synced, errors }) => {
-        if (synced > 0) toast.success(`✅ تمت مزامنة ${synced} عمليات`);
-        if (errors > 0) toast.error(`⚠️ فشلت ${errors} عمليات`);
-      });
+      runPendingSync(false);
     }
-  }, [justBack, user]);
+  }, [justBack, user, runPendingSync]);
 
   return {
     user, authLoading, isOnline, restaurant, menuItems, setMenuItems,

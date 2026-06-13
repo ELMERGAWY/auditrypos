@@ -11,6 +11,7 @@ import inventoryCosting from './inventoryCosting';
 import taxService from './taxService';
 import type { Order, OrderItem } from '@/pages/dashboard/types';
 import type { BusinessType } from '@/lib/businessTypes';
+import { queueOfflineOrder } from '@/lib/offlineEngine';
 
 export interface CheckoutContext {
   restaurantId: string;
@@ -56,6 +57,38 @@ class CheckoutIntegration {
       customOrderNumber?: string;
     }
   ): Promise<CheckoutResult> {
+    // 7. Prepare order data first (so it's available in catch)
+    const paidAmount = orderData.paidAmount ?? 0;
+    const orderNum = orderData.customOrderNumber || `ORD-${Date.now().toString().slice(-6)}`;
+    const clientOrderId = `${context.restaurantId}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    
+    let finalNotes = orderData.notes || '';
+    if (orderData.customerRef) {
+      finalNotes = finalNotes 
+        ? `${finalNotes} | المرجع: ${orderData.customerRef}` 
+        : `المرجع: ${orderData.customerRef}`;
+    }
+
+    let orderPayload: Record<string, unknown> = {
+      restaurant_id: context.restaurantId,
+      order_number: orderNum,
+      total: 0,
+      discount: 0,
+      status: 'pending',
+      table_number: orderData.tableNumber || null,
+      order_type: orderData.orderType,
+      customer_name: orderData.customerName || 'عميل نقدي',
+      customer_phone: orderData.customerPhone || '',
+      customer_ref: orderData.customerRef || null,
+      delivery_address: orderData.deliveryAddress || '',
+      delivery_agent_id: orderData.deliveryAgentId || null,
+      payment_method: orderData.paymentMethod,
+      paid_amount: paidAmount,
+      notes: finalNotes,
+      client_order_id: clientOrderId,
+      customer_id: null,
+    };
+
     try {
       // 0. Ensure accounting accounts exist (Self-healing) — non-blocking
       if (context.isOnline) {
@@ -66,6 +99,10 @@ class CheckoutIntegration {
 
       const isDelivery = orderData.orderType === 'delivery';
       const inventoryItems = orderData.cart.filter(item => (item as any).product_id || item.menu_item_id);
+      const inventoryItemsForCosting = inventoryItems.map(item => ({
+        ...item,
+        quantity: item.quantity * (item.unitFactor || 1),
+      }));
 
       // 1, 6, 8. Run independent calculations in parallel — each isolated so a single failure does NOT abort the sale
       const safeTax = taxService.calculateOrderTaxes(
@@ -86,7 +123,7 @@ class CheckoutIntegration {
         return { subtotal: 0, taxAmount: 0, total: 0, isInclusive: true, taxLines: [] as any[] };
       });
 
-      const safeCogs = inventoryCosting.calculateOrderCOGS(inventoryItems, context.restaurantId)
+      const safeCogs = inventoryCosting.calculateOrderCOGS(inventoryItemsForCosting, context.restaurantId)
         .catch((e) => {
           console.warn('[checkout] COGS calc failed:', e);
           return { totalCOGS: 0, itemsWithCost: [] as any[] };
@@ -104,7 +141,7 @@ class CheckoutIntegration {
 
       // 2. Calculate subtotal
       const subtotal = orderData.cart.reduce(
-        (sum, item) => sum + (item.price * item.quantity * (item.unitFactor || 1)),
+        (sum, item) => sum + (item.price * item.quantity),
         0
       );
 
@@ -129,42 +166,18 @@ class CheckoutIntegration {
         finalTotal += taxCalculation.taxAmount;
       }
 
-      // 7. Prepare order data
-      const paidAmount = orderData.paidAmount ?? finalTotal;
-      const orderNum = orderData.customOrderNumber || `ORD-${Date.now().toString().slice(-6)}`;
-      const clientOrderId = `${context.restaurantId}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-
-
       // 9. Create order (compatible with existing schema)
       // For non-food businesses or direct sell, use 'completed' status
       const isDirectSell = context.skipPreparation || 
         ['retail', 'grocery', 'pharmacy', 'wholesale', 'warehouse'].includes(context.businessType);
-      
-      // Merge customer reference into notes if provided (legacy compat)
-      let finalNotes = orderData.notes || '';
-      if (orderData.customerRef) {
-        finalNotes = finalNotes 
-          ? `${finalNotes} | المرجع: ${orderData.customerRef}` 
-          : `المرجع: ${orderData.customerRef}`;
-      }
 
-      const orderPayload: Record<string, unknown> = {
-        restaurant_id: context.restaurantId,
-        order_number: orderNum,
+      // Update order payload with calculated values
+      orderPayload = {
+        ...orderPayload,
         total: finalTotal,
         discount: discountAmount,
         status: isDirectSell ? 'completed' as const : 'pending' as const,
-        table_number: orderData.tableNumber || null,
-        order_type: orderData.orderType,
-        customer_name: orderData.customerName || 'عميل نقدي',
-        customer_phone: orderData.customerPhone || '',
-        customer_ref: orderData.customerRef || null,
-        delivery_address: orderData.deliveryAddress || '',
-        delivery_agent_id: orderData.deliveryAgentId || null,
-        payment_method: orderData.paymentMethod,
-        paid_amount: paidAmount,
-        notes: finalNotes,
-        client_order_id: clientOrderId,
+        paid_amount: paidAmount ?? finalTotal,
         customer_id: customerId,
       };
 
@@ -186,7 +199,7 @@ class CheckoutIntegration {
         menu_item_name: item.menu_item_name || (item as any).name || 'صنف',
         menu_item_image: item.menu_item_image || '📦',
         quantity: item.quantity,
-        price: item.price * (item.unitFactor || 1),
+        price: item.price,
         sold_unit: item.unitMode || 'قطعة',
         unit_factor: item.unitFactor || 1,
         cost_price_snapshot: (item as any).unitCost || 0,
@@ -250,7 +263,7 @@ class CheckoutIntegration {
 
       // 15. Record inventory consumption
       if (cogs > 0) {
-        await this.recordInventoryConsumption(order.id, inventoryItems);
+        await this.recordInventoryConsumption(order.id, inventoryItemsForCosting);
       }
 
       toast.success(`✅ تم إنشاء الطلب #${orderNum.slice(-4)} - ${finalTotal.toFixed(2)} ${context.currency}`);
@@ -291,6 +304,30 @@ class CheckoutIntegration {
           errorMsg = '❌ فشل الاتصال بعد إعادة المحاولة. سيتم الحفظ محلياً.';
           errorCode = 'CONNECTION_FAILED';
           isNetworkError = true;
+
+          // Prepare order items for offline storage
+          const offlineOrderItems = orderData.cart.map(item => ({
+            menu_item_id: (item as any).product_id ? null : item.menu_item_id,
+            product_id: (item as any).product_id || null,
+            menu_item_name: item.menu_item_name || (item as any).name || 'صنف',
+            menu_item_image: item.menu_item_image || '📦',
+            quantity: item.quantity,
+            price: item.price,
+            sold_unit: item.unitMode || 'قطعة',
+            unit_factor: item.unitFactor || 1,
+            cost_price_snapshot: (item as any).unitCost || 0,
+          }));
+
+          // Queue the order locally
+          await queueOfflineOrder({
+            id: `${context.restaurantId}-${Date.now()}-${Math.random().toString(36).slice(2,8)}`,
+            restaurantId: context.restaurantId,
+            orderData: orderPayload,
+            items: offlineOrderItems,
+            timestamp: Date.now()
+          });
+
+          toast.success('✅ تم حفظ الطلب محلياً! سيتم مزامنته تلقائياً عند إعادة الاتصال.');
         }
       }
       // RLS/Permission

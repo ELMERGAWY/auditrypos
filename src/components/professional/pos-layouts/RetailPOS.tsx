@@ -86,7 +86,7 @@ export function RetailPOS({
   // Filter products
   const filteredProducts = useMemo(() => {
     return products.filter(product => {
-      if (!product.available) return false;
+      if (product.available === false) return false;
       if (activeCategory !== 'all' && product.category !== activeCategory) return false;
       if (searchQuery) {
         const q = searchQuery.toLowerCase();

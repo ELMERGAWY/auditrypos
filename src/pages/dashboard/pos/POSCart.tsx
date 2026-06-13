@@ -13,7 +13,7 @@ import { usePermissions } from '@/hooks/usePermissions';
 interface POSCartProps {
   activeInvoiceId: string | null;
   invoiceTabs: HeldInvoice[];
-  cart: { item: MenuItem; qty: number; qtyText: string; unitMode: string }[];
+  cart: { item: MenuItem; qty: number; qtyText: string; unitMode: string; unitFactor: number; price: number }[];
   holdCurrentInvoice: () => void;
   setShowInvoiceTabs: (show: boolean) => void;
   clearCart: () => void;
@@ -195,7 +195,12 @@ export const POSCart = memo(function POSCart({
       {/* Cart Items */}
       <div className="flex-1 overflow-auto p-4 space-y-3">
         {cart.length === 0 && <p className="text-muted-foreground text-sm text-center py-8">السلة فارغة</p>}
-        {cart.map(c => (
+        {cart.map(c => {
+          const defaultUnitPrice = (Number(c.item.price) || 0) * (c.unitFactor || 1);
+          const lineTotal = (Number(c.price) || 0) * (Number(c.qty) || 0);
+          const unitOptions = getUnitOptions(c.item);
+
+          return (
           <motion.div key={c.item.id} initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }}
             className="flex items-center gap-2 bg-secondary/50 rounded-lg p-3 relative group">
             <button 
@@ -238,7 +243,7 @@ export const POSCart = memo(function POSCart({
                 </div>
               )}
               
-              {Number(c.price) !== Number(c.item.price) && !editingPriceId && (
+              {Math.abs(Number(c.price) - defaultUnitPrice) > 0.001 && !editingPriceId && (
                 <p className="text-[9px] text-amber-600 font-bold">سعر معدل: {c.price} {currency}</p>
               )}
             </div>
@@ -250,12 +255,12 @@ export const POSCart = memo(function POSCart({
                     type="text"
                     inputMode="decimal"
                     defaultValue={(() => {
-                      const total = c.price * c.qty;
+                      const total = lineTotal;
                       return Number.isInteger(total) ? total.toString() : total.toFixed(2).replace(/\.?0+$/, "");
                     })()}
                     onBlur={e => {
                       const v = parseFloat(e.target.value);
-                      if (!isNaN(v) && Math.abs(v - c.price * c.qty) > 0.001) updateValue(c.item.id, v);
+                      if (!isNaN(v) && Math.abs(v - lineTotal) > 0.001) updateValue(c.item.id, v);
                     }}
                     onKeyDown={e => {
                       if (e.key === 'Enter') {
@@ -281,15 +286,15 @@ export const POSCart = memo(function POSCart({
                   <button onClick={() => updateQty(c.item.id, 1)} className="w-6 h-6 flex items-center justify-center hover:bg-primary/20 rounded"><Plus className="w-3 h-3" /></button>
                 </div>
               </div>
-              {getUnitOptions(c.item).length > 1 && (
+              {unitOptions.length > 1 && (
                 <select value={c.unitMode} onChange={e => setCartItemUnit(c.item.id, e.target.value)}
                   className="h-6 text-[10px] bg-secondary border-0 rounded px-1 w-full">
-                  {getUnitOptions(c.item).map(u => <option key={u.label} value={u.label}>{u.label}</option>)}
+                  {unitOptions.map(u => <option key={u.label} value={u.label}>{u.label}</option>)}
                 </select>
               )}
             </div>
           </motion.div>
-        ))}
+        )})}
       </div>
 
       {/* Totals & Checkout */}
