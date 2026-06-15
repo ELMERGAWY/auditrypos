@@ -714,6 +714,85 @@ class JournalService {
     });
   }
 
+  async createCustomerPaymentJournalEntry(
+    restaurantId: string,
+    payment: {
+      customerId: string;
+      customerName: string;
+      amount: number;
+      paymentMethod: 'cash' | 'bank' | 'instapay' | 'vodafone_cash';
+      description?: string;
+    },
+    currency: string = 'ج.م'
+  ): Promise<JournalEntry | null> {
+    const mapping = this.getBusinessMapping('general');
+    const lines: Omit<JournalEntryLine, 'id' | 'entry_id'>[] = [];
+
+    // Ensure accounts exist
+    await this.ensureAccountingSetup(restaurantId, currency);
+    this.clearCache();
+
+    // Get accounts
+    const cashAcc = await this.getAccountByCode(restaurantId, mapping.cashAccount);
+    const bankAcc = await this.getAccountByCode(restaurantId, mapping.bankAccount);
+    const arAcc = await this.getAccountByCode(restaurantId, mapping.accountsReceivable);
+
+    if (!arAcc) {
+      toast.error('حساب الذمم المدينة غير موجود');
+      return null;
+    }
+
+    // Determine payment account
+    let paymentAcc;
+    if (payment.paymentMethod === 'bank') {
+      paymentAcc = bankAcc;
+    } else {
+      paymentAcc = cashAcc; // Treat other methods as cash
+    }
+
+    if (!paymentAcc) {
+      toast.error('حساب الدفع (نقدية أو بنك) غير موجود');
+      return null;
+    }
+
+    // 1. Debit: Payment account (cash/bank)
+    lines.push({
+      account_id: paymentAcc.id,
+      debit: payment.amount,
+      credit: 0,
+      description: `استلام دفعة من ${payment.customerName}`,
+      line_order: 1,
+    });
+
+    // 2. Credit: Accounts Receivable
+    lines.push({
+      account_id: arAcc.id,
+      debit: 0,
+      credit: payment.amount,
+      description: `تخفيض مديونية ${payment.customerName}`,
+      line_order: 2,
+    });
+
+    // Create journal entry
+    const entry = await this.createJournalEntry(restaurantId, {
+      entry_date: new Date(),
+      reference_type: 'customer_payment',
+      reference_id: payment.customerId,
+      description: payment.description || `دفعة من ${payment.customerName}`,
+      source: 'customers',
+      is_posted: true,
+      lines,
+    });
+
+    // Update customer balance (already handled in CustomersTab, but just in case)
+    await supabase.rpc('update_customer_balance', {
+      p_customer_id: payment.customerId,
+      p_amount: -payment.amount
+    });
+
+    return entry;
+  }
+
   // ============================================================
   // REPORTS
   // ============================================================

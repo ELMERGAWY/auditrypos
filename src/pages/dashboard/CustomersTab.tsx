@@ -7,6 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
+import { journalService } from '@/lib/accounting/journalService';
 
 interface Customer {
   id: string;
@@ -49,6 +50,12 @@ export function CustomersTab({ restaurantId, currency }: Props) {
   const [paymentAmount, setPaymentAmount] = useState('');
   const [paymentDesc, setPaymentDesc] = useState('');
   const [paymentMethodLocal, setPaymentMethodLocal] = useState('cash');
+  const [showPrintSettings, setShowPrintSettings] = useState(false);
+  const [printSettings, setPrintSettings] = useState({
+    customerCopy: true,
+    businessCopy: true,
+    kitchenCopy: false
+  });
   const [showReports, setShowReports] = useState(false);
   const [allTransactions, setAllTransactions] = useState<(Transaction & { customer_name?: string })[]>([]);
   const [form, setForm] = useState({
@@ -94,7 +101,7 @@ export function CustomersTab({ restaurantId, currency }: Props) {
     toast.success('تم الحذف'); load();
   };
 
-  const handlePayment = async () => {
+  const handleSavePayment = async () => {
     if (!showPayment || !paymentAmount) return;
     const amount = Number(paymentAmount);
     const newBalance = showPayment.balance - amount;
@@ -104,13 +111,98 @@ export function CustomersTab({ restaurantId, currency }: Props) {
       type: 'payment', amount: -amount, description: paymentDesc || 'دفعة نقدية',
       payment_method: paymentMethodLocal,
     });
+    
+    // Create accounting journal entry
+    await journalService.createCustomerPaymentJournalEntry(
+      restaurantId,
+      {
+        customerId: showPayment.id,
+        customerName: showPayment.name,
+        amount,
+        paymentMethod: paymentMethodLocal,
+        description: paymentDesc,
+      },
+      currency
+    );
+    
     toast.success(`تم تسجيل دفعة ${amount} ${currency}`);
+    setShowPayment(null); setPaymentAmount(''); setPaymentDesc(''); setPaymentMethodLocal('cash');
+    load();
+  };
 
-    // Print payment receipt (سند قبض)
+  const handlePrintReceipt = () => {
+    if (!showPayment || !paymentAmount) return;
+    const amount = Number(paymentAmount);
+    const newBalance = showPayment.balance - amount;
+    const receiptDate = new Date().toLocaleDateString('ar-EG');
+    const receiptTime = new Date().toLocaleTimeString('ar-EG');
+    
     const printWindow = window.open('', '_blank', 'width=320,height=600');
     if (printWindow) {
-      const receiptDate = new Date().toLocaleDateString('ar-EG');
-      const receiptTime = new Date().toLocaleTimeString('ar-EG');
+      let content = '';
+      
+      if (printSettings.customerCopy) {
+        content += `
+          <div class="page-break">
+            <div class="center bold" style="margin-bottom: 5px;">نسخة العميل</div>
+            <div class="center title">سند قبض</div>
+            <div class="divider"></div>
+            <div class="row"><span>التاريخ:</span><span>${receiptDate}</span></div>
+            <div class="row"><span>الوقت:</span><span>${receiptTime}</span></div>
+            <div class="divider"></div>
+            <div class="row"><span>اسم العميل:</span><span class="bold">${showPayment.name}</span></div>
+            <div class="row"><span>الهاتف:</span><span>${showPayment.phone || '-'}</span></div>
+            <div class="divider"></div>
+            <div class="amount">${amount.toFixed(2)} ${currency}</div>
+            <div class="row"><span>الرصيد السابق:</span><span>${showPayment.balance.toFixed(2)} ${currency}</span></div>
+            <div class="row"><span>الرصيد الجديد:</span><span class="bold">${newBalance.toFixed(2)} ${currency}</span></div>
+            ${paymentDesc ? `<div class="divider"></div><div>ملاحظات: ${paymentDesc}</div>` : ''}
+            <div class="divider"></div>
+            <div class="center" style="font-size:10px;color:#666;margin-top:8px;">Powered by AuditryPOS</div>
+          </div>
+        `;
+      }
+      
+      if (printSettings.businessCopy) {
+        content += `
+          <div class="page-break">
+            <div class="center bold" style="margin-bottom: 5px;">نسخة المؤسسة</div>
+            <div class="center title">سند قبض</div>
+            <div class="divider"></div>
+            <div class="row"><span>التاريخ:</span><span>${receiptDate}</span></div>
+            <div class="row"><span>الوقت:</span><span>${receiptTime}</span></div>
+            <div class="divider"></div>
+            <div class="row"><span>اسم العميل:</span><span class="bold">${showPayment.name}</span></div>
+            <div class="row"><span>الهاتف:</span><span>${showPayment.phone || '-'}</span></div>
+            <div class="divider"></div>
+            <div class="amount">${amount.toFixed(2)} ${currency}</div>
+            <div class="row"><span>الرصيد السابق:</span><span>${showPayment.balance.toFixed(2)} ${currency}</span></div>
+            <div class="row"><span>الرصيد الجديد:</span><span class="bold">${newBalance.toFixed(2)} ${currency}</span></div>
+            ${paymentDesc ? `<div class="divider"></div><div>ملاحظات: ${paymentDesc}</div>` : ''}
+            <div class="divider"></div>
+            <div class="center" style="font-size:10px;color:#666;margin-top:8px;">Powered by AuditryPOS</div>
+          </div>
+        `;
+      }
+      
+      if (printSettings.kitchenCopy) {
+        content += `
+          <div class="page-break">
+            <div class="center bold" style="margin-bottom: 5px;">نسخة المطبخ</div>
+            <div class="center title">سند قبض</div>
+            <div class="divider"></div>
+            <div class="row"><span>التاريخ:</span><span>${receiptDate}</span></div>
+            <div class="row"><span>الوقت:</span><span>${receiptTime}</span></div>
+            <div class="divider"></div>
+            <div class="row"><span>اسم العميل:</span><span class="bold">${showPayment.name}</span></div>
+            <div class="amount">${amount.toFixed(2)} ${currency}</div>
+            ${paymentDesc ? `<div class="divider"></div><div>ملاحظات: ${paymentDesc}</div>` : ''}
+            <div class="divider"></div>
+            <div class="center" style="font-size:10px;color:#666;margin-top:8px;">Powered by AuditryPOS</div>
+          </div>
+        `;
+      }
+
       printWindow.document.open();
       printWindow.document.write(`<!DOCTYPE html>
 <html dir="rtl" lang="ar">
@@ -124,30 +216,16 @@ export function CustomersTab({ restaurantId, currency }: Props) {
   .divider { border-top: 1px dashed #333; margin: 8px 0; }
   .row { display: flex; justify-content: space-between; padding: 3px 0; }
   .amount { font-size: 20px; font-weight: bold; text-align: center; margin: 8px 0; }
+  .page-break { page-break-after: always; }
+  .page-break:last-child { page-break-after: avoid; }
   @media print { @page { margin: 0; } }
 </style></head>
 <body>
-  <div class="center title">سند قبض</div>
-  <div class="divider"></div>
-  <div class="row"><span>التاريخ:</span><span>${receiptDate}</span></div>
-  <div class="row"><span>الوقت:</span><span>${receiptTime}</span></div>
-  <div class="divider"></div>
-  <div class="row"><span>اسم العميل:</span><span class="bold">${showPayment.name}</span></div>
-  <div class="row"><span>الهاتف:</span><span>${showPayment.phone || '-'}</span></div>
-  <div class="divider"></div>
-  <div class="amount">${amount.toFixed(2)} ${currency}</div>
-  <div class="row"><span>الرصيد السابق:</span><span>${showPayment.balance.toFixed(2)} ${currency}</span></div>
-  <div class="row"><span>الرصيد الجديد:</span><span class="bold">${newBalance.toFixed(2)} ${currency}</span></div>
-  ${paymentDesc ? `<div class="divider"></div><div>ملاحظات: ${paymentDesc}</div>` : ''}
-  <div class="divider"></div>
-  <div class="center" style="font-size:10px;color:#666;margin-top:8px;">Powered by AuditryPOS</div>
+  ${content}
 </body></html>`);
       printWindow.document.close();
       printWindow.onload = () => { printWindow.focus(); printWindow.print(); };
     }
-
-    setShowPayment(null); setPaymentAmount(''); setPaymentDesc(''); setPaymentMethodLocal('cash');
-    load();
   };
 
   const openLedger = async (c: Customer) => {
@@ -358,7 +436,11 @@ export function CustomersTab({ restaurantId, currency }: Props) {
                 ))}
               </div>
               <Input placeholder="الوصف (اختياري)" value={paymentDesc} onChange={e => setPaymentDesc(e.target.value)} />
-              <Button onClick={handlePayment} className="w-full gradient-bg text-primary-foreground border-0">تسجيل الدفعة وطباعة السند</Button>
+              <div className="flex gap-2">
+                <Button onClick={handleSavePayment} className="flex-1 gradient-bg text-primary-foreground border-0">حفظ الدفعة</Button>
+                <Button onClick={handlePrintReceipt} className="flex-1" variant="outline">طباعة السند</Button>
+              </div>
+              <Button onClick={() => setShowPrintSettings(true)} className="w-full" variant="ghost">إعدادات الطباعة</Button>
             </motion.div>
           </motion.div>
         )}
@@ -423,6 +505,42 @@ export function CustomersTab({ restaurantId, currency }: Props) {
                   </table>
                 </div>
               )}
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Print Settings Modal */}
+      <AnimatePresence>
+        {showPrintSettings && (
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 bg-background/80 backdrop-blur-sm flex items-center justify-center p-4" onClick={() => setShowPrintSettings(false)}>
+            <motion.div initial={{ scale: 0.9 }} animate={{ scale: 1 }} exit={{ scale: 0.9 }}
+              className="glass-card p-6 max-w-sm w-full space-y-4" onClick={e => e.stopPropagation()}>
+              <div className="flex items-center justify-between">
+                <h3 className="font-display font-bold">إعدادات الطباعة</h3>
+                <button onClick={() => setShowPrintSettings(false)}><X className="w-5 h-5" /></button>
+              </div>
+              
+              <div className="space-y-3">
+                <label className="flex items-center gap-3 cursor-pointer">
+                  <input type="checkbox" checked={printSettings.customerCopy} onChange={(e) => setPrintSettings({ ...printSettings, customerCopy: e.target.checked })} className="w-4 h-4" />
+                  <span className="text-sm">نسخة العميل</span>
+                </label>
+                <label className="flex items-center gap-3 cursor-pointer">
+                  <input type="checkbox" checked={printSettings.businessCopy} onChange={(e) => setPrintSettings({ ...printSettings, businessCopy: e.target.checked })} className="w-4 h-4" />
+                  <span className="text-sm">نسخة المؤسسة</span>
+                </label>
+                <label className="flex items-center gap-3 cursor-pointer">
+                  <input type="checkbox" checked={printSettings.kitchenCopy} onChange={(e) => setPrintSettings({ ...printSettings, kitchenCopy: e.target.checked })} className="w-4 h-4" />
+                  <span className="text-sm">نسخة المطبخ</span>
+                </label>
+              </div>
+              
+              <div className="flex gap-2 pt-2">
+                <Button onClick={() => setShowPrintSettings(false)} className="flex-1 gradient-bg text-primary-foreground border-0">حفظ</Button>
+                <Button variant="outline" onClick={() => setShowPrintSettings(false)} className="flex-1">إلغاء</Button>
+              </div>
             </motion.div>
           </motion.div>
         )}

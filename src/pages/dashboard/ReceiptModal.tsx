@@ -1,6 +1,7 @@
 import { useRef, useState } from 'react';
-import { Printer } from 'lucide-react';
+import { Printer, X, Settings } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { motion, AnimatePresence } from 'framer-motion';
 import type { Order, Restaurant } from './types';
 import { ORDER_TYPE_CONFIG, extractCustomerRef } from './types';
 import { supabase } from '@/integrations/supabase/client';
@@ -194,6 +195,12 @@ function ReceiptContent({ order, restaurant }: { order: Order; restaurant: Resta
 
 export function ReceiptModalWrapper({ order, restaurant, onClose, onComplete }: ReceiptProps) {
   const ref = useRef<HTMLDivElement>(null);
+  const [showPrintSettings, setShowPrintSettings] = useState(false);
+  const [printSettings, setPrintSettings] = useState({
+    customerCopy: true,
+    businessCopy: true,
+    kitchenCopy: true,
+  });
 
   const printReceipt = () => {
     if (!ref.current) return;
@@ -234,6 +241,30 @@ export function ReceiptModalWrapper({ order, restaurant, onClose, onComplete }: 
       </div>
     `;
 
+    let printContent = '';
+    
+    if (printSettings.customerCopy) {
+      printContent += `
+        <div class="receipt page-break">
+          <div class="center bold" style="margin-bottom: 5px;">نسخة العميل</div>
+          ${content}
+        </div>
+      `;
+    }
+    
+    if (printSettings.businessCopy) {
+      printContent += `
+        <div class="receipt page-break">
+          <div class="center bold" style="margin-bottom: 5px;">نسخة المؤسسة</div>
+          ${content}
+        </div>
+      `;
+    }
+    
+    if (printSettings.kitchenCopy && (isFood || isWholesale)) {
+      printContent += kitchenCopy;
+    }
+
     printWindow.document.open();
     printWindow.document.write(`<!DOCTYPE html>
 <html dir="rtl" lang="ar">
@@ -243,15 +274,7 @@ export function ReceiptModalWrapper({ order, restaurant, onClose, onComplete }: 
   <style>${THERMAL_STYLES} @media print { .page-break { page-break-after: always; } }</style>
 </head>
 <body>
-  <!-- Customer Copy -->
-  <div class="receipt page-break">
-    <div class="center bold" style="margin-bottom: 5px;">نسخة العميل</div>
-    ${content}
-  </div>
-
-  <!-- Kitchen/Warehouse Copy -->
-  ${(isFood || isWholesale) ? kitchenCopy : ''}
-
+  ${printContent}
   <script>
     window.onload = function() {
       setTimeout(function() {
@@ -277,11 +300,45 @@ export function ReceiptModalWrapper({ order, restaurant, onClose, onComplete }: 
         <Button onClick={printReceipt} className="flex-1 gradient-bg text-primary-foreground border-0">
           <Printer className="w-4 h-4 ml-1" /> طباعة حرارية
         </Button>
+        <Button variant="outline" onClick={() => setShowPrintSettings(true)} className="flex-1">
+          <Settings className="w-4 h-4 ml-1" /> إعدادات الطباعة
+        </Button>
         <Button variant="outline" onClick={onClose} className="flex-1">إغلاق</Button>
         {onComplete && (
           <Button onClick={onComplete} className="flex-1 gradient-bg text-primary-foreground border-0">إتمام الطلب</Button>
         )}
       </div>
+      
+      {/* Print Settings Modal */}
+      <AnimatePresence>
+        {showPrintSettings && (
+          <div className="fixed inset-0 z-[60] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4" onClick={() => setShowPrintSettings(false)}>
+            <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.9, opacity: 0 }} className="glass-card p-6 max-w-md w-full space-y-4" onClick={(e) => e.stopPropagation()}>
+              <div className="flex items-center justify-between">
+                <h3 className="font-bold text-lg">إعدادات الطباعة</h3>
+                <button onClick={() => setShowPrintSettings(false)}><X className="w-5 h-5" /></button>
+              </div>
+              
+              <div className="space-y-3">
+                <label className="flex items-center gap-3 cursor-pointer">
+                  <input type="checkbox" checked={printSettings.customerCopy} onChange={(e) => setPrintSettings({ ...printSettings, customerCopy: e.target.checked })} className="w-4 h-4" />
+                  <span className="text-sm">نسخة العميل</span>
+                </label>
+                <label className="flex items-center gap-3 cursor-pointer">
+                  <input type="checkbox" checked={printSettings.businessCopy} onChange={(e) => setPrintSettings({ ...printSettings, businessCopy: e.target.checked })} className="w-4 h-4" />
+                  <span className="text-sm">نسخة المؤسسة</span>
+                </label>
+                <label className="flex items-center gap-3 cursor-pointer">
+                  <input type="checkbox" checked={printSettings.kitchenCopy} onChange={(e) => setPrintSettings({ ...printSettings, kitchenCopy: e.target.checked })} className="w-4 h-4" />
+                  <span className="text-sm">نسخة المطبخ/المخزن</span>
+                </label>
+              </div>
+              
+              <Button onClick={() => setShowPrintSettings(false)} className="w-full gradient-bg text-primary-foreground border-0">حفظ</Button>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
