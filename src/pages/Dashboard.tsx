@@ -504,7 +504,7 @@ export default function Dashboard() {
               </div>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">{filteredOrders.map(o => (
-              <Card key={o.id} className="p-4 hover:shadow-md transition-shadow border-primary/10 cursor-pointer" onClick={() => setViewingOrderId(o.id)}>
+              <Card key={o.id} className="p-4 hover:shadow-md transition-shadow border-primary/10 cursor-pointer" onClick={() => { setLastReceipt(o); setShowReceipt(true); }}>
                 <div className="flex justify-between items-start font-bold mb-3">
                   <div className="flex flex-col">
                     <span className="text-primary font-black">#{o.order_number.slice(-4)}</span>
@@ -552,7 +552,7 @@ export default function Dashboard() {
                 </div>
 
                 <div className="flex gap-2 mt-auto">
-                <Button className="flex-1 gradient-bg border-0 text-white" size="sm" onClick={(e) => { e.stopPropagation(); setViewingOrderId(o.id); }}>
+                <Button className="flex-1 gradient-bg border-0 text-white" size="sm" onClick={(e) => { e.stopPropagation(); setLastReceipt(o); setShowReceipt(true); }}>
                   <FileText className="w-4 h-4 ml-1" /> تفاصيل
                 </Button>
                 <Button className="flex-1 bg-emerald-600 hover:bg-emerald-700 border-0 text-white" size="sm" onClick={(e) => { e.stopPropagation(); setLastReceipt(o); setShowReceipt(true); }}>
