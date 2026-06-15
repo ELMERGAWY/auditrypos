@@ -193,6 +193,8 @@ function ReceiptContent({ order, restaurant }: { order: Order; restaurant: Resta
   );
 }
 
+export { ReceiptContent, THERMAL_STYLES };
+
 export function ReceiptModalWrapper({ order, restaurant, onClose, onComplete }: ReceiptProps) {
   const ref = useRef<HTMLDivElement>(null);
   const [showPrintSettings, setShowPrintSettings] = useState(false);
@@ -284,8 +286,7 @@ export function ReceiptModalWrapper({ order, restaurant, onClose, onComplete }: 
       }, 250);
     };
   </script>
-</body>
-</html>`);
+</body></html>`);
     printWindow.document.close();
   };
 
