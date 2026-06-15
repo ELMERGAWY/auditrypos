@@ -63,7 +63,39 @@ const THERMAL_STYLES = `
   }
 `;
 
-function ReceiptContent({ order, restaurant }: { order: Order; restaurant: Restaurant }) {
+interface PrintElementSettings {
+  logo: boolean;
+  restaurantName: boolean;
+  invoiceNumber: boolean;
+  dateTime: boolean;
+  itemCount: boolean;
+  customerName: boolean;
+  customerPhone: boolean;
+  customerRef: boolean;
+  deliveryAddress: boolean;
+  items: boolean;
+  totalQty: boolean;
+  subtotal: boolean;
+  discount: boolean;
+  total: boolean;
+  paymentMethod: boolean;
+  paidAmount: boolean;
+  remaining: boolean;
+  change: boolean;
+  notes: boolean;
+  thankYou: boolean;
+  poweredBy: boolean;
+}
+
+function ReceiptContent({ 
+  order, 
+  restaurant, 
+  printSettings 
+}: { 
+  order: Order; 
+  restaurant: Restaurant; 
+  printSettings: PrintElementSettings;
+}) {
   const currency = restaurant.currency || 'ج.م';
   const orderTypeInfo = ORDER_TYPE_CONFIG[order.order_type as keyof typeof ORDER_TYPE_CONFIG];
   const items = Array.isArray(order.items) ? order.items : [];
@@ -78,97 +110,117 @@ function ReceiptContent({ order, restaurant }: { order: Order; restaurant: Resta
     <div className="receipt">
       {/* Header */}
       <div className="center">
-        {restaurant.logo_url && (
+        {printSettings.logo && restaurant.logo_url && (
           <img src={restaurant.logo_url} alt="" style={{ width: 64, height: 64, objectFit: 'contain', margin: '0 auto 4px' }} />
         )}
-        <div className="logo-name">{restaurant.name}</div>
+        {printSettings.restaurantName && (
+          <div className="logo-name">{restaurant.name}</div>
+        )}
       </div>
 
       <hr className="divider" />
 
       {/* Order Info */}
-      <div className="row"><span className="info-label">التاريخ / {new Date(order.created_at).toLocaleDateString('ar-EG')}</span><span>م {new Date(order.created_at).toLocaleTimeString('ar-EG')}</span></div>
+      {printSettings.dateTime && (
+        <div className="row"><span className="info-label">التاريخ / {new Date(order.created_at).toLocaleDateString('ar-EG')}</span><span>م {new Date(order.created_at).toLocaleTimeString('ar-EG')}</span></div>
+      )}
       <div className="row">
-        <span className="info-label">الفاتورة / <span className="bold">{order.order_number.slice(-4)}</span></span>
-        <span className="info-label">عدد الأصناف / <span className="bold">{order.items.length}</span></span>
+        {printSettings.invoiceNumber && (
+          <span className="info-label">الفاتورة / <span className="bold">{order.order_number.slice(-4)}</span></span>
+        )}
+        {printSettings.itemCount && (
+          <span className="info-label">عدد الأصناف / <span className="bold">{order.items.length}</span></span>
+        )}
       </div>
-      {order.customer_name && (
+      {printSettings.customerName && order.customer_name && (
         <div className="row"><span className="info-label">إسم العميل / <span className="bold">{order.customer_name}</span></span></div>
       )}
-      {order.customer_phone && (
+      {printSettings.customerPhone && order.customer_phone && (
         <div className="row">
           <span className="info-label">التليفون / <span dir="ltr">{order.customer_phone}</span></span>
         </div>
       )}
-      {extractCustomerRef(order) && (
+      {printSettings.customerRef && extractCustomerRef(order) && (
         <div className="row">
           <span className="info-label">مرجع العميل / <span className="bold">{extractCustomerRef(order)}</span></span>
         </div>
       )}
-      {order.delivery_address && (
+      {printSettings.deliveryAddress && order.delivery_address && (
         <div className="row"><span className="info-label">العنوان / {order.delivery_address}</span></div>
       )}
 
       {/* Items Section - Using divs instead of table for better thermal printer support */}
-      <div className="items-section">
-        <div className="items-header">
-          <span className="item-name">الصنف</span>
-          <span className="item-qty">كمية</span>
-          <span className="item-price">السعر</span>
-          <span className="item-total">الإجمالي</span>
-        </div>
-        {order.items && order.items.length > 0 ? (
-          order.items.map((item, idx) => (
-            <div key={idx} className="item-row">
-              <span className="item-name">{item.menu_item_name || 'صنف'}</span>
-              <span className="item-qty">{item.quantity}</span>
-              <span className="item-price">{Number(item.price).toFixed(2)}</span>
-              <span className="item-total">{(Number(item.price) * Number(item.quantity)).toFixed(2)}</span>
-            </div>
-          ))
-        ) : (
-          <div className="item-row" style={{ textAlign: 'center', color: '#000' }}>
-            لا توجد أصناف
+      {printSettings.items && (
+        <div className="items-section">
+          <div className="items-header">
+            <span className="item-name">الصنف</span>
+            <span className="item-qty">كمية</span>
+            <span className="item-price">السعر</span>
+            <span className="item-total">الإجمالي</span>
           </div>
-        )}
-      </div>
+          {order.items && order.items.length > 0 ? (
+            order.items.map((item, idx) => (
+              <div key={idx} className="item-row">
+                <span className="item-name">{item.menu_item_name || 'صنف'}</span>
+                <span className="item-qty">{item.quantity}</span>
+                <span className="item-price">{Number(item.price).toFixed(2)}</span>
+                <span className="item-total">{(Number(item.price) * Number(item.quantity)).toFixed(2)}</span>
+              </div>
+            ))
+          ) : (
+            <div className="item-row" style={{ textAlign: 'center', color: '#000' }}>
+              لا توجد أصناف
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Summary Table */}
       <table className="summary-table">
         <tbody>
-          <tr>
-            <td>إجمالي الكمية</td>
-            <td>{itemCount.toFixed(2)}</td>
-          </tr>
-          <tr>
-            <td>الإجمالي</td>
-            <td>{subtotal.toFixed(2)}</td>
-          </tr>
-          {Number(order.discount) > 0 && (
+          {printSettings.totalQty && (
+            <tr>
+              <td>إجمالي الكمية</td>
+              <td>{itemCount.toFixed(2)}</td>
+            </tr>
+          )}
+          {printSettings.subtotal && (
+            <tr>
+              <td>الإجمالي</td>
+              <td>{subtotal.toFixed(2)}</td>
+            </tr>
+          )}
+          {printSettings.discount && Number(order.discount) > 0 && (
             <tr>
               <td>الخصم</td>
               <td>{Number(order.discount).toFixed(2)}</td>
             </tr>
           )}
-          <tr>
-            <td className="bold">صافى الفاتورة</td>
-            <td className="bold" style={{ fontSize: 14 }}>{Number(order.total).toFixed(2)}</td>
-          </tr>
-          <tr>
-            <td>طريقة الدفع</td>
-            <td>{PAYMENT_LABELS[paymentMethod] || 'نقدي'}</td>
-          </tr>
-          <tr>
-            <td>المدفوع</td>
-            <td className="text-green">{paidAmount.toFixed(2)}</td>
-          </tr>
-          {remaining > 0 && (
+          {printSettings.total && (
+            <tr>
+              <td className="bold">صافى الفاتورة</td>
+              <td className="bold" style={{ fontSize: 14 }}>{Number(order.total).toFixed(2)}</td>
+            </tr>
+          )}
+          {printSettings.paymentMethod && (
+            <tr>
+              <td>طريقة الدفع</td>
+              <td>{PAYMENT_LABELS[paymentMethod] || 'نقدي'}</td>
+            </tr>
+          )}
+          {printSettings.paidAmount && (
+            <tr>
+              <td>المدفوع</td>
+              <td className="text-green">{paidAmount.toFixed(2)}</td>
+            </tr>
+          )}
+          {printSettings.remaining && remaining > 0 && (
             <tr>
               <td>المتبقي</td>
               <td className="text-red">{remaining.toFixed(2)}</td>
             </tr>
           )}
-          {change > 0 && (
+          {printSettings.change && change > 0 && (
             <tr>
               <td>الباقي للعميل</td>
               <td className="text-green">{change.toFixed(2)}</td>
@@ -180,14 +232,18 @@ function ReceiptContent({ order, restaurant }: { order: Order; restaurant: Resta
       <hr className="divider" />
 
       {/* Notes */}
-      {order.notes && (
+      {printSettings.notes && order.notes && (
         <div style={{ fontSize: 11, padding: '3px 0' }}>📝 {order.notes}</div>
       )}
 
       {/* Footer */}
       <div className="center footer">
-        <p style={{ fontSize: 12, margin: '6px 0' }}>شكراً لزيارتكم ❤️</p>
-        <p style={{ marginTop: 4, fontSize: 9, color: '#999' }}>Powered by AuditryPOS</p>
+        {printSettings.thankYou && (
+          <p style={{ fontSize: 12, margin: '6px 0' }}>شكراً لزيارتكم ❤️</p>
+        )}
+        {printSettings.poweredBy && (
+          <p style={{ marginTop: 4, fontSize: 9, color: '#999' }}>Powered by AuditryPOS</p>
+        )}
       </div>
     </div>
   );
@@ -195,10 +251,40 @@ function ReceiptContent({ order, restaurant }: { order: Order; restaurant: Resta
 
 export { ReceiptContent, THERMAL_STYLES };
 
+// Extend PrintElementSettings with copy options
+type CombinedPrintSettings = PrintElementSettings & {
+  customerCopy: boolean;
+  businessCopy: boolean;
+  kitchenCopy: boolean;
+};
+
 export function ReceiptModalWrapper({ order, restaurant, onClose, onComplete }: ReceiptProps) {
   const ref = useRef<HTMLDivElement>(null);
   const [showPrintSettings, setShowPrintSettings] = useState(false);
-  const [printSettings, setPrintSettings] = useState({
+  const [printSettings, setPrintSettings] = useState<CombinedPrintSettings>({
+    // Element settings
+    logo: true,
+    restaurantName: true,
+    invoiceNumber: true,
+    dateTime: true,
+    itemCount: true,
+    customerName: true,
+    customerPhone: true,
+    customerRef: true,
+    deliveryAddress: true,
+    items: true,
+    totalQty: true,
+    subtotal: true,
+    discount: true,
+    total: true,
+    paymentMethod: true,
+    paidAmount: true,
+    remaining: true,
+    change: true,
+    notes: true,
+    thankYou: true,
+    poweredBy: true,
+    // Copy settings
     customerCopy: true,
     businessCopy: true,
     kitchenCopy: true,
@@ -294,7 +380,7 @@ export function ReceiptModalWrapper({ order, restaurant, onClose, onComplete }: 
     <div>
       <div ref={ref} className="space-y-2 text-xs bg-card rounded-lg p-4 max-h-[60vh] overflow-auto" dir="rtl"
         style={{ fontFamily: "'Arial', 'Tahoma', sans-serif" }}>
-        <ReceiptContent order={order} restaurant={restaurant} />
+        <ReceiptContent order={order} restaurant={restaurant} printSettings={printSettings} />
       </div>
 
       <div className="flex gap-2 mt-4">
@@ -314,25 +400,122 @@ export function ReceiptModalWrapper({ order, restaurant, onClose, onComplete }: 
       <AnimatePresence>
         {showPrintSettings && (
           <div className="fixed inset-0 z-[60] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4" onClick={() => setShowPrintSettings(false)}>
-            <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.9, opacity: 0 }} className="glass-card p-6 max-w-md w-full space-y-4" onClick={(e) => e.stopPropagation()}>
+            <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.9, opacity: 0 }} className="glass-card p-6 max-w-md w-full space-y-4 max-h-[80vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
               <div className="flex items-center justify-between">
                 <h3 className="font-bold text-lg">إعدادات الطباعة</h3>
                 <button onClick={() => setShowPrintSettings(false)}><X className="w-5 h-5" /></button>
               </div>
               
-              <div className="space-y-3">
-                <label className="flex items-center gap-3 cursor-pointer">
-                  <input type="checkbox" checked={printSettings.customerCopy} onChange={(e) => setPrintSettings({ ...printSettings, customerCopy: e.target.checked })} className="w-4 h-4" />
-                  <span className="text-sm">نسخة العميل</span>
-                </label>
-                <label className="flex items-center gap-3 cursor-pointer">
-                  <input type="checkbox" checked={printSettings.businessCopy} onChange={(e) => setPrintSettings({ ...printSettings, businessCopy: e.target.checked })} className="w-4 h-4" />
-                  <span className="text-sm">نسخة المؤسسة</span>
-                </label>
-                <label className="flex items-center gap-3 cursor-pointer">
-                  <input type="checkbox" checked={printSettings.kitchenCopy} onChange={(e) => setPrintSettings({ ...printSettings, kitchenCopy: e.target.checked })} className="w-4 h-4" />
-                  <span className="text-sm">نسخة المطبخ/المخزن</span>
-                </label>
+              <div className="space-y-4">
+                {/* Copy Settings */}
+                <div className="border border-border rounded-xl p-4">
+                  <h4 className="font-bold text-sm mb-3 text-primary">النسخ</h4>
+                  <div className="space-y-3">
+                    <label className="flex items-center gap-3 cursor-pointer">
+                      <input type="checkbox" checked={printSettings.customerCopy} onChange={(e) => setPrintSettings({ ...printSettings, customerCopy: e.target.checked })} className="w-4 h-4" />
+                      <span className="text-sm">نسخة العميل</span>
+                    </label>
+                    <label className="flex items-center gap-3 cursor-pointer">
+                      <input type="checkbox" checked={printSettings.businessCopy} onChange={(e) => setPrintSettings({ ...printSettings, businessCopy: e.target.checked })} className="w-4 h-4" />
+                      <span className="text-sm">نسخة المؤسسة</span>
+                    </label>
+                    <label className="flex items-center gap-3 cursor-pointer">
+                      <input type="checkbox" checked={printSettings.kitchenCopy} onChange={(e) => setPrintSettings({ ...printSettings, kitchenCopy: e.target.checked })} className="w-4 h-4" />
+                      <span className="text-sm">نسخة المطبخ/المخزن</span>
+                    </label>
+                  </div>
+                </div>
+
+                {/* Element Settings */}
+                <div className="border border-border rounded-xl p-4">
+                  <h4 className="font-bold text-sm mb-3 text-primary">عناصر الفاتورة</h4>
+                  <div className="grid grid-cols-2 gap-3">
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input type="checkbox" checked={printSettings.logo} onChange={(e) => setPrintSettings({ ...printSettings, logo: e.target.checked })} className="w-4 h-4" />
+                      <span className="text-sm">الشعار</span>
+                    </label>
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input type="checkbox" checked={printSettings.restaurantName} onChange={(e) => setPrintSettings({ ...printSettings, restaurantName: e.target.checked })} className="w-4 h-4" />
+                      <span className="text-sm">اسم المطعم</span>
+                    </label>
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input type="checkbox" checked={printSettings.invoiceNumber} onChange={(e) => setPrintSettings({ ...printSettings, invoiceNumber: e.target.checked })} className="w-4 h-4" />
+                      <span className="text-sm">رقم الفاتورة</span>
+                    </label>
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input type="checkbox" checked={printSettings.dateTime} onChange={(e) => setPrintSettings({ ...printSettings, dateTime: e.target.checked })} className="w-4 h-4" />
+                      <span className="text-sm">التاريخ والوقت</span>
+                    </label>
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input type="checkbox" checked={printSettings.itemCount} onChange={(e) => setPrintSettings({ ...printSettings, itemCount: e.target.checked })} className="w-4 h-4" />
+                      <span className="text-sm">عدد الأصناف</span>
+                    </label>
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input type="checkbox" checked={printSettings.customerName} onChange={(e) => setPrintSettings({ ...printSettings, customerName: e.target.checked })} className="w-4 h-4" />
+                      <span className="text-sm">اسم العميل</span>
+                    </label>
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input type="checkbox" checked={printSettings.customerPhone} onChange={(e) => setPrintSettings({ ...printSettings, customerPhone: e.target.checked })} className="w-4 h-4" />
+                      <span className="text-sm">هاتف العميل</span>
+                    </label>
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input type="checkbox" checked={printSettings.customerRef} onChange={(e) => setPrintSettings({ ...printSettings, customerRef: e.target.checked })} className="w-4 h-4" />
+                      <span className="text-sm">مرجع العميل</span>
+                    </label>
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input type="checkbox" checked={printSettings.deliveryAddress} onChange={(e) => setPrintSettings({ ...printSettings, deliveryAddress: e.target.checked })} className="w-4 h-4" />
+                      <span className="text-sm">العنوان</span>
+                    </label>
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input type="checkbox" checked={printSettings.items} onChange={(e) => setPrintSettings({ ...printSettings, items: e.target.checked })} className="w-4 h-4" />
+                      <span className="text-sm">الأصناف</span>
+                    </label>
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input type="checkbox" checked={printSettings.totalQty} onChange={(e) => setPrintSettings({ ...printSettings, totalQty: e.target.checked })} className="w-4 h-4" />
+                      <span className="text-sm">إجمالي الكمية</span>
+                    </label>
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input type="checkbox" checked={printSettings.subtotal} onChange={(e) => setPrintSettings({ ...printSettings, subtotal: e.target.checked })} className="w-4 h-4" />
+                      <span className="text-sm">المجموع الفرعي</span>
+                    </label>
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input type="checkbox" checked={printSettings.discount} onChange={(e) => setPrintSettings({ ...printSettings, discount: e.target.checked })} className="w-4 h-4" />
+                      <span className="text-sm">الخصم</span>
+                    </label>
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input type="checkbox" checked={printSettings.total} onChange={(e) => setPrintSettings({ ...printSettings, total: e.target.checked })} className="w-4 h-4" />
+                      <span className="text-sm">الإجمالي</span>
+                    </label>
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input type="checkbox" checked={printSettings.paymentMethod} onChange={(e) => setPrintSettings({ ...printSettings, paymentMethod: e.target.checked })} className="w-4 h-4" />
+                      <span className="text-sm">طريقة الدفع</span>
+                    </label>
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input type="checkbox" checked={printSettings.paidAmount} onChange={(e) => setPrintSettings({ ...printSettings, paidAmount: e.target.checked })} className="w-4 h-4" />
+                      <span className="text-sm">المدفوع</span>
+                    </label>
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input type="checkbox" checked={printSettings.remaining} onChange={(e) => setPrintSettings({ ...printSettings, remaining: e.target.checked })} className="w-4 h-4" />
+                      <span className="text-sm">المتبقي</span>
+                    </label>
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input type="checkbox" checked={printSettings.change} onChange={(e) => setPrintSettings({ ...printSettings, change: e.target.checked })} className="w-4 h-4" />
+                      <span className="text-sm">الباقي للعميل</span>
+                    </label>
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input type="checkbox" checked={printSettings.notes} onChange={(e) => setPrintSettings({ ...printSettings, notes: e.target.checked })} className="w-4 h-4" />
+                      <span className="text-sm">الملاحظات</span>
+                    </label>
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input type="checkbox" checked={printSettings.thankYou} onChange={(e) => setPrintSettings({ ...printSettings, thankYou: e.target.checked })} className="w-4 h-4" />
+                      <span className="text-sm">شكراً لزيارتكم</span>
+                    </label>
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input type="checkbox" checked={printSettings.poweredBy} onChange={(e) => setPrintSettings({ ...printSettings, poweredBy: e.target.checked })} className="w-4 h-4" />
+                      <span className="text-sm">Powered by Auditry</span>
+                    </label>
+                  </div>
+                </div>
               </div>
               
               <Button onClick={() => setShowPrintSettings(false)} className="w-full gradient-bg text-primary-foreground border-0">حفظ</Button>

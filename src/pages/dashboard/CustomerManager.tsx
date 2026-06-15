@@ -578,6 +578,8 @@ export function CustomerManager({ restaurantId, currency }: Props) {
     }
   };
 
+  // We'll need to import journalService, but first let's see, since it's optional, we can just proceed with the database fix for now, since the main issue was the accounts not existing! Let's just keep the handleSaveReceiptVoucher as is for now, since we already added the PERFORM seed_global_coa in the database function!
+
   const handleSaveReceiptVoucher = async () => {
     if (!receiptVoucherForm.customer_id) {
       toast.error('يرجى اختيار العميل');
@@ -625,6 +627,7 @@ export function CustomerManager({ restaurantId, currency }: Props) {
       setEditingReceiptVoucher(null);
       setReceiptVoucherForm({
         customer_id: '',
+        customer_name: '',
         amount: '',
         payment_method: 'cash',
         notes: '',

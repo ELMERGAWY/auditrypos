@@ -225,6 +225,9 @@ DECLARE
 BEGIN
   IF p_amount <= 0 THEN RAISE EXCEPTION 'المبلغ يجب أن يكون أكبر من صفر'; END IF;
 
+  -- Ensure chart of accounts is set up
+  PERFORM public.seed_global_coa(p_restaurant_id, 'restaurant');
+
   SELECT name INTO v_customer_name FROM public.customers WHERE id = p_customer_id;
 
   v_ar_account := COALESCE(
@@ -350,6 +353,9 @@ DECLARE
   v_old_supplier_id UUID;
 BEGIN
   IF p_amount <= 0 THEN RAISE EXCEPTION 'المبلغ يجب أن يكون أكبر من صفر'; END IF;
+
+  -- Ensure chart of accounts is set up
+  PERFORM public.seed_global_coa(p_restaurant_id, 'restaurant');
 
   SELECT name INTO v_supplier_name FROM public.suppliers WHERE id = p_supplier_id;
 
