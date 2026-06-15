@@ -8,11 +8,13 @@ import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Users, Plus, Search, Phone, MapPin, FileText, TrendingUp, 
   TrendingDown, Wallet, Download, CreditCard, AlertCircle, Receipt,
-  ArrowRight, Calendar, Eye, FileJson, Trash2, Banknote, Edit
+  ArrowRight, Calendar, Eye, FileJson, Trash2, Banknote, Edit, X, Settings, Printer
 } from 'lucide-react';
+import { CustomerSearch } from './CustomerSearch';
 import * as XLSX from 'xlsx';
 import jsPDF from 'jspdf';
 import 'jspdf-autotable';
@@ -95,6 +97,7 @@ export function CustomerManager({ restaurantId, currency }: Props) {
   const [editingReceiptVoucher, setEditingReceiptVoucher] = useState<ReceiptVoucher | null>(null);
   const [receiptVoucherForm, setReceiptVoucherForm] = useState({
     customer_id: '',
+    customer_name: '',
     amount: '',
     payment_method: 'cash',
     notes: '',
@@ -103,6 +106,13 @@ export function CustomerManager({ restaurantId, currency }: Props) {
     counter_account_id: ''
   });
   const [accounts, setAccounts] = useState<any[]>([]);
+  // Print Settings
+  const [showPrintSettings, setShowPrintSettings] = useState(false);
+  const [printSettings, setPrintSettings] = useState({
+    customerCopy: true,
+    businessCopy: true,
+    kitchenCopy: false
+  });
 
   // Form state
   const [formData, setFormData] = useState({
@@ -151,13 +161,129 @@ export function CustomerManager({ restaurantId, currency }: Props) {
   };
 
   const handleCustomerChange = (customerId: string) => {
+    const customer = customers.find(c => c.id === customerId);
     const recAcc = accounts.find(acc => acc.code?.startsWith('12') || acc.name?.includes('عملاء') || acc.name?.includes('مدينة'));
     setReceiptVoucherForm(prev => ({
       ...prev,
       customer_id: customerId,
+      customer_name: customer?.name || '',
       account_id: recAcc ? recAcc.id : prev.account_id,
       counter_account_id: recAcc ? recAcc.id : prev.counter_account_id
     }));
+  };
+
+  const handleCustomerSearchChange = (name: string, phone?: string, address?: string, customerId?: string) => {
+    const recAcc = accounts.find(acc => acc.code?.startsWith('12') || acc.name?.includes('عملاء') || acc.name?.includes('مدينة'));
+    if (customerId) {
+      const customer = customers.find(c => c.id === customerId);
+      setReceiptVoucherForm(prev => ({
+        ...prev,
+        customer_id: customerId,
+        customer_name: customer?.name || name,
+        account_id: recAcc ? recAcc.id : prev.account_id,
+        counter_account_id: recAcc ? recAcc.id : prev.counter_account_id
+      }));
+    } else {
+      setReceiptVoucherForm(prev => ({
+        ...prev,
+        customer_name: name
+      }));
+    }
+  };
+
+  const handlePrintReceiptVoucher = () => {
+    const customer = customers.find(c => c.id === receiptVoucherForm.customer_id);
+    const amount = Number(receiptVoucherForm.amount);
+    const newBalance = customer ? customer.balance - amount : 0;
+    const receiptDate = new Date(receiptVoucherForm.voucher_date).toLocaleDateString('ar-EG');
+    const receiptTime = new Date().toLocaleTimeString('ar-EG');
+    
+    const printWindow = window.open('', '_blank', 'width=320,height=600');
+    if (printWindow) {
+      let content = '';
+      
+      if (printSettings.customerCopy) {
+        content += `
+          <div class="page-break">
+            <div class="center bold" style="margin-bottom: 5px;">نسخة العميل</div>
+            <div class="center title">سند قبض</div>
+            <div class="divider"></div>
+            <div class="row"><span>التاريخ:</span><span>${receiptDate}</span></div>
+            <div class="row"><span>الوقت:</span><span>${receiptTime}</span></div>
+            <div class="divider"></div>
+            <div class="row"><span>اسم العميل:</span><span class="bold">${receiptVoucherForm.customer_name}</span></div>
+            <div class="row"><span>الهاتف:</span><span>${customer?.phone || '-'}</span></div>
+            <div class="divider"></div>
+            <div class="amount">${amount.toFixed(2)} ${currency}</div>
+            ${customer ? `<div class="row"><span>الرصيد السابق:</span><span>${customer.balance.toFixed(2)} ${currency}</span></div><div class="row"><span>الرصيد الجديد:</span><span class="bold">${newBalance.toFixed(2)} ${currency}</span></div>` : ''}
+            ${receiptVoucherForm.notes ? `<div class="divider"></div><div>ملاحظات: ${receiptVoucherForm.notes}</div>` : ''}
+            <div class="divider"></div>
+            <div class="center" style="font-size:10px;color:#666;margin-top:8px">Powered by AuditryPOS</div>
+          </div>
+        `;
+      }
+      
+      if (printSettings.businessCopy) {
+        content += `
+          <div class="page-break">
+            <div class="center bold" style="margin-bottom: 5px;">نسخة المؤسسة</div>
+            <div class="center title">سند قبض</div>
+            <div class="divider"></div>
+            <div class="row"><span>التاريخ:</span><span>${receiptDate}</span></div>
+            <div class="row"><span>الوقت:</span><span>${receiptTime}</span></div>
+            <div class="divider"></div>
+            <div class="row"><span>اسم العميل:</span><span class="bold">${receiptVoucherForm.customer_name}</span></div>
+            <div class="row"><span>الهاتف:</span><span>${customer?.phone || '-'}</span></div>
+            <div class="divider"></div>
+            <div class="amount">${amount.toFixed(2)} ${currency}</div>
+            ${customer ? `<div class="row"><span>الرصيد السابق:</span><span>${customer.balance.toFixed(2)} ${currency}</span></div><div class="row"><span>الرصيد الجديد:</span><span class="bold">${newBalance.toFixed(2)} ${currency}</span></div>` : ''}
+            ${receiptVoucherForm.notes ? `<div class="divider"></div><div>ملاحظات: ${receiptVoucherForm.notes}</div>` : ''}
+            <div class="divider"></div>
+            <div class="center" style="font-size:10px;color:#666;margin-top:8px">Powered by AuditryPOS</div>
+          </div>
+        `;
+      }
+      
+      if (printSettings.kitchenCopy) {
+        content += `
+          <div class="page-break">
+            <div class="center bold" style="margin-bottom: 5px;">نسخة المطبخ</div>
+            <div class="center title">سند قبض</div>
+            <div class="divider"></div>
+            <div class="row"><span>التاريخ:</span><span>${receiptDate}</span></div>
+            <div class="row"><span>الوقت:</span><span>${receiptTime}</span></div>
+            <div class="divider"></div>
+            <div class="row"><span>اسم العميل:</span><span class="bold">${receiptVoucherForm.customer_name}</span></div>
+            <div class="amount">${amount.toFixed(2)} ${currency}</div>
+            ${receiptVoucherForm.notes ? `<div class="divider"></div><div>ملاحظات: ${receiptVoucherForm.notes}</div>` : ''}
+            <div class="divider"></div>
+            <div class="center" style="font-size:10px;color:#666;margin-top:8px">Powered by AuditryPOS</div>
+          </div>
+        `;
+      }
+
+      printWindow.document.write(`<!DOCTYPE html>
+        <html dir="rtl" lang="ar">
+        <head><meta charset="UTF-8"><title>سند قبض</title>
+        <style>
+          * { margin: 0; padding: 0; box-sizing: border-box; }
+          body { font-family: 'Courier New', monospace; font-size: 12px; padding: 10px; max-width: 300px; margin: 0 auto; }
+          .center { text-align: center; }
+          .bold { font-weight: bold; }
+          .title { font-size: 18px; font-weight: bold; margin: 8px 0; border: 2px solid #000; padding: 4px; }
+          .divider { border-top: 1px dashed #333; margin: 8px 0; }
+          .row { display: flex; justify-content: space-between; padding: 3px 0; }
+          .amount { font-size: 20px; font-weight: bold; text-align: center; margin: 8px 0; }
+          .page-break { page-break-after: always; }
+          .page-break:last-child { page-break-after: avoid; }
+          @media print { @page { margin: 0; } }
+        </style></head>
+        <body>
+          ${content}
+        </body></html>`);
+      printWindow.document.close();
+      printWindow.onload = () => { printWindow.focus(); printWindow.print(); };
+    }
   };
 
   const loadReceiptVouchers = async () => {
@@ -534,7 +660,7 @@ export function CustomerManager({ restaurantId, currency }: Props) {
     }
   };
 
-  const handleRecordPayment = async () => {
+  const handleSavePayment = async () => {
     if (!selectedCustomer) return;
     const amount = Number(paymentForm.amount);
     if (!amount || amount <= 0) { toast.error('أدخل مبلغ صحيح'); return; }
@@ -562,37 +688,6 @@ export function CustomerManager({ restaurantId, currency }: Props) {
         } as any);
       }
 
-      const newBalance = selectedCustomer.balance - amount;
-
-      // Print payment receipt (سند قبض)
-      const w = window.open('', '_blank', 'width=320,height=600');
-      if (w) {
-        const d = new Date();
-        w.document.write(`<!DOCTYPE html><html dir="rtl" lang="ar"><head><meta charset="UTF-8"><title>سند قبض</title><style>
-          *{margin:0;padding:0;box-sizing:border-box}body{font-family:'Courier New',monospace;font-size:12px;padding:10px;max-width:300px;margin:0 auto}
-          .center{text-align:center}.bold{font-weight:bold}
-          .title{font-size:18px;font-weight:bold;margin:8px 0;border:2px solid #000;padding:4px;text-align:center}
-          .divider{border-top:1px dashed #333;margin:8px 0}.row{display:flex;justify-content:space-between;padding:3px 0}
-          .amount{font-size:20px;font-weight:bold;text-align:center;margin:8px 0}
-          @media print{@page{margin:0}}</style></head><body>
-          <div class="title">سند قبض</div>
-          <div class="row"><span>التاريخ:</span><span>${d.toLocaleDateString('ar-EG')}</span></div>
-          <div class="row"><span>الوقت:</span><span>${d.toLocaleTimeString('ar-EG')}</span></div>
-          <div class="divider"></div>
-          <div class="row"><span>اسم العميل:</span><span class="bold">${selectedCustomer.name}</span></div>
-          <div class="row"><span>الهاتف:</span><span>${selectedCustomer.phone || '-'}</span></div>
-          <div class="divider"></div>
-          <div class="amount">${amount.toFixed(2)} ${currency}</div>
-          <div class="row"><span>الرصيد السابق:</span><span>${selectedCustomer.balance.toFixed(2)} ${currency}</span></div>
-          <div class="row"><span>الرصيد الجديد:</span><span class="bold">${newBalance.toFixed(2)} ${currency}</span></div>
-          ${paymentForm.notes ? `<div class="divider"></div><div>ملاحظات: ${paymentForm.notes}</div>` : ''}
-          <div class="divider"></div>
-          <div class="center" style="font-size:10px;color:#666;margin-top:8px">Powered by AuditryPOS</div>
-        </body></html>`);
-        w.document.close();
-        w.onload = () => { w.focus(); w.print(); };
-      }
-
       toast.success(`تم تسجيل دفعة ${amount.toFixed(2)} ${currency}`);
       setShowPaymentModal(false);
       setPaymentForm({ amount: '', payment_method: 'cash', notes: '' });
@@ -602,6 +697,103 @@ export function CustomerManager({ restaurantId, currency }: Props) {
       toast.error('فشل تسجيل الدفعة: ' + error.message);
     } finally {
       setProcessingPayment(false);
+    }
+  };
+
+  const handlePrintReceipt = () => {
+    if (!selectedCustomer) return;
+    const amount = Number(paymentForm.amount);
+    const newBalance = selectedCustomer.balance - amount;
+    const receiptDate = new Date().toLocaleDateString('ar-EG');
+    const receiptTime = new Date().toLocaleTimeString('ar-EG');
+    
+    const printWindow = window.open('', '_blank', 'width=320,height=600');
+    if (printWindow) {
+      let content = '';
+      
+      if (printSettings.customerCopy) {
+        content += `
+          <div class="page-break">
+            <div class="center bold" style="margin-bottom: 5px;">نسخة العميل</div>
+            <div class="center title">سند قبض</div>
+            <div class="divider"></div>
+            <div class="row"><span>التاريخ:</span><span>${receiptDate}</span></div>
+            <div class="row"><span>الوقت:</span><span>${receiptTime}</span></div>
+            <div class="divider"></div>
+            <div class="row"><span>اسم العميل:</span><span class="bold">${selectedCustomer.name}</span></div>
+            <div class="row"><span>الهاتف:</span><span>${selectedCustomer.phone || '-'}</span></div>
+            <div class="divider"></div>
+            <div class="amount">${amount.toFixed(2)} ${currency}</div>
+            <div class="row"><span>الرصيد السابق:</span><span>${selectedCustomer.balance.toFixed(2)} ${currency}</span></div>
+            <div class="row"><span>الرصيد الجديد:</span><span class="bold">${newBalance.toFixed(2)} ${currency}</span></div>
+            ${paymentForm.notes ? `<div class="divider"></div><div>ملاحظات: ${paymentForm.notes}</div>` : ''}
+            <div class="divider"></div>
+            <div class="center" style="font-size:10px;color:#666;margin-top:8px">Powered by AuditryPOS</div>
+          </div>
+        `;
+      }
+      
+      if (printSettings.businessCopy) {
+        content += `
+          <div class="page-break">
+            <div class="center bold" style="margin-bottom: 5px;">نسخة المؤسسة</div>
+            <div class="center title">سند قبض</div>
+            <div class="divider"></div>
+            <div class="row"><span>التاريخ:</span><span>${receiptDate}</span></div>
+            <div class="row"><span>الوقت:</span><span>${receiptTime}</span></div>
+            <div class="divider"></div>
+            <div class="row"><span>اسم العميل:</span><span class="bold">${selectedCustomer.name}</span></div>
+            <div class="row"><span>الهاتف:</span><span>${selectedCustomer.phone || '-'}</span></div>
+            <div class="divider"></div>
+            <div class="amount">${amount.toFixed(2)} ${currency}</div>
+            <div class="row"><span>الرصيد السابق:</span><span>${selectedCustomer.balance.toFixed(2)} ${currency}</span></div>
+            <div class="row"><span>الرصيد الجديد:</span><span class="bold">${newBalance.toFixed(2)} ${currency}</span></div>
+            ${paymentForm.notes ? `<div class="divider"></div><div>ملاحظات: ${paymentForm.notes}</div>` : ''}
+            <div class="divider"></div>
+            <div class="center" style="font-size:10px;color:#666;margin-top:8px">Powered by AuditryPOS</div>
+          </div>
+        `;
+      }
+      
+      if (printSettings.kitchenCopy) {
+        content += `
+          <div class="page-break">
+            <div class="center bold" style="margin-bottom: 5px;">نسخة المطبخ</div>
+            <div class="center title">سند قبض</div>
+            <div class="divider"></div>
+            <div class="row"><span>التاريخ:</span><span>${receiptDate}</span></div>
+            <div class="row"><span>الوقت:</span><span>${receiptTime}</span></div>
+            <div class="divider"></div>
+            <div class="row"><span>اسم العميل:</span><span class="bold">${selectedCustomer.name}</span></div>
+            <div class="amount">${amount.toFixed(2)} ${currency}</div>
+            ${paymentForm.notes ? `<div class="divider"></div><div>ملاحظات: ${paymentForm.notes}</div>` : ''}
+            <div class="divider"></div>
+            <div class="center" style="font-size:10px;color:#666;margin-top:8px">Powered by AuditryPOS</div>
+          </div>
+        `;
+      }
+
+      printWindow.document.write(`<!DOCTYPE html>
+        <html dir="rtl" lang="ar">
+        <head><meta charset="UTF-8"><title>سند قبض</title>
+        <style>
+          * { margin: 0; padding: 0; box-sizing: border-box; }
+          body { font-family: 'Courier New', monospace; font-size: 12px; padding: 10px; max-width: 300px; margin: 0 auto; }
+          .center { text-align: center; }
+          .bold { font-weight: bold; }
+          .title { font-size: 18px; font-weight: bold; margin: 8px 0; border: 2px solid #000; padding: 4px; }
+          .divider { border-top: 1px dashed #333; margin: 8px 0; }
+          .row { display: flex; justify-content: space-between; padding: 3px 0; }
+          .amount { font-size: 20px; font-weight: bold; text-align: center; margin: 8px 0; }
+          .page-break { page-break-after: always; }
+          .page-break:last-child { page-break-after: avoid; }
+          @media print { @page { margin: 0; } }
+        </style></head>
+        <body>
+          ${content}
+        </body></html>`);
+      printWindow.document.close();
+      printWindow.onload = () => { printWindow.focus(); printWindow.print(); };
     }
   };
 
@@ -1193,8 +1385,14 @@ export function CustomerManager({ restaurantId, currency }: Props) {
               />
             </div>
             <div className="flex gap-2">
-              <Button className="flex-1 gradient-bg text-primary-foreground border-0" disabled={processingPayment} onClick={handleRecordPayment}>
-                {processingPayment ? 'جاري التسجيل...' : 'تسجيل وطباعة السند'}
+              <Button className="flex-1 gradient-bg text-primary-foreground border-0" disabled={processingPayment} onClick={handleSavePayment}>
+                {processingPayment ? 'جاري التسجيل...' : 'حفظ السند'}
+              </Button>
+              <Button variant="outline" className="flex-1" onClick={handlePrintReceipt}>
+                طباعة السند
+              </Button>
+              <Button variant="outline" onClick={() => setShowPrintSettings(true)}>
+                <Settings className="w-4 h-4 ml-1" />
               </Button>
               <Button variant="outline" onClick={() => setShowPaymentModal(false)}>إلغاء</Button>
             </div>
@@ -1219,6 +1417,7 @@ export function CustomerManager({ restaurantId, currency }: Props) {
               setEditingReceiptVoucher(null);
               setReceiptVoucherForm({
                 customer_id: '',
+                customer_name: '',
                 amount: '',
                 payment_method: 'cash',
                 notes: '',
@@ -1278,6 +1477,7 @@ export function CustomerManager({ restaurantId, currency }: Props) {
                                 setEditingReceiptVoucher(voucher);
                                 setReceiptVoucherForm({
                                   customer_id: voucher.customer_id,
+                                  customer_name: voucher.customer_name,
                                   amount: voucher.amount.toString(),
                                   payment_method: voucher.payment_method,
                                   notes: voucher.notes || '',
@@ -1320,18 +1520,12 @@ export function CustomerManager({ restaurantId, currency }: Props) {
           <div className="space-y-4 mt-4">
             <div>
               <Label>العميل *</Label>
-              <select
-                value={receiptVoucherForm.customer_id}
-                onChange={(e) => handleCustomerChange(e.target.value)}
-                className="w-full px-3 py-2 rounded-md bg-background border border-input text-sm"
-              >
-                <option value="">اختر العميل</option>
-                {customers.map(customer => (
-                  <option key={customer.id} value={customer.id}>
-                    {customer.name} - {customer.phone || 'لا يوجد هاتف'}
-                  </option>
-                ))}
-              </select>
+              <CustomerSearch
+                restaurantId={restaurantId}
+                value={receiptVoucherForm.customer_name}
+                onChange={handleCustomerSearchChange}
+                placeholder="ابحث عن عميل أو أدخل اسم جديد"
+              />
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div>
@@ -1394,14 +1588,51 @@ export function CustomerManager({ restaurantId, currency }: Props) {
               />
             </div>
             <div className="flex gap-2">
-              <Button className="flex-1" onClick={handleSaveReceiptVoucher}>
+              <Button className="flex-1 gradient-bg text-primary-foreground border-0" onClick={handleSaveReceiptVoucher}>
                 {editingReceiptVoucher ? 'تحديث' : 'إضافة'}
+              </Button>
+              <Button variant="outline" className="flex-1" onClick={handlePrintReceiptVoucher}>
+                طباعة
+              </Button>
+              <Button variant="outline" onClick={() => setShowPrintSettings(true)}>
+                <Settings className="w-4 h-4 ml-1" />
               </Button>
               <Button variant="outline" onClick={() => setShowReceiptVoucherModal(false)}>إلغاء</Button>
             </div>
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Print Settings Modal */}
+      <AnimatePresence>
+        {showPrintSettings && (
+          <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4" onClick={() => setShowPrintSettings(false)}>
+            <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.9, opacity: 0 }} className="glass-card p-6 max-w-md w-full space-y-4" onClick={(e) => e.stopPropagation()}>
+              <div className="flex items-center justify-between">
+                <h3 className="font-bold text-lg">إعدادات الطباعة</h3>
+                <button onClick={() => setShowPrintSettings(false)}><X className="w-5 h-5" /></button>
+              </div>
+              
+              <div className="space-y-3">
+                <label className="flex items-center gap-3 cursor-pointer">
+                  <input type="checkbox" checked={printSettings.customerCopy} onChange={(e) => setPrintSettings({ ...printSettings, customerCopy: e.target.checked })} className="w-4 h-4" />
+                  <span className="text-sm">نسخة العميل</span>
+                </label>
+                <label className="flex items-center gap-3 cursor-pointer">
+                  <input type="checkbox" checked={printSettings.businessCopy} onChange={(e) => setPrintSettings({ ...printSettings, businessCopy: e.target.checked })} className="w-4 h-4" />
+                  <span className="text-sm">نسخة المؤسسة</span>
+                </label>
+                <label className="flex items-center gap-3 cursor-pointer">
+                  <input type="checkbox" checked={printSettings.kitchenCopy} onChange={(e) => setPrintSettings({ ...printSettings, kitchenCopy: e.target.checked })} className="w-4 h-4" />
+                  <span className="text-sm">نسخة المطبخ</span>
+                </label>
+              </div>
+              
+              <Button onClick={() => setShowPrintSettings(false)} className="w-full gradient-bg text-primary-foreground border-0">حفظ</Button>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
