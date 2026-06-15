@@ -552,7 +552,7 @@ export default function Dashboard() {
                 </div>
 
                 <div className="flex gap-2 mt-auto">
-                <Button className="flex-1 gradient-bg border-0 text-white" size="sm" onClick={() => { setViewingOrderId(o.id); }}>
+                <Button className="flex-1 gradient-bg border-0 text-white" size="sm" onClick={() => { setLastReceipt(o); setShowReceipt(true); }}>
                   <FileText className="w-4 h-4 ml-1" /> تفاصيل
                 </Button>
                 <Button type="button" variant="ghost" size="sm" onClick={(e) => { e.stopPropagation(); handleEditOrder(o); }}>
