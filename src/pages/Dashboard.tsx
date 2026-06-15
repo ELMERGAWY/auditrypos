@@ -24,6 +24,7 @@ import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { useDashboardData } from './dashboard/useDashboardData';
 import { ReceiptModalWrapper } from './dashboard/ReceiptModal';
+import { InvoiceViewer } from '@/components/InvoiceViewer';
 import { ProfessionalSidebar, type SidebarTab } from '@/components/professional/ProfessionalSidebar';
 import { ModuleErrorBoundary } from '@/components/professional/ModuleErrorBoundary';
 import { DashboardErrorBoundary } from '@/components/professional/DashboardErrorBoundary';
@@ -141,6 +142,7 @@ export default function Dashboard() {
   const [showInvoiceTabs, setShowInvoiceTabs] = useState(false);
   const [lastReceipt, setLastReceipt] = useState<Order | null>(null);
   const [showReceipt, setShowReceipt] = useState(false);
+  const [viewingOrderId, setViewingOrderId] = useState<string | null>(null);
   const [isProcessingCheckout, setIsProcessingCheckout] = useState(false);
 
   // Reset modals on tab change
@@ -550,7 +552,7 @@ export default function Dashboard() {
                 </div>
 
                 <div className="flex gap-2 mt-auto">
-                <Button className="flex-1 gradient-bg border-0 text-white" size="sm" onClick={() => { setLastReceipt(o); setShowReceipt(true); }}>
+                <Button className="flex-1 gradient-bg border-0 text-white" size="sm" onClick={() => { setViewingOrderId(o.id); }}>
                   <FileText className="w-4 h-4 ml-1" /> تفاصيل
                 </Button>
                 <Button type="button" variant="ghost" size="sm" onClick={(e) => { e.stopPropagation(); handleEditOrder(o); }}>
@@ -668,6 +670,18 @@ export default function Dashboard() {
           </div>
         </main>
         {showReceipt && lastReceipt && <ReceiptModalWrapper isOpen={showReceipt} onClose={() => setShowReceipt(false)} order={lastReceipt} restaurant={restaurant} />}
+
+        {viewingOrderId && (
+          <InvoiceViewer
+            open={!!viewingOrderId}
+            onClose={() => setViewingOrderId(null)}
+            source="order"
+            recordId={viewingOrderId}
+            currency={currency}
+            restaurantName={restaurant?.name}
+            restaurantLogo={restaurant?.logo}
+          />
+        )}
         
         {/* Edit Order Modal */}
         {showEditOrderModal && (

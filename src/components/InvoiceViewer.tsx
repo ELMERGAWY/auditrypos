@@ -163,7 +163,7 @@ export function InvoiceViewer({
           </div>
 
           {/* Invoice Body */}
-          <div className="relative bg-card text-foreground rounded-3xl overflow-hidden shadow-2xl border border-border print:rounded-none print:shadow-none print:border-0">
+          <div className="invoice-print-body relative bg-card text-foreground rounded-3xl overflow-hidden shadow-2xl border border-border print:rounded-none print:shadow-none print:border-0">
             {/* Watermark */}
             <div className="absolute inset-0 pointer-events-none opacity-[0.035] flex items-center justify-center select-none">
               <Receipt className="w-[500px] h-[500px]" />
