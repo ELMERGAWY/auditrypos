@@ -552,16 +552,16 @@ export default function Dashboard() {
                 </div>
 
                 <div className="flex gap-2 mt-auto">
-                <Button className="flex-1 gradient-bg border-0 text-white" size="sm" onClick={() => { setViewingOrderId(o.id); }}>
+                <Button className="flex-1 gradient-bg border-0 text-white" size="sm" onClick={(e) => { e.stopPropagation(); setViewingOrderId(o.id); }}>
                   <FileText className="w-4 h-4 ml-1" /> تفاصيل
                 </Button>
-                <Button className="flex-1 bg-emerald-600 hover:bg-emerald-700 border-0 text-white" size="sm" onClick={() => { setLastReceipt(o); setShowReceipt(true); }}>
+                <Button className="flex-1 bg-emerald-600 hover:bg-emerald-700 border-0 text-white" size="sm" onClick={(e) => { e.stopPropagation(); setLastReceipt(o); setShowReceipt(true); }}>
                   <Printer className="w-4 h-4 ml-1" /> طباعة
                 </Button>
                 <Button type="button" variant="ghost" size="sm" onClick={(e) => { e.stopPropagation(); handleEditOrder(o); }}>
                   <Edit className="w-4 h-4" />
                 </Button>
-                <Button variant="ghost" size="sm" className="text-destructive hover:bg-destructive/10" onClick={() => handleDeleteOrder(o.id)}>
+                <Button variant="ghost" size="sm" className="text-destructive hover:bg-destructive/10" onClick={(e) => { e.stopPropagation(); handleDeleteOrder(o.id); }}>
                   <Trash2 className="w-4 h-4" />
                 </Button>
               </div>
