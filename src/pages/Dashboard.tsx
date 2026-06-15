@@ -504,7 +504,7 @@ export default function Dashboard() {
               </div>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">{filteredOrders.map(o => (
-              <Card key={o.id} className="p-4 hover:shadow-md transition-shadow border-primary/10">
+              <Card key={o.id} className="p-4 hover:shadow-md transition-shadow border-primary/10 cursor-pointer" onClick={() => setViewingOrderId(o.id)}>
                 <div className="flex justify-between items-start font-bold mb-3">
                   <div className="flex flex-col">
                     <span className="text-primary font-black">#{o.order_number.slice(-4)}</span>
