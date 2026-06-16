@@ -27,39 +27,39 @@ const THERMAL_STYLES = `
   * { margin: 0; padding: 0; box-sizing: border-box; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
   body { 
     font-family: 'Segoe UI', 'Arial', 'Tahoma', sans-serif; 
-    font-size: 14px; 
+    font-size: 11px; 
     line-height: 1.2;
     padding: 0; 
-    max-width: 58mm; 
+    max-width: 48mm; 
     margin: 0 auto; 
     color: #000; 
     background: #fff; 
   }
-  .receipt { padding: 4px; width: 100%; }
+  .receipt { padding: 2px; width: 100%; }
   .center { text-align: center; }
   .bold { font-weight: 800; }
-  .logo-name { font-size: 20px; font-weight: 900; letter-spacing: 0.5px; margin-bottom: 4px; }
-  .subtitle { font-size: 11px; font-weight: 700; color: #000; margin-bottom: 3px; }
-  .divider { border: none; border-top: 2.5px solid #000; margin: 6px 0; }
-  .divider-thin { border: none; border-top: 1.5px solid #000; margin: 5px 0; }
-  .row { display: flex; justify-content: space-between; align-items: center; padding: 2px 0; font-size: 12px; font-weight: 600; }
-  .total-row { font-size: 15px; font-weight: 900; padding: 5px 0; border-top: 2px solid #000; }
-  .info-label { color: #000; font-size: 12px; }
-  .footer { font-size: 10px; color: #000; margin-top: 8px; font-weight: 700; }
-  .items-section { margin: 8px 0; width: 100%; }
-  .item-row { display: flex; justify-content: space-between; padding: 5px 0; border-bottom: 1px dashed #000; font-size: 12px; font-weight: 700; }
+  .logo-name { font-size: 15px; font-weight: 900; letter-spacing: 0.5px; margin-bottom: 2px; }
+  .subtitle { font-size: 10px; font-weight: 700; color: #000; margin-bottom: 2px; }
+  .divider { border: none; border-top: 2px solid #000; margin: 4px 0; }
+  .divider-thin { border: none; border-top: 1px dashed #000; margin: 4px 0; }
+  .row { display: flex; justify-content: space-between; align-items: center; padding: 2px 0; font-size: 10px; font-weight: 600; }
+  .total-row { font-size: 12px; font-weight: 900; padding: 4px 0; border-top: 1.5px solid #000; }
+  .info-label { color: #000; font-size: 10px; }
+  .footer { font-size: 9px; color: #000; margin-top: 6px; font-weight: 700; }
+  .items-section { margin: 6px 0; width: 100%; }
+  .item-row { display: flex; justify-content: space-between; padding: 4px 0; border-bottom: 1px dashed #000; font-size: 10px; font-weight: 700; }
   .item-name { flex: 1; text-align: right; padding-left: 3px; overflow: hidden; line-height: 1.1; }
-  .item-qty { width: 30px; text-align: center; font-weight: 900; }
-  .item-price { width: 45px; text-align: left; }
-  .item-total { width: 55px; text-align: left; font-weight: 900; }
-  .items-header { display: flex; justify-content: space-between; padding: 4px 0; border-top: 2px solid #000; border-bottom: 2px solid #000; font-size: 11px; font-weight: 900; }
-  .summary-table { width: 100%; border-collapse: collapse; margin: 8px 0; table-layout: fixed; }
-  .summary-table td { padding: 4px 2px; font-size: 13px; border-bottom: 1.5px solid #000; font-weight: 700; }
+  .item-qty { width: 22px; text-align: center; font-weight: 900; }
+  .item-price { width: 38px; text-align: left; }
+  .item-total { width: 45px; text-align: left; font-weight: 900; }
+  .items-header { display: flex; justify-content: space-between; padding: 3px 0; border-top: 1.5px solid #000; border-bottom: 1.5px solid #000; font-size: 9px; font-weight: 900; }
+  .summary-table { width: 100%; border-collapse: collapse; margin: 6px 0; table-layout: fixed; }
+  .summary-table td { padding: 3px 2px; font-size: 11px; border-bottom: 1px dashed #000; font-weight: 700; }
   .summary-table td:last-child { text-align: left; font-weight: 900; }
-  .summary-table tr:last-child td { border-bottom: 3px solid #000; }
+  .summary-table tr:last-child td { border-bottom: 2px solid #000; }
   @media print { 
-    body { margin: 0; padding: 0; width: 58mm; } 
-    .receipt { width: 58mm; padding: 0; }
+    body { margin: 0 auto; padding: 0; width: 48mm; } 
+    .receipt { width: 48mm; padding: 0; }
     @page { margin: 0; size: 58mm auto; }
     * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; color: #000 !important; }
   }
@@ -405,7 +405,7 @@ export function ReceiptModalWrapper({ order, restaurant, onClose, onComplete, is
 
             <div className="flex-1 overflow-y-auto max-h-[60vh] bg-white border border-border/50 rounded-2xl shadow-inner flex justify-center py-4 text-black custom-scrollbar">
               <div 
-                className="w-[58mm] bg-white text-black p-1 text-xs"
+                className="w-[48mm] bg-white text-black p-1 text-xs"
                 style={{ 
                   fontFamily: "'Segoe UI', 'Arial', 'Tahoma', sans-serif",
                   lineHeight: '1.2'
