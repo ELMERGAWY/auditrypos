@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useRef, useState, useEffect } from 'react';
 import { Printer, X, Settings } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -12,6 +12,8 @@ interface ReceiptProps {
   restaurant: Restaurant;
   onClose: () => void;
   onComplete?: () => void;
+  isOpen?: boolean;
+  autoPrint?: boolean;
 }
 
 const PAYMENT_LABELS: Record<string, string> = {
@@ -56,9 +58,9 @@ const THERMAL_STYLES = `
   .summary-table td:last-child { text-align: left; font-weight: 900; }
   .summary-table tr:last-child td { border-bottom: 3px solid #000; }
   @media print { 
-    body { margin: 0; padding: 0; width: 100%; } 
-    .receipt { width: 100%; }
-    @page { margin: 0; size: auto; }
+    body { margin: 0; padding: 0; width: 58mm; } 
+    .receipt { width: 58mm; padding: 0; }
+    @page { margin: 0; size: 58mm auto; }
     * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; color: #000 !important; }
   }
 `;
@@ -258,7 +260,7 @@ type CombinedPrintSettings = PrintElementSettings & {
   kitchenCopy: boolean;
 };
 
-export function ReceiptModalWrapper({ order, restaurant, onClose, onComplete }: ReceiptProps) {
+export function ReceiptModalWrapper({ order, restaurant, onClose, onComplete, isOpen = true, autoPrint = false }: ReceiptProps) {
   const ref = useRef<HTMLDivElement>(null);
   const [showPrintSettings, setShowPrintSettings] = useState(false);
   const [printSettings, setPrintSettings] = useState<CombinedPrintSettings>({
@@ -376,30 +378,89 @@ export function ReceiptModalWrapper({ order, restaurant, onClose, onComplete }: 
     printWindow.document.close();
   };
 
-  return (
-    <div>
-      <div ref={ref} className="space-y-2 text-xs bg-card rounded-lg p-4 max-h-[60vh] overflow-auto" dir="rtl"
-        style={{ fontFamily: "'Arial', 'Tahoma', sans-serif" }}>
-        <ReceiptContent order={order} restaurant={restaurant} printSettings={printSettings} />
-      </div>
+  useEffect(() => {
+    if (isOpen && autoPrint) {
+      const timer = setTimeout(() => {
+        printReceipt();
+      }, 500);
+      return () => clearTimeout(timer);
+    }
+  }, [isOpen, autoPrint]);
 
-      <div className="flex gap-2 mt-4">
-        <Button onClick={printReceipt} className="flex-1 gradient-bg text-primary-foreground border-0">
-          <Printer className="w-4 h-4 ml-1" /> طباعة حرارية
-        </Button>
-        <Button variant="outline" onClick={() => setShowPrintSettings(true)} className="flex-1">
-          <Settings className="w-4 h-4 ml-1" /> إعدادات الطباعة
-        </Button>
-        <Button variant="outline" onClick={onClose} className="flex-1">إغلاق</Button>
-        {onComplete && (
-          <Button onClick={onComplete} className="flex-1 gradient-bg text-primary-foreground border-0">إتمام الطلب</Button>
-        )}
-      </div>
-      
+  return (
+    <AnimatePresence>
+      {isOpen && (
+        <div className="fixed inset-0 z-[100] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto" onClick={onClose}>
+          <motion.div 
+            initial={{ scale: 0.9, opacity: 0 }} 
+            animate={{ scale: 1, opacity: 1 }} 
+            exit={{ scale: 0.9, opacity: 0 }} 
+            className="glass-card p-6 w-full max-w-[380px] flex flex-col relative max-h-[90vh] bg-card text-foreground"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button onClick={onClose} className="absolute left-4 top-4 text-muted-foreground hover:text-foreground">
+              <X className="w-5 h-5" />
+            </button>
+            <h3 className="text-xl font-black mb-4 text-center">تفاصيل الفاتورة</h3>
+
+            <div className="flex-1 overflow-y-auto max-h-[60vh] bg-white border border-border/50 rounded-2xl shadow-inner flex justify-center py-4 text-black custom-scrollbar">
+              <div 
+                className="w-[58mm] bg-white text-black p-1 text-xs"
+                style={{ 
+                  fontFamily: "'Segoe UI', 'Arial', 'Tahoma', sans-serif",
+                  lineHeight: '1.2'
+                }}
+              >
+                <style dangerouslySetInnerHTML={{ __html: `
+                  .receipt { width: 100%; padding: 0; color: #000; background: #fff; }
+                  .center { text-align: center; }
+                  .bold { font-weight: 800; }
+                  .logo-name { font-size: 16px; font-weight: 900; margin-bottom: 2px; }
+                  .subtitle { font-size: 10px; font-weight: 700; margin-bottom: 2px; }
+                  .divider { border: none; border-top: 2px solid #000; margin: 4px 0; }
+                  .divider-thin { border: none; border-top: 1px dashed #000; margin: 4px 0; }
+                  .row { display: flex; justify-content: space-between; align-items: center; padding: 1px 0; font-size: 10px; font-weight: 600; }
+                  .total-row { font-size: 13px; font-weight: 900; padding: 4px 0; border-top: 1.5px solid #000; }
+                  .info-label { color: #000; font-size: 10px; }
+                  .footer { font-size: 9px; color: #666; margin-top: 6px; font-weight: 700; }
+                  .items-section { margin: 6px 0; width: 100%; }
+                  .item-row { display: flex; justify-content: space-between; padding: 3px 0; border-bottom: 1px dashed #ccc; font-size: 10px; font-weight: 700; color: #000; }
+                  .item-name { flex: 1; text-align: right; padding-left: 2px; overflow: hidden; }
+                  .item-qty { width: 20px; text-align: center; font-weight: 900; }
+                  .item-price { width: 35px; text-align: left; }
+                  .item-total { width: 40px; text-align: left; font-weight: 900; }
+                  .items-header { display: flex; justify-content: space-between; padding: 3px 0; border-top: 1.5px solid #000; border-bottom: 1.5px solid #000; font-size: 9px; font-weight: 900; }
+                  .summary-table { width: 100%; border-collapse: collapse; margin: 6px 0; }
+                  .summary-table td { padding: 3px 1px; font-size: 11px; border-bottom: 1px dashed #000; font-weight: 700; color: #000; }
+                  .summary-table td:last-child { text-align: left; font-weight: 900; }
+                  .summary-table tr:last-child td { border-bottom: 2px solid #000; }
+                `}} />
+                <div ref={ref}>
+                  <ReceiptContent order={order} restaurant={restaurant} printSettings={printSettings} />
+                </div>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-2 mt-4">
+              <Button onClick={printReceipt} className="gradient-bg text-primary-foreground border-0 gap-1 flex items-center justify-center">
+                <Printer className="w-4 h-4" /> طباعة حرارية
+              </Button>
+              <Button variant="outline" onClick={() => setShowPrintSettings(true)} className="gap-1 flex items-center justify-center">
+                <Settings className="w-4 h-4" /> الإعدادات
+              </Button>
+              <Button variant="outline" onClick={onClose} className="col-span-2">إغلاق</Button>
+              {onComplete && (
+                <Button onClick={onComplete} className="col-span-2 gradient-bg text-primary-foreground border-0">إتمام الطلب</Button>
+              )}
+            </div>
+          </motion.div>
+        </div>
+      )}
+
       {/* Print Settings Modal */}
       <AnimatePresence>
         {showPrintSettings && (
-          <div className="fixed inset-0 z-[60] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4" onClick={() => setShowPrintSettings(false)}>
+          <div className="fixed inset-0 z-[110] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4" onClick={() => setShowPrintSettings(false)}>
             <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.9, opacity: 0 }} className="glass-card p-6 max-w-md w-full space-y-4 max-h-[80vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
               <div className="flex items-center justify-between">
                 <h3 className="font-bold text-lg">إعدادات الطباعة</h3>
@@ -523,10 +584,10 @@ export function ReceiptModalWrapper({ order, restaurant, onClose, onComplete }: 
           </div>
         )}
       </AnimatePresence>
-    </div>
+    </AnimatePresence>
   );
 }
 
 export function ReceiptModal({ order, restaurant, onClose, onComplete }: ReceiptProps) {
-  return <ReceiptModalWrapper order={order} restaurant={restaurant} onClose={onClose} onComplete={onComplete} />;
+  return <ReceiptModalWrapper isOpen={true} order={order} restaurant={restaurant} onClose={onClose} onComplete={onComplete} />;
 }

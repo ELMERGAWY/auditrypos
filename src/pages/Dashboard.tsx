@@ -142,6 +142,7 @@ export default function Dashboard() {
   const [showInvoiceTabs, setShowInvoiceTabs] = useState(false);
   const [lastReceipt, setLastReceipt] = useState<Order | null>(null);
   const [showReceipt, setShowReceipt] = useState(false);
+  const [autoPrint, setAutoPrint] = useState(false);
   const [viewingOrderId, setViewingOrderId] = useState<string | null>(null);
   const [isProcessingCheckout, setIsProcessingCheckout] = useState(false);
 
@@ -149,6 +150,7 @@ export default function Dashboard() {
   useEffect(() => {
     setShowReceipt(false);
     setShowInvoiceTabs(false);
+    setAutoPrint(false);
   }, [activeTab]);
 
   // Derived
@@ -440,6 +442,7 @@ export default function Dashboard() {
         };
         setOrders(prev => [completeOrder as Order, ...(Array.isArray(prev) ? prev : [])]);
         setLastReceipt(completeOrder as Order);
+        setAutoPrint(false);
         setShowReceipt(true);
         toast.success(`✅ تم إنشاء الطلب #${result.order.order_number?.slice(-4)}`);
         clearCart();
@@ -477,7 +480,7 @@ export default function Dashboard() {
         {activeTab === 'pos' && (
           <div className="flex flex-col lg:flex-row h-full gap-4 overflow-hidden">
             <POSGrid restaurant={restaurant} currency={currency} categories={categories} selectedCategory={selectedCategory} setSelectedCategory={setSelectedCategory} searchQuery={searchQuery} setSearchQuery={setSearchQuery} filteredItems={filteredItems} addToCart={addToCart} servicePackages={servicePackages} addPackageToCart={addPackageToCart} businessType={businessType} todayRevenue={todayRevenue} todayOrders={todayOrdersList} avgOrderValue={avgOrderValue} pendingOrders={pendingOrders} orderType={orderType} orders={orders} tableNumber={tableNumber} setTableNumber={setTableNumber} />
-            <POSCart activeInvoiceId={activeInvoiceId} invoiceTabs={invoiceTabs} cart={cart} holdCurrentInvoice={holdCurrentInvoice} setShowInvoiceTabs={setShowInvoiceTabs} clearCart={clearCart} businessType={businessType} orderType={orderType} setOrderType={setOrderType} tableNumber={tableNumber} setTableNumber={setTableNumber} customOrderNumber={customOrderNumber} setCustomOrderNumber={setCustomOrderNumber} restaurant={restaurant} customerName={customerName} setCustomerName={selectCustomerFromSearch} customerPhone={customerPhone} setCustomerPhone={setCustomerPhone} customerRef={customerRef} setCustomerRef={setCustomerRef} deliveryAddress={deliveryAddress} setDeliveryAddress={setDeliveryAddress} agents={agents} selectedDeliveryAgent={selectedDeliveryAgent} setSelectedDeliveryAgent={setSelectedDeliveryAgent} orderNotes={orderNotes} setOrderNotes={setOrderNotes} discount={discount} setDiscount={setDiscount} discountType={discountType} setDiscountType={setDiscountType} currency={currency} getUnitOptions={getUnitOptions} updateQty={updateQty} setCartItemQty={setCartItemQty} setCartItemUnit={setCartItemUnit} updateValue={updateValue} updatePrice={updatePrice} discountAmount={discountAmount} taxAmount={totalTax} cartSubtotal={cartSubtotal} cartTotal={cartTotal} paymentMethod={paymentMethod} setPaymentMethod={setPaymentMethod} paidAmount={paidAmount} setPaidAmount={setPaidAmount} remaining={remaining} checkout={performCheckout} previewInvoice={() => { setLastReceipt({ total: cartTotal, items: cart.map(c => ({ menu_item_name: c.item.name, quantity: c.qty, price: Number(c.price) })) } as any); setShowReceipt(true); }} removeFromCart={(id) => setCart(prev => prev.filter(c => c.item.id !== id))} accountingAccounts={accountingAccounts} selectedAccountId={selectedAccountId} setSelectedAccountId={setSelectedAccountId} isProcessing={isProcessingCheckout} />
+            <POSCart activeInvoiceId={activeInvoiceId} invoiceTabs={invoiceTabs} cart={cart} holdCurrentInvoice={holdCurrentInvoice} setShowInvoiceTabs={setShowInvoiceTabs} clearCart={clearCart} businessType={businessType} orderType={orderType} setOrderType={setOrderType} tableNumber={tableNumber} setTableNumber={setTableNumber} customOrderNumber={customOrderNumber} setCustomOrderNumber={setCustomOrderNumber} restaurant={restaurant} customerName={customerName} setCustomerName={selectCustomerFromSearch} customerPhone={customerPhone} setCustomerPhone={setCustomerPhone} customerRef={customerRef} setCustomerRef={setCustomerRef} deliveryAddress={deliveryAddress} setDeliveryAddress={setDeliveryAddress} agents={agents} selectedDeliveryAgent={selectedDeliveryAgent} setSelectedDeliveryAgent={setSelectedDeliveryAgent} orderNotes={orderNotes} setOrderNotes={setOrderNotes} discount={discount} setDiscount={setDiscount} discountType={discountType} setDiscountType={setDiscountType} currency={currency} getUnitOptions={getUnitOptions} updateQty={updateQty} setCartItemQty={setCartItemQty} setCartItemUnit={setCartItemUnit} updateValue={updateValue} updatePrice={updatePrice} discountAmount={discountAmount} taxAmount={totalTax} cartSubtotal={cartSubtotal} cartTotal={cartTotal} paymentMethod={paymentMethod} setPaymentMethod={setPaymentMethod} paidAmount={paidAmount} setPaidAmount={setPaidAmount} remaining={remaining} checkout={performCheckout} previewInvoice={() => { setLastReceipt({ total: cartTotal, items: cart.map(c => ({ menu_item_name: c.item.name, quantity: c.qty, price: Number(c.price) })) } as any); setAutoPrint(false); setShowReceipt(true); }} removeFromCart={(id) => setCart(prev => prev.filter(c => c.item.id !== id))} accountingAccounts={accountingAccounts} selectedAccountId={selectedAccountId} setSelectedAccountId={setSelectedAccountId} isProcessing={isProcessingCheckout} />
           </div>
         )}
         {activeTab === 'orders' && (
@@ -504,7 +507,7 @@ export default function Dashboard() {
               </div>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">{filteredOrders.map(o => (
-              <Card key={o.id} className="p-4 hover:shadow-md transition-shadow border-primary/10 cursor-pointer" onClick={() => { setLastReceipt(o); setShowReceipt(true); }}>
+              <Card key={o.id} className="p-4 hover:shadow-md transition-shadow border-primary/10 cursor-pointer" onClick={() => { setLastReceipt(o); setAutoPrint(false); setShowReceipt(true); }}>
                 <div className="flex justify-between items-start font-bold mb-3">
                   <div className="flex flex-col">
                     <span className="text-primary font-black">#{o.order_number.slice(-4)}</span>
@@ -552,10 +555,10 @@ export default function Dashboard() {
                 </div>
 
                 <div className="flex gap-2 mt-auto">
-                <Button className="flex-1 gradient-bg border-0 text-white" size="sm" onClick={(e) => { e.stopPropagation(); setLastReceipt(o); setShowReceipt(true); }}>
+                <Button className="flex-1 gradient-bg border-0 text-white" size="sm" onClick={(e) => { e.stopPropagation(); setLastReceipt(o); setAutoPrint(false); setShowReceipt(true); }}>
                   <FileText className="w-4 h-4 ml-1" /> تفاصيل
                 </Button>
-                <Button className="flex-1 bg-emerald-600 hover:bg-emerald-700 border-0 text-white" size="sm" onClick={(e) => { e.stopPropagation(); setLastReceipt(o); setShowReceipt(true); }}>
+                <Button className="flex-1 bg-emerald-600 hover:bg-emerald-700 border-0 text-white" size="sm" onClick={(e) => { e.stopPropagation(); setLastReceipt(o); setAutoPrint(true); setShowReceipt(true); }}>
                   <Printer className="w-4 h-4 ml-1" /> طباعة
                 </Button>
                 <Button type="button" variant="ghost" size="sm" onClick={(e) => { e.stopPropagation(); handleEditOrder(o); }}>
@@ -672,7 +675,7 @@ export default function Dashboard() {
             {activeTabContent}
           </div>
         </main>
-        {showReceipt && lastReceipt && <ReceiptModalWrapper isOpen={showReceipt} onClose={() => setShowReceipt(false)} order={lastReceipt} restaurant={restaurant} />}
+        {showReceipt && lastReceipt && <ReceiptModalWrapper isOpen={showReceipt} onClose={() => setShowReceipt(false)} order={lastReceipt} restaurant={restaurant} autoPrint={autoPrint} />}
 
         {viewingOrderId && (
           <InvoiceViewer
