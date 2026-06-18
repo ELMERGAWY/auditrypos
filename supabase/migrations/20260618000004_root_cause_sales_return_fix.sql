@@ -40,6 +40,9 @@ DECLARE
   v_total_credit NUMERIC(15,2) := 0;
   v_item RECORD;
   v_success BOOLEAN;
+  v_inventory_mode TEXT;
+  v_linked_product_id UUID;
+  v_component RECORD;
 BEGIN
   -- Only process when status changes to 'approved' or 'completed'
   IF NEW.status NOT IN ('approved', 'completed') OR OLD.status IN ('approved', 'completed') THEN
@@ -97,50 +100,45 @@ BEGIN
     END IF;
 
     IF NOT v_success AND v_item.menu_item_id IS NOT NULL THEN
-      DECLARE
-        v_inventory_mode TEXT;
-        v_linked_product_id UUID;
-      BEGIN
-        SELECT inventory_mode, product_id INTO v_inventory_mode, v_linked_product_id
-        FROM public.menu_items WHERE id = v_item.menu_item_id;
+      SELECT inventory_mode, product_id INTO v_inventory_mode, v_linked_product_id
+      FROM public.menu_items WHERE id = v_item.menu_item_id;
 
-        IF v_inventory_mode = 'direct' AND v_linked_product_id IS NOT NULL THEN
-          v_success := public.adjust_product_stock(
-            v_linked_product_id,
+      IF v_inventory_mode = 'direct' AND v_linked_product_id IS NOT NULL THEN
+        v_success := public.adjust_product_stock(
+          v_linked_product_id,
+          NEW.restaurant_id,
+          v_item.quantity_returned,
+          'in',
+          'sales_return_direct',
+          NEW.id::text || '_' || v_item.id::text
+        );
+      ELSIF v_inventory_mode = 'recipe' THEN
+        FOR v_component IN (
+          SELECT product_id, quantity_required
+          FROM public.menu_item_components
+          WHERE menu_item_id = v_item.menu_item_id
+        ) LOOP
+          PERFORM public.adjust_product_stock(
+            v_component.product_id,
             NEW.restaurant_id,
-            v_item.quantity_returned,
+            v_component.quantity_required * v_item.quantity_returned,
             'in',
-            'sales_return_direct',
-            NEW.id::text || '_' || v_item.id::text
+            'sales_return_recipe',
+            NEW.id::text || '_' || v_item.id::text || '_' || v_component.product_id::text
           );
-        ELSIF v_inventory_mode = 'recipe' THEN
-          FOR v_component IN (
-            SELECT product_id, quantity_required
-            FROM public.menu_item_components
-            WHERE menu_item_id = v_item.menu_item_id
-          ) LOOP
-            PERFORM public.adjust_product_stock(
-              v_component.product_id,
-              NEW.restaurant_id,
-              v_component.quantity_required * v_item.quantity_returned,
-              'in',
-              'sales_return_recipe',
-              NEW.id::text || '_' || v_item.id::text || '_' || v_component.product_id::text
-            );
-          END LOOP;
-          v_success := true;
-        ELSIF v_inventory_mode = 'none' OR v_inventory_mode IS NULL THEN
-          -- Try menu_item_id as product ID
-          v_success := public.adjust_product_stock(
-            v_item.menu_item_id,
-            NEW.restaurant_id,
-            v_item.quantity_returned,
-            'in',
-            'sales_return_retail',
-            NEW.id::text || '_' || v_item.id::text
-          );
-        END IF;
-      END;
+        END LOOP;
+        v_success := true;
+      ELSIF v_inventory_mode = 'none' OR v_inventory_mode IS NULL THEN
+        -- Try menu_item_id as product ID
+        v_success := public.adjust_product_stock(
+          v_item.menu_item_id,
+          NEW.restaurant_id,
+          v_item.quantity_returned,
+          'in',
+          'sales_return_retail',
+          NEW.id::text || '_' || v_item.id::text
+        );
+      END IF;
     END IF;
   END LOOP;
 
