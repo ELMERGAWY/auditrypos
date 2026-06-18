@@ -465,8 +465,8 @@ export function CustomerManager({ restaurantId, currency }: Props) {
           type: payment.type as any,
           reference: '',
           description: payment.description || (payment.type === 'payment' ? 'سداد' : 'تسوية'),
-          debit: payment.type === 'debit' ? amount : 0,
-          credit: payment.type !== 'debit' ? amount : 0,
+          debit: payment.type === 'debit' ? Math.abs(amount) : 0,
+          credit: payment.type !== 'debit' ? Math.abs(amount) : 0,
           balance: 0
         });
       });
@@ -669,12 +669,16 @@ export function CustomerManager({ restaurantId, currency }: Props) {
     if (!amount || amount <= 0) { toast.error('أدخل مبلغ صحيح'); return; }
     setProcessingPayment(true);
     try {
+      const recAcc = accounts.find(acc => acc.code?.startsWith('12') || acc.name?.includes('عملاء') || acc.name?.includes('مدينة'));
       const { error: rpcError } = await supabase.rpc('save_receipt_voucher', {
         p_restaurant_id: restaurantId,
         p_customer_id: selectedCustomer.id,
         p_amount: amount,
         p_payment_method: paymentForm.payment_method,
+        p_voucher_date: new Date().toISOString().split('T')[0],
         p_notes: paymentForm.notes || 'سند قبض',
+        p_account_id: recAcc ? recAcc.id : null,
+        p_counter_account_id: recAcc ? recAcc.id : null,
         p_voucher_id: null
       });
 

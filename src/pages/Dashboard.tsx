@@ -317,16 +317,21 @@ export default function Dashboard() {
     }));
   }, [getUnitOptions]);
 
-  // Bidirectional: editing the value (amount) field recomputes qty = value / unitPrice
+  // Bidirectional: editing the value (amount) field recomputes qty = value / unitPrice.
+  // If price is 0, treat the entered value as the new unit price (qty stays 1).
   const updateValue = useCallback((id: string, value: number) => {
     if (isNaN(value) || value < 0) return;
     setCart(prev => prev.map(c => {
       if (c.item.id !== id) return c;
       const price = Number(c.price) || 0;
-      if (price <= 0) return c;
+      if (price <= 0) {
+        // No unit price yet — set value as price, keep qty = 1
+        return { ...c, price: value, qty: 1, qtyText: '1' };
+      }
       const newQty = Math.round((value / price) * 1000) / 1000;
+      if (newQty <= 0) return c; // don't remove — just keep as is
       return { ...c, qty: newQty, qtyText: String(newQty) };
-    }).filter(c => c.qty > 0));
+    }));
   }, []);
 
   const updatePrice = useCallback((id: string, newPrice: number) => {

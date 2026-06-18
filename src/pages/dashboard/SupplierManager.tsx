@@ -323,8 +323,8 @@ export function SupplierManager({ restaurantId, currency }: Props) {
           type: tx.type as any,
           reference: '',
           description: tx.description || (tx.type === 'payment' ? 'سداد للمورد' : 'تسوية'),
-          debit: tx.type === 'debit' ? amount : 0,
-          credit: tx.type !== 'debit' ? amount : 0,
+          debit: tx.type === 'debit' ? Math.abs(amount) : 0,
+          credit: tx.type !== 'debit' ? Math.abs(amount) : 0,
           balance: 0
         });
       });
