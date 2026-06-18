@@ -274,23 +274,7 @@ export function SalesReturnsManager({ restaurantId, currency }: Props) {
 
       if (error) throw error;
 
-      // Accounting Integration
-      if (newStatus === 'completed') {
-        const bt = (await supabase.from('restaurants').select('business_type').eq('id', restaurantId).single()).data?.business_type || 'restaurant';
-        
-        await journalService.createSalesReturnJournalEntry(
-          restaurantId,
-          {
-            orderId: ret.id, // Using return ID as reference
-            orderNumber: ret.return_number,
-            amount: ret.total_amount,
-            taxAmount: 0, // Should be calculated or pulled from items
-            reason: ret.reason || 'مردود مبيعات',
-            customerId: ret.customer_id || undefined,
-          },
-          bt
-        );
-      }
+      // Accounting Integration is handled automatically by database trigger trg_create_sales_return_journal on BEFORE UPDATE of sales_returns status to completed/approved.
 
       toast.success('تم تحديث حالة المردود');
       loadReturns();
