@@ -207,6 +207,12 @@ export function SalesReturnsManager({ restaurantId, currency }: Props) {
     }
 
     try {
+      // Calculate total amount first
+      const totalAmount = itemsToReturn.reduce((sum, [itemId, config]) => {
+        const item = orderItems.find(i => i.id === itemId);
+        return sum + ((item?.price || 0) * config.quantity);
+      }, 0);
+      
       // Generate return number
       const { data: countData } = await supabase
         .from('sales_returns')
@@ -227,7 +233,7 @@ export function SalesReturnsManager({ restaurantId, currency }: Props) {
           return_date: returnDate,
           reason: returnReason,
           status: 'pending',
-          total_amount: 0 // Will be calculated by trigger
+          total_amount: totalAmount
         })
         .select()
         .single();
