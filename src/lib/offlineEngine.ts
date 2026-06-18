@@ -159,7 +159,7 @@ export async function removePendingStatusUpdate(id: string) {
 // ─── Pending Transactions Queue (General ERP) ───
 export interface PendingTransaction {
   id: string;
-  type: 'expense' | 'sales_order' | 'crm_log' | 'return' | 'stock_adjustment';
+  type: 'expense' | 'sales_order' | 'crm_log' | 'return' | 'stock_adjustment' | 'marketing_metadata';
   payload: any;
   timestamp: number;
 }
@@ -404,6 +404,28 @@ export async function syncPendingData(): Promise<{ synced: number; errors: numbe
           const { error: soErr } = await supabase.from('orders').insert(ptx.payload);
           if (!soErr) success = true;
           break;
+        case 'marketing_metadata':
+          const { data: existingLead } = await supabase.from('crm_leads')
+            .select('id')
+            .eq('restaurant_id', ptx.payload.restaurant_id)
+            .eq('name', 'MARKETING_ERP_SYSTEM_METADATA')
+            .limit(1);
+          if (existingLead && existingLead.length > 0) {
+            const { error: updErr } = await supabase.from('crm_leads')
+              .update({ raw_social_data: ptx.payload.data })
+              .eq('id', existingLead[0].id);
+            if (!updErr) success = true;
+          } else {
+            const { error: insErr } = await supabase.from('crm_leads')
+              .insert({
+                restaurant_id: ptx.payload.restaurant_id,
+                name: 'MARKETING_ERP_SYSTEM_METADATA',
+                raw_social_data: ptx.payload.data,
+                stage: 'metadata'
+              });
+            if (!insErr) success = true;
+          }
+          break;
       }
       if (success) {
         await removePendingTransaction(ptx.id);
@@ -524,6 +546,28 @@ export async function forceSyncPendingData(): Promise<{ synced: number; errors: 
         case 'sales_order':
           const { error: soErr } = await supabase.from('orders').insert(ptx.payload);
           if (!soErr) success = true;
+          break;
+        case 'marketing_metadata':
+          const { data: existingLead } = await supabase.from('crm_leads')
+            .select('id')
+            .eq('restaurant_id', ptx.payload.restaurant_id)
+            .eq('name', 'MARKETING_ERP_SYSTEM_METADATA')
+            .limit(1);
+          if (existingLead && existingLead.length > 0) {
+            const { error: updErr } = await supabase.from('crm_leads')
+              .update({ raw_social_data: ptx.payload.data })
+              .eq('id', existingLead[0].id);
+            if (!updErr) success = true;
+          } else {
+            const { error: insErr } = await supabase.from('crm_leads')
+              .insert({
+                restaurant_id: ptx.payload.restaurant_id,
+                name: 'MARKETING_ERP_SYSTEM_METADATA',
+                raw_social_data: ptx.payload.data,
+                stage: 'metadata'
+              });
+            if (!insErr) success = true;
+          }
           break;
       }
       if (success) {
