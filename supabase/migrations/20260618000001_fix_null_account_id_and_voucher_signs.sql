@@ -289,4 +289,122 @@ BEGIN
 END;
 $$;
 
+
+-- 10) Fix create_sales_return_journal_entry (self-contained, robust version)
+CREATE OR REPLACE FUNCTION public.create_sales_return_journal_entry()
+RETURNS TRIGGER AS $$
+DECLARE
+  v_entry_id UUID;
+  v_sales_returns_account UUID;
+  v_receivable_account UUID;
+  v_cash_account UUID;
+  v_cogs_account UUID;
+  v_inventory_account UUID;
+  v_entry_number TEXT;
+  v_total_cost DECIMAL(15,2) := 0;
+BEGIN
+  -- Only process when status changes to 'approved' or 'completed'
+  IF NEW.status NOT IN ('approved', 'completed') OR OLD.status IN ('approved', 'completed') THEN
+    RETURN NEW;
+  END IF;
+  
+  -- Skip if already has journal entry
+  IF NEW.journal_entry_id IS NOT NULL THEN
+    RETURN NEW;
+  END IF;
+  
+  -- 1) Get/Create Sales Returns Account (4020 or 402 or 4000)
+  SELECT id INTO v_sales_returns_account FROM public.chart_of_accounts 
+  WHERE restaurant_id = NEW.restaurant_id AND (code = '4020' OR code = '402' OR system_key = 'sales_returns');
+  IF v_sales_returns_account IS NULL THEN
+    INSERT INTO public.chart_of_accounts (restaurant_id, code, name, account_type, subtype, system_key, normal_side, account_class)
+    VALUES (NEW.restaurant_id, '4020', 'مردودات المبيعات', 'revenue', 'sales_returns', 'sales_returns', 'debit', 'revenue')
+    ON CONFLICT (restaurant_id, code) DO UPDATE SET name = EXCLUDED.name
+    RETURNING id INTO v_sales_returns_account;
+  END IF;
+
+  -- 2) Get/Create Accounts Receivable (1200 or 102)
+  SELECT id INTO v_receivable_account FROM public.chart_of_accounts 
+  WHERE restaurant_id = NEW.restaurant_id AND (code = '1200' OR code = '102' OR system_key = 'accounts_receivable');
+  IF v_receivable_account IS NULL THEN
+    INSERT INTO public.chart_of_accounts (restaurant_id, code, name, account_type, subtype, system_key, normal_side, account_class)
+    VALUES (NEW.restaurant_id, '1200', 'العملاء', 'asset', 'receivable', 'accounts_receivable', 'debit', 'asset')
+    ON CONFLICT (restaurant_id, code) DO UPDATE SET name = EXCLUDED.name
+    RETURNING id INTO v_receivable_account;
+  END IF;
+
+  -- 3) Get/Create Cash Account (1000 or 101)
+  SELECT id INTO v_cash_account FROM public.chart_of_accounts 
+  WHERE restaurant_id = NEW.restaurant_id AND (code = '1000' OR code = '101' OR is_cash_account = true OR system_key = 'cash_on_hand');
+  IF v_cash_account IS NULL THEN
+    INSERT INTO public.chart_of_accounts (restaurant_id, code, name, account_type, is_cash_account, subtype, system_key, normal_side, account_class)
+    VALUES (NEW.restaurant_id, '1000', 'الصندوق الرئيسي', 'asset', true, 'cash', 'cash_on_hand', 'debit', 'asset')
+    ON CONFLICT (restaurant_id, code) DO UPDATE SET name = EXCLUDED.name
+    RETURNING id INTO v_cash_account;
+  END IF;
+
+  -- 4) Get/Create COGS Account (5000 or 501)
+  SELECT id INTO v_cogs_account FROM public.chart_of_accounts 
+  WHERE restaurant_id = NEW.restaurant_id AND (code = '5000' OR code = '501' OR system_key = 'cogs');
+  IF v_cogs_account IS NULL THEN
+    INSERT INTO public.chart_of_accounts (restaurant_id, code, name, account_type, subtype, system_key, normal_side, account_class)
+    VALUES (NEW.restaurant_id, '5000', 'تكلفة المبيعات', 'expense', 'cogs', 'cogs', 'debit', 'expense')
+    ON CONFLICT (restaurant_id, code) DO UPDATE SET name = EXCLUDED.name
+    RETURNING id INTO v_cogs_account;
+  END IF;
+
+  -- 5) Get/Create Inventory Account (1300 or 103)
+  SELECT id INTO v_inventory_account FROM public.chart_of_accounts 
+  WHERE restaurant_id = NEW.restaurant_id AND (code = '1300' OR code = '103' OR system_key = 'inventory');
+  IF v_inventory_account IS NULL THEN
+    INSERT INTO public.chart_of_accounts (restaurant_id, code, name, account_type, subtype, system_key, normal_side, account_class)
+    VALUES (NEW.restaurant_id, '1300', 'المخزون', 'asset', 'inventory', 'inventory', 'debit', 'asset')
+    ON CONFLICT (restaurant_id, code) DO UPDATE SET name = EXCLUDED.name
+    RETURNING id INTO v_inventory_account;
+  END IF;
+  
+  -- Calculate total cost from return items
+  SELECT COALESCE(SUM(cost_price_at_return * quantity_returned), 0) INTO v_total_cost
+  FROM public.sales_return_items 
+  WHERE sales_return_id = NEW.id AND return_to_inventory = true;
+  
+  -- Generate entry number
+  v_entry_number := public.generate_entry_number(NEW.restaurant_id);
+  
+  -- Create journal entry header
+  INSERT INTO public.journal_entries (
+    restaurant_id, entry_number, entry_date, reference_type, reference_id,
+    description, source, total_debit, total_credit, is_posted
+  ) VALUES (
+    NEW.restaurant_id, v_entry_number, NEW.return_date, 'sales_return', NEW.id,
+    'مردود مبيعات - ' || NEW.return_number || COALESCE(' - ' || NEW.reason, ''), 'auto', 
+    NEW.total_amount + v_total_cost, NEW.total_amount + v_total_cost, true
+  ) RETURNING id INTO v_entry_id;
+  
+  -- Combined into one SELECT-based insert to avoid trigger errors
+  INSERT INTO public.journal_entry_lines (entry_id, account_id, debit, credit, description, line_order)
+  SELECT v_entry_id, account_id, debit, credit, description, line_order
+  FROM (
+    SELECT v_sales_returns_account AS account_id, NEW.total_amount AS debit, 0::numeric AS credit, 'مردود مبيعات'::text AS description, 1 AS line_order
+    UNION ALL
+    SELECT CASE WHEN NEW.customer_id IS NOT NULL THEN v_receivable_account ELSE v_cash_account END, 0, NEW.total_amount, CASE WHEN NEW.customer_id IS NOT NULL THEN 'مستحق من العميل' ELSE 'استرداد نقدي' END, 2
+    UNION ALL
+    SELECT v_inventory_account, v_total_cost, 0, 'إعادة للمخزون', 3 WHERE v_total_cost > 0
+    UNION ALL
+    SELECT v_cogs_account, 0, v_total_cost, 'عكس تكلفة', 4 WHERE v_total_cost > 0
+  ) t;
+  
+  -- Update journal_entry_id
+  NEW.journal_entry_id := v_entry_id;
+  NEW.inventory_adjusted := true;
+  
+  -- Update customer balance (reduce receivable) if customer_id exists
+  IF NEW.customer_id IS NOT NULL THEN
+    UPDATE public.customers SET balance = COALESCE(balance, 0) - NEW.total_amount WHERE id = NEW.customer_id;
+  END IF;
+  
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
 COMMIT;
