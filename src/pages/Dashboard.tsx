@@ -97,6 +97,12 @@ export default function Dashboard() {
     soundEnabled, setSoundEnabled, taxes, isSuspended
   } = useDashboardData();
 
+  // Conceptually, `restaurant` acts as the active Branch (branch_id = restaurant.id).
+  // The root tenant is the Company (company_id = restaurant.company_id),
+  // which is automatically populated in the database via triggers.
+  const branchId = restaurant?.id;
+  const companyId = restaurant?.company_id;
+
   // Basic State
   const [activeTab, setActiveTab] = useState<SidebarTab>('home');
   const [activeSubView, setActiveSubView] = useState<'stock' | 'bom'>('stock');

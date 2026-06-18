@@ -377,7 +377,7 @@ export function SupplierManager({ restaurantId, currency }: Props) {
           email: formData.email || null,
           address: formData.address || null,
           contact_person: formData.contact_person || null,
-          credit_limit: formData.credit_limit ? Number(formData.credit_limit) : null,
+          credit_limit: formData.credit_limit ? Number(formData.credit_limit) : 0,
           payment_terms: formData.payment_terms || null,
           tax_number: formData.tax_number || null,
           balance: 0
@@ -405,7 +405,7 @@ export function SupplierManager({ restaurantId, currency }: Props) {
           email: formData.email || null,
           address: formData.address || null,
           contact_person: formData.contact_person || null,
-          credit_limit: formData.credit_limit ? Number(formData.credit_limit) : null,
+          credit_limit: formData.credit_limit ? Number(formData.credit_limit) : 0,
           payment_terms: formData.payment_terms || null,
           tax_number: formData.tax_number || null,
         })
