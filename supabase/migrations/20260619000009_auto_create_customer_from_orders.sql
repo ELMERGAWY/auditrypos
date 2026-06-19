@@ -160,7 +160,7 @@ DECLARE
   v_customer_id UUID;
 BEGIN
   FOR v_order IN
-    SELECT id, restaurant_id, customer_name, customer_phone, total, paid_amount, status
+    SELECT id, restaurant_id, customer_name, customer_phone, total, paid_amount, status, order_number
     FROM public.orders
     WHERE customer_id IS NULL
     AND customer_name IS NOT NULL
