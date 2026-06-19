@@ -281,11 +281,17 @@ export function SalesReturnsManager({ restaurantId, currency }: Props) {
       if (error) throw error;
 
       // Accounting Integration is handled automatically by database trigger trg_create_sales_return_journal on BEFORE UPDATE of sales_returns status to completed/approved.
-
-      toast.success('تم تحديث حالة المردود');
+      if (newStatus === 'completed') {
+        toast.success('✅ تم تأكيد المردود — تم تحديث المخزون ورصيد العميل والقيد المحاسبي تلقائياً');
+      } else {
+        toast.success('تم تحديث حالة المردود');
+      }
       loadReturns();
     } catch (error: any) {
-      toast.error('فشل تحديث الحالة: ' + error.message);
+      // Show the underlying trigger/DB error for easier diagnosis
+      const msg = error?.message || 'خطأ غير معروف';
+      toast.error(`فشل تحديث الحالة: ${msg}`);
+      console.error('handleUpdateStatus error:', error);
     }
   };
 
@@ -522,7 +528,7 @@ export function SalesReturnsManager({ restaurantId, currency }: Props) {
                           <Button 
                             variant="ghost" 
                             size="sm"
-                            onClick={() => handleUpdateStatus(ret.id, 'completed')}
+                            onClick={() => handleUpdateStatus(ret, 'completed')}
                           >
                             <CheckCircle className="w-4 h-4 text-success" />
                           </Button>

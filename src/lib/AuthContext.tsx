@@ -53,8 +53,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setLastKnownUser(session.user);
         localStorage.setItem('last_known_user', JSON.stringify(session.user));
         setAdminChecked(false);
-        // Only check admin if we have a user and something changed
-        setTimeout(async () => {
+        // Check admin role asynchronously - use async IIFE to avoid race condition
+        // where adminChecked becomes false while loading is also false
+        (async () => {
           try {
             const { data } = await supabase
               .from('user_roles')
@@ -65,10 +66,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             setIsSuperAdmin(!!data);
           } catch (err) {
             console.error("Error checking admin status:", err);
+            setIsSuperAdmin(false);
           } finally {
+            // IMPORTANT: setAdminChecked AFTER setIsSuperAdmin to prevent
+            // premature redirect in SuperAdmin.tsx while role is still loading
             setAdminChecked(true);
           }
-        }, 0);
+        })();
         setLoading(false);
       } else {
         // Fallback for INITIAL_SESSION with no user

@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { Book, CheckCircle2, AlertCircle, Info, Building2 } from 'lucide-react';
+import { Book, CheckCircle2, AlertCircle, Info, Building2, Edit, ShieldCheck } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { BUSINESS_TYPES } from '@/lib/businessTypes';
 
@@ -9,6 +9,7 @@ interface Props {
   restaurant: any;
   loadData: () => void;
   isSuperAdmin?: boolean;
+  isOwner?: boolean;
 }
 
 const STANDARDS = [
@@ -28,13 +29,15 @@ const SYSTEMS = [
   { id: 'PERIODIC', label: 'الجرد الدوري (Periodic)', description: 'تحديث المخزون في نهاية الفترة المحاسبية فقط.' },
 ];
 
-export function AccountingSettings({ restaurant, loadData, isSuperAdmin }: Props) {
+export function AccountingSettings({ restaurant, loadData, isSuperAdmin, isOwner }: Props) {
+  const canManageInvoiceEditing = isSuperAdmin || isOwner;
   const [loading, setLoading] = useState(false);
   const [form, setForm] = useState({
     accounting_standard: restaurant.accounting_standard || 'IFRS',
     inventory_method: restaurant.inventory_method || 'FIFO',
     inventory_system: restaurant.inventory_system || 'PERPETUAL',
-    business_type: restaurant.business_type || 'restaurant'
+    business_type: restaurant.business_type || 'restaurant',
+    allow_invoice_editing: restaurant.allow_invoice_editing ?? false
   });
 
   const handleSave = async () => {
@@ -53,6 +56,9 @@ export function AccountingSettings({ restaurant, loadData, isSuperAdmin }: Props
     };
     if (isSuperAdmin) {
       updatePayload.business_type = form.business_type;
+    }
+    if (canManageInvoiceEditing) {
+      updatePayload.allow_invoice_editing = form.allow_invoice_editing;
     }
     const { error } = await supabase.from('restaurants').update(updatePayload).eq('id', restaurant.id);
 
@@ -194,6 +200,50 @@ export function AccountingSettings({ restaurant, loadData, isSuperAdmin }: Props
           </p>
         </div>
       </div>
+
+      {/* Invoice Editing Control - visible only to super admin and owner */}
+      {canManageInvoiceEditing && (
+        <div className="glass-card p-4 border-amber-500/30 bg-amber-500/5">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="p-2 rounded-lg bg-amber-500/10">
+                <Edit className="w-4 h-4 text-amber-500" />
+              </div>
+              <div>
+                <p className="font-bold text-sm flex items-center gap-2">
+                  <ShieldCheck className="w-4 h-4 text-amber-500" />
+                  السماح بتعديل الفواتير المحفوظة
+                </p>
+                <p className="text-[11px] text-muted-foreground mt-0.5">
+                  عند التفعيل، يمكن للمستخدمين تعديل أسعار وبيانات الفواتير بعد حفظها
+                </p>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => setForm({ ...form, allow_invoice_editing: !form.allow_invoice_editing })}
+              className={`relative inline-flex h-7 w-12 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                form.allow_invoice_editing
+                  ? 'bg-amber-500'
+                  : 'bg-muted'
+              }`}
+            >
+              <span
+                className={`pointer-events-none inline-block h-6 w-6 transform rounded-full bg-white shadow-lg ring-0 transition duration-200 ease-in-out ${
+                  form.allow_invoice_editing ? 'translate-x-5' : 'translate-x-0'
+                }`}
+              />
+            </button>
+          </div>
+          {form.allow_invoice_editing && (
+            <div className="mt-3 p-2 bg-amber-500/10 rounded-lg border border-amber-500/20">
+              <p className="text-[11px] text-amber-600 font-medium">
+                ⚠️ تحذير: السماح بتعديل الفواتير قد يؤثر على دقة السجلات المحاسبية. يُنصح بالتدقيق الدوري.
+              </p>
+            </div>
+          )}
+        </div>
+      )}
 
       <div className="flex flex-col gap-3">
         <Button onClick={handleSave} disabled={loading} className="w-full h-12 gradient-bg text-primary-foreground text-lg border-0 shadow-lg shadow-primary/20">
