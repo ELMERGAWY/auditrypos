@@ -70,10 +70,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           } finally {
             // IMPORTANT: setAdminChecked AFTER setIsSuperAdmin to prevent
             // premature redirect in SuperAdmin.tsx while role is still loading
+            // Also ensure loading is set to false after admin check completes
             setAdminChecked(true);
+            setLoading(false);
           }
         })();
-        setLoading(false);
       } else {
         // Fallback for INITIAL_SESSION with no user
         setAdminChecked(true);

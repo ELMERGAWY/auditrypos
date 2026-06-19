@@ -12,6 +12,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { Badge } from '@/components/ui/badge';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { findOrCreateCustomer } from '@/lib/customerUtils';
 
 interface MarketingService {
   id: string;
@@ -179,9 +180,16 @@ export function MarketingContracts({ restaurantId, currency }: Props) {
     setLoading(true);
     try {
       const contractNumber = editingContract ? editingContract.contract_number : `C-${Date.now().toString().slice(-8)}`;
+      
+      // Auto-register customer if customer_name is provided but customer_id is not
+      let customerId = form.customer_id || null;
+      if (!customerId && form.customer_name && form.customer_name.trim() !== '' && form.customer_name !== 'عميل نقدي') {
+        customerId = await findOrCreateCustomer(restaurantId, form.customer_name);
+      }
+      
       const payload = {
         restaurant_id: restaurantId,
-        customer_id: form.customer_id || null,
+        customer_id: customerId,
         customer_name: form.customer_name,
         contract_number: contractNumber,
         start_date: form.start_date,

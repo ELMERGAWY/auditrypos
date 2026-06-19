@@ -77,70 +77,75 @@ BEGIN
   -- ==========================================
   -- STEP 1: UPDATE INVENTORY FIRST!
   -- ==========================================
-  FOR v_item IN (
-    SELECT
-      sri.*,
-      oi.product_id,
-      oi.menu_item_id
-    FROM public.sales_return_items sri
-    LEFT JOIN public.order_items oi ON sri.original_order_item_id = oi.id
-    WHERE sri.sales_return_id = NEW.id AND sri.return_to_inventory = true
-  ) LOOP
-    -- Try to adjust stock (copied logic from inventory_fallback_fix)
-    v_success := false;
-    IF v_item.product_id IS NOT NULL THEN
-      v_success := public.adjust_product_stock(
-        v_item.product_id,
-        NEW.restaurant_id,
-        v_item.quantity_returned,
-        'in',
-        'sales_return',
-        NEW.id::text || '_' || v_item.id::text
-      );
-    END IF;
-
-    IF NOT v_success AND v_item.menu_item_id IS NOT NULL THEN
-      SELECT inventory_mode, product_id INTO v_inventory_mode, v_linked_product_id
-      FROM public.menu_items WHERE id = v_item.menu_item_id;
-
-      IF v_inventory_mode = 'direct' AND v_linked_product_id IS NOT NULL THEN
+  BEGIN
+    FOR v_item IN (
+      SELECT
+        sri.*,
+        oi.product_id,
+        oi.menu_item_id
+      FROM public.sales_return_items sri
+      LEFT JOIN public.order_items oi ON sri.original_order_item_id = oi.id
+      WHERE sri.sales_return_id = NEW.id AND sri.return_to_inventory = true
+    ) LOOP
+      -- Try to adjust stock (copied logic from inventory_fallback_fix)
+      v_success := false;
+      IF v_item.product_id IS NOT NULL THEN
         v_success := public.adjust_product_stock(
-          v_linked_product_id,
+          v_item.product_id,
           NEW.restaurant_id,
           v_item.quantity_returned,
           'in',
-          'sales_return_direct',
-          NEW.id::text || '_' || v_item.id::text
-        );
-      ELSIF v_inventory_mode = 'recipe' THEN
-        FOR v_component IN (
-          SELECT product_id, quantity_required
-          FROM public.menu_item_components
-          WHERE menu_item_id = v_item.menu_item_id
-        ) LOOP
-          PERFORM public.adjust_product_stock(
-            v_component.product_id,
-            NEW.restaurant_id,
-            v_component.quantity_required * v_item.quantity_returned,
-            'in',
-            'sales_return_recipe',
-            NEW.id::text || '_' || v_item.id::text || '_' || v_component.product_id::text
-          );
-        END LOOP;
-        v_success := true;
-      ELSIF v_inventory_mode = 'none' OR v_inventory_mode IS NULL THEN
-        -- Try menu_item_id as product ID
-        v_success := public.adjust_product_stock(
-          v_item.menu_item_id,
-          NEW.restaurant_id,
-          v_item.quantity_returned,
-          'in',
-          'sales_return_retail',
+          'sales_return',
           NEW.id::text || '_' || v_item.id::text
         );
       END IF;
-    END IF;
-  END LOOP;
+
+      IF NOT v_success AND v_item.menu_item_id IS NOT NULL THEN
+        SELECT inventory_mode, product_id INTO v_inventory_mode, v_linked_product_id
+        FROM public.menu_items WHERE id = v_item.menu_item_id;
+
+        IF v_inventory_mode = 'direct' AND v_linked_product_id IS NOT NULL THEN
+          v_success := public.adjust_product_stock(
+            v_linked_product_id,
+            NEW.restaurant_id,
+            v_item.quantity_returned,
+            'in',
+            'sales_return_direct',
+            NEW.id::text || '_' || v_item.id::text
+          );
+        ELSIF v_inventory_mode = 'recipe' THEN
+          FOR v_component IN (
+            SELECT product_id, quantity_required
+            FROM public.menu_item_components
+            WHERE menu_item_id = v_item.menu_item_id
+          ) LOOP
+            PERFORM public.adjust_product_stock(
+              v_component.product_id,
+              NEW.restaurant_id,
+              v_component.quantity_required * v_item.quantity_returned,
+              'in',
+              'sales_return_recipe',
+              NEW.id::text || '_' || v_item.id::text || '_' || v_component.product_id::text
+            );
+          END LOOP;
+          v_success := true;
+        ELSIF v_inventory_mode = 'none' OR v_inventory_mode IS NULL THEN
+          -- Try menu_item_id as product ID
+          v_success := public.adjust_product_stock(
+            v_item.menu_item_id,
+            NEW.restaurant_id,
+            v_item.quantity_returned,
+            'in',
+            'sales_return_retail',
+            NEW.id::text || '_' || v_item.id::text
+          );
+        END IF;
+      END IF;
+    END LOOP;
+  EXCEPTION WHEN OTHERS THEN
+    -- Log warning but don't fail the entire transaction
+    RAISE NOTICE 'Sales return inventory update failed for return %: %', NEW.id, SQLERRM;
+  END;
 
   -- Generate entry number
   v_entry_number := public.generate_entry_number(NEW.restaurant_id);
@@ -192,22 +197,27 @@ BEGIN
   -- ==========================================
   -- STEP 2: UPDATE CUSTOMER BALANCE!
   -- ==========================================
-  IF NEW.customer_id IS NOT NULL THEN
-    UPDATE public.customers
-    SET balance = COALESCE(balance, 0) - NEW.total_amount
-    WHERE id = NEW.customer_id;
+  BEGIN
+    IF NEW.customer_id IS NOT NULL THEN
+      UPDATE public.customers
+      SET balance = COALESCE(balance, 0) - NEW.total_amount
+      WHERE id = NEW.customer_id;
 
-    -- Also log customer transaction
-    INSERT INTO public.customer_transactions (
-      restaurant_id, customer_id, type, amount, description
-    ) VALUES (
-      NEW.restaurant_id,
-      NEW.customer_id,
-      'sales_return',
-      NEW.total_amount,
-      'مردود مبيعات ' || NEW.return_number
-    );
-  END IF;
+      -- Also log customer transaction
+      INSERT INTO public.customer_transactions (
+        restaurant_id, customer_id, type, amount, description
+      ) VALUES (
+        NEW.restaurant_id,
+        NEW.customer_id,
+        'sales_return',
+        NEW.total_amount,
+        'مردود مبيعات ' || NEW.return_number
+      );
+    END IF;
+  EXCEPTION WHEN OTHERS THEN
+    -- Log warning but don't fail the entire transaction
+    RAISE NOTICE 'Sales return customer balance update failed for return %: %', NEW.id, SQLERRM;
+  END;
 
   RETURN NEW;
 END;

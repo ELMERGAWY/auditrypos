@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 import { Label } from '@/components/ui/label';
 import { InvoiceViewer } from '@/components/InvoiceViewer';
+import { findOrCreateCustomer } from '@/lib/customerUtils';
 
 interface SalesOrder {
   id: string;
@@ -142,12 +143,19 @@ export function SalesOrders({ restaurantId, currency }: Props) {
       const total = selectedItems.reduce((sum, i) => sum + (i.price * i.quantity), 0);
       const orderNumber = `SO-${Date.now().toString().slice(-6)}`;
       
+      // Auto-register customer if customer_name is provided but customer_id is not
+      let customerId = selectedCustomerId || null;
+      const customerName = customers.find(c => c.id === selectedCustomerId)?.name || 'عميل نقدي';
+      if (!customerId && customerName && customerName.trim() !== '' && customerName !== 'عميل نقدي') {
+        customerId = await findOrCreateCustomer(restaurantId, customerName);
+      }
+      
       const { data, error } = await supabase.from('sales_orders').insert({
         restaurant_id: restaurantId,
         order_number: orderNumber,
         order_date: new Date().toISOString(),
-        customer_id: selectedCustomerId || null,
-        customer_name: customers.find(c => c.id === selectedCustomerId)?.name || 'عميل نقدي',
+        customer_id: customerId,
+        customer_name: customerName,
         total_amount: total,
         status: 'confirmed'
       }).select().single();

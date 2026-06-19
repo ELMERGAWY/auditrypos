@@ -105,12 +105,16 @@ const SuperAdmin = () => {
   const [newUserForm, setNewUserForm] = useState({ email: '', fullName: '', restaurantId: '', role: 'cashier' });
   const [selectedRestForTabs, setSelectedRestForTabs] = useState<any | null>(null);
   const [customTabsForm, setCustomTabsForm] = useState<string[]>([]);
+  const [initialLoadComplete, setInitialLoadComplete] = useState(false);
 
   useEffect(() => {
     // Wait for both authLoading AND adminChecked before redirecting (prevents race condition kicking super admins out)
-    if (!authLoading && adminChecked && (!user || !isSuperAdmin)) {
-      toast.error('غير مصرح لك بالوصول - يجب أن تكون سوبر أدمن');
-      navigate('/');
+    if (!authLoading && adminChecked) {
+      setInitialLoadComplete(true);
+      if (!user || !isSuperAdmin) {
+        toast.error('غير مصرح لك بالوصول - يجب أن تكون سوبر أدمن');
+        navigate('/');
+      }
     }
   }, [user, isSuperAdmin, adminChecked, authLoading, navigate]);
 

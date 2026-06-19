@@ -483,7 +483,7 @@ export default function Dashboard() {
   // Performance Optimization: Memoize the active tab content
   const activeTabContent = useMemo(() => {
     if (!restaurant) return null;
-    const commonProps = { restaurantId: restaurant.id, currency };
+    const commonProps = { restaurantId: restaurant.id, currency, restaurant, isSuperAdmin, isOwner: profileName === restaurant.owner_name };
 
     return (
       <Suspense fallback={

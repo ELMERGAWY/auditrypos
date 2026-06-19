@@ -36,9 +36,12 @@ interface Invoice {
 interface Props {
   restaurantId: string;
   currency: string;
+  restaurant?: any;
+  isSuperAdmin?: boolean;
+  isOwner?: boolean;
 }
 
-export function SalesInvoices({ restaurantId, currency }: Props) {
+export function SalesInvoices({ restaurantId, currency, restaurant, isSuperAdmin, isOwner }: Props) {
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [loading, setLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -56,6 +59,9 @@ export function SalesInvoices({ restaurantId, currency }: Props) {
     notes: ''
   });
   const [editItems, setEditItems] = useState<any[]>([]);
+
+  // Check if invoice editing is allowed
+  const canEditInvoices = isSuperAdmin || isOwner || (restaurant?.allow_invoice_editing === true);
 
   useEffect(() => {
     loadInvoices();
@@ -279,9 +285,11 @@ export function SalesInvoices({ restaurantId, currency }: Props) {
                 <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => setViewingId(inv.id)} title="عرض الفاتورة">
                   <Eye className="w-4 h-4" />
                 </Button>
-                <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => handleEditInvoice(inv)} title="تعديل الفاتورة">
-                  <Edit className="w-4 h-4" />
-                </Button>
+                {canEditInvoices && (
+                  <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => handleEditInvoice(inv)} title="تعديل الفاتورة">
+                    <Edit className="w-4 h-4" />
+                  </Button>
+                )}
                 <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => setViewingId(inv.id)} title="طباعة">
                   <Printer className="w-4 h-4" />
                 </Button>
