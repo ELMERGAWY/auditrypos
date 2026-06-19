@@ -3,7 +3,7 @@ import { motion } from 'framer-motion';
 import { cn } from '@/lib/utils';
 import {
   BarChart3, Bell, Building2, CalendarClock, ChefHat, Construction,
-  CreditCard, DollarSign, FileText, Gift, Heart, Landmark, Layers,
+  CreditCard, DollarSign, FileText, FileCheck, Gift, Heart, Landmark, Layers,
   LayoutGrid, LogOut, MessageSquare, Moon, Network, Package, QrCode, Receipt, RefreshCw,
   RotateCcw, Settings, Settings2, Shield, ShoppingCart, Sparkles, Sun,
   Truck, Users, UsersRound, Volume2, VolumeX, Wallet, Wifi, WifiOff,
