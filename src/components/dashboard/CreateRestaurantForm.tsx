@@ -17,6 +17,7 @@ export function CreateRestaurantForm({ userId, onCreated }: Props) {
   const [bizType, setBizType] = useState<BusinessType>('restaurant');
   const [loading, setLoading] = useState(false);
   const [step, setStep] = useState<1 | 2>(1);
+  const [customBusinessTypes, setCustomBusinessTypes] = useState<any[]>([]);
 
   // Check localStorage for pending business from registration
   useEffect(() => {
@@ -31,27 +32,44 @@ export function CreateRestaurantForm({ userId, onCreated }: Props) {
     }
   }, []);
 
+  // Load custom business types
+  useEffect(() => {
+    const loadCustomTypes = async () => {
+      const { data } = await supabase.from('custom_business_types').select('*');
+      if (data) setCustomBusinessTypes(data);
+    };
+    loadCustomTypes();
+  }, []);
+
   const handleCreate = async () => {
     if (!name.trim()) { toast.error('يرجى إدخال اسم النشاط'); return; }
     setLoading(true);
     try {
       const trialEnd = new Date();
       trialEnd.setDate(trialEnd.getDate() + 14);
+
+      // Check if it's a custom business type
+      const customType = customBusinessTypes.find(ct => ct.id === bizType);
+      const businessType = customType ? 'custom' : bizType;
+      const customTabs = customType ? customType.tabs : undefined;
+
       const { error } = await supabase.from('restaurants').insert({
         owner_id: userId,
         name,
         status: 'active',
         subscription_end: trialEnd.toISOString(),
-        business_type: bizType,
+        business_type: businessType,
+        custom_business_type_id: customType ? customType.id : null,
+        custom_tabs: customTabs,
         business_type_locked: true, // Lock business type after creation
       });
-      
+
       if (error) {
         toast.error('حدث خطأ أثناء الإنشاء: ' + error.message);
         console.error('Create restaurant error:', error);
         return;
       }
-      
+
       onCreated();
     } catch (err: any) {
       toast.error('خطأ غير متوقع: ' + err.message);
@@ -61,8 +79,11 @@ export function CreateRestaurantForm({ userId, onCreated }: Props) {
     }
   };
 
-  const selectedBT = BUSINESS_TYPES[bizType];
-  const bizEntries = Object.entries(BUSINESS_TYPES) as [BusinessType, typeof BUSINESS_TYPES[BusinessType]][];
+  const selectedBT = customBusinessTypes.find(ct => ct.id === bizType) || BUSINESS_TYPES[bizType];
+  const bizEntries = [
+    ...Object.entries(BUSINESS_TYPES) as [BusinessType, typeof BUSINESS_TYPES[BusinessType]][],
+    ...customBusinessTypes.map(ct => [ct.id as BusinessType, { label: ct.name, icon: ct.icon, tabs: ct.tabs }] as [BusinessType, typeof BUSINESS_TYPES[BusinessType]])
+  ];
 
   return (
     <div className="min-h-screen w-full flex items-center justify-center bg-background p-4" dir="rtl">

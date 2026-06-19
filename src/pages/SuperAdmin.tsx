@@ -110,6 +110,9 @@ const SuperAdmin = () => {
   const [showChangeBusinessType, setShowChangeBusinessType] = useState(false);
   const [selectedRestForBusinessType, setSelectedRestForBusinessType] = useState<any | null>(null);
   const [newBusinessType, setNewBusinessType] = useState<BusinessType>('restaurant');
+  const [customBusinessTypes, setCustomBusinessTypes] = useState<any[]>([]);
+  const [showCreateCustomType, setShowCreateCustomType] = useState(false);
+  const [newCustomTypeForm, setNewCustomTypeForm] = useState({ name: '', icon: '🏢', tabs: [] as string[] });
 
   useEffect(() => {
     // Only redirect if auth is fully loaded and admin check is complete
@@ -128,7 +131,7 @@ const SuperAdmin = () => {
   }, [authLoading, adminChecked, isSuperAdmin, user]);
 
   const load = async () => {
-    const [restsRes, rcptsRes, ordersRes, agentsRes, bansRes, issuesRes, usersRes] = await Promise.all([
+    const [restsRes, rcptsRes, ordersRes, agentsRes, bansRes, issuesRes, usersRes, customTypesRes] = await Promise.all([
       supabase.from('restaurants').select('*').order('created_at', { ascending: false }),
       supabase.from('payment_receipts').select('*, restaurants(name)').order('uploaded_at', { ascending: false }),
       supabase.from('orders').select('*, order_items(*)').order('created_at', { ascending: false }).limit(500),
@@ -136,7 +139,8 @@ const SuperAdmin = () => {
       supabase.from('bans').select('*, restaurants(name)').order('created_at', { ascending: false }),
       // Try to fetch failures if the table exists
       supabase.from('accounting_post_failures' as any).select('*, restaurants(name)').order('created_at', { ascending: false }).limit(50),
-      supabase.from('profiles').select('*, user_roles(role), company_users(company_id, role)').limit(1000)
+      supabase.from('profiles').select('*, user_roles(role), company_users(company_id, role)').limit(1000),
+      supabase.from('custom_business_types').select('*').order('created_at', { ascending: false })
     ]);
     setRestaurants(restsRes.data || []);
     setReceipts(rcptsRes.data || []);
@@ -145,6 +149,7 @@ const SuperAdmin = () => {
     setBans(bansRes.data || []);
     setIssues(issuesRes.data || []);
     setGlobalUsers(usersRes.data || []);
+    setCustomBusinessTypes(customTypesRes.data || []);
   };
 
   useEffect(() => { if (isSuperAdmin) load(); }, [isSuperAdmin]);
@@ -699,21 +704,27 @@ const SuperAdmin = () => {
                 تغيير الموديول سيؤثر على جميع التابات والوظائف المتاحة للنشاط. هذا الإجراء لا يمكن التراجع عنه.
               </p>
             </div>
-            <Button 
-              className="w-full gradient-bg text-white font-bold h-11 rounded-xl" 
+            <Button
+              className="w-full gradient-bg text-white font-bold h-11 rounded-xl"
               onClick={async () => {
                 if (!selectedRestForBusinessType) return;
                 if (!confirm(`هل أنت متأكد من تغيير موديول "${selectedRestForBusinessType.name}" إلى "${BUSINESS_TYPES[newBusinessType].label}"؟`)) return;
-                
+
+                console.log('Changing business type:', {
+                  restaurantId: selectedRestForBusinessType.id,
+                  newType: newBusinessType
+                });
+
                 const { error } = await supabase
                   .from('restaurants')
-                  .update({ 
+                  .update({
                     business_type: newBusinessType,
                     business_type_locked: true // Keep it locked after change
                   })
                   .eq('id', selectedRestForBusinessType.id);
 
                 if (error) {
+                  console.error('Error changing business type:', error);
                   toast.error('فشل تغيير الموديول: ' + error.message);
                 } else {
                   toast.success(`تم تغيير موديول "${selectedRestForBusinessType.name}" بنجاح`);
@@ -742,14 +753,23 @@ const SuperAdmin = () => {
             </div>
             <div className="space-y-1">
               <label className="text-xs font-bold mr-1">الموديول</label>
-              <select 
-                value={newRestaurantForm.business_type} 
-                onChange={e => setNewRestaurantForm({ ...newRestaurantForm, business_type: e.target.value as BusinessType })} 
+              <select
+                value={newRestaurantForm.business_type}
+                onChange={e => setNewRestaurantForm({ ...newRestaurantForm, business_type: e.target.value as BusinessType })}
                 className="w-full h-10 px-3 rounded-md border border-input bg-background"
               >
-                {Object.entries(BUSINESS_TYPES).map(([key, bt]) => (
-                  <option key={key} value={key}>{bt.icon} {bt.label}</option>
-                ))}
+                <optgroup label="الأنواع الافتراضية">
+                  {Object.entries(BUSINESS_TYPES).map(([key, bt]) => (
+                    <option key={key} value={key}>{bt.icon} {bt.label}</option>
+                  ))}
+                </optgroup>
+                {customBusinessTypes.length > 0 && (
+                  <optgroup label="الأنواع المخصصة">
+                    {customBusinessTypes.map(ct => (
+                      <option key={ct.id} value={ct.id}>{ct.icon} {ct.name}</option>
+                    ))}
+                  </optgroup>
+                )}
               </select>
             </div>
             <div className="space-y-1">
@@ -763,17 +783,24 @@ const SuperAdmin = () => {
                 {globalUsers.map(u => <option key={u.user_id} value={u.user_id}>{u.full_name || u.email}</option>)}
               </select>
             </div>
-            <Button 
-              className="w-full gradient-bg text-white font-bold h-11 rounded-xl" 
+            <Button
+              className="w-full gradient-bg text-white font-bold h-11 rounded-xl"
               onClick={async () => {
                 if (!newRestaurantForm.name.trim()) return toast.error('يرجى إدخال اسم الشركة');
-                
+
                 const trialEnd = new Date();
                 trialEnd.setDate(trialEnd.getDate() + 14);
-                
+
+                // Check if it's a custom business type
+                const customType = customBusinessTypes.find(ct => ct.id === newRestaurantForm.business_type);
+                const businessType = customType ? 'custom' : newRestaurantForm.business_type;
+                const customTabs = customType ? customType.tabs : undefined;
+
                 const { error } = await supabase.from('restaurants').insert({
                   name: newRestaurantForm.name,
-                  business_type: newRestaurantForm.business_type,
+                  business_type: businessType,
+                  custom_business_type_id: customType ? customType.id : null,
+                  custom_tabs: customTabs,
                   owner_id: newRestaurantForm.owner_id || null,
                   status: 'active',
                   subscription_end: trialEnd.toISOString(),
@@ -791,6 +818,123 @@ const SuperAdmin = () => {
               }}
             >
               إضافة الشركة
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Create Custom Business Type Dialog */}
+      <Dialog open={showCreateCustomType} onOpenChange={setShowCreateCustomType}>
+        <DialogContent className="max-w-2xl rounded-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>إنشاء نوع بيزنس مخصص</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 pt-4">
+            <div className="space-y-1">
+              <label className="text-xs font-bold mr-1">اسم النوع المخصص</label>
+              <Input 
+                value={newCustomTypeForm.name} 
+                onChange={e => setNewCustomTypeForm({ ...newCustomTypeForm, name: e.target.value })} 
+                placeholder="مثال: صالون تجميل، ورشة سيارات..." 
+              />
+            </div>
+            <div className="space-y-1">
+              <label className="text-xs font-bold mr-1">الأيقونة</label>
+              <div className="flex gap-2 flex-wrap">
+                {['🏢', '🏪', '🏭', '🏨', '🏥', '🏫', '🎨', '💇', '🚗', '🔧', '👗', '🍽️', '☕', '🎮', '💻'].map(icon => (
+                  <button
+                    key={icon}
+                    type="button"
+                    onClick={() => setNewCustomTypeForm({ ...newCustomTypeForm, icon })}
+                    className={`w-12 h-12 rounded-xl border-2 text-2xl transition-all ${
+                      newCustomTypeForm.icon === icon
+                        ? 'border-primary bg-primary/10'
+                        : 'border-border hover:border-primary/30'
+                    }`}
+                  >
+                    {icon}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-bold mr-1">التابات المتاحة</label>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => setNewCustomTypeForm({ ...newCustomTypeForm, tabs: Object.keys(ALL_TABS_CONFIG) })}
+                    className="text-[11px] px-3 py-1.5 rounded-lg border border-primary/30 bg-primary/5 hover:bg-primary/10 text-primary transition-colors font-bold"
+                  >
+                    ✓ تحديد الكل
+                  </button>
+                  <button
+                    onClick={() => setNewCustomTypeForm({ ...newCustomTypeForm, tabs: [] })}
+                    className="text-[11px] px-3 py-1.5 rounded-lg border border-destructive/30 bg-destructive/5 hover:bg-destructive/10 text-destructive transition-colors font-bold"
+                  >
+                    ✕ مسح الكل
+                  </button>
+                </div>
+              </div>
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2 max-h-60 overflow-y-auto p-2 border border-border rounded-xl">
+                {Object.entries(ALL_TABS_CONFIG).map(([key, tabConf]) => {
+                  const isChecked = newCustomTypeForm.tabs.includes(key);
+                  return (
+                    <label
+                      key={key}
+                      className={`flex items-center gap-2 p-3 rounded-lg border-2 transition-all cursor-pointer select-none ${
+                        isChecked
+                          ? 'border-primary bg-primary/5'
+                          : 'border-border hover:border-primary/20'
+                      }`}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={isChecked}
+                        onChange={(e) => {
+                          if (e.target.checked) {
+                            setNewCustomTypeForm({ ...newCustomTypeForm, tabs: [...newCustomTypeForm.tabs, key] });
+                          } else {
+                            setNewCustomTypeForm({ ...newCustomTypeForm, tabs: newCustomTypeForm.tabs.filter(t => t !== key) });
+                          }
+                        }}
+                        className="w-4 h-4 accent-primary rounded cursor-pointer"
+                      />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs font-bold truncate flex items-center gap-1">
+                          <span>{tabConf.icon}</span>
+                          <span>{tabConf.label}</span>
+                        </p>
+                      </div>
+                    </label>
+                  );
+                })}
+              </div>
+              <p className="text-[10px] text-muted-foreground">المحددة: <strong className="text-primary">{newCustomTypeForm.tabs.length}</strong> تبويب</p>
+            </div>
+            <Button 
+              className="w-full gradient-bg text-white font-bold h-11 rounded-xl" 
+              onClick={async () => {
+                if (!newCustomTypeForm.name.trim()) return toast.error('يرجى إدخال اسم النوع المخصص');
+                if (newCustomTypeForm.tabs.length === 0) return toast.error('يرجى اختيار تبويب واحد على الأقل');
+                
+                const { error } = await supabase.from('custom_business_types').insert({
+                  name: newCustomTypeForm.name,
+                  icon: newCustomTypeForm.icon,
+                  tabs: newCustomTypeForm.tabs,
+                  created_by: user?.id,
+                });
+
+                if (error) {
+                  toast.error('فشل إنشاء النوع المخصص: ' + error.message);
+                } else {
+                  toast.success('تم إنشاء النوع المخصص بنجاح');
+                  setShowCreateCustomType(false);
+                  setNewCustomTypeForm({ name: '', icon: '🏢', tabs: [] });
+                  load();
+                }
+              }}
+            >
+              إنشاء النوع المخصص
             </Button>
           </div>
         </DialogContent>
@@ -845,43 +989,92 @@ const SuperAdmin = () => {
       {tab === 'tabs_management' && (
         <div className="space-y-6">
           <div className="glass-card p-6">
-            <h2 className="text-2xl font-bold mb-6 flex items-center gap-3">
-              <LayoutGrid className="w-6 h-6 text-primary" />
-              إدارة التابات لكل موديول
-            </h2>
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-2xl font-bold flex items-center gap-3">
+                <LayoutGrid className="w-6 h-6 text-primary" />
+                إدارة التابات لكل موديول
+              </h2>
+              <Button onClick={() => setShowCreateCustomType(true)} className="gradient-bg text-white">
+                <Sparkles className="w-4 h-4 mr-2" />
+                إنشاء نوع بيزنس مخصص
+              </Button>
+            </div>
             <p className="text-muted-foreground mb-6">
               يمكنك إضافة أو حذف التابات المتاحة لكل موديول. هذا التحكم متاح فقط للسوبر أدمن.
             </p>
 
-            <div className="space-y-6">
-              {Object.entries(BUSINESS_TYPES).map(([key, businessType]) => (
-                <div key={key} className="border border-border rounded-xl p-4">
-                  <div className="flex items-center justify-between mb-4">
-                    <div>
-                      <h3 className="font-bold text-lg">{businessType.label}</h3>
-                      <p className="text-sm text-muted-foreground">التابات الافتراضية: {businessType.tabs?.length || 0}</p>
+            {/* Custom Business Types Section */}
+            {customBusinessTypes.length > 0 && (
+              <div className="mb-8">
+                <h3 className="text-lg font-bold mb-4 text-primary">الأنواع المخصصة</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {customBusinessTypes.map(customType => (
+                    <div key={customType.id} className="border border-primary/30 bg-primary/5 rounded-xl p-4">
+                      <div className="flex items-center justify-between mb-3">
+                        <div className="flex items-center gap-2">
+                          <span className="text-2xl">{customType.icon}</span>
+                          <h4 className="font-bold">{customType.name}</h4>
+                        </div>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={async () => {
+                            if (!confirm(`هل أنت متأكد من حذف "${customType.name}"؟`)) return;
+                            const { error } = await supabase.from('custom_business_types').delete().eq('id', customType.id);
+                            if (error) toast.error('فشل الحذف');
+                            else { toast.success('تم الحذف بنجاح'); load(); }
+                          }}
+                          className="text-destructive hover:bg-destructive/10"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
+                      </div>
+                      <div className="flex flex-wrap gap-1">
+                        {(customType.tabs || []).map(tab => (
+                          <Badge key={tab} variant="secondary" className="text-[10px]">
+                            {ALL_TABS_CONFIG[tab as keyof typeof ALL_TABS_CONFIG]?.label || tab}
+                          </Badge>
+                        ))}
+                      </div>
                     </div>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => {
-                        setSelectedRestForTabs({ id: key, name: businessType.label, business_type: key, custom_tabs: businessType.tabs || [] });
-                        setCustomTabsForm(businessType.tabs || []);
-                      }}
-                    >
-                      <Edit className="w-4 h-4 mr-2" />
-                      تعديل التابات
-                    </Button>
-                  </div>
-                  <div className="flex flex-wrap gap-2">
-                    {(businessType.tabs || []).map(tab => (
-                      <Badge key={tab} variant="secondary" className="text-xs">
-                        {ALL_TABS_CONFIG[tab as keyof typeof ALL_TABS_CONFIG]?.label || tab}
-                      </Badge>
-                    ))}
-                  </div>
+                  ))}
                 </div>
-              ))}
+              </div>
+            )}
+
+            {/* Default Business Types Section */}
+            <div>
+              <h3 className="text-lg font-bold mb-4">الأنواع الافتراضية</h3>
+              <div className="space-y-4">
+                {Object.entries(BUSINESS_TYPES).map(([key, businessType]) => (
+                  <div key={key} className="border border-border rounded-xl p-4">
+                    <div className="flex items-center justify-between mb-4">
+                      <div>
+                        <h3 className="font-bold text-lg">{businessType.label}</h3>
+                        <p className="text-sm text-muted-foreground">التابات الافتراضية: {businessType.tabs?.length || 0}</p>
+                      </div>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => {
+                          setSelectedRestForTabs({ id: key, name: businessType.label, business_type: key, custom_tabs: businessType.tabs || [] });
+                          setCustomTabsForm(businessType.tabs || []);
+                        }}
+                      >
+                        <Edit className="w-4 h-4 mr-2" />
+                        تعديل التابات
+                      </Button>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      {(businessType.tabs || []).map(tab => (
+                        <Badge key={tab} variant="secondary" className="text-xs">
+                          {ALL_TABS_CONFIG[tab as keyof typeof ALL_TABS_CONFIG]?.label || tab}
+                        </Badge>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
             </div>
           </div>
         </div>
