@@ -59,7 +59,7 @@ BEGIN
   ) VALUES (
     p_restaurant_id,
     v_trimmed_name,
-    NULLIF(v_trimmed_phone, ''),
+    COALESCE(NULLIF(v_trimmed_phone, ''), ''),
     'regular',
     0,
     0
