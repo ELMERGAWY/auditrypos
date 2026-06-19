@@ -487,7 +487,7 @@ export function MarketingQuotes({ restaurantId, currency }: Props) {
                   <div key={index} className="flex justify-between items-center p-2 bg-secondary/10 rounded-lg">
                     <div>
                       <p className="font-bold">{item.service_name}</p>
-                      {item.description && <p className="text-xs text-muted-foreground">{item.description}</p>
+                      {item.description && <p className="text-xs text-muted-foreground">{item.description}</p>}
                     </div>
                     <div className="text-left">
                       <p>{item.quantity} × {item.unit_price.toLocaleString()}</p>
@@ -501,7 +501,7 @@ export function MarketingQuotes({ restaurantId, currency }: Props) {
                 <p className="text-2xl font-bold text-primary">{viewingQuote?.total_amount.toLocaleString()} {currency}</p>
               </div>
             </div>
-            {viewingQuote?.notes && <p className="text-muted-foreground text-sm">{viewingQuote.notes}</p>
+            {viewingQuote?.notes && <p className="text-muted-foreground text-sm">{viewingQuote.notes}</p>}
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowViewModal(false)}>إغلاق</Button>
