@@ -7,7 +7,7 @@ BEGIN;
 -- 1. Update public_products view to include stock information
 CREATE OR REPLACE VIEW public.public_products
 WITH (security_invoker = true) AS
-SELECT 
+SELECT
   p.id,
   p.restaurant_id,
   p.name,
@@ -18,9 +18,8 @@ SELECT
   p.sort_order,
   p.unit,
   COALESCE(p.quantity, 0) as quantity,
-  COALESCE(p.minimum_stock, 0) as minimum_stock,
-  CASE 
-    WHEN COALESCE(p.quantity, 0) > COALESCE(p.minimum_stock, 0) THEN true
+  CASE
+    WHEN COALESCE(p.quantity, 0) > 0 THEN true
     ELSE false
   END as in_stock
 FROM public.products p
@@ -29,7 +28,7 @@ WHERE p.available = true;
 -- 2. Update public_menu_items view to include stock information
 CREATE OR REPLACE VIEW public.public_menu_items
 WITH (security_invoker = true) AS
-SELECT 
+SELECT
   mi.id,
   mi.restaurant_id,
   mi.name,
@@ -40,17 +39,16 @@ SELECT
   mi.sort_order,
   mi.product_type,
   mi.inventory_mode,
-  CASE 
+  CASE
     WHEN mi.inventory_mode = 'none' THEN true
     WHEN mi.inventory_mode = 'direct' AND mi.product_id IS NOT NULL THEN
-      COALESCE((SELECT quantity FROM public.products WHERE id = mi.product_id), 0) > 
-      COALESCE((SELECT minimum_stock FROM public.products WHERE id = mi.product_id), 0)
+      COALESCE((SELECT quantity FROM public.products WHERE id = mi.product_id), 0) > 0
     WHEN mi.inventory_mode = 'recipe' THEN
       EXISTS (
         SELECT 1 FROM public.menu_item_components mic
         JOIN public.products p ON mic.product_id = p.id
         WHERE mic.menu_item_id = mi.id
-        AND COALESCE(p.quantity, 0) > COALESCE(p.minimum_stock, 0)
+        AND COALESCE(p.quantity, 0) > 0
       )
     ELSE true
   END as in_stock
