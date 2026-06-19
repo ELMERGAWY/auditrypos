@@ -667,6 +667,13 @@ export default function Dashboard() {
     fetchAccountingAccounts();
   }, [restaurant?.id]);
 
+  const sidebarTabs = useMemo(() => {
+    if (!restaurant) return [];
+    const baseTabs = config?.tabs || [];
+    const customTabs = Array.isArray(restaurant.custom_tabs) ? restaurant.custom_tabs : [];
+    return Array.from(new Set([...baseTabs, ...customTabs])) as SidebarTab[];
+  }, [restaurant, config?.tabs]);
+
   if (authLoading || !user || !dataLoaded) return <div className="min-h-screen flex items-center justify-center"><RefreshCcw className="w-10 h-10 animate-spin text-primary" /></div>;
   if (!restaurant) return <div className="min-h-screen flex items-center justify-center p-4"><Suspense fallback={null}><CreateRestaurantForm userId={user.id} onCreated={loadData} /></Suspense></div>;
 
@@ -690,6 +697,7 @@ export default function Dashboard() {
           isDark={isDark}
           onToggleDark={toggleDarkMode}
           isSuperAdmin={isSuperAdmin}
+          tabs={sidebarTabs}
         />
         <main className="flex-1 pt-16 h-[100dvh] overflow-hidden">
           <div className="h-full overflow-auto custom-scrollbar p-2 sm:p-4">

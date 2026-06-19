@@ -8,6 +8,7 @@ import { BUSINESS_TYPES } from '@/lib/businessTypes';
 interface Props {
   restaurant: any;
   loadData: () => void;
+  isSuperAdmin?: boolean;
 }
 
 const STANDARDS = [
@@ -27,7 +28,7 @@ const SYSTEMS = [
   { id: 'PERIODIC', label: 'الجرد الدوري (Periodic)', description: 'تحديث المخزون في نهاية الفترة المحاسبية فقط.' },
 ];
 
-export function AccountingSettings({ restaurant, loadData }: Props) {
+export function AccountingSettings({ restaurant, loadData, isSuperAdmin }: Props) {
   const [loading, setLoading] = useState(false);
   const [form, setForm] = useState({
     accounting_standard: restaurant.accounting_standard || 'IFRS',
@@ -45,12 +46,15 @@ export function AccountingSettings({ restaurant, loadData }: Props) {
     }
 
     setLoading(true);
-    const { error } = await supabase.from('restaurants').update({
+    const updatePayload: any = {
       accounting_standard: form.accounting_standard,
       inventory_method: form.inventory_method,
-      inventory_system: form.inventory_system,
-      business_type: form.business_type
-    } as any).eq('id', restaurant.id);
+      inventory_system: form.inventory_system
+    };
+    if (isSuperAdmin) {
+      updatePayload.business_type = form.business_type;
+    }
+    const { error } = await supabase.from('restaurants').update(updatePayload).eq('id', restaurant.id);
 
     if (error) {
       console.error('Save settings error:', error);
@@ -126,29 +130,59 @@ export function AccountingSettings({ restaurant, loadData }: Props) {
       {/* Business Module Selection */}
       <div className="glass-card p-4 space-y-4 lg:col-span-2 border-primary/20">
         <label className="block text-sm font-bold text-primary flex items-center gap-2">
-          <Building2 className="w-4 h-4" /> موديول النظام المخصص (Business Modules)
+          <Building2 className="w-4 h-4" /> موديول النظام المخصص (Business Module)
         </label>
-        <p className="text-xs text-muted-foreground mb-4">
-          اختر طبيعة نشاطك التجاري. هذا الاختيار سيقوم بتخصيص الواجهات، القوائم، التقارير، والربط المحاسبي (Chart of Accounts) آلياً بما يتوافق مع ممارسات هذا النشاط.
-        </p>
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
-          {Object.values(BUSINESS_TYPES).map(bt => (
-            <button 
-              key={bt.id} 
-              type="button"
-              onClick={() => setForm({ ...form, business_type: bt.id })}
-              className={`p-4 rounded-xl border-2 text-center transition-all flex flex-col items-center gap-2 relative group ${form.business_type === bt.id ? 'border-primary bg-primary/5 ring-1 ring-primary/20' : 'border-border hover:border-primary/30 bg-card/50'}`}
-            >
-              <span className="text-3xl group-hover:scale-110 transition-transform">{bt.icon}</span>
-              <span className="font-bold text-[11px] leading-tight">{bt.label}</span>
-              {form.business_type === bt.id && (
-                <div className="absolute top-1 left-1">
-                  <CheckCircle2 className="w-4 h-4 text-primary" />
+
+        {isSuperAdmin ? (
+          /* Super Admin: Full editable grid */
+          <>
+            <p className="text-xs text-muted-foreground">
+              بصفتك سوبر أدمن، يمكنك تغيير موديول النشاط. سيؤدي هذا إلى تغيير التبويبات والواجهات المتاحة.
+            </p>
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
+              {Object.values(BUSINESS_TYPES).map(bt => (
+                <button
+                  key={bt.id}
+                  type="button"
+                  onClick={() => setForm({ ...form, business_type: bt.id })}
+                  className={`p-4 rounded-xl border-2 text-center transition-all flex flex-col items-center gap-2 relative group hover:scale-105 active:scale-95 ${form.business_type === bt.id ? 'border-primary bg-primary/5 ring-1 ring-primary/20 shadow-md shadow-primary/10' : 'border-border hover:border-primary/30 bg-card/50'}`}
+                >
+                  <span className="text-3xl group-hover:scale-110 transition-transform">{bt.icon}</span>
+                  <span className="font-bold text-[11px] leading-tight">{bt.label}</span>
+                  {form.business_type === bt.id && (
+                    <div className="absolute top-1 left-1">
+                      <CheckCircle2 className="w-4 h-4 text-primary" />
+                    </div>
+                  )}
+                </button>
+              ))}
+            </div>
+          </>
+        ) : (
+          /* Regular client: Read-only display of current module */
+          <>
+            <p className="text-xs text-muted-foreground mb-3">
+              الموديول الخاص بنشاطك. لتغيير الموديول، يرجى التواصل مع فريق الدعم الفني.
+            </p>
+            {(() => {
+              const currentBT = Object.values(BUSINESS_TYPES).find(bt => bt.id === form.business_type);
+              return currentBT ? (
+                <div className="flex items-center gap-4 p-4 bg-primary/5 border-2 border-primary/20 rounded-xl">
+                  <span className="text-4xl">{currentBT.icon}</span>
+                  <div>
+                    <p className="font-black text-lg text-primary">{currentBT.label}</p>
+                    <p className="text-xs text-muted-foreground">
+                      الموديول المُفعّل لحسابك — يتحكم في التبويبات والتقارير المتاحة
+                    </p>
+                  </div>
+                  <div className="mr-auto">
+                    <CheckCircle2 className="w-6 h-6 text-primary" />
+                  </div>
                 </div>
-              )}
-            </button>
-          ))}
-        </div>
+              ) : null;
+            })()}
+          </>
+        )}
       </div>
 
       <div className="p-4 bg-primary/5 border border-primary/20 rounded-xl flex gap-3">

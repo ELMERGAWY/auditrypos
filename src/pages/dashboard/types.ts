@@ -82,6 +82,8 @@ export interface Restaurant {
   accounting_standard?: string;
   inventory_method?: string;
   inventory_system?: string;
+  enabled_modules?: string[];
+  custom_tabs?: string[];
 }
 
   export interface HeldInvoice {

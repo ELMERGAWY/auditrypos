@@ -39,6 +39,53 @@ const BAN_LEVELS = {
   permanent: { label: 'حظر دائم', color: 'bg-red-500/20 text-red-400 border-red-500/30' },
 };
 
+const ALL_TABS_CONFIG = {
+  pos: { label: 'نقطة البيع', icon: '🛒' },
+  orders: { label: 'الطلبات', icon: '📄' },
+  menu: { label: 'المنيو/الأصناف', icon: '📦' },
+  employees: { label: 'الموظفين والرواتب', icon: '👥' },
+  customers: { label: 'العملاء والحسابات', icon: '👥' },
+  crm: { label: 'إدارة علاقات العملاء CRM', icon: '❤️' },
+  sales_orders: { label: 'أوامر البيع', icon: '📄' },
+  sales_invoices: { label: 'فواتير البيع', icon: '📄' },
+  sales_returns: { label: 'مرتجعات المبيعات', icon: '🔄' },
+  suppliers: { label: 'الموردين والحسابات', icon: '👥' },
+  purchase_orders: { label: 'أوامر الشراء', icon: '🛒' },
+  purchase_invoices: { label: 'فواتير الشراء', icon: '💵' },
+  supplier_contracts: { label: 'عقود الموردين والعمولات', icon: '📄' },
+  inventory: { label: 'المخزون', icon: '📦' },
+  bom: { label: 'تكاليف الإنتاج (BOM)', icon: '🥞' },
+  service_packages: { label: 'حزم الخدمات', icon: '📦' },
+  financials: { label: 'القوائم المالية', icon: '💼' },
+  treasury: { label: 'الخزينة والبنك', icon: '💼' },
+  expenses: { label: 'المصروفات', icon: '💵' },
+  chart_of_accounts: { label: 'دليل الحسابات', icon: '🕸️' },
+  manual_journal: { label: 'قيود اليومية', icon: '📄' },
+  fixed_assets: { label: 'الأصول الثابتة', icon: '🏢' },
+  accounting_mapping: { label: 'توجيه المحاسبة', icon: '⚙️' },
+  contracting: { label: 'المقاولات', icon: '🏗️' },
+  projects: { label: 'المشاريع', icon: '🏗️' },
+  analytics: { label: 'التقارير والإحصائيات', icon: '📊' },
+  ai_assistant: { label: 'المساعد الذكي (AI)', icon: '✨' },
+  staff: { label: 'فريق العمل', icon: '👥' },
+  payroll: { label: 'مسيرات الرواتب', icon: '💵' },
+  chat: { label: 'دردشة التيم', icon: '💬' },
+  users: { label: 'الصلاحيات والمستخدمين', icon: '🛡️' },
+  settings: { label: 'إعدادات النظام', icon: '⚙️' },
+  notifications: { label: 'التنبيهات', icon: '🔔' },
+  delivery: { label: 'التوصيل والمناديب', icon: '🛵' },
+  shifts: { label: 'الشيفتات اليومية', icon: '📅' },
+  kds: { label: 'شاشة المطبخ (KDS)', icon: '👨‍🍳' },
+  qr: { label: 'منيو QR الذكي', icon: '📱' },
+  waiter: { label: 'استدعاء الجرسون', icon: '🔔' },
+  loyalty: { label: 'نقاط الولاء', icon: '❤️' },
+  gift_cards: { label: 'كروت الهدايا', icon: '🎁' },
+  branches: { label: 'الفروع والمنافذ', icon: '🏢' },
+  marketing_services: { label: 'خدمات التسويق', icon: '✨' },
+  marketing_quotes: { label: 'عروض الأسعار', icon: '📄' },
+  marketing_contracts: { label: 'عقود التسويق', icon: '📄' }
+};
+
 const SuperAdmin = () => {
   useDarkMode();
   const navigate = useNavigate();
@@ -56,6 +103,8 @@ const SuperAdmin = () => {
   const [globalUsers, setGlobalUsers] = useState<any[]>([]);
   const [showAddUser, setShowAddUser] = useState(false);
   const [newUserForm, setNewUserForm] = useState({ email: '', fullName: '', restaurantId: '', role: 'cashier' });
+  const [selectedRestForTabs, setSelectedRestForTabs] = useState<any | null>(null);
+  const [customTabsForm, setCustomTabsForm] = useState<string[]>([]);
 
   useEffect(() => {
     // Wait for both authLoading AND adminChecked before redirecting (prevents race condition kicking super admins out)
@@ -286,17 +335,39 @@ const SuperAdmin = () => {
                       </div>
                       <p className="text-[10px] text-muted-foreground font-mono mb-2 uppercase tracking-widest">{r.id}</p>
                       
+                      {/* Primary Module Selection */}
+                      <div className="flex items-center gap-2 mb-3 bg-primary/5 p-2 rounded-lg border border-primary/10">
+                        <span className="text-xs font-bold text-primary">الموديول الرئيسي للعميل:</span>
+                        <select
+                          value={r.business_type || 'restaurant'}
+                          onChange={async (e) => {
+                            const newType = e.target.value;
+                            const { error } = await supabase.from('restaurants').update({ business_type: newType }).eq('id', r.id);
+                            if (error) toast.error('فشل تحديث الموديول');
+                            else { load(); toast.success('تم تحديث الموديول الرئيسي للشركة'); }
+                          }}
+                          className="bg-card text-xs font-bold rounded px-2 py-1 border border-border focus:outline-none"
+                        >
+                          {Object.entries(BUSINESS_TYPES).map(([key, bt]) => (
+                            <option key={key} value={key}>{bt.icon} {bt.label}</option>
+                          ))}
+                        </select>
+                      </div>
+
                       {/* Modules Display */}
-                      <div className="flex flex-wrap gap-1 mb-3">
-                        {Object.entries(BUSINESS_TYPES).map(([key, bt]) => {
-                          const isEnabled = Array.isArray(r.enabled_modules) && r.enabled_modules.includes(key);
-                          return (
-                            <button key={key} onClick={() => handleToggleModule(r.id, key)}
-                              className={`px-2 py-0.5 rounded text-[10px] border transition-all ${isEnabled ? 'bg-primary/20 border-primary text-primary font-bold' : 'bg-secondary/30 border-transparent text-muted-foreground opacity-50 hover:opacity-100'}`}>
-                              {bt.label}
-                            </button>
-                          );
-                        })}
+                      <div className="space-y-1 mb-3">
+                        <span className="text-[10px] font-bold text-muted-foreground block">الموديولات المفعلة الإضافية:</span>
+                        <div className="flex flex-wrap gap-1">
+                          {Object.entries(BUSINESS_TYPES).map(([key, bt]) => {
+                            const isEnabled = Array.isArray(r.enabled_modules) && r.enabled_modules.includes(key);
+                            return (
+                              <button key={key} onClick={() => handleToggleModule(r.id, key)}
+                                className={`px-2 py-0.5 rounded text-[10px] border transition-all ${isEnabled ? 'bg-primary/20 border-primary text-primary font-bold' : 'bg-secondary/30 border-transparent text-muted-foreground opacity-50 hover:opacity-100'}`}>
+                                {bt.label}
+                              </button>
+                            );
+                          })}
+                        </div>
                       </div>
 
                       <div className="flex items-center gap-4 text-xs font-medium">
@@ -320,6 +391,12 @@ const SuperAdmin = () => {
                     <Button size="sm" variant="outline" onClick={() => handleStatusChange(r.id, r.status === 'active' ? 'suspended' : 'active')} className="w-full sm:w-auto">
                       {r.status === 'active' ? <Pause className="w-4 h-4 ml-1" /> : <Play className="w-4 h-4 ml-1" />}
                       {r.status === 'active' ? 'إيقاف' : 'تفعيل'}
+                    </Button>
+                    <Button size="sm" variant="outline" onClick={() => {
+                      setSelectedRestForTabs(r);
+                      setCustomTabsForm(Array.isArray(r.custom_tabs) ? r.custom_tabs : []);
+                    }} className="w-full sm:w-auto gap-1 border-primary/30 text-primary">
+                      <Sparkles className="w-4 h-4" /> تخصيص التبويبات
                     </Button>
                     <Button size="sm" variant="outline" onClick={() => setDrillIn({ id: r.id, name: r.name })} className="w-full sm:w-auto gap-1 border-primary/30 text-primary">
                       <ChevronRight className="w-4 h-4" /> إدارة شاملة
@@ -424,6 +501,90 @@ const SuperAdmin = () => {
         open={!!drillIn}
         onClose={() => setDrillIn(null)}
       />
+
+      {/* Custom Tabs Customization Dialog */}
+      <Dialog open={!!selectedRestForTabs} onOpenChange={(open) => !open && setSelectedRestForTabs(null)}>
+        <DialogContent className="max-w-3xl max-h-[90vh] overflow-hidden flex flex-col" dir="rtl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 font-display text-lg font-bold">
+              <Sparkles className="w-5 h-5 text-primary" />
+              تخصيص التبويبات المضافة لـ {selectedRestForTabs?.name}
+            </DialogTitle>
+          </DialogHeader>
+
+          <p className="text-xs text-muted-foreground mb-4">
+            التبويبات المحددة هنا ستظهر للعميل بالإضافة إلى التبويبات الافتراضية الخاصة بموديوله الرئيسي ({BUSINESS_TYPES[selectedRestForTabs?.business_type as BusinessType]?.label || '—'}). التبويبات الافتراضية محددة تلقائياً ولا يمكن إلغاؤها من هنا.
+          </p>
+
+          <div className="flex-1 overflow-y-auto grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2 p-1">
+            {Object.entries(ALL_TABS_CONFIG).map(([key, tabConf]) => {
+              const isDefaultTab = selectedRestForTabs && 
+                (BUSINESS_TYPES[selectedRestForTabs.business_type as BusinessType]?.tabs || []).includes(key);
+              const isChecked = customTabsForm.includes(key);
+
+              return (
+                <label 
+                  key={key} 
+                  className={`flex items-center gap-3 p-3 rounded-xl border-2 transition-all cursor-pointer select-none ${
+                    isDefaultTab 
+                      ? 'border-secondary bg-secondary/20 opacity-60 cursor-not-allowed' 
+                      : isChecked 
+                        ? 'border-primary bg-primary/5 ring-1 ring-primary/20' 
+                        : 'border-border hover:border-primary/20'
+                  }`}
+                >
+                  <input
+                    type="checkbox"
+                    checked={isDefaultTab || isChecked}
+                    disabled={!!isDefaultTab}
+                    onChange={(e) => {
+                      if (e.target.checked) {
+                        setCustomTabsForm([...customTabsForm, key]);
+                      } else {
+                        setCustomTabsForm(customTabsForm.filter(t => t !== key));
+                      }
+                    }}
+                    className="w-4 h-4 accent-primary rounded cursor-pointer"
+                  />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-bold truncate flex items-center gap-1">
+                      <span>{tabConf.icon}</span>
+                      <span>{tabConf.label}</span>
+                    </p>
+                    {isDefaultTab && (
+                      <span className="text-[9px] text-primary font-bold">(افتراضي للموديول)</span>
+                    )}
+                  </div>
+                </label>
+              );
+            })}
+          </div>
+
+          <div className="flex justify-end gap-2 pt-4 border-t border-border mt-4">
+            <Button variant="outline" onClick={() => setSelectedRestForTabs(null)}>إلغاء</Button>
+            <Button 
+              className="gradient-bg text-white shadow-lg shadow-primary/20 border-0"
+              onClick={async () => {
+                if (!selectedRestForTabs) return;
+                const { error } = await supabase
+                  .from('restaurants')
+                  .update({ custom_tabs: customTabsForm })
+                  .eq('id', selectedRestForTabs.id);
+
+                if (error) {
+                  toast.error('حدث خطأ أثناء حفظ التبويبات المخصصة');
+                } else {
+                  toast.success('تم حفظ وتعديل تبويبات المشترك بنجاح');
+                  setSelectedRestForTabs(null);
+                  load();
+                }
+              }}
+            >
+              حفظ وتطبيق التغييرات
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* Add User Dialog */}
       <Dialog open={showAddUser} onOpenChange={setShowAddUser}>
