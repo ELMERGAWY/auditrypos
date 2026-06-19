@@ -394,7 +394,13 @@ const SuperAdmin = () => {
                     </Button>
                     <Button size="sm" variant="outline" onClick={() => {
                       setSelectedRestForTabs(r);
-                      setCustomTabsForm(Array.isArray(r.custom_tabs) ? r.custom_tabs : []);
+                      // Pre-populate with effective current tabs:
+                      // if custom_tabs are already set → use them
+                      // otherwise → start with the module's default tabs so super admin sees current state
+                      const effectiveTabs = Array.isArray(r.custom_tabs) && r.custom_tabs.length > 0
+                        ? r.custom_tabs
+                        : (BUSINESS_TYPES[r.business_type as BusinessType]?.tabs || []);
+                      setCustomTabsForm([...effectiveTabs]);
                     }} className="w-full sm:w-auto gap-1 border-primary/30 text-primary">
                       <Sparkles className="w-4 h-4" /> تخصيص التبويبات
                     </Button>
@@ -502,41 +508,71 @@ const SuperAdmin = () => {
         onClose={() => setDrillIn(null)}
       />
 
-      {/* Custom Tabs Customization Dialog */}
+      {/* Custom Tabs Customization Dialog - Full Control */}
       <Dialog open={!!selectedRestForTabs} onOpenChange={(open) => !open && setSelectedRestForTabs(null)}>
         <DialogContent className="max-w-3xl max-h-[90vh] overflow-hidden flex flex-col" dir="rtl">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2 font-display text-lg font-bold">
               <Sparkles className="w-5 h-5 text-primary" />
-              تخصيص التبويبات المضافة لـ {selectedRestForTabs?.name}
+              تحكم كامل في تبويبات: {selectedRestForTabs?.name}
             </DialogTitle>
           </DialogHeader>
 
-          <p className="text-xs text-muted-foreground mb-4">
-            التبويبات المحددة هنا ستظهر للعميل بالإضافة إلى التبويبات الافتراضية الخاصة بموديوله الرئيسي ({BUSINESS_TYPES[selectedRestForTabs?.business_type as BusinessType]?.label || '—'}). التبويبات الافتراضية محددة تلقائياً ولا يمكن إلغاؤها من هنا.
-          </p>
+          <div className="bg-primary/5 border border-primary/20 rounded-xl p-3 mb-3">
+            <p className="text-xs font-bold text-primary mb-1">⚡ تحكم شامل في التبويبات</p>
+            <p className="text-[11px] text-muted-foreground leading-relaxed">
+              ما تحدده هنا هو <strong>القائمة الكاملة والنهائية</strong> للتبويبات التي سيراها المشترك — بما فيها الافتراضية لموديوله. يمكنك إضافة أو حذف أي تبويب بحرية كاملة.
+              الموديول الحالي: <strong className="text-primary">{BUSINESS_TYPES[selectedRestForTabs?.business_type as BusinessType]?.label || '—'}</strong>
+              &nbsp;({(BUSINESS_TYPES[selectedRestForTabs?.business_type as BusinessType]?.tabs || []).length} تبويب افتراضي).
+            </p>
+          </div>
+
+          {/* Quick actions */}
+          <div className="flex gap-2 mb-3 flex-wrap">
+            <button
+              onClick={() => {
+                const defaultTabs = BUSINESS_TYPES[selectedRestForTabs?.business_type as BusinessType]?.tabs || [];
+                setCustomTabsForm([...defaultTabs]);
+              }}
+              className="text-[11px] px-3 py-1.5 rounded-lg border border-border bg-secondary hover:bg-secondary/80 transition-colors font-bold"
+            >
+              ↩ استعادة افتراضيات الموديول
+            </button>
+            <button
+              onClick={() => setCustomTabsForm(Object.keys(ALL_TABS_CONFIG))}
+              className="text-[11px] px-3 py-1.5 rounded-lg border border-primary/30 bg-primary/5 hover:bg-primary/10 text-primary transition-colors font-bold"
+            >
+              ✓ تحديد الكل
+            </button>
+            <button
+              onClick={() => setCustomTabsForm([])}
+              className="text-[11px] px-3 py-1.5 rounded-lg border border-destructive/30 bg-destructive/5 hover:bg-destructive/10 text-destructive transition-colors font-bold"
+            >
+              ✕ مسح الكل
+            </button>
+            <span className="text-[11px] text-muted-foreground flex items-center gap-1 mr-auto">
+              المحددة: <strong className="text-primary">{customTabsForm.length}</strong> تبويب
+            </span>
+          </div>
 
           <div className="flex-1 overflow-y-auto grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2 p-1">
             {Object.entries(ALL_TABS_CONFIG).map(([key, tabConf]) => {
-              const isDefaultTab = selectedRestForTabs && 
+              const isModuleDefault = selectedRestForTabs &&
                 (BUSINESS_TYPES[selectedRestForTabs.business_type as BusinessType]?.tabs || []).includes(key);
               const isChecked = customTabsForm.includes(key);
 
               return (
-                <label 
-                  key={key} 
+                <label
+                  key={key}
                   className={`flex items-center gap-3 p-3 rounded-xl border-2 transition-all cursor-pointer select-none ${
-                    isDefaultTab 
-                      ? 'border-secondary bg-secondary/20 opacity-60 cursor-not-allowed' 
-                      : isChecked 
-                        ? 'border-primary bg-primary/5 ring-1 ring-primary/20' 
-                        : 'border-border hover:border-primary/20'
+                    isChecked
+                      ? 'border-primary bg-primary/5 ring-1 ring-primary/20'
+                      : 'border-border hover:border-primary/20'
                   }`}
                 >
                   <input
                     type="checkbox"
-                    checked={isDefaultTab || isChecked}
-                    disabled={!!isDefaultTab}
+                    checked={isChecked}
                     onChange={(e) => {
                       if (e.target.checked) {
                         setCustomTabsForm([...customTabsForm, key]);
@@ -551,8 +587,8 @@ const SuperAdmin = () => {
                       <span>{tabConf.icon}</span>
                       <span>{tabConf.label}</span>
                     </p>
-                    {isDefaultTab && (
-                      <span className="text-[9px] text-primary font-bold">(افتراضي للموديول)</span>
+                    {isModuleDefault && (
+                      <span className="text-[9px] text-emerald-500 font-bold">✓ افتراضي للموديول</span>
                     )}
                   </div>
                 </label>
@@ -562,10 +598,33 @@ const SuperAdmin = () => {
 
           <div className="flex justify-end gap-2 pt-4 border-t border-border mt-4">
             <Button variant="outline" onClick={() => setSelectedRestForTabs(null)}>إلغاء</Button>
-            <Button 
+            <Button
+              variant="outline"
+              className="border-destructive/30 text-destructive hover:bg-destructive/10"
+              onClick={async () => {
+                if (!selectedRestForTabs) return;
+                if (!confirm('سيتم حذف التخصيص وإعادة التابات لافتراضيات الموديول. هل أنت متأكد؟')) return;
+                const { error } = await supabase
+                  .from('restaurants')
+                  .update({ custom_tabs: [] })
+                  .eq('id', selectedRestForTabs.id);
+                if (!error) {
+                  toast.success('تم إعادة التبويبات لافتراضيات الموديول');
+                  setSelectedRestForTabs(null);
+                  load();
+                }
+              }}
+            >
+              إعادة تعيين للافتراضي
+            </Button>
+            <Button
               className="gradient-bg text-white shadow-lg shadow-primary/20 border-0"
               onClick={async () => {
                 if (!selectedRestForTabs) return;
+                if (customTabsForm.length === 0) {
+                  toast.error('يجب تحديد تبويب واحد على الأقل');
+                  return;
+                }
                 const { error } = await supabase
                   .from('restaurants')
                   .update({ custom_tabs: customTabsForm })
@@ -574,7 +633,7 @@ const SuperAdmin = () => {
                 if (error) {
                   toast.error('حدث خطأ أثناء حفظ التبويبات المخصصة');
                 } else {
-                  toast.success('تم حفظ وتعديل تبويبات المشترك بنجاح');
+                  toast.success(`تم تطبيق ${customTabsForm.length} تبويب على ${selectedRestForTabs.name}`);
                   setSelectedRestForTabs(null);
                   load();
                 }

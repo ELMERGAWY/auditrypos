@@ -670,8 +670,12 @@ export default function Dashboard() {
   const sidebarTabs = useMemo(() => {
     if (!restaurant) return [];
     const baseTabs = config?.tabs || [];
-    const customTabs = Array.isArray(restaurant.custom_tabs) ? restaurant.custom_tabs : [];
-    return Array.from(new Set([...baseTabs, ...customTabs])) as SidebarTab[];
+    const customTabs = Array.isArray(restaurant.custom_tabs) && restaurant.custom_tabs.length > 0
+      ? restaurant.custom_tabs
+      : null;
+    // If super admin has configured custom tabs → use them as the FULL list (complete override)
+    // If no custom tabs configured → fall back to the module's default tabs
+    return (customTabs ?? baseTabs) as SidebarTab[];
   }, [restaurant, config?.tabs]);
 
   if (authLoading || !user || !dataLoaded) return <div className="min-h-screen flex items-center justify-center"><RefreshCcw className="w-10 h-10 animate-spin text-primary" /></div>;
