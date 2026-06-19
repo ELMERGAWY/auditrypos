@@ -98,32 +98,24 @@ const StoreFront = () => {
     }
     setLoading(true);
     try {
-      const projectId = import.meta.env.VITE_SUPABASE_PROJECT_ID || 'nmkjyweoagbblkbqavdz';
-      const res = await fetch(
-        `https://${projectId}.supabase.co/functions/v1/storefront-order`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'apikey': import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY || '',
-          },
-          body: JSON.stringify({
-            restaurant_id: restaurantId,
-            items: cart.map(c => ({ name: c.item.name, image: c.item.image, price: c.item.price, quantity: c.qty })),
-            customer_name: customerForm.name,
-            customer_phone: customerForm.phone,
-            delivery_address: customerForm.address,
-            notes: customerForm.notes,
-            order_type: customerForm.address ? 'delivery' : 'takeaway',
-          }),
-        }
-      );
-      const data = await res.json();
-      if (data.error) throw new Error(data.error);
+      const { data, error } = await supabase.rpc('create_storefront_order', {
+        p_restaurant_id: restaurantId,
+        p_items: cart.map(c => ({ name: c.item.name, image: c.item.image, price: c.item.price, quantity: c.qty })),
+        p_customer_name: customerForm.name,
+        p_customer_phone: customerForm.phone,
+        p_delivery_address: customerForm.address || null,
+        p_notes: customerForm.notes || null,
+        p_order_type: customerForm.address ? 'delivery' : 'takeaway',
+      });
+
+      if (error) throw new Error(error.message);
+      if (!data || !data.success) throw new Error('فشل إنشاء الطلب');
+
       setOrderPlaced(data.order_number);
       setCart([]);
       setShowCheckout(false);
       setShowCart(false);
+      toast.success('تم إرسال طلبك بنجاح! سيتم التواصل معك قريباً');
     } catch (err: any) {
       toast.error(err.message || 'حدث خطأ');
     } finally {
