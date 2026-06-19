@@ -208,7 +208,7 @@ export const BUSINESS_TYPES: Record<BusinessType, BusinessTypeConfig> = {
       requireCustomer: false
     },
     
-    tabs: ['home', 'employees', 'pos', 'orders', 'menu', 'bom', 'service_packages', 'inventory', 'inventory_receipts', 'purchase_invoices', 'purchase_orders', 'supplier_contracts', 'sales_invoices', 'sales_orders', 'crm', 'delivery', 'customers', 'customer_accounts', 'sales_returns', 'suppliers', 'supplier_accounts', 'shifts', 'stats', 'analytics', 'ai_assistant', 'financials', 'treasury', 'chart_of_accounts', 'manual_journal', 'accounting_mapping', 'fixed_assets', 'expenses', 'staff', 'users', 'notifications', 'settings'],
+    tabs: ['home', 'employees', 'marketing_services', 'marketing_quotes', 'marketing_contracts', 'pos', 'orders', 'menu', 'bom', 'service_packages', 'inventory', 'inventory_receipts', 'purchase_invoices', 'purchase_orders', 'supplier_contracts', 'sales_invoices', 'sales_orders', 'crm', 'delivery', 'customers', 'customer_accounts', 'sales_returns', 'suppliers', 'supplier_accounts', 'shifts', 'stats', 'analytics', 'ai_assistant', 'financials', 'treasury', 'chart_of_accounts', 'manual_journal', 'accounting_mapping', 'fixed_assets', 'expenses', 'staff', 'users', 'notifications', 'settings'],
     
     specialFields: [
       { name: 'guest_count', type: 'number', label: 'عدد الضيوف', required: false },
@@ -288,7 +288,7 @@ export const BUSINESS_TYPES: Record<BusinessType, BusinessTypeConfig> = {
       requireCustomer: false
     },
     
-    tabs: ['home', 'employees', 'pos', 'orders', 'menu', 'service_packages', 'inventory', 'inventory_receipts', 'purchase_invoices', 'purchase_orders', 'supplier_contracts', 'sales_invoices', 'sales_orders', 'crm', 'delivery', 'customers', 'customer_accounts', 'sales_returns', 'suppliers', 'supplier_accounts', 'shifts', 'stats', 'analytics', 'ai_assistant', 'financials', 'treasury', 'fixed_assets', 'expenses', 'staff', 'users', 'notifications', 'settings'],
+    tabs: ['home', 'employees', 'marketing_services', 'marketing_quotes', 'marketing_contracts', 'pos', 'orders', 'menu', 'service_packages', 'inventory', 'inventory_receipts', 'purchase_invoices', 'purchase_orders', 'supplier_contracts', 'sales_invoices', 'sales_orders', 'crm', 'delivery', 'customers', 'customer_accounts', 'sales_returns', 'suppliers', 'supplier_accounts', 'shifts', 'stats', 'analytics', 'ai_assistant', 'financials', 'treasury', 'fixed_assets', 'expenses', 'staff', 'users', 'notifications', 'settings'],
   },
   
   retail: {
@@ -362,7 +362,7 @@ export const BUSINESS_TYPES: Record<BusinessType, BusinessTypeConfig> = {
       requireCustomer: false
     },
     
-    tabs: ['home', 'employees', 'pos', 'orders', 'menu', 'service_packages', 'inventory', 'inventory_receipts', 'purchase_invoices', 'purchase_orders', 'supplier_contracts', 'sales_invoices', 'sales_orders', 'crm', 'delivery', 'customers', 'customer_accounts', 'sales_returns', 'suppliers', 'supplier_accounts', 'shifts', 'stats', 'analytics', 'ai_assistant', 'financials', 'treasury', 'fixed_assets', 'expenses', 'staff', 'users', 'notifications', 'settings'],
+    tabs: ['home', 'employees', 'marketing_services', 'marketing_quotes', 'marketing_contracts', 'pos', 'orders', 'menu', 'service_packages', 'inventory', 'inventory_receipts', 'purchase_invoices', 'purchase_orders', 'supplier_contracts', 'sales_invoices', 'sales_orders', 'crm', 'delivery', 'customers', 'customer_accounts', 'sales_returns', 'suppliers', 'supplier_accounts', 'shifts', 'stats', 'analytics', 'ai_assistant', 'financials', 'treasury', 'fixed_assets', 'expenses', 'staff', 'users', 'notifications', 'settings'],
     
     specialFields: [
       { name: 'size', type: 'select', label: 'المقاس', required: false },
@@ -440,7 +440,7 @@ export const BUSINESS_TYPES: Record<BusinessType, BusinessTypeConfig> = {
       requireCustomer: false
     },
     
-    tabs: ['home', 'employees', 'pos', 'orders', 'menu', 'service_packages', 'inventory', 'inventory_receipts', 'purchase_invoices', 'purchase_orders', 'supplier_contracts', 'sales_invoices', 'sales_orders', 'crm', 'delivery', 'customers', 'customer_accounts', 'sales_returns', 'suppliers', 'supplier_accounts', 'shifts', 'stats', 'analytics', 'ai_assistant', 'financials', 'treasury', 'fixed_assets', 'expenses', 'staff', 'users', 'notifications', 'settings'],
+    tabs: ['home', 'employees', 'marketing_services', 'marketing_quotes', 'marketing_contracts', 'pos', 'orders', 'menu', 'service_packages', 'inventory', 'inventory_receipts', 'purchase_invoices', 'purchase_orders', 'supplier_contracts', 'sales_invoices', 'sales_orders', 'crm', 'delivery', 'customers', 'customer_accounts', 'sales_returns', 'suppliers', 'supplier_accounts', 'shifts', 'stats', 'analytics', 'ai_assistant', 'financials', 'treasury', 'fixed_assets', 'expenses', 'staff', 'users', 'notifications', 'settings'],
     
     specialFields: [
       { name: 'expiry_date', type: 'date', label: 'تاريخ الصلاحية', required: false },
@@ -519,7 +519,7 @@ export const BUSINESS_TYPES: Record<BusinessType, BusinessTypeConfig> = {
       requireCustomer: true
     },
     
-    tabs: ['home', 'employees', 'pos', 'orders', 'menu', 'service_packages', 'inventory', 'inventory_receipts', 'purchase_invoices', 'purchase_orders', 'supplier_contracts', 'sales_invoices', 'sales_orders', 'crm', 'delivery', 'customers', 'customer_accounts', 'sales_returns', 'suppliers', 'supplier_accounts', 'shifts', 'stats', 'analytics', 'ai_assistant', 'financials', 'treasury', 'fixed_assets', 'expenses', 'staff', 'users', 'notifications', 'settings'],
+    tabs: ['home', 'employees', 'marketing_services', 'marketing_quotes', 'marketing_contracts', 'pos', 'orders', 'menu', 'service_packages', 'inventory', 'inventory_receipts', 'purchase_invoices', 'purchase_orders', 'supplier_contracts', 'sales_invoices', 'sales_orders', 'crm', 'delivery', 'customers', 'customer_accounts', 'sales_returns', 'suppliers', 'supplier_accounts', 'shifts', 'stats', 'analytics', 'ai_assistant', 'financials', 'treasury', 'fixed_assets', 'expenses', 'staff', 'users', 'notifications', 'settings'],
     
     specialFields: [
       { name: 'prescription_number', type: 'text', label: 'رقم الروشتة', required: false },
@@ -599,7 +599,7 @@ export const BUSINESS_TYPES: Record<BusinessType, BusinessTypeConfig> = {
       requireCustomer: true
     },
     
-    tabs: ['home', 'employees', 'pos', 'orders', 'menu', 'service_packages', 'inventory', 'inventory_receipts', 'purchase_invoices', 'purchase_orders', 'supplier_contracts', 'sales_invoices', 'sales_orders', 'crm', 'delivery', 'customers', 'customer_accounts', 'sales_returns', 'suppliers', 'supplier_accounts', 'shifts', 'stats', 'analytics', 'ai_assistant', 'financials', 'treasury', 'fixed_assets', 'expenses', 'staff', 'users', 'notifications', 'settings'],
+    tabs: ['home', 'employees', 'marketing_services', 'marketing_quotes', 'marketing_contracts', 'pos', 'orders', 'menu', 'service_packages', 'inventory', 'inventory_receipts', 'purchase_invoices', 'purchase_orders', 'supplier_contracts', 'sales_invoices', 'sales_orders', 'crm', 'delivery', 'customers', 'customer_accounts', 'sales_returns', 'suppliers', 'supplier_accounts', 'shifts', 'stats', 'analytics', 'ai_assistant', 'financials', 'treasury', 'fixed_assets', 'expenses', 'staff', 'users', 'notifications', 'settings'],
     
     specialFields: [
       { name: 'credit_limit', type: 'number', label: 'حد الائتمان', required: false },
@@ -678,7 +678,7 @@ export const BUSINESS_TYPES: Record<BusinessType, BusinessTypeConfig> = {
       requireCustomer: true
     },
     
-    tabs: ['home', 'employees', 'pos', 'orders', 'menu', 'service_packages', 'inventory', 'inventory_receipts', 'purchase_invoices', 'purchase_orders', 'supplier_contracts', 'sales_invoices', 'sales_orders', 'crm', 'delivery', 'customers', 'customer_accounts', 'sales_returns', 'suppliers', 'supplier_accounts', 'shifts', 'stats', 'analytics', 'ai_assistant', 'financials', 'treasury', 'fixed_assets', 'expenses', 'staff', 'users', 'notifications', 'settings'],
+    tabs: ['home', 'employees', 'marketing_services', 'marketing_quotes', 'marketing_contracts', 'pos', 'orders', 'menu', 'service_packages', 'inventory', 'inventory_receipts', 'purchase_invoices', 'purchase_orders', 'supplier_contracts', 'sales_invoices', 'sales_orders', 'crm', 'delivery', 'customers', 'customer_accounts', 'sales_returns', 'suppliers', 'supplier_accounts', 'shifts', 'stats', 'analytics', 'ai_assistant', 'financials', 'treasury', 'fixed_assets', 'expenses', 'staff', 'users', 'notifications', 'settings'],
   },
   
   services: {
@@ -752,7 +752,7 @@ export const BUSINESS_TYPES: Record<BusinessType, BusinessTypeConfig> = {
       requireCustomer: true
     },
     
-    tabs: ['home', 'employees', 'pos', 'orders', 'menu', 'service_packages', 'inventory', 'inventory_receipts', 'purchase_invoices', 'purchase_orders', 'supplier_contracts', 'sales_invoices', 'sales_orders', 'crm', 'delivery', 'customers', 'customer_accounts', 'sales_returns', 'suppliers', 'supplier_accounts', 'shifts', 'stats', 'analytics', 'ai_assistant', 'financials', 'treasury', 'fixed_assets', 'expenses', 'staff', 'users', 'notifications', 'settings'],
+    tabs: ['home', 'employees', 'marketing_services', 'marketing_quotes', 'marketing_contracts', 'pos', 'orders', 'menu', 'service_packages', 'inventory', 'inventory_receipts', 'purchase_invoices', 'purchase_orders', 'supplier_contracts', 'sales_invoices', 'sales_orders', 'crm', 'delivery', 'customers', 'customer_accounts', 'sales_returns', 'suppliers', 'supplier_accounts', 'shifts', 'stats', 'analytics', 'ai_assistant', 'financials', 'treasury', 'fixed_assets', 'expenses', 'staff', 'users', 'notifications', 'settings'],
     
     specialFields: [
       { name: 'pickup_date', type: 'date', label: 'تاريخ الاستلام', required: true },
@@ -832,7 +832,7 @@ export const BUSINESS_TYPES: Record<BusinessType, BusinessTypeConfig> = {
       requireCustomer: false
     },
     
-    tabs: ['home', 'employees', 'pos', 'orders', 'menu', 'service_packages', 'inventory', 'inventory_receipts', 'purchase_invoices', 'purchase_orders', 'supplier_contracts', 'sales_invoices', 'sales_orders', 'crm', 'delivery', 'customers', 'customer_accounts', 'sales_returns', 'suppliers', 'supplier_accounts', 'shifts', 'stats', 'analytics', 'ai_assistant', 'financials', 'treasury', 'fixed_assets', 'expenses', 'staff', 'users', 'notifications', 'settings']
+    tabs: ['home', 'employees', 'marketing_services', 'marketing_quotes', 'marketing_contracts', 'pos', 'orders', 'menu', 'service_packages', 'inventory', 'inventory_receipts', 'purchase_invoices', 'purchase_orders', 'supplier_contracts', 'sales_invoices', 'sales_orders', 'crm', 'delivery', 'customers', 'customer_accounts', 'sales_returns', 'suppliers', 'supplier_accounts', 'shifts', 'stats', 'analytics', 'ai_assistant', 'financials', 'treasury', 'fixed_assets', 'expenses', 'staff', 'users', 'notifications', 'settings']
   },
   shipping: {
     id: 'shipping',
@@ -897,7 +897,7 @@ export const BUSINESS_TYPES: Record<BusinessType, BusinessTypeConfig> = {
       allowCredit: true,
       requireCustomer: true
     },
-    tabs: ['home', 'employees', 'pos', 'orders', 'menu', 'service_packages', 'crm', 'delivery', 'customers', 'customer_accounts', 'stats', 'analytics', 'ai_assistant', 'financials', 'accounting', 'expenses', 'staff', 'settings']
+    tabs: ['home', 'employees', 'marketing_services', 'marketing_quotes', 'marketing_contracts', 'pos', 'orders', 'menu', 'service_packages', 'crm', 'delivery', 'customers', 'customer_accounts', 'stats', 'analytics', 'ai_assistant', 'financials', 'accounting', 'expenses', 'staff', 'settings']
   },
   distribution: {
     id: 'distribution',
@@ -961,7 +961,7 @@ export const BUSINESS_TYPES: Record<BusinessType, BusinessTypeConfig> = {
       allowCredit: true,
       requireCustomer: true
     },
-    tabs: ['home', 'employees', 'pos', 'orders', 'menu', 'service_packages', 'inventory', 'inventory_receipts', 'crm', 'delivery', 'customers', 'customer_accounts', 'suppliers', 'supplier_accounts', 'stats', 'analytics', 'ai_assistant', 'financials', 'accounting', 'settings']
+    tabs: ['home', 'employees', 'marketing_services', 'marketing_quotes', 'marketing_contracts', 'pos', 'orders', 'menu', 'service_packages', 'inventory', 'inventory_receipts', 'crm', 'delivery', 'customers', 'customer_accounts', 'suppliers', 'supplier_accounts', 'stats', 'analytics', 'ai_assistant', 'financials', 'accounting', 'settings']
   },
   hospital: {
     id: 'hospital',
@@ -1025,7 +1025,7 @@ export const BUSINESS_TYPES: Record<BusinessType, BusinessTypeConfig> = {
       allowCredit: true,
       requireCustomer: true
     },
-    tabs: ['home', 'employees', 'pos', 'orders', 'menu', 'service_packages', 'crm', 'delivery', 'customers', 'customer_accounts', 'suppliers', 'supplier_accounts', 'stats', 'analytics', 'ai_assistant', 'financials', 'accounting', 'staff', 'settings']
+    tabs: ['home', 'employees', 'marketing_services', 'marketing_quotes', 'marketing_contracts', 'pos', 'orders', 'menu', 'service_packages', 'crm', 'delivery', 'customers', 'customer_accounts', 'suppliers', 'supplier_accounts', 'stats', 'analytics', 'ai_assistant', 'financials', 'accounting', 'staff', 'settings']
   },
   factory: {
     id: 'factory',
@@ -1089,7 +1089,7 @@ export const BUSINESS_TYPES: Record<BusinessType, BusinessTypeConfig> = {
       allowCredit: true,
       requireCustomer: false
     },
-    tabs: ['home', 'employees', 'bom', 'pos', 'orders', 'menu', 'service_packages', 'inventory', 'inventory_receipts', 'purchase_invoices', 'purchase_orders', 'supplier_contracts', 'sales_orders', 'crm', 'delivery', 'customers', 'customer_accounts', 'suppliers', 'supplier_accounts', 'stats', 'analytics', 'ai_assistant', 'financials', 'accounting', 'settings']
+    tabs: ['home', 'employees', 'marketing_services', 'marketing_quotes', 'marketing_contracts', 'bom', 'pos', 'orders', 'menu', 'service_packages', 'inventory', 'inventory_receipts', 'purchase_invoices', 'purchase_orders', 'supplier_contracts', 'sales_orders', 'crm', 'delivery', 'customers', 'customer_accounts', 'suppliers', 'supplier_accounts', 'stats', 'analytics', 'ai_assistant', 'financials', 'accounting', 'settings']
   },
   real_estate: {
     id: 'real_estate',
@@ -1154,7 +1154,7 @@ export const BUSINESS_TYPES: Record<BusinessType, BusinessTypeConfig> = {
       allowCredit: true,
       requireCustomer: true
     },
-    tabs: ['home', 'employees', 'pos', 'orders', 'menu', 'service_packages', 'crm', 'delivery', 'customers', 'customer_accounts', 'suppliers', 'supplier_accounts', 'stats', 'analytics', 'ai_assistant', 'financials', 'accounting', 'expenses', 'staff', 'settings']
+    tabs: ['home', 'employees', 'marketing_services', 'marketing_quotes', 'marketing_contracts', 'pos', 'orders', 'menu', 'service_packages', 'crm', 'delivery', 'customers', 'customer_accounts', 'suppliers', 'supplier_accounts', 'stats', 'analytics', 'ai_assistant', 'financials', 'accounting', 'expenses', 'staff', 'settings']
   },
   contracting: {
     id: 'contracting',
@@ -1218,7 +1218,7 @@ export const BUSINESS_TYPES: Record<BusinessType, BusinessTypeConfig> = {
       allowCredit: true,
       requireCustomer: true
     },
-    tabs: ['home', 'employees', 'contracting', 'projects', 'pos', 'orders', 'menu', 'service_packages', 'inventory', 'inventory_receipts', 'purchase_invoices', 'purchase_orders', 'supplier_contracts', 'crm', 'delivery', 'customers', 'customer_accounts', 'suppliers', 'supplier_accounts', 'stats', 'analytics', 'ai_assistant', 'financials', 'treasury', 'chart_of_accounts', 'manual_journal', 'accounting_mapping', 'fixed_assets', 'settings']
+    tabs: ['home', 'employees', 'marketing_services', 'marketing_quotes', 'marketing_contracts', 'contracting', 'projects', 'pos', 'orders', 'menu', 'service_packages', 'inventory', 'inventory_receipts', 'purchase_invoices', 'purchase_orders', 'supplier_contracts', 'crm', 'delivery', 'customers', 'customer_accounts', 'suppliers', 'supplier_accounts', 'stats', 'analytics', 'ai_assistant', 'financials', 'treasury', 'chart_of_accounts', 'manual_journal', 'accounting_mapping', 'fixed_assets', 'settings']
   },
   finishing: {
     id: 'finishing',
@@ -1282,7 +1282,7 @@ export const BUSINESS_TYPES: Record<BusinessType, BusinessTypeConfig> = {
       allowCredit: true,
       requireCustomer: true
     },
-    tabs: ['home', 'employees', 'pos', 'orders', 'menu', 'service_packages', 'inventory', 'inventory_receipts', 'crm', 'delivery', 'customers', 'customer_accounts', 'stats', 'analytics', 'ai_assistant', 'financials', 'accounting', 'fixed_assets', 'expenses', 'staff', 'settings']
+    tabs: ['home', 'employees', 'marketing_services', 'marketing_quotes', 'marketing_contracts', 'pos', 'orders', 'menu', 'service_packages', 'inventory', 'inventory_receipts', 'crm', 'delivery', 'customers', 'customer_accounts', 'stats', 'analytics', 'ai_assistant', 'financials', 'accounting', 'fixed_assets', 'expenses', 'staff', 'settings']
   },
   rental: {
     id: 'rental',
@@ -1346,7 +1346,7 @@ export const BUSINESS_TYPES: Record<BusinessType, BusinessTypeConfig> = {
       allowCredit: true,
       requireCustomer: true
     },
-    tabs: ['home', 'employees', 'pos', 'orders', 'menu', 'service_packages', 'inventory', 'inventory_receipts', 'purchase_invoices', 'purchase_orders', 'supplier_contracts', 'crm', 'delivery', 'customers', 'customer_accounts', 'suppliers', 'supplier_accounts', 'stats', 'analytics', 'ai_assistant', 'financials', 'accounting', 'fixed_assets', 'expenses', 'staff', 'settings']
+    tabs: ['home', 'employees', 'marketing_services', 'marketing_quotes', 'marketing_contracts', 'pos', 'orders', 'menu', 'service_packages', 'inventory', 'inventory_receipts', 'purchase_invoices', 'purchase_orders', 'supplier_contracts', 'crm', 'delivery', 'customers', 'customer_accounts', 'suppliers', 'supplier_accounts', 'stats', 'analytics', 'ai_assistant', 'financials', 'accounting', 'fixed_assets', 'expenses', 'staff', 'settings']
   },
   education: {
     id: 'education',
@@ -1410,7 +1410,7 @@ export const BUSINESS_TYPES: Record<BusinessType, BusinessTypeConfig> = {
       allowCredit: true,
       requireCustomer: true
     },
-    tabs: ['home', 'employees', 'pos', 'orders', 'menu', 'service_packages', 'crm', 'delivery', 'customers', 'customer_accounts', 'stats', 'analytics', 'ai_assistant', 'financials', 'accounting', 'fixed_assets', 'staff', 'settings']
+    tabs: ['home', 'employees', 'marketing_services', 'marketing_quotes', 'marketing_contracts', 'pos', 'orders', 'menu', 'service_packages', 'crm', 'delivery', 'customers', 'customer_accounts', 'stats', 'analytics', 'ai_assistant', 'financials', 'accounting', 'fixed_assets', 'staff', 'settings']
   },
   law_firm: {
     id: 'law_firm',
@@ -1474,7 +1474,7 @@ export const BUSINESS_TYPES: Record<BusinessType, BusinessTypeConfig> = {
       allowCredit: true,
       requireCustomer: true
     },
-    tabs: ['home', 'employees', 'pos', 'orders', 'menu', 'service_packages', 'crm', 'delivery', 'customers', 'customer_accounts', 'stats', 'analytics', 'ai_assistant', 'financials', 'accounting', 'fixed_assets', 'staff', 'settings']
+    tabs: ['home', 'employees', 'marketing_services', 'marketing_quotes', 'marketing_contracts', 'pos', 'orders', 'menu', 'service_packages', 'crm', 'delivery', 'customers', 'customer_accounts', 'stats', 'analytics', 'ai_assistant', 'financials', 'accounting', 'fixed_assets', 'staff', 'settings']
   },
   marketing_agency: {
     id: 'marketing_agency',
@@ -1538,7 +1538,7 @@ export const BUSINESS_TYPES: Record<BusinessType, BusinessTypeConfig> = {
       allowCredit: true,
       requireCustomer: true
     },
-    tabs: ['home', 'employees', 'crm', 'projects', 'customers', 'suppliers', 'sales_orders', 'sales_invoices', 'purchase_orders', 'supplier_contracts', 'purchase_invoices', 'financials', 'treasury', 'chart_of_accounts', 'manual_journal', 'accounting_mapping', 'fixed_assets', 'expenses', 'staff', 'payroll', 'chat', 'users', 'notifications', 'settings']
+    tabs: ['home', 'employees', 'marketing_services', 'marketing_quotes', 'marketing_contracts', 'crm', 'projects', 'customers', 'suppliers', 'sales_orders', 'sales_invoices', 'purchase_orders', 'supplier_contracts', 'purchase_invoices', 'financials', 'treasury', 'chart_of_accounts', 'manual_journal', 'accounting_mapping', 'fixed_assets', 'expenses', 'staff', 'payroll', 'chat', 'users', 'notifications', 'settings']
   },
   gym: {
     id: 'gym',
@@ -1602,7 +1602,7 @@ export const BUSINESS_TYPES: Record<BusinessType, BusinessTypeConfig> = {
       allowCredit: true,
       requireCustomer: true
     },
-    tabs: ['home', 'employees', 'pos', 'orders', 'menu', 'service_packages', 'inventory', 'crm', 'delivery', 'customers', 'customer_accounts', 'stats', 'analytics', 'ai_assistant', 'financials', 'accounting', 'fixed_assets', 'expenses', 'staff', 'settings']
+    tabs: ['home', 'employees', 'marketing_services', 'marketing_quotes', 'marketing_contracts', 'pos', 'orders', 'menu', 'service_packages', 'inventory', 'crm', 'delivery', 'customers', 'customer_accounts', 'stats', 'analytics', 'ai_assistant', 'financials', 'accounting', 'fixed_assets', 'expenses', 'staff', 'settings']
   },
   beauty_salon: {
     id: 'beauty_salon',
@@ -1666,7 +1666,7 @@ export const BUSINESS_TYPES: Record<BusinessType, BusinessTypeConfig> = {
       allowCredit: true,
       requireCustomer: false
     },
-    tabs: ['home', 'employees', 'pos', 'orders', 'menu', 'service_packages', 'inventory', 'crm', 'delivery', 'customers', 'customer_accounts', 'stats', 'analytics', 'ai_assistant', 'financials', 'accounting', 'fixed_assets', 'expenses', 'staff', 'settings']
+    tabs: ['home', 'employees', 'marketing_services', 'marketing_quotes', 'marketing_contracts', 'pos', 'orders', 'menu', 'service_packages', 'inventory', 'crm', 'delivery', 'customers', 'customer_accounts', 'stats', 'analytics', 'ai_assistant', 'financials', 'accounting', 'fixed_assets', 'expenses', 'staff', 'settings']
   },
   auto_repair: {
     id: 'auto_repair',
@@ -1730,7 +1730,7 @@ export const BUSINESS_TYPES: Record<BusinessType, BusinessTypeConfig> = {
       allowCredit: true,
       requireCustomer: true
     },
-    tabs: ['home', 'employees', 'pos', 'orders', 'menu', 'service_packages', 'inventory', 'inventory_receipts', 'purchase_invoices', 'crm', 'delivery', 'customers', 'customer_accounts', 'suppliers', 'supplier_accounts', 'stats', 'analytics', 'ai_assistant', 'financials', 'accounting', 'fixed_assets', 'expenses', 'staff', 'settings']
+    tabs: ['home', 'employees', 'marketing_services', 'marketing_quotes', 'marketing_contracts', 'pos', 'orders', 'menu', 'service_packages', 'inventory', 'inventory_receipts', 'purchase_invoices', 'crm', 'delivery', 'customers', 'customer_accounts', 'suppliers', 'supplier_accounts', 'stats', 'analytics', 'ai_assistant', 'financials', 'accounting', 'fixed_assets', 'expenses', 'staff', 'settings']
   }
 };
 
