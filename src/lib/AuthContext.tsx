@@ -57,20 +57,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         // where adminChecked becomes false while loading is also false
         (async () => {
           try {
-            const { data } = await supabase
+            const { data, error } = await supabase
               .from('user_roles')
               .select('role')
               .eq('user_id', session.user.id)
               .eq('role', 'super_admin')
               .maybeSingle();
+            
+            console.log('Admin check result:', { data, error, userId: session.user.id });
+            
             setIsSuperAdmin(!!data);
-          } catch (err) {
-            console.error("Error checking admin status:", err);
-            setIsSuperAdmin(false);
-          } finally {
             // IMPORTANT: setAdminChecked AFTER setIsSuperAdmin to prevent
             // premature redirect in SuperAdmin.tsx while role is still loading
             // Also ensure loading is set to false after admin check completes
+            setAdminChecked(true);
+            setLoading(false);
+          } catch (err) {
+            console.error("Error checking admin status:", err);
+            setIsSuperAdmin(false);
             setAdminChecked(true);
             setLoading(false);
           }

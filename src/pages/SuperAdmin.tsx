@@ -26,7 +26,7 @@ import {
   ResponsiveContainer, PieChart, Pie, Cell, Area, AreaChart
 } from 'recharts';
 
-type Tab = 'overview' | 'restaurants' | 'users' | 'agents' | 'bans' | 'receipts' | 'backup';
+type Tab = 'overview' | 'restaurants' | 'users' | 'agents' | 'bans' | 'receipts' | 'backup' | 'tabs_management';
 
 const CHART_COLORS = [
   'hsl(25, 95%, 53%)', 'hsl(38, 92%, 50%)', 'hsl(142, 71%, 45%)',
@@ -102,21 +102,30 @@ const SuperAdmin = () => {
   const [issues, setIssues] = useState<any[]>([]);
   const [globalUsers, setGlobalUsers] = useState<any[]>([]);
   const [showAddUser, setShowAddUser] = useState(false);
+  const [showAddRestaurant, setShowAddRestaurant] = useState(false);
+  const [newRestaurantForm, setNewRestaurantForm] = useState({ name: '', business_type: 'restaurant', owner_id: '' });
   const [newUserForm, setNewUserForm] = useState({ email: '', fullName: '', restaurantId: '', role: 'cashier' });
   const [selectedRestForTabs, setSelectedRestForTabs] = useState<any | null>(null);
   const [customTabsForm, setCustomTabsForm] = useState<string[]>([]);
-  const [initialLoadComplete, setInitialLoadComplete] = useState(false);
+  const [showChangeBusinessType, setShowChangeBusinessType] = useState(false);
+  const [selectedRestForBusinessType, setSelectedRestForBusinessType] = useState<any | null>(null);
+  const [newBusinessType, setNewBusinessType] = useState<BusinessType>('restaurant');
 
   useEffect(() => {
-    // Wait for both authLoading AND adminChecked before redirecting (prevents race condition kicking super admins out)
-    if (!authLoading && adminChecked) {
-      setInitialLoadComplete(true);
+    // Only redirect if auth is fully loaded and admin check is complete
+    // Wait for isSuperAdmin to be explicitly set (not undefined)
+    if (!authLoading && adminChecked && isSuperAdmin !== undefined) {
       if (!user || !isSuperAdmin) {
         toast.error('غير مصرح لك بالوصول - يجب أن تكون سوبر أدمن');
         navigate('/');
       }
     }
   }, [user, isSuperAdmin, adminChecked, authLoading, navigate]);
+
+  // Debug logging to help diagnose the issue
+  useEffect(() => {
+    console.log('SuperAdmin Debug:', { authLoading, adminChecked, isSuperAdmin, user });
+  }, [authLoading, adminChecked, isSuperAdmin, user]);
 
   const load = async () => {
     const [restsRes, rcptsRes, ordersRes, agentsRes, bansRes, issuesRes, usersRes] = await Promise.all([
@@ -240,6 +249,7 @@ const SuperAdmin = () => {
             { id: 'receipts', label: 'الاشتراكات', icon: FileText, badge: stats.pendingReceipts },
             { id: 'issues', label: 'مشاكل العملاء', icon: AlertTriangle, badge: stats.unresolvedIssues },
             { id: 'bans', label: 'الرقابة', icon: Ban },
+            { id: 'tabs_management', label: 'إدارة التابات', icon: LayoutGrid },
             { id: 'backup', label: 'النظام', icon: Database },
           ].map(t => (
             <button key={t.id} onClick={() => setTab(t.id as Tab)}
@@ -317,9 +327,12 @@ const SuperAdmin = () => {
           <div className="space-y-6">
             <div className="flex flex-col md:flex-row gap-4 items-center justify-between">
               <h2 className="text-2xl font-bold flex items-center gap-2"><Store className="w-6 h-6 text-primary" /> إدارة الشركات والموديولات</h2>
-              <div className="relative w-full md:w-80">
-                <Search className="w-4 h-4 absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
-                <Input placeholder="بحث باسم الشركة أو المعرف..." className="pr-10 rounded-xl" value={searchQuery} onChange={e => setSearchQuery(e.target.value)} />
+              <div className="flex gap-2 w-full md:w-auto">
+                <div className="relative flex-1 md:w-80">
+                  <Search className="w-4 h-4 absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                  <Input placeholder="بحث باسم الشركة أو المعرف..." className="pr-10 rounded-xl" value={searchQuery} onChange={e => setSearchQuery(e.target.value)} />
+                </div>
+                <Button onClick={() => setShowAddRestaurant(true)} className="gradient-bg text-white rounded-xl"><Store className="w-4 h-4 ml-1" /> شركة جديدة</Button>
               </div>
             </div>
 
@@ -407,6 +420,13 @@ const SuperAdmin = () => {
                       setCustomTabsForm([...effectiveTabs]);
                     }} className="w-full sm:w-auto gap-1 border-primary/30 text-primary">
                       <Sparkles className="w-4 h-4" /> تخصيص التبويبات
+                    </Button>
+                    <Button size="sm" variant="outline" onClick={() => {
+                      setSelectedRestForBusinessType(r);
+                      setNewBusinessType(r.business_type || 'restaurant');
+                      setShowChangeBusinessType(true);
+                    }} className="w-full sm:w-auto gap-1 border-warning/30 text-warning">
+                      <Building2 className="w-4 h-4" /> تغيير الموديول
                     </Button>
                     <Button size="sm" variant="outline" onClick={() => setDrillIn({ id: r.id, name: r.name })} className="w-full sm:w-auto gap-1 border-primary/30 text-primary">
                       <ChevronRight className="w-4 h-4" /> إدارة شاملة
@@ -649,6 +669,133 @@ const SuperAdmin = () => {
         </DialogContent>
       </Dialog>
 
+      {/* Change Business Type Dialog */}
+      <Dialog open={showChangeBusinessType} onOpenChange={setShowChangeBusinessType}>
+        <DialogContent className="max-w-md rounded-2xl">
+          <DialogHeader>
+            <DialogTitle>تغيير موديول النشاط (فقط للسوبر أدمن)</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 pt-4">
+            <div className="bg-secondary/50 rounded-xl p-4">
+              <p className="text-sm font-bold mb-2">النشاط الحالي:</p>
+              <p className="text-lg font-black text-primary">{selectedRestForBusinessType?.name}</p>
+              <p className="text-xs text-muted-foreground">الموديول الحالي: {selectedRestForBusinessType?.business_type}</p>
+            </div>
+            <div className="space-y-2">
+              <label className="text-xs font-bold mr-1">الموديول الجديد:</label>
+              <select 
+                value={newBusinessType} 
+                onChange={e => setNewBusinessType(e.target.value as BusinessType)} 
+                className="w-full h-10 px-3 rounded-md border border-input bg-background"
+              >
+                {Object.entries(BUSINESS_TYPES).map(([key, bt]) => (
+                  <option key={key} value={key}>{bt.icon} {bt.label}</option>
+                ))}
+              </select>
+            </div>
+            <div className="bg-destructive/10 border border-destructive/20 rounded-xl p-3">
+              <p className="text-xs text-destructive font-bold">⚠️ تحذير هام:</p>
+              <p className="text-xs text-destructive mt-1">
+                تغيير الموديول سيؤثر على جميع التابات والوظائف المتاحة للنشاط. هذا الإجراء لا يمكن التراجع عنه.
+              </p>
+            </div>
+            <Button 
+              className="w-full gradient-bg text-white font-bold h-11 rounded-xl" 
+              onClick={async () => {
+                if (!selectedRestForBusinessType) return;
+                if (!confirm(`هل أنت متأكد من تغيير موديول "${selectedRestForBusinessType.name}" إلى "${BUSINESS_TYPES[newBusinessType].label}"؟`)) return;
+                
+                const { error } = await supabase
+                  .from('restaurants')
+                  .update({ 
+                    business_type: newBusinessType,
+                    business_type_locked: true // Keep it locked after change
+                  })
+                  .eq('id', selectedRestForBusinessType.id);
+
+                if (error) {
+                  toast.error('فشل تغيير الموديول: ' + error.message);
+                } else {
+                  toast.success(`تم تغيير موديول "${selectedRestForBusinessType.name}" بنجاح`);
+                  setShowChangeBusinessType(false);
+                  setSelectedRestForBusinessType(null);
+                  load();
+                }
+              }}
+            >
+              تأكيد تغيير الموديول
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Add Restaurant Dialog */}
+      <Dialog open={showAddRestaurant} onOpenChange={setShowAddRestaurant}>
+        <DialogContent className="max-w-md rounded-2xl">
+          <DialogHeader>
+            <DialogTitle>إضافة شركة جديدة (فقط للسوبر أدمن)</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 pt-4">
+            <div className="space-y-1">
+              <label className="text-xs font-bold mr-1">اسم الشركة</label>
+              <Input value={newRestaurantForm.name} onChange={e => setNewRestaurantForm({ ...newRestaurantForm, name: e.target.value })} placeholder="اسم النشاط التجاري" />
+            </div>
+            <div className="space-y-1">
+              <label className="text-xs font-bold mr-1">الموديول</label>
+              <select 
+                value={newRestaurantForm.business_type} 
+                onChange={e => setNewRestaurantForm({ ...newRestaurantForm, business_type: e.target.value as BusinessType })} 
+                className="w-full h-10 px-3 rounded-md border border-input bg-background"
+              >
+                {Object.entries(BUSINESS_TYPES).map(([key, bt]) => (
+                  <option key={key} value={key}>{bt.icon} {bt.label}</option>
+                ))}
+              </select>
+            </div>
+            <div className="space-y-1">
+              <label className="text-xs font-bold mr-1">المالك (اختياري)</label>
+              <select 
+                value={newRestaurantForm.owner_id} 
+                onChange={e => setNewRestaurantForm({ ...newRestaurantForm, owner_id: e.target.value })} 
+                className="w-full h-10 px-3 rounded-md border border-input bg-background"
+              >
+                <option value="">— اختر مستخدم —</option>
+                {globalUsers.map(u => <option key={u.user_id} value={u.user_id}>{u.full_name || u.email}</option>)}
+              </select>
+            </div>
+            <Button 
+              className="w-full gradient-bg text-white font-bold h-11 rounded-xl" 
+              onClick={async () => {
+                if (!newRestaurantForm.name.trim()) return toast.error('يرجى إدخال اسم الشركة');
+                
+                const trialEnd = new Date();
+                trialEnd.setDate(trialEnd.getDate() + 14);
+                
+                const { error } = await supabase.from('restaurants').insert({
+                  name: newRestaurantForm.name,
+                  business_type: newRestaurantForm.business_type,
+                  owner_id: newRestaurantForm.owner_id || null,
+                  status: 'active',
+                  subscription_end: trialEnd.toISOString(),
+                  business_type_locked: true,
+                });
+
+                if (error) {
+                  toast.error('فشل إضافة الشركة: ' + error.message);
+                } else {
+                  toast.success('تم إضافة الشركة بنجاح');
+                  setShowAddRestaurant(false);
+                  setNewRestaurantForm({ name: '', business_type: 'restaurant', owner_id: '' });
+                  load();
+                }
+              }}
+            >
+              إضافة الشركة
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
       {/* Add User Dialog */}
       <Dialog open={showAddUser} onOpenChange={setShowAddUser}>
         <DialogContent className="max-w-md rounded-2xl">
@@ -693,6 +840,52 @@ const SuperAdmin = () => {
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Tabs Management Tab */}
+      {tab === 'tabs_management' && (
+        <div className="space-y-6">
+          <div className="glass-card p-6">
+            <h2 className="text-2xl font-bold mb-6 flex items-center gap-3">
+              <LayoutGrid className="w-6 h-6 text-primary" />
+              إدارة التابات لكل موديول
+            </h2>
+            <p className="text-muted-foreground mb-6">
+              يمكنك إضافة أو حذف التابات المتاحة لكل موديول. هذا التحكم متاح فقط للسوبر أدمن.
+            </p>
+
+            <div className="space-y-6">
+              {Object.entries(BUSINESS_TYPES).map(([key, businessType]) => (
+                <div key={key} className="border border-border rounded-xl p-4">
+                  <div className="flex items-center justify-between mb-4">
+                    <div>
+                      <h3 className="font-bold text-lg">{businessType.label}</h3>
+                      <p className="text-sm text-muted-foreground">التابات الافتراضية: {businessType.tabs?.length || 0}</p>
+                    </div>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => {
+                        setSelectedRestForTabs({ id: key, name: businessType.label, business_type: key, custom_tabs: businessType.tabs || [] });
+                        setCustomTabsForm(businessType.tabs || []);
+                      }}
+                    >
+                      <Edit className="w-4 h-4 mr-2" />
+                      تعديل التابات
+                    </Button>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    {(businessType.tabs || []).map(tab => (
+                      <Badge key={tab} variant="secondary" className="text-xs">
+                        {ALL_TABS_CONFIG[tab as keyof typeof ALL_TABS_CONFIG]?.label || tab}
+                      </Badge>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

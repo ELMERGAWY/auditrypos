@@ -43,6 +43,7 @@ export function CreateRestaurantForm({ userId, onCreated }: Props) {
         status: 'active',
         subscription_end: trialEnd.toISOString(),
         business_type: bizType,
+        business_type_locked: true, // Lock business type after creation
       });
       
       if (error) {
