@@ -64,6 +64,7 @@ export function PurchaseInvoices({ restaurantId, currency }: Props) {
 
   const [suppliers, setSuppliers] = useState<{ id: string; name: string }[]>([]);
   const [supplierContracts, setSupplierContracts] = useState<any[]>([]);
+  const [projects, setProjects] = useState<any[]>([]);
   const [products, setProducts] = useState<{ id: string; name: string; cost_price: number; unit: string }[]>([]);
   const [glAccounts, setGlAccounts] = useState<{ id: string; code: string; name: string; account_type: string }[]>([]);
   const [warehouses, setWarehouses] = useState<{ id: string; name: string }[]>([]);
@@ -72,11 +73,14 @@ export function PurchaseInvoices({ restaurantId, currency }: Props) {
   const [form, setForm] = useState({
     supplier_id: '',
     supplier_contract_id: '',
+    project_id: '',
     invoice_number: '',
     invoice_date: new Date().toISOString().split('T')[0],
     paid_amount: '',
     is_credit: true,
     notes: '',
+    is_pass_through_to_client: false,
+    client_sales_amount: '',
   });
   const [lines, setLines] = useState<LineItem[]>([
     { line_type: 'inventory', description: '', quantity: 1, unit_cost: 0, tax_amount: 0 }
@@ -91,14 +95,16 @@ export function PurchaseInvoices({ restaurantId, currency }: Props) {
     Promise.all([
       supabase.from('suppliers').select('id,name').eq('restaurant_id', restaurantId),
       supabase.from('supplier_contracts').select('*').eq('restaurant_id', restaurantId).eq('status', 'active'),
+      supabase.from('projects').select('id,name').eq('restaurant_id', restaurantId),
       supabase.from('products').select('id,name,cost_price,unit').eq('restaurant_id', restaurantId).eq('available', true),
       supabase.from('chart_of_accounts').select('id,code,name,account_type').eq('restaurant_id', restaurantId).eq('is_active', true).eq('posting_allowed', true),
       supabase.from('warehouses').select('id,name').eq('restaurant_id', restaurantId),
       supabase.from('restaurants').select('inventory_method').eq('id', restaurantId).single(),
       supabase.from('inventory_settings').select('costing_method').eq('restaurant_id', restaurantId).maybeSingle(),
-    ]).then(([s, sc, p, a, w, rest, settings]: any) => {
+    ]).then(([s, sc, prj, p, a, w, rest, settings]: any) => {
       setSuppliers(s.data || []);
       setSupplierContracts(sc.data || []);
+      setProjects(prj.data || []);
       setProducts(p.data || []);
       setGlAccounts((a.data || []).filter((acc: any) => ['expense', 'asset'].includes(acc.account_type)));
       setWarehouses(w.data || []);
@@ -206,12 +212,16 @@ export function PurchaseInvoices({ restaurantId, currency }: Props) {
       const supplier = suppliers.find(s => s.id === form.supplier_id);
       const paid = Number(form.paid_amount || 0);
 
+      const clientSalesAmount = Number(form.client_sales_amount) || 0;
+      const passThroughMarkup = form.is_pass_through_to_client ? clientSalesAmount - netTotal : 0;
+      
       const { data: inv, error } = await supabase
         .from('purchase_invoices')
         .insert({
           restaurant_id: restaurantId,
           supplier_id: form.supplier_id,
           supplier_contract_id: form.supplier_contract_id || null,
+          project_id: form.project_id || null,
           supplier_name: supplier?.name,
           invoice_number: form.invoice_number || `PI-${Date.now()}`,
           invoice_date: form.invoice_date,
@@ -222,6 +232,9 @@ export function PurchaseInvoices({ restaurantId, currency }: Props) {
           is_credit: form.is_credit && paid < netTotal,
           notes: form.notes,
           status: 'draft',
+          is_pass_through_to_client: form.is_pass_through_to_client,
+          client_sales_amount: clientSalesAmount,
+          pass_through_markup_amount: passThroughMarkup,
         } as any)
         .select()
         .single();
@@ -260,7 +273,18 @@ export function PurchaseInvoices({ restaurantId, currency }: Props) {
 
       toast.success('تم حفظ الفاتورة');
       setShowAddModal(false);
-      setForm({ supplier_id: '', invoice_number: '', invoice_date: new Date().toISOString().split('T')[0], paid_amount: '', is_credit: true, notes: '' });
+      setForm({
+        supplier_id: '',
+        supplier_contract_id: '',
+        project_id: '',
+        invoice_number: '',
+        invoice_date: new Date().toISOString().split('T')[0],
+        paid_amount: '',
+        is_credit: true,
+        notes: '',
+        is_pass_through_to_client: false,
+        client_sales_amount: '',
+      });
       setLines([{ line_type: 'inventory', description: '', quantity: 1, unit_cost: 0, tax_amount: 0 }]);
       loadInvoices();
     } catch (e: any) {
@@ -576,6 +600,15 @@ export function PurchaseInvoices({ restaurantId, currency }: Props) {
               </Select>
             </div>
             <div>
+              <Label>المشروع (اختياري)</Label>
+              <Select value={form.project_id} onValueChange={v => setForm({ ...form, project_id: v })}>
+                <SelectTrigger><SelectValue placeholder="اختر المشروع" /></SelectTrigger>
+                <SelectContent>
+                  {projects.map(p => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
               <Label>رقم الفاتورة</Label>
               <Input value={form.invoice_number} onChange={e => setForm({ ...form, invoice_number: e.target.value })} placeholder="تلقائي" />
             </div>
@@ -583,6 +616,33 @@ export function PurchaseInvoices({ restaurantId, currency }: Props) {
               <Label>التاريخ</Label>
               <Input type="date" value={form.invoice_date} onChange={e => setForm({ ...form, invoice_date: e.target.value })} />
             </div>
+          </div>
+          
+          {/* Pass-through to Client Toggle */}
+          <div className="grid grid-cols-2 gap-3 border-t border-border pt-4 mt-2">
+            <div className="flex items-center gap-3">
+              <input
+                type="checkbox"
+                id="isPassThrough"
+                checked={form.is_pass_through_to_client}
+                onChange={(e) => setForm({ ...form, is_pass_through_to_client: e.target.checked })}
+                className="w-5 h-5 rounded"
+              />
+              <Label htmlFor="isPassThrough" className="text-sm">
+                فاتورة مُمرّة للعميل (تُستخدم لحساب البونص فقط
+              </Label>
+            </div>
+            {form.is_pass_through_to_client && (
+              <div>
+                <Label>سعر البيع للعميل ({currency})</Label>
+                <Input
+                  type="number"
+                  value={form.client_sales_amount}
+                  onChange={(e) => setForm({ ...form, client_sales_amount: e.target.value })}
+                  placeholder="مثال: 1000"
+                />
+              </div>
+            )}
           </div>
 
           <div className="bg-primary/5 p-3 rounded-xl border border-primary/10 flex items-center gap-4">

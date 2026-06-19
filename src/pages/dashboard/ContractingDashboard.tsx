@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Plus, Building2, Construction, Receipt, AlertCircle, Trash2, ArrowLeft } from 'lucide-react';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { motion, AnimatePresence } from 'framer-motion';
 
 interface Props {
@@ -20,7 +21,7 @@ export function ContractingDashboard({ restaurantId, currency }: Props) {
   const [showAddProject, setShowAddProject] = useState(false);
   const [showAddBlock, setShowAddBlock] = useState<{ projectId: string } | null>(null);
   
-  const [newProject, setNewProject] = useState({ name: '', client: '', budget: '' });
+  const [newProject, setNewProject] = useState({ name: '', client: '', budget: '', pricing_type: 'fixed_price', markup_percentage: '0' });
   const [newBlock, setNewBlock] = useState({ name: '', estimatedCost: '' });
   
   const [selectedProject, setSelectedProject] = useState<any>(null);
@@ -47,13 +48,37 @@ export function ContractingDashboard({ restaurantId, currency }: Props) {
       .eq('restaurant_id', restaurantId)
       .not('project_id', 'is', null);
 
+    // Calculate pass-through purchase invoices for projects
+    const { data: passThroughData } = await supabase
+      .from('purchase_invoices')
+      .select('project_id, total_amount, client_sales_amount, pass_through_markup_amount')
+      .eq('restaurant_id', restaurantId)
+      .not('project_id', 'is', null)
+      .eq('is_pass_through_to_client', true);
+
     const enrichedProjects = (projectsData || []).map(p => {
       const pExpenses = expensesData?.filter(e => e.project_id === p.id) || [];
       const pInvoices = invoicesData?.filter(i => i.project_id === p.id) || [];
+      const pPassThrough = passThroughData?.filter(pt => pt.project_id === p.id) || [];
+
+      // Total cost includes both expenses and purchase invoice totals (for supplier bonus)
+      const totalCost = pExpenses.reduce((s, e) => s + Number(e.amount), 0) +
+                       pPassThrough.reduce((s, pt) => s + Number(pt.total_amount), 0);
       
-      const totalCost = pExpenses.reduce((s, e) => s + Number(e.amount), 0);
-      const totalRevenue = pInvoices.reduce((s, i) => s + Number(i.grand_total), 0);
+      // Total revenue includes sales invoices plus pass-through client sales amounts
+      const totalRevenue = pInvoices.reduce((s, i) => s + Number(i.grand_total), 0) +
+                          pPassThrough.reduce((s, pt) => s + Number(pt.client_sales_amount), 0);
       
+      // Calculate total markup from pass-through invoices
+      const totalPassThroughMarkup = pPassThrough.reduce((s, pt) => s + Number(pt.pass_through_markup_amount), 0);
+
+      // Calculate projected profit if cost-plus
+      let projectedProfit = totalRevenue - totalCost;
+      if (p.pricing_type === 'cost_plus_percentage' && p.markup_percentage) {
+        const costPlusRevenue = totalCost * (1 + (p.markup_percentage / 100));
+        projectedProfit = costPlusRevenue - totalCost;
+      }
+
       const enrichedBlocks = (p.project_blocks || []).map((b: any) => {
         const bExpenses = pExpenses.filter(e => e.block_id === b.id);
         const bInvoices = pInvoices.filter(i => i.block_id === b.id);
@@ -68,6 +93,8 @@ export function ContractingDashboard({ restaurantId, currency }: Props) {
         ...p,
         total_cost: totalCost,
         total_revenue: totalRevenue,
+        total_pass_through_markup: totalPassThroughMarkup,
+        projected_profit: projectedProfit,
         project_blocks: enrichedBlocks
       };
     });
@@ -85,13 +112,15 @@ export function ContractingDashboard({ restaurantId, currency }: Props) {
       restaurant_id: restaurantId,
       name: newProject.name,
       client_name: newProject.client,
-      total_budget: Number(newProject.budget) || 0
+      total_budget: Number(newProject.budget) || 0,
+      pricing_type: newProject.pricing_type,
+      markup_percentage: Number(newProject.markup_percentage) || 0
     });
 
     if (!error) {
       toast.success('تم إنشاء المشروع بنجاح');
       setShowAddProject(false);
-      setNewProject({ name: '', client: '', budget: '' });
+      setNewProject({ name: '', client: '', budget: '', pricing_type: 'fixed_price', markup_percentage: '0' });
       loadData();
     } else {
       toast.error('فشل إنشاء المشروع');
@@ -167,11 +196,27 @@ export function ContractingDashboard({ restaurantId, currency }: Props) {
                   </div>
                 </div>
                 
-                <div className="pt-4 border-t flex justify-between items-center text-sm">
-                  <span className="text-muted-foreground">الربح التقديري:</span>
-                  <span className={`font-black ${p.total_revenue - p.total_cost >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                    {(p.total_revenue - p.total_cost).toLocaleString()} {currency}
-                  </span>
+                <div className="pt-4 border-t flex flex-col gap-2 text-sm">
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">نوع التسعير:</span>
+                    <span className="font-bold">
+                      {p.pricing_type === 'cost_plus_percentage' ? `نسبة على التكلفة (${p.markup_percentage}%)` : 'سعر ثابت'}
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">الربح الحالي/المتوقع:</span>
+                    <span className={`font-black ${p.projected_profit >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                      {Number(p.projected_profit || 0).toLocaleString()} {currency}
+                    </span>
+                  </div>
+                  {p.total_pass_through_markup > 0 && (
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">ربح الفواتير المُمرّة:</span>
+                      <span className="font-bold text-emerald-500">
+                        {Number(p.total_pass_through_markup).toLocaleString()} {currency}
+                      </span>
+                    </div>
+                  )}
                 </div>
               </div>
               <div className="bg-secondary/30 px-6 py-3 border-t text-xs font-bold text-muted-foreground flex justify-between">
@@ -271,6 +316,24 @@ export function ContractingDashboard({ restaurantId, currency }: Props) {
                         <Label>الموازنة التقديرية ({currency})</Label>
                         <Input type="number" value={newProject.budget} onChange={e => setNewProject({...newProject, budget: e.target.value})} placeholder="0.00" />
                      </div>
+                     <div>
+                        <Label>نوع التسعير</Label>
+                        <Select value={newProject.pricing_type} onValueChange={v => setNewProject({...newProject, pricing_type: v})}>
+                           <SelectTrigger>
+                              <SelectValue placeholder="اختر نوع التسعير" />
+                           </SelectTrigger>
+                           <SelectContent>
+                              <SelectItem value="fixed_price">سعر ثابت للمشروع</SelectItem>
+                              <SelectItem value="cost_plus_percentage">نسبة على التكلفة (Cost Plus)</SelectItem>
+                           </SelectContent>
+                        </Select>
+                     </div>
+                     {newProject.pricing_type === 'cost_plus_percentage' && (
+                        <div>
+                           <Label>نسبة الربح على التكلفة (%)</Label>
+                           <Input type="number" value={newProject.markup_percentage} onChange={e => setNewProject({...newProject, markup_percentage: e.target.value})} placeholder="مثال: 10.00" min="0" step="0.01" />
+                        </div>
+                     )}
                      <div className="flex gap-3 pt-6">
                         <Button className="flex-1 text-white" onClick={handleCreateProject}>حفظ وإنشاء</Button>
                         <Button variant="outline" onClick={() => setShowAddProject(false)}>إلغاء</Button>
