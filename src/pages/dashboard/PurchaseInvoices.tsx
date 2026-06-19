@@ -63,6 +63,7 @@ export function PurchaseInvoices({ restaurantId, currency }: Props) {
   const [viewLines, setViewLines] = useState<any[]>([]);
 
   const [suppliers, setSuppliers] = useState<{ id: string; name: string }[]>([]);
+  const [supplierContracts, setSupplierContracts] = useState<any[]>([]);
   const [products, setProducts] = useState<{ id: string; name: string; cost_price: number; unit: string }[]>([]);
   const [glAccounts, setGlAccounts] = useState<{ id: string; code: string; name: string; account_type: string }[]>([]);
   const [warehouses, setWarehouses] = useState<{ id: string; name: string }[]>([]);
@@ -70,6 +71,7 @@ export function PurchaseInvoices({ restaurantId, currency }: Props) {
 
   const [form, setForm] = useState({
     supplier_id: '',
+    supplier_contract_id: '',
     invoice_number: '',
     invoice_date: new Date().toISOString().split('T')[0],
     paid_amount: '',
@@ -88,13 +90,15 @@ export function PurchaseInvoices({ restaurantId, currency }: Props) {
     loadInvoices();
     Promise.all([
       supabase.from('suppliers').select('id,name').eq('restaurant_id', restaurantId),
+      supabase.from('supplier_contracts').select('*').eq('restaurant_id', restaurantId).eq('status', 'active'),
       supabase.from('products').select('id,name,cost_price,unit').eq('restaurant_id', restaurantId).eq('available', true),
       supabase.from('chart_of_accounts').select('id,code,name,account_type').eq('restaurant_id', restaurantId).eq('is_active', true).eq('posting_allowed', true),
       supabase.from('warehouses').select('id,name').eq('restaurant_id', restaurantId),
       supabase.from('restaurants').select('inventory_method').eq('id', restaurantId).single(),
       supabase.from('inventory_settings').select('costing_method').eq('restaurant_id', restaurantId).maybeSingle(),
-    ]).then(([s, p, a, w, rest, settings]: any) => {
+    ]).then(([s, sc, p, a, w, rest, settings]: any) => {
       setSuppliers(s.data || []);
+      setSupplierContracts(sc.data || []);
       setProducts(p.data || []);
       setGlAccounts((a.data || []).filter((acc: any) => ['expense', 'asset'].includes(acc.account_type)));
       setWarehouses(w.data || []);
@@ -207,6 +211,7 @@ export function PurchaseInvoices({ restaurantId, currency }: Props) {
         .insert({
           restaurant_id: restaurantId,
           supplier_id: form.supplier_id,
+          supplier_contract_id: form.supplier_contract_id || null,
           supplier_name: supplier?.name,
           invoice_number: form.invoice_number || `PI-${Date.now()}`,
           invoice_date: form.invoice_date,
@@ -552,10 +557,21 @@ export function PurchaseInvoices({ restaurantId, currency }: Props) {
           <div className="grid grid-cols-4 gap-3 py-2">
             <div className="col-span-2">
               <Label>المورد *</Label>
-              <Select value={form.supplier_id} onValueChange={v => setForm({ ...form, supplier_id: v })}>
+              <Select value={form.supplier_id} onValueChange={v => setForm({ ...form, supplier_id: v, supplier_contract_id: '' })}>
                 <SelectTrigger><SelectValue placeholder="اختر المورد" /></SelectTrigger>
                 <SelectContent>
                   {suppliers.map(s => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label>عقد المورد</Label>
+              <Select value={form.supplier_contract_id} onValueChange={v => setForm({ ...form, supplier_contract_id: v })}>
+                <SelectTrigger><SelectValue placeholder="اختر العقد (اختياري)" /></SelectTrigger>
+                <SelectContent>
+                  {supplierContracts.filter(sc => sc.supplier_id === form.supplier_id).map(sc => 
+                    <SelectItem key={sc.id} value={sc.id}>{sc.name} ({new Date(sc.start_date).toLocaleDateString('ar-EG')} - {new Date(sc.end_date).toLocaleDateString('ar-EG')})</SelectItem>
+                  )}
                 </SelectContent>
               </Select>
             </div>

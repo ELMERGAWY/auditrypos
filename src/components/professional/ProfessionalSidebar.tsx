@@ -29,7 +29,8 @@ export type SidebarTab =
   | 'ai_assistant' | 'treasury' | 'users' | 'sales_invoices' | 'purchase_invoices'
   | 'sales_orders' | 'purchase_orders' | 'projects' | 'manual_journal'
   | 'chart_of_accounts' | 'accounting_mapping' | 'fixed_assets'
-  | 'loyalty' | 'gift_cards' | 'branches' | 'contracting' | 'bom' | 'service_packages' | 'payroll' | 'chat';
+  | 'loyalty' | 'gift_cards' | 'branches' | 'contracting' | 'bom' | 'service_packages' | 'payroll' | 'chat'
+  | 'employees' | 'supplier_contracts';
 
 interface NavItem {
   id: SidebarTab;
@@ -135,6 +136,7 @@ export const ProfessionalSidebar = memo(function ProfessionalSidebar({
     pos: { label: 'نقطة البيع', icon: ShoppingCart, section: 'main' },
     orders: { label: config.labels.orders, icon: Receipt, badge: stats.pendingOrders, section: 'main' },
     menu: { label: config.labels.menu, icon: config.category === 'food' ? ChefHat : Package, section: 'main' },
+    employees: { label: 'الموظفين والرواتب', icon: Users, badge: stats.customersCount, section: 'main' },
     
     customers: { label: 'العملاء والحسابات', icon: Users, badge: stats.customersCount, section: 'sales' },
     customer_accounts: { label: '', icon: CreditCard, section: 'sales' }, // merged into 'customers'
@@ -147,6 +149,7 @@ export const ProfessionalSidebar = memo(function ProfessionalSidebar({
     supplier_accounts: { label: '', icon: Wallet, section: 'purchases' }, // merged into 'suppliers'
     purchase_orders: { label: 'أوامر شراء', icon: ShoppingCart, section: 'purchases' },
     purchase_invoices: { label: 'فواتير شراء', icon: DollarSign, badge: stats.purchaseInvoicesCount, section: 'purchases' },
+    supplier_contracts: { label: 'عقود الموردين والعمولات', icon: FileText, section: 'purchases' },
     
     inventory: { label: 'المخزون', icon: Package, section: 'inventory' },
     // inventory_receipts: { label: 'استلام بضاعة', icon: FileText, badge: stats.inventoryReceiptsCount, section: 'inventory' },

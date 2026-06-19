@@ -43,6 +43,7 @@ const InventoryReceiptsManager = lazy(() => import('./dashboard/InventoryReceipt
 const ExpensesTab = lazy(() => import('./dashboard/ExpensesTab').then(m => ({ default: m.ExpensesTab })));
 const StaffTab = lazy(() => import('./dashboard/StaffTab').then(m => ({ default: m.StaffTab })));
 const PayrollTab = lazy(() => import('./dashboard/PayrollTab').then(m => ({ default: m.PayrollTab })));
+const EmployeesTab = lazy(() => import('./dashboard/EmployeesTab').then(m => ({ default: m.EmployeesTab })));
 const NotificationsTab = lazy(() => import('./dashboard/NotificationsTab').then(m => ({ default: m.NotificationsTab })));
 const FinancialsTab = lazy(() => import('./dashboard/FinancialsTab').then(m => ({ default: m.FinancialsTab })));
 const OverheadManager = lazy(() => import('./dashboard/OverheadManager').then(m => ({ default: m.OverheadManager })));
@@ -74,6 +75,7 @@ const BranchManager = lazy(() => import('./dashboard/BranchManager').then(m => (
 const ServicePackages = lazy(() => import('./dashboard/ServicePackages').then(m => ({ default: m.ServicePackages })));
 const MarketingProjects = lazy(() => import('./dashboard/MarketingProjects').then(m => ({ default: m.MarketingProjects })));
 const EmployeeChat = lazy(() => import('./dashboard/EmployeeChat').then(m => ({ default: m.EmployeeChat })));
+const SupplierContracts = lazy(() => import('./dashboard/SupplierContracts').then(m => ({ default: m.SupplierContracts })));
 
 import { BUSINESS_TYPES, BUSINESS_TABS, getBusinessConfig, getDefaultOrderType, isFoodSector, isInventoryDrivenBusiness, type BusinessType } from '@/lib/businessTypes';
 import { useAuth } from '@/lib/AuthContext';
@@ -586,6 +588,7 @@ export default function Dashboard() {
         
         {/* Management Tabs */}
         {activeTab === 'menu' && <MenuTab restaurant={restaurant} menuItems={menuItems} setMenuItems={setMenuItems} loadData={loadData} />}
+        {activeTab === 'employees' && <EmployeesTab {...commonProps} businessType={businessType} />}
         {activeTab === 'inventory' && <InventoryTab {...commonProps} businessType={businessType} />}
         {activeTab === 'inventory_receipts' && <InventoryReceiptsManager {...commonProps} />}
         {activeTab === 'bom' && <BOMManager {...commonProps} />}
@@ -597,6 +600,7 @@ export default function Dashboard() {
         {activeTab === 'sales_returns' && <SalesReturnsManager {...commonProps} />}
         {activeTab === 'purchase_orders' && <PurchaseOrders {...commonProps} />}
         {activeTab === 'purchase_invoices' && <PurchaseInvoices {...commonProps} />}
+        {activeTab === 'supplier_contracts' && <SupplierContracts {...commonProps} />}
         {activeTab === 'super_admin' && <SuperAdmin />}
         {activeTab === 'contracting' && <ContractingDashboard {...commonProps} />}
          {activeTab === 'projects' && (businessType === 'marketing_agency' ? <MarketingProjects {...commonProps} /> : <ContractingDashboard {...commonProps} />)}
