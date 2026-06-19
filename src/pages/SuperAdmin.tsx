@@ -9,7 +9,7 @@ import {
   DollarSign, ShoppingCart, MapPin, Phone, Eye, EyeOff,
   Calendar, ArrowUpRight, ArrowDownRight, Activity,
   Store, Database, CalendarPlus, LayoutGrid, Building2, Package,
-  UserPlus, ChevronRight, Sparkles
+  UserPlus, ChevronRight, Sparkles, Edit
 } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { CompanyDrillIn } from '@/components/CompanyDrillIn';
