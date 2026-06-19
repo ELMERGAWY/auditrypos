@@ -202,15 +202,15 @@ export function MarketingQuotes({ restaurantId, currency }: Props) {
   const handleSendWhatsApp = (quote: MarketingQuote) => {
     let message = `📄 عرض سعر رقم ${quote.quote_number} - ${quote.customer_name || 'عميل'}:\n`;
     message += `تاريخ الإصدار: ${new Date(quote.created_at).toLocaleDateString('ar-EG')}\n`;
-    message += `صالح حتى: ${quote.valid_until ? new Date(quote.valid_until).toLocaleDateString('ar-EG') || '-'}\n`;
-    message += '\nالخدمات:\n`;
+    message += `صالح حتى: ${quote.valid_until ? new Date(quote.valid_until).toLocaleDateString('ar-EG') : '-'}\n`;
+    message += '\nالخدمات:\n';
     quote.items?.forEach((item, index) => {
       message += `${index + 1}. ${item.service_name} - ${item.quantity} × ${item.unit_price.toLocaleString()} = ${item.total_price.toLocaleString()} ${currency}\n`;
       if (item.description) message += `   ${item.description}\n`;
     });
     message += `\n💵 المجموع الكلي: ${quote.total_amount.toLocaleString()} ${currency}\n`;
     if (quote.notes) message += `\nملاحظات: ${quote.notes}\n`;
-    message += '\nشكراً لتعاونكم! 🤝`;
+    message += '\nشكراً لتعاونكم! 🤝';
 
     const encodedMessage = encodeURIComponent(message);
     window.open(`https://wa.me/?text=${encodedMessage}`, '_blank');
