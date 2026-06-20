@@ -9,7 +9,7 @@ import {
   DollarSign, ShoppingCart, MapPin, Phone, Eye, EyeOff,
   Calendar, ArrowUpRight, ArrowDownRight, Activity,
   Store, Database, CalendarPlus, LayoutGrid, Building2, Package,
-  UserPlus, ChevronRight, Sparkles, Edit
+  UserPlus, ChevronRight, Sparkles, Edit, Globe, Facebook, Music
 } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { CompanyDrillIn } from '@/components/CompanyDrillIn';
@@ -26,7 +26,7 @@ import {
   ResponsiveContainer, PieChart, Pie, Cell, Area, AreaChart
 } from 'recharts';
 
-type Tab = 'overview' | 'restaurants' | 'users' | 'agents' | 'bans' | 'receipts' | 'backup' | 'tabs_management';
+type Tab = 'overview' | 'restaurants' | 'users' | 'agents' | 'bans' | 'receipts' | 'backup' | 'tabs_management' | 'tracking_pixels';
 
 const CHART_COLORS = [
   'hsl(25, 95%, 53%)', 'hsl(38, 92%, 50%)', 'hsl(142, 71%, 45%)',
@@ -113,6 +113,7 @@ const SuperAdmin = () => {
   const [customBusinessTypes, setCustomBusinessTypes] = useState<any[]>([]);
   const [showCreateCustomType, setShowCreateCustomType] = useState(false);
   const [newCustomTypeForm, setNewCustomTypeForm] = useState({ name: '', icon: '🏢', tabs: [] as string[] });
+  const [landingPagePixels, setLandingPagePixels] = useState<any>({ facebook: '', google_analytics: '', tiktok: '' });
 
   useEffect(() => {
     // Only redirect if auth is fully loaded and admin check is complete
@@ -255,6 +256,7 @@ const SuperAdmin = () => {
             { id: 'issues', label: 'مشاكل العملاء', icon: AlertTriangle, badge: stats.unresolvedIssues },
             { id: 'bans', label: 'الرقابة', icon: Ban },
             { id: 'tabs_management', label: 'إدارة التابات', icon: LayoutGrid },
+            { id: 'tracking_pixels', label: 'التتبع', icon: Globe },
             { id: 'backup', label: 'النظام', icon: Database },
           ].map(t => (
             <button key={t.id} onClick={() => setTab(t.id as Tab)}
@@ -984,6 +986,63 @@ const SuperAdmin = () => {
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Tracking Pixels Tab */}
+      {tab === 'tracking_pixels' && (
+        <div className="space-y-6">
+          <div className="glass-card p-6">
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-2xl font-bold flex items-center gap-3">
+                <Globe className="w-6 h-6 text-primary" />
+                إعدادات التتبع لصفحة الهبوط
+              </h2>
+            </div>
+            <p className="text-muted-foreground mb-6">
+              أضف أكواد التتبع لصفحة الهبوط الرئيسية لمراقبة أداء الموقع
+            </p>
+
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Facebook Pixel</label>
+                <Input
+                  placeholder="أدخل معرف Facebook Pixel"
+                  value={landingPagePixels?.facebook || ''}
+                  onChange={(e) => setLandingPagePixels({ ...landingPagePixels, facebook: e.target.value })}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Google Analytics ID</label>
+                <Input
+                  placeholder="أدخل معرف Google Analytics (G-XXXXXXXXXX)"
+                  value={landingPagePixels?.google_analytics || ''}
+                  onChange={(e) => setLandingPagePixels({ ...landingPagePixels, google_analytics: e.target.value })}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-sm font-medium">TikTok Pixel</label>
+                <Input
+                  placeholder="أدخل معرف TikTok Pixel"
+                  value={landingPagePixels?.tiktok || ''}
+                  onChange={(e) => setLandingPagePixels({ ...landingPagePixels, tiktok: e.target.value })}
+                />
+              </div>
+
+              <Button onClick={async () => {
+                const { error } = await supabase
+                  .from('restaurants')
+                  .update({ landing_page_pixels: landingPagePixels })
+                  .eq('id', '00000000-0000-0000-0000-000000000000'); // Use system restaurant ID
+                if (error) toast.error('فشل حفظ الإعدادات');
+                else toast.success('تم حفظ الإعدادات بنجاح');
+              }} className="gradient-bg text-white">
+                حفظ الإعدادات
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Tabs Management Tab */}
       {tab === 'tabs_management' && (

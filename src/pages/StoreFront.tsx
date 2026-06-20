@@ -29,6 +29,7 @@ const StoreFront = () => {
   const [orderPlaced, setOrderPlaced] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [customerForm, setCustomerForm] = useState({ name: '', phone: '', address: '', notes: '' });
+  const [trackingPixels, setTrackingPixels] = useState<any[]>([]);
 
   useEffect(() => {
     if (!restaurantId) return;
@@ -66,9 +67,63 @@ const StoreFront = () => {
         setItems(prods);
         setCategories([...new Set(prods.map(i => i.category).filter(Boolean))]);
       }
+
+      // Load tracking pixels
+      const { data: pixelsData, error: pixelsError } = await supabase.rpc('get_tracking_pixels', {
+        p_restaurant_id: restaurantId,
+        p_placement: 'storefront'
+      });
+      if (pixelsError) console.error('get_tracking_pixels error:', pixelsError);
+      else setTrackingPixels(pixelsData || []);
     };
     load();
   }, [restaurantId]);
+
+  // Inject tracking pixels into DOM
+  useEffect(() => {
+    trackingPixels.forEach(pixel => {
+      if (pixel.platform === 'facebook' && pixel.pixel_id) {
+        const script = document.createElement('script');
+        script.innerHTML = `
+          !function(f,b,e,v,n,t,s)
+          {if(f.fbq)return;n=f.fbq=function(){n.callMethod?
+          n.callMethod.apply(n,arguments):n.queue.push(arguments)};
+          if(!f._fbq)f._fbq=n;n.push=n;n.loaded=!0;n.version='2.0';
+          n.queue=[];t=b.createElement(e);t.async=!0;
+          t.src=v;s=b.getElementsByTagName(e)[0];
+          s.parentNode.insertBefore(t,s)}(window, document,'script',
+          'https://connect.facebook.net/en_US/fbevents.js');
+          fbq('init', '${pixel.pixel_id}');
+          fbq('track', 'PageView');
+        `;
+        document.head.appendChild(script);
+      } else if (pixel.platform === 'google_analytics' && pixel.pixel_id) {
+        const script = document.createElement('script');
+        script.async = true;
+        script.src = `https://www.googletagmanager.com/gtag/js?id=${pixel.pixel_id}`;
+        document.head.appendChild(script);
+
+        const script2 = document.createElement('script');
+        script2.innerHTML = `
+          window.dataLayer = window.dataLayer || [];
+          function gtag(){dataLayer.push(arguments);}
+          gtag('js', new Date());
+          gtag('config', '${pixel.pixel_id}');
+        `;
+        document.head.appendChild(script2);
+      } else if (pixel.platform === 'tiktok' && pixel.pixel_id) {
+        const script = document.createElement('script');
+        script.innerHTML = `
+          !function (w, d, t) {
+            w.TiktokAnalyticsObject=t;var ttq=w[t]=w[t]||[];ttq.methods=["page","track","identify"],ttq.setAndDefer=function(t,e){t[e]=function(){this.push([e].concat(Array.prototype.slice.call(arguments,0)))}};for(var s=0;s<ttq.methods.length;s++)ttq.setAndDefer(ttq,ttq.methods[s]);ttq.instance=function(t){for(var e=ttq._i[t]||[],o=0;o<ttq.methods.length;o++)ttq.setAndDefer(e,ttq.methods[o]);return ttq._i[t]=e},ttq.load=function(e,o){var i="https://analytics.tiktok.com/i18n/pixel/events.js";ttq._i=ttq._i||{},ttq._i[e]=[],ttq._i[e]._u=i,ttq._t=ttq._t||{},ttq._t[e]=+new Date,ttq._o=ttq._o||{},ttq._o[e]=o||{};var n=document.createElement("script");n.type="text/javascript",n.async=!0,n.src=i+"?sdkid="+e+"&lib="+t;var a=document.getElementsByTagName("script")[0];a.parentNode.insertBefore(n,a)};
+          ttq.load('${pixel.pixel_id}', 'Tiktok');
+          ttq.page();
+        }(window, document, 'ttq');
+        `;
+        document.head.appendChild(script);
+      }
+    });
+  }, [trackingPixels]);
 
   const filtered = items.filter(i => {
     if (selectedCat !== 'all' && i.category !== selectedCat) return false;
