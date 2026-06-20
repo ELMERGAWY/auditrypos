@@ -292,6 +292,41 @@ export function ReceiptModalWrapper({ order, restaurant, onClose, onComplete, is
     kitchenCopy: true,
   });
 
+  // Load print settings from database on mount
+  useEffect(() => {
+    const loadPrintSettings = async () => {
+      if (!restaurant?.id) return;
+      try {
+        const { data, error } = await supabase.rpc('get_or_create_print_settings', { 
+          restaurant_id: restaurant.id 
+        });
+        if (error) throw error;
+        if (data) {
+          setPrintSettings(data as CombinedPrintSettings);
+        }
+      } catch (error) {
+        console.error('Failed to load print settings:', error);
+        // Keep default settings if load fails
+      }
+    };
+    loadPrintSettings();
+  }, [restaurant?.id]);
+
+  // Save print settings to database when changed
+  const savePrintSettings = async (newSettings: CombinedPrintSettings) => {
+    if (!restaurant?.id) return;
+    try {
+      const { error } = await supabase.rpc('update_print_settings', { 
+        restaurant_id: restaurant.id, 
+        new_settings: newSettings 
+      });
+      if (error) throw error;
+    } catch (error) {
+      console.error('Failed to save print settings:', error);
+      toast.error('فشل حفظ إعدادات الطباعة');
+    }
+  };
+
   const printReceipt = () => {
     if (!ref.current) return;
     
@@ -579,7 +614,11 @@ export function ReceiptModalWrapper({ order, restaurant, onClose, onComplete, is
                 </div>
               </div>
               
-              <Button onClick={() => setShowPrintSettings(false)} className="w-full gradient-bg text-primary-foreground border-0">حفظ</Button>
+              <Button onClick={async () => {
+                await savePrintSettings(printSettings);
+                setShowPrintSettings(false);
+                toast.success('تم حفظ إعدادات الطباعة');
+              }} className="w-full gradient-bg text-primary-foreground border-0">حفظ</Button>
             </motion.div>
           </div>
         )}
