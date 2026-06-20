@@ -193,6 +193,72 @@ export function SalesInvoices({ restaurantId, currency, restaurant, isSuperAdmin
     }
   };
 
+  const handleDeleteAndRecreateInvoice = async () => {
+    if (!editingInvoice) return;
+    if (!confirm('هل أنت متأكد من حذف هذه الفاتورة وإعادة إنشائها؟ سيتم حذف جميع القيود المحاسبية المرتبطة بها.')) return;
+
+    try {
+      // Delete order items first
+      await supabase.from('order_items').delete().eq('order_id', editingInvoice.id);
+
+      // Delete the order
+      const { error: deleteError } = await supabase.from('orders').delete().eq('id', editingInvoice.id);
+      if (deleteError) throw deleteError;
+
+      // Create new order with updated data
+      const amount = parseFloat(form.amount);
+      const paidAmount = parseFloat(form.paid_amount) || amount;
+      const discount = parseFloat(form.discount) || 0;
+
+      const { data: newOrder, error: insertError } = await supabase
+        .from('orders')
+        .insert({
+          restaurant_id: restaurantId,
+          customer_name: form.customer_name,
+          customer_ref: form.customer_ref || null,
+          total: amount,
+          paid_amount: paidAmount,
+          discount,
+          notes: form.notes || '',
+          payment_method: form.payment_method,
+          status: 'completed',
+          is_pos: false
+        } as any)
+        .select()
+        .single();
+
+      if (insertError) throw insertError;
+
+      // Create order items
+      for (const item of editItems) {
+        await supabase.from('order_items').insert({
+          order_id: newOrder.id,
+          menu_item_id: item.menu_item_id,
+          menu_item_name: item.menu_item_name,
+          quantity: item.quantity,
+          price: item.price
+        });
+      }
+
+      // Create journal entry
+      await journalService.ensureAccountingSetup(restaurantId, currency);
+      await journalService.createSaleJournalEntry(restaurantId, {
+        ...newOrder,
+        items: editItems,
+        paid_amount: paidAmount
+      }, 'retail');
+
+      toast.success('تم إعادة إنشاء الفاتورة وترحيلها محاسبياً بنجاح ✅');
+      setShowManualForm(false);
+      setEditingInvoice(null);
+      setEditItems([]);
+      setForm({ customer_name: '', amount: '', description: '', payment_method: 'cash', customer_ref: '', paid_amount: '', discount: '', notes: '' });
+      loadInvoices();
+    } catch (e: any) {
+      toast.error('فشل إعادة إنشاء الفاتورة: ' + e.message);
+    }
+  };
+
   const handleDelete = async (inv: Invoice) => {
     if (!confirm(`هل أنت متأكد من حذف الفاتورة ${inv.order_number}؟ سيتم حذف الأصناف وقيود اليومية المرتبطة.`)) return;
     try {
@@ -384,9 +450,20 @@ export function SalesInvoices({ restaurantId, currency, restaurant, isSuperAdmin
                   </select>
                 </div>
 
-                <Button className="w-full h-12 gradient-bg border-0 text-white font-bold text-lg mt-4" onClick={editingInvoice ? handleUpdateInvoice : handleCreateManual}>
-                  {editingInvoice ? 'تحديث الفاتورة' : 'حفظ وترحيل الفاتورة'}
-                </Button>
+                {editingInvoice ? (
+                  <div className="flex gap-2">
+                    <Button className="flex-1 h-12 gradient-bg border-0 text-white font-bold text-lg mt-4" onClick={handleUpdateInvoice}>
+                      تحديث الفاتورة
+                    </Button>
+                    <Button className="h-12 border-0 text-white font-bold text-lg mt-4 bg-destructive hover:bg-destructive/90" onClick={handleDeleteAndRecreateInvoice}>
+                      حذف وإعادة إنشاء
+                    </Button>
+                  </div>
+                ) : (
+                  <Button className="w-full h-12 gradient-bg border-0 text-white font-bold text-lg mt-4" onClick={handleCreateManual}>
+                    حفظ وترحيل الفاتورة
+                  </Button>
+                )}
               </div>
             </motion.div>
           </div>

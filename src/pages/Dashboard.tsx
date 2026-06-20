@@ -28,6 +28,7 @@ import { InvoiceViewer } from '@/components/InvoiceViewer';
 import { ProfessionalSidebar, type SidebarTab } from '@/components/professional/ProfessionalSidebar';
 import { ModuleErrorBoundary } from '@/components/professional/ModuleErrorBoundary';
 import { DashboardErrorBoundary } from '@/components/professional/DashboardErrorBoundary';
+import { updateService } from '@/lib/updateService';
 
 // Lazy loaded components for performance
 const DeliveryTab = lazy(() => import('./dashboard/DeliveryTab').then(m => ({ default: m.DeliveryTab })));
@@ -433,6 +434,62 @@ export default function Dashboard() {
     }
   }, [editingOrder, editOrderForm, editOrderItems, loadData]);
 
+  const handleDeleteAndRecreateOrder = useCallback(async () => {
+    if (!editingOrder) return;
+    if (!confirm('هل أنت متأكد من حذف هذا الطلب وإعادة إنشائه؟ سيتم حذف جميع القيود المحاسبية المرتبطة به.')) return;
+
+    try {
+      // Delete order items first
+      await supabase.from('order_items').delete().eq('order_id', editingOrder.id);
+
+      // Delete the order
+      const { error: deleteError } = await supabase.from('orders').delete().eq('id', editingOrder.id);
+      if (deleteError) throw deleteError;
+
+      // Create new order with updated data
+      const ref = editOrderForm.customer_ref?.trim();
+      let notes = editOrderForm.notes || '';
+      if (ref && !notes.includes('المرجع:')) {
+        notes = notes ? `${notes} | المرجع: ${ref}` : `المرجع: ${ref}`;
+      }
+
+      const payload: Record<string, unknown> = {
+        restaurant_id: restaurant.id,
+        customer_name: editOrderForm.customer_name,
+        customer_phone: editOrderForm.customer_phone,
+        total: parseFloat(editOrderForm.total) || 0,
+        paid_amount: parseFloat(editOrderForm.paid_amount) || 0,
+        status: editOrderForm.status,
+        payment_method: editOrderForm.payment_method,
+        notes,
+        order_number: editingOrder.order_number // Keep same order number
+      };
+      if (ref) payload.customer_ref = ref;
+
+      const { data: newOrder, error: insertError } = await supabase.from('orders').insert(payload as any).select().single();
+      if (insertError) throw insertError;
+
+      // Create order items
+      for (const item of editOrderItems) {
+        await supabase.from('order_items').insert({
+          order_id: newOrder.id,
+          menu_item_id: item.menu_item_id,
+          menu_item_name: item.menu_item_name,
+          quantity: item.quantity,
+          price: item.price
+        });
+      }
+
+      toast.success('تم إعادة إنشاء الطلب بنجاح ✅');
+      setShowEditOrderModal(false);
+      setEditingOrder(null);
+      setEditOrderItems([]);
+      loadData();
+    } catch (e: any) {
+      toast.error('فشل إعادة إنشاء الطلب: ' + (e?.message || 'خطأ غير معروف'));
+    }
+  }, [editingOrder, editOrderForm, editOrderItems, loadData, restaurant.id]);
+
   const performCheckout = async (sendToPrep: boolean = false) => {
     if (cart.length === 0) return;
     setIsProcessingCheckout(true);
@@ -667,6 +724,9 @@ export default function Dashboard() {
       if (data?.length) setSelectedAccountId(data.find(a => a.is_cash_account && a.code === '1100')?.id || data[0].id);
     };
     fetchAccountingAccounts();
+
+    // Start update checking service
+    updateService.startPeriodicCheck(restaurant.id);
   }, [restaurant?.id]);
 
   const sidebarTabs = useMemo(() => {
@@ -842,9 +902,14 @@ export default function Dashboard() {
                   </div>
                 )}
 
-                <Button className="w-full h-12 gradient-bg border-0 text-white font-bold text-lg mt-4" onClick={handleUpdateOrder}>
-                  تحديث الطلب
-                </Button>
+                <div className="flex gap-2">
+                  <Button className="flex-1 h-12 gradient-bg border-0 text-white font-bold text-lg mt-4" onClick={handleUpdateOrder}>
+                    تحديث الطلب
+                  </Button>
+                  <Button className="h-12 border-0 text-white font-bold text-lg mt-4 bg-destructive hover:bg-destructive/90" onClick={handleDeleteAndRecreateOrder}>
+                    حذف وإعادة إنشاء
+                  </Button>
+                </div>
               </div>
             </div>
           </div>

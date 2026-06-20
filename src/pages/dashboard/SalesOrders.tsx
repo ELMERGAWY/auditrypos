@@ -123,6 +123,54 @@ export function SalesOrders({ restaurantId, currency }: Props) {
     }
   };
 
+  const handleDeleteAndRecreateOrder = async () => {
+    if (!editingOrder) return;
+    if (!confirm('هل أنت متأكد من حذف هذا الأمر وإعادة إنشائه؟ سيتم حذف جميع القيود المحاسبية المرتبطة به.')) return;
+
+    try {
+      // Delete order items first
+      await supabase.from('sales_order_items').delete().eq('sales_order_id', editingOrder.id);
+
+      // Delete the order
+      const { error: deleteError } = await supabase.from('sales_orders').delete().eq('id', editingOrder.id);
+      if (deleteError) throw deleteError;
+
+      // Create new order with updated data
+      const total = parseFloat(editForm.total_amount) || 0;
+      const payload: any = {
+        restaurant_id: restaurantId,
+        customer_name: editForm.customer_name,
+        total_amount: total,
+        status: editForm.status,
+        expected_delivery: editForm.expected_delivery || null,
+        order_number: editingOrder.order_number // Keep same order number
+      };
+      if (editForm.customer_id) payload.customer_id = editForm.customer_id;
+
+      const { data: newOrder, error: insertError } = await supabase.from('sales_orders').insert(payload).select().single();
+      if (insertError) throw insertError;
+
+      // Create order items
+      for (const item of editOrderItems) {
+        await supabase.from('sales_order_items').insert({
+          sales_order_id: newOrder.id,
+          menu_item_id: item.menu_item_id,
+          item_name: item.item_name,
+          quantity: item.quantity,
+          unit_price: item.unit_price
+        });
+      }
+
+      toast.success('تم إعادة إنشاء الأمر بنجاح ✅');
+      setShowEditModal(false);
+      setEditingOrder(null);
+      setEditOrderItems([]);
+      loadOrders();
+    } catch (e: any) {
+      toast.error('فشل إعادة إنشاء الأمر: ' + e.message);
+    }
+  };
+
   useEffect(() => {
     loadOrders();
     loadLookupData();
@@ -512,9 +560,14 @@ export function SalesOrders({ restaurantId, currency }: Props) {
                 </div>
               )}
 
-              <Button className="w-full h-12 gradient-bg border-0 text-white font-bold text-lg mt-4" onClick={handleUpdateOrder}>
-                تحديث أمر البيع
-              </Button>
+              <div className="flex gap-2">
+                <Button className="flex-1 h-12 gradient-bg border-0 text-white font-bold text-lg mt-4" onClick={handleUpdateOrder}>
+                  تحديث أمر البيع
+                </Button>
+                <Button className="h-12 border-0 text-white font-bold text-lg mt-4 bg-destructive hover:bg-destructive/90" onClick={handleDeleteAndRecreateOrder}>
+                  حذف وإعادة إنشاء
+                </Button>
+              </div>
             </div>
           </div>
         </div>
