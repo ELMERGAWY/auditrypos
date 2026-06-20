@@ -35,15 +35,26 @@ CREATE OR REPLACE FUNCTION public.ensure_warehouse_accounts(warehouse_id UUID, r
 RETURNS VOID AS $$
 DECLARE
     wh_name TEXT;
-    wh_code TEXT;
+    wh_type TEXT;
     inv_acc_id UUID;
     cogs_acc_id UUID;
     var_acc_id UUID;
+    account_suffix TEXT;
 BEGIN
     -- Get warehouse details
-    SELECT name, code INTO wh_name, wh_code
+    SELECT name, type INTO wh_name, wh_type
     FROM public.warehouses
     WHERE id = warehouse_id;
+    
+    -- Generate account suffix based on warehouse type
+    account_suffix := CASE 
+        WHEN wh_type = 'main' THEN '00'
+        WHEN wh_type = 'sub' THEN '01'
+        WHEN wh_type = 'raw' THEN '02'
+        WHEN wh_type = 'finished' THEN '03'
+        WHEN wh_type = 'project' THEN '04'
+        ELSE '99'
+    END;
     
     -- Create or get inventory account for this warehouse
     INSERT INTO public.chart_of_accounts (
@@ -51,20 +62,20 @@ BEGIN
         is_active, balance_type, description
     ) VALUES (
         restaurant_id,
-        '13' || SUBSTRING(wh_code FROM 1 FOR 2) || '00',
+        '13' || account_suffix || SUBSTRING(warehouse_id::text FROM 1 FOR 2),
         'مخزون - ' || wh_name,
         'asset',
         (SELECT id FROM public.chart_of_accounts WHERE code = '1300' AND restaurant_id = restaurant_id LIMIT 1),
         true,
         'debit',
-        'حساب مخزون ' || wh_name || ' - ' || wh_code
+        'حساب مخزون ' || wh_name
     )
     ON CONFLICT (restaurant_id, code) DO NOTHING
     RETURNING id INTO inv_acc_id;
     
     IF inv_acc_id IS NULL THEN
         SELECT id INTO inv_acc_id FROM public.chart_of_accounts 
-        WHERE restaurant_id = restaurant_id AND code = '13' || SUBSTRING(wh_code FROM 1 FOR 2) || '00';
+        WHERE restaurant_id = restaurant_id AND code = '13' || account_suffix || SUBSTRING(warehouse_id::text FROM 1 FOR 2);
     END IF;
     
     -- Create or get COGS account for this warehouse
@@ -73,7 +84,7 @@ BEGIN
         is_active, balance_type, description
     ) VALUES (
         restaurant_id,
-        '51' || SUBSTRING(wh_code FROM 1 FOR 2) || '00',
+        '51' || account_suffix || SUBSTRING(warehouse_id::text FROM 1 FOR 2),
         'تكلفة البضاعة المباعة - ' || wh_name,
         'expense',
         (SELECT id FROM public.chart_of_accounts WHERE code = '5100' AND restaurant_id = restaurant_id LIMIT 1),
@@ -86,7 +97,7 @@ BEGIN
     
     IF cogs_acc_id IS NULL THEN
         SELECT id INTO cogs_acc_id FROM public.chart_of_accounts 
-        WHERE restaurant_id = restaurant_id AND code = '51' || SUBSTRING(wh_code FROM 1 FOR 2) || '00';
+        WHERE restaurant_id = restaurant_id AND code = '51' || account_suffix || SUBSTRING(warehouse_id::text FROM 1 FOR 2);
     END IF;
     
     -- Create or get variance account for this warehouse
@@ -95,7 +106,7 @@ BEGIN
         is_active, balance_type, description
     ) VALUES (
         restaurant_id,
-        '52' || SUBSTRING(wh_code FROM 1 FOR 2) || '00',
+        '52' || account_suffix || SUBSTRING(warehouse_id::text FROM 1 FOR 2),
         'فروقات مخزون - ' || wh_name,
         'expense',
         (SELECT id FROM public.chart_of_accounts WHERE code = '5200' AND restaurant_id = restaurant_id LIMIT 1),
@@ -108,7 +119,7 @@ BEGIN
     
     IF var_acc_id IS NULL THEN
         SELECT id INTO var_acc_id FROM public.chart_of_accounts 
-        WHERE restaurant_id = restaurant_id AND code = '52' || SUBSTRING(wh_code FROM 1 FOR 2) || '00';
+        WHERE restaurant_id = restaurant_id AND code = '52' || account_suffix || SUBSTRING(warehouse_id::text FROM 1 FOR 2);
     END IF;
     
     -- Update warehouse with account references

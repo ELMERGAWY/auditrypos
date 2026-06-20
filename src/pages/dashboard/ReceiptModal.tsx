@@ -297,7 +297,7 @@ export function ReceiptModalWrapper({ order, restaurant, onClose, onComplete, is
     const loadPrintSettings = async () => {
       if (!restaurant?.id) return;
       try {
-        const { data, error } = await supabase.rpc('get_or_create_print_settings', { 
+        const { data, error } = await supabase.rpc('get_or_create_print_settings' as any, { 
           restaurant_id: restaurant.id 
         });
         if (error) throw error;
@@ -316,14 +316,15 @@ export function ReceiptModalWrapper({ order, restaurant, onClose, onComplete, is
   const savePrintSettings = async (newSettings: CombinedPrintSettings) => {
     if (!restaurant?.id) return;
     try {
-      const { error } = await supabase.rpc('update_print_settings', { 
+      const { error } = await supabase.rpc('update_print_settings' as any, { 
         restaurant_id: restaurant.id, 
         new_settings: newSettings 
       });
       if (error) throw error;
+      return true;
     } catch (error) {
       console.error('Failed to save print settings:', error);
-      toast.error('فشل حفظ إعدادات الطباعة');
+      return false;
     }
   };
 
@@ -615,9 +616,13 @@ export function ReceiptModalWrapper({ order, restaurant, onClose, onComplete, is
               </div>
               
               <Button onClick={async () => {
-                await savePrintSettings(printSettings);
-                setShowPrintSettings(false);
-                toast.success('تم حفظ إعدادات الطباعة');
+                const success = await savePrintSettings(printSettings);
+                if (success) {
+                  setShowPrintSettings(false);
+                  toast.success('تم حفظ إعدادات الطباعة');
+                } else {
+                  toast.error('فشل حفظ إعدادات الطباعة');
+                }
               }} className="w-full gradient-bg text-primary-foreground border-0">حفظ</Button>
             </motion.div>
           </div>
