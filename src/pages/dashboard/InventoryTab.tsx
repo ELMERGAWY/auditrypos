@@ -815,16 +815,23 @@ function WarehousesManager({ restaurantId, warehouses, onRefresh }: { restaurant
     if (!form.name) return toast.error('أدخل اسم المخزن');
     const data = { ...form, restaurant_id: restaurantId };
     
-    if (editingWarehouse) {
-      await supabase.from('warehouses').update(data).eq('id', editingWarehouse.id);
-      toast.success('تم تحديث بيانات المخزن');
-    } else {
-      await supabase.from('warehouses').insert(data);
-      toast.success('تم إنشاء المخزن الجديد');
+    try {
+      if (editingWarehouse) {
+        const { error } = await supabase.from('warehouses').update(data).eq('id', editingWarehouse.id);
+        if (error) throw error;
+        toast.success('تم تحديث بيانات المخزن');
+      } else {
+        const { error } = await supabase.from('warehouses').insert(data);
+        if (error) throw error;
+        toast.success('تم إنشاء المخزن الجديد');
+      }
+      setShowForm(false);
+      setEditingWarehouse(null);
+      onRefresh();
+    } catch (error: any) {
+      console.error('Warehouse save error:', error);
+      toast.error(`فشل الحفظ: ${error?.message || 'تحقق من الصلاحيات والاتصال'}`);
     }
-    setShowForm(false);
-    setEditingWarehouse(null);
-    onRefresh();
   };
 
   return (
