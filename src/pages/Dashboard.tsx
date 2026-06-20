@@ -436,6 +436,10 @@ export default function Dashboard() {
 
   const handleDeleteAndRecreateOrder = useCallback(async () => {
     if (!editingOrder) return;
+    if (!restaurant?.id) {
+      toast.error('خطأ: بيانات المطعم غير متاحة');
+      return;
+    }
     if (!confirm('هل أنت متأكد من حذف هذا الطلب وإعادة إنشائه؟ سيتم حذف جميع القيود المحاسبية المرتبطة به.')) return;
 
     try {
@@ -488,14 +492,19 @@ export default function Dashboard() {
     } catch (e: any) {
       toast.error('فشل إعادة إنشاء الطلب: ' + (e?.message || 'خطأ غير معروف'));
     }
-  }, [editingOrder, editOrderForm, editOrderItems, loadData, restaurant.id]);
+  }, [editingOrder, editOrderForm, editOrderItems, loadData, restaurant?.id]);
 
   const performCheckout = async (sendToPrep: boolean = false) => {
     if (cart.length === 0) return;
+    if (!restaurant?.id) {
+      toast.error('خطأ: بيانات المطعم غير متاحة');
+      setIsProcessingCheckout(false);
+      return;
+    }
     setIsProcessingCheckout(true);
     try {
       const result = await checkoutIntegration.processCheckout(
-        { restaurantId: restaurant!.id, businessType: businessType as any, currency, isOnline, userId: user?.id, skipPreparation: !sendToPrep },
+        { restaurantId: restaurant.id, businessType: businessType as any, currency, isOnline, userId: user?.id, skipPreparation: !sendToPrep },
         { cart: cart.map(c => ({ 
             ...c.item, 
             price: Number(c.price),
@@ -725,12 +734,12 @@ export default function Dashboard() {
     };
     fetchAccountingAccounts();
 
-    // Start update checking service
-    try {
-      updateService.startPeriodicCheck(restaurant.id);
-    } catch (error) {
-      console.error('Failed to start update service:', error);
-    }
+    // Start update checking service (disabled temporarily to debug)
+    // try {
+    //   updateService.startPeriodicCheck(restaurant.id);
+    // } catch (error) {
+    //   console.error('Failed to start update service:', error);
+    // }
   }, [restaurant?.id]);
 
   const sidebarTabs = useMemo(() => {

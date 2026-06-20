@@ -128,11 +128,17 @@ class UpdateService {
   }
 
   startPeriodicCheck(restaurantId: string): void {
+    if (!restaurantId) {
+      console.warn('Cannot start periodic check: restaurantId is null');
+      return;
+    }
     this.restaurantId = restaurantId;
     
-    // Initial check
-    this.checkForUpdates(restaurantId);
-    this.recordCheckIn(restaurantId);
+    // Delay initial check to avoid blocking initial page load
+    setTimeout(() => {
+      this.checkForUpdates(restaurantId);
+      this.recordCheckIn(restaurantId);
+    }, 3000); // 3 seconds delay
 
     // Start periodic checks
     if (this.checkInterval) {
