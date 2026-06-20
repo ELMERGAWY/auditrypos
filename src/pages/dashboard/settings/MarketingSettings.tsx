@@ -22,6 +22,7 @@ export function MarketingSettings({ restaurant }: Props) {
   const [activePlatform, setActivePlatform] = useState('meta');
 
   const loadConfigs = async () => {
+    if (!restaurant?.id) return;
     const { data } = await supabase
       .from('crm_platform_configs')
       .select('*')
@@ -31,7 +32,7 @@ export function MarketingSettings({ restaurant }: Props) {
 
   useEffect(() => {
     loadConfigs();
-  }, [restaurant.id]);
+  }, [restaurant?.id]);
 
   const currentConfig = configs.find(c => c.platform === activePlatform) || {
     platform: activePlatform,
@@ -41,6 +42,10 @@ export function MarketingSettings({ restaurant }: Props) {
   };
 
   const handleSave = async () => {
+    if (!restaurant?.id) {
+      toast.error('خطأ: بيانات المطعم غير متاحة');
+      return;
+    }
     setLoading(true);
     const { error } = await supabase
       .from('crm_platform_configs')
