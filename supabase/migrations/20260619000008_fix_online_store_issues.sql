@@ -101,7 +101,7 @@ BEGIN
     restaurant_id,
     order_number,
     order_type,
-    total_amount,
+    total,
     status,
     customer_name,
     customer_phone,
