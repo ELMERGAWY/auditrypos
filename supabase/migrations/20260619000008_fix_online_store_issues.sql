@@ -107,7 +107,6 @@ BEGIN
     customer_phone,
     delivery_address,
     notes,
-    source,
     created_at
   ) VALUES (
     p_restaurant_id,
@@ -119,7 +118,6 @@ BEGIN
     p_customer_phone,
     p_delivery_address,
     p_notes,
-    'storefront',
     NOW()
   ) RETURNING id INTO v_order_id;
 

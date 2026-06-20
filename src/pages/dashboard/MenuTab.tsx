@@ -17,6 +17,7 @@ export interface MenuFormState {
   price: string;
   category: string;
   image: string;
+  icon_url: string;
   product_type: string;
   pricing_method: string;
   profit_margin_percent: string;
@@ -52,6 +53,7 @@ export function MenuTab({
     price: '',
     category: '',
     image: defaultIcon,
+    icon_url: '',
     product_type: 'inventory',
     pricing_method: 'fixed',
     profit_margin_percent: '30',
@@ -97,11 +99,12 @@ export function MenuTab({
   };
 
   const resetForm = () => {
-    setMenuForm({ 
-      name: '', 
-      price: '', 
-      category: '', 
+    setMenuForm({
+      name: '',
+      price: '',
+      category: '',
       image: defaultIcon,
+      icon_url: '',
       product_type: 'inventory',
       pricing_method: 'fixed',
       profit_margin_percent: '30',
@@ -127,6 +130,7 @@ export function MenuTab({
       price: Number(menuForm.price),
       category: menuForm.category,
       image: menuForm.image,
+      icon_url: menuForm.icon_url || null,
       available: true,
       ...(isInventoryBusiness ? {
         cost_price: menuForm.product_type === 'inventory' ? (inventoryProducts.find(p => p.id === menuForm.product_id)?.cost_price || 0) : 0,
@@ -180,11 +184,12 @@ export function MenuTab({
 
   const startEdit = (item: MenuItem) => {
     setEditingItem(item);
-    setMenuForm({ 
-      name: item.name, 
-      price: String(item.price), 
-      category: item.category, 
+    setMenuForm({
+      name: item.name,
+      price: String(item.price),
+      category: item.category,
       image: item.image,
+      icon_url: (item as any).icon_url || '',
       product_type: (item as any).product_type || 'inventory',
       pricing_method: (item as any).pricing_method || 'fixed',
       profit_margin_percent: String((item as any).profit_margin_percent || 30),
@@ -422,13 +427,59 @@ export function MenuTab({
                   <datalist id="cat-list">{categories.map(c => <option key={c} value={c} />)}</datalist>
                 </div>
                 <div>
-                  <Label>الأيقونة</Label>
+                  <Label>الأيقونة (اختياري)</Label>
                   <div className="flex gap-1 flex-wrap mt-1">
                     {EMOJI_OPTIONS.map(e => (
                       <button key={e} onClick={() => setMenuForm({ ...menuForm, image: e })}
                         className={`w-9 h-9 rounded-lg text-lg flex items-center justify-center transition-colors ${menuForm.image === e ? 'bg-primary/20 ring-2 ring-primary' : 'bg-secondary'}`}>{e}</button>
                     ))}
                   </div>
+                </div>
+
+                <div>
+                  <Label>أيقونة مخصصة (اختياري)</Label>
+                  <div className="flex gap-2 mt-1">
+                    <Input
+                      value={menuForm.icon_url}
+                      onChange={e => setMenuForm({ ...menuForm, icon_url: e.target.value })}
+                      placeholder="رابط صورة الأيقونة"
+                    />
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => {
+                        const input = document.createElement('input');
+                        input.type = 'file';
+                        input.accept = 'image/*';
+                        input.onchange = async (e) => {
+                          const file = (e.target as HTMLInputElement).files?.[0];
+                          if (!file) return;
+
+                          const ext = file.name.split('.').pop();
+                          const path = `product-icons/${restaurant.id}/${Date.now()}.${ext}`;
+
+                          toast.info('جاري رفع الأيقونة...');
+                          const { error: uploadError } = await supabase.storage.from('restaurant-assets').upload(path, file);
+                          if (uploadError) {
+                            toast.error('خطأ في رفع الأيقونة');
+                            return;
+                          }
+
+                          const { data: { publicUrl } } = supabase.storage.from('restaurant-assets').getPublicUrl(path);
+                          setMenuForm({ ...menuForm, icon_url: publicUrl });
+                          toast.success('تم رفع الأيقونة بنجاح');
+                        };
+                        input.click();
+                      }}
+                    >
+                      <Upload className="w-3 h-3 ml-1" /> رفع
+                    </Button>
+                  </div>
+                  {menuForm.icon_url && (
+                    <div className="mt-2">
+                      <img src={menuForm.icon_url} alt="icon preview" className="w-8 h-8 object-contain rounded" />
+                    </div>
+                  )}
                 </div>
                 
                 {/* Pricing Method */}

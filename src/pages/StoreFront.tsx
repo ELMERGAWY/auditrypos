@@ -9,7 +9,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 
 interface MenuItem {
-  id: string; name: string; price: number; category: string; image: string;
+  id: string; name: string; price: number; category: string; image: string; icon_url?: string; in_stock?: boolean; quantity?: number;
 }
 
 interface CartItem { item: MenuItem; qty: number; }
@@ -57,13 +57,31 @@ const StoreFront = () => {
       if (isFoodType) {
         const { data: menuData, error: mErr } = await supabase.from('public_menu_items' as any).select('*').eq('restaurant_id', restaurantId).order('sort_order');
         if (mErr) console.error('public_menu_items error:', mErr);
-        const menuItems = (menuData || []).map((m: any) => ({ id: m.id, name: m.name, price: m.price, category: m.category, image: m.image })) as MenuItem[];
+        const menuItems = (menuData || []).map((m: any) => ({
+          id: m.id,
+          name: m.name,
+          price: m.price,
+          category: m.category,
+          image: m.image,
+          icon_url: m.icon_url,
+          in_stock: m.in_stock,
+          quantity: m.quantity
+        })) as MenuItem[];
         setItems(menuItems);
         setCategories([...new Set(menuItems.map(i => i.category).filter(Boolean))]);
       } else {
         const { data: prodData, error: pErr } = await supabase.from('public_products' as any).select('*').eq('restaurant_id', restaurantId).order('sort_order');
         if (pErr) console.error('public_products error:', pErr);
-        const prods = (prodData || []).map((p: any) => ({ id: p.id, name: p.name, price: p.price, category: p.category, image: p.image })) as MenuItem[];
+        const prods = (prodData || []).map((p: any) => ({
+          id: p.id,
+          name: p.name,
+          price: p.price,
+          category: p.category,
+          image: p.image,
+          icon_url: p.icon_url,
+          in_stock: p.in_stock,
+          quantity: p.quantity
+        })) as MenuItem[];
         setItems(prods);
         setCategories([...new Set(prods.map(i => i.category).filter(Boolean))]);
       }
@@ -200,25 +218,25 @@ const StoreFront = () => {
   }
 
   return (
-    <div className="min-h-screen bg-background pb-24" dir="rtl">
+    <div className="min-h-screen bg-gradient-to-b from-background to-background/95 pb-24" dir="rtl">
       {/* Header */}
-      <div className="gradient-bg p-6 pb-10 rounded-b-3xl">
+      <div className="gradient-bg p-6 pb-10 rounded-b-3xl shadow-2xl">
         <div className="flex items-center gap-3 mb-4">
           {restaurantLogo ? (
-            <img src={restaurantLogo} alt="logo" className="w-12 h-12 rounded-xl object-contain bg-white/20" />
+            <img src={restaurantLogo} alt="logo" className="w-14 h-14 rounded-xl object-contain bg-white/20 shadow-lg" />
           ) : (
-            <div className="w-12 h-12 rounded-xl bg-primary-foreground/20 flex items-center justify-center">
-              <Store className="w-6 h-6 text-primary-foreground" />
+            <div className="w-14 h-14 rounded-xl bg-primary-foreground/20 flex items-center justify-center shadow-lg">
+              <Store className="w-7 h-7 text-primary-foreground" />
             </div>
           )}
           <div>
-            <h1 className="font-display text-xl font-bold text-primary-foreground">{restaurantName || 'المتجر'}</h1>
-            <p className="text-sm text-primary-foreground/70">تصفّح واطلب مباشرة</p>
+            <h1 className="font-display text-2xl font-bold text-primary-foreground">{restaurantName || 'المتجر'}</h1>
+            <p className="text-sm text-primary-foreground/70">🛒 تصفّح واطلب مباشرة</p>
           </div>
         </div>
         <div className="relative">
           <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-          <Input placeholder="ابحث عن منتج..." value={search} onChange={e => setSearch(e.target.value)} className="pr-10 bg-background/90 border-0" />
+          <Input placeholder="ابحث عن منتج..." value={search} onChange={e => setSearch(e.target.value)} className="pr-10 bg-background/90 border-0 shadow-lg" />
         </div>
       </div>
 
@@ -240,10 +258,20 @@ const StoreFront = () => {
       <div className="px-4 mt-4 grid grid-cols-2 gap-3">
         {filtered.map((item, i) => (
           <motion.div key={item.id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.03 }}
-            className="glass-card p-3 flex flex-col">
-            <div className="text-4xl w-full h-20 flex items-center justify-center rounded-lg bg-secondary mb-2">{item.image}</div>
+            className="glass-card p-3 flex flex-col hover:shadow-lg transition-shadow cursor-pointer">
+            {item.icon_url ? (
+              <img src={item.icon_url} alt={item.name} className="w-full h-24 object-contain rounded-lg bg-secondary mb-2" />
+            ) : (
+              <div className="text-5xl w-full h-24 flex items-center justify-center rounded-lg bg-secondary mb-2">{item.image}</div>
+            )}
             <h3 className="font-medium text-sm truncate">{item.name}</h3>
             <p className="text-xs text-muted-foreground">{item.category}</p>
+            {item.in_stock === false && (
+              <span className="text-xs text-destructive mt-1">غير متوفر</span>
+            )}
+            {item.quantity !== undefined && item.quantity > 0 && (
+              <p className="text-xs text-muted-foreground mt-1">متوفر: {item.quantity}</p>
+            )}
             <div className="flex items-center justify-between mt-2">
               <p className="font-display font-bold text-primary">{item.price} {currency}</p>
               <Button size="sm" className="gradient-bg text-primary-foreground border-0 h-8 w-8 p-0" onClick={() => addToCart(item)}>
