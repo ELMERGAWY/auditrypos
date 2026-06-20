@@ -734,12 +734,12 @@ export default function Dashboard() {
     };
     fetchAccountingAccounts();
 
-    // Start update checking service (disabled temporarily to debug)
-    // try {
-    //   updateService.startPeriodicCheck(restaurant.id);
-    // } catch (error) {
-    //   console.error('Failed to start update service:', error);
-    // }
+    // Start update checking service
+    try {
+      updateService.startPeriodicCheck(restaurant.id);
+    } catch (error) {
+      console.error('Failed to start update service:', error);
+    }
   }, [restaurant?.id]);
 
   const sidebarTabs = useMemo(() => {
