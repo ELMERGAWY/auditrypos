@@ -821,9 +821,24 @@ function WarehousesManager({ restaurantId, warehouses, onRefresh }: { restaurant
         if (error) throw error;
         toast.success('تم تحديث بيانات المخزن');
       } else {
-        const { error } = await supabase.from('warehouses').insert(data);
+        const { data: newWarehouse, error } = await supabase.from('warehouses').insert(data).select().single();
         if (error) throw error;
-        toast.success('تم إنشاء المخزن الجديد');
+        
+        // Auto-create accounting accounts for the new warehouse
+        if (newWarehouse?.id) {
+          try {
+            await supabase.rpc('ensure_warehouse_accounts', { 
+              warehouse_id: newWarehouse.id, 
+              restaurant_id: restaurantId 
+            });
+            toast.success('تم إنشاء المخزن والحسابات المحاسبية الخاصة به');
+          } catch (accountError: any) {
+            console.warn('Failed to auto-create warehouse accounts:', accountError);
+            toast.success('تم إنشاء المخزن (لم يتم إنشاء الحسابات المحاسبية تلقائياً)');
+          }
+        } else {
+          toast.success('تم إنشاء المخزن الجديد');
+        }
       }
       setShowForm(false);
       setEditingWarehouse(null);
