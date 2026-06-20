@@ -400,6 +400,7 @@ export function SalesInvoices({ restaurantId, currency, restaurant, isSuperAdmin
           source="order"
           recordId={viewingId}
           currency={currency}
+          restaurantId={restaurantId}
         />
       )}
     </div>

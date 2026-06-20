@@ -396,6 +396,7 @@ export function SalesOrders({ restaurantId, currency }: Props) {
           source="sales_order"
           recordId={viewingId}
           currency={currency}
+          restaurantId={restaurantId}
         />
       )}
 

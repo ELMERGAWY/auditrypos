@@ -19,6 +19,7 @@ interface InvoiceViewerProps {
   currency?: string;
   restaurantName?: string;
   restaurantLogo?: string | null;
+  restaurantId?: string;
 }
 
 // Reuse or redefine PrintElementSettings here for InvoiceViewer
@@ -46,7 +47,7 @@ interface PrintElementSettings {
 
 export function InvoiceViewer({
   open, onClose, source, recordId, currency = 'ج.م',
-  restaurantName, restaurantLogo
+  restaurantName, restaurantLogo, restaurantId
 }: InvoiceViewerProps) {
   const [loading, setLoading] = useState(false);
   const [record, setRecord] = useState<any>(null);
@@ -73,6 +74,73 @@ export function InvoiceViewer({
     thankYou: true,
     poweredBy: true,
   });
+
+  // Load print settings from database
+  useEffect(() => {
+    if (!restaurantId) return;
+    loadPrintSettings();
+  }, [restaurantId]);
+
+  const loadPrintSettings = async () => {
+    try {
+      const { data: restaurant } = await supabase
+        .from('restaurants')
+        .select('printer_settings')
+        .eq('id', restaurantId)
+        .single();
+
+      if (restaurant?.printer_settings) {
+        const savedSettings = typeof restaurant.printer_settings === 'string'
+          ? JSON.parse(restaurant.printer_settings)
+          : restaurant.printer_settings;
+
+        setPrintSettings({
+          logo: savedSettings.logo ?? true,
+          restaurantName: savedSettings.restaurantName ?? true,
+          invoiceNumber: savedSettings.invoiceNumber ?? true,
+          dateTime: savedSettings.dateTime ?? true,
+          customerName: savedSettings.customerName ?? true,
+          customerPhone: savedSettings.customerPhone ?? true,
+          deliveryAddress: savedSettings.deliveryAddress ?? true,
+          paymentMethod: savedSettings.paymentMethod ?? true,
+          status: savedSettings.status ?? true,
+          items: savedSettings.items ?? true,
+          subtotal: savedSettings.subtotal ?? true,
+          discount: savedSettings.discount ?? true,
+          tax: savedSettings.tax ?? true,
+          total: savedSettings.total ?? true,
+          paidAmount: savedSettings.paidAmount ?? true,
+          remaining: savedSettings.remaining ?? true,
+          notes: savedSettings.notes ?? true,
+          thankYou: savedSettings.thankYou ?? true,
+          poweredBy: savedSettings.poweredBy ?? true,
+        });
+      }
+    } catch (e) {
+      console.error('Failed to load print settings:', e);
+    }
+  };
+
+  const savePrintSettings = async (newSettings: PrintElementSettings) => {
+    if (!restaurantId) return;
+    try {
+      const { error } = await supabase
+        .from('restaurants')
+        .update({ printer_settings: newSettings })
+        .eq('id', restaurantId);
+
+      if (error) throw error;
+      toast.success('تم حفظ إعدادات الطباعة');
+    } catch (e: any) {
+      toast.error('فشل حفظ الإعدادات: ' + e.message);
+    }
+  };
+
+  const handlePrintSettingChange = (key: keyof PrintElementSettings, value: boolean) => {
+    const newSettings = { ...printSettings, [key]: value };
+    setPrintSettings(newSettings);
+    savePrintSettings(newSettings);
+  };
 
   useEffect(() => {
     if (!open || !recordId) return;
@@ -393,85 +461,85 @@ export function InvoiceViewer({
                   <h4 className="font-bold text-sm mb-3 text-primary">عناصر الفاتورة</h4>
                   <div className="grid grid-cols-2 gap-3">
                     <label className="flex items-center gap-2 cursor-pointer">
-                      <input type="checkbox" checked={printSettings.logo} onChange={(e) => setPrintSettings({ ...printSettings, logo: e.target.checked })} className="w-4 h-4" />
+                      <input type="checkbox" checked={printSettings.logo} onChange={(e) => handlePrintSettingChange('logo', e.target.checked)} className="w-4 h-4" />
                       <span className="text-sm">الشعار</span>
                     </label>
                     <label className="flex items-center gap-2 cursor-pointer">
-                      <input type="checkbox" checked={printSettings.restaurantName} onChange={(e) => setPrintSettings({ ...printSettings, restaurantName: e.target.checked })} className="w-4 h-4" />
+                      <input type="checkbox" checked={printSettings.restaurantName} onChange={(e) => handlePrintSettingChange('restaurantName', e.target.checked)} className="w-4 h-4" />
                       <span className="text-sm">اسم المطعم</span>
                     </label>
                     <label className="flex items-center gap-2 cursor-pointer">
-                      <input type="checkbox" checked={printSettings.invoiceNumber} onChange={(e) => setPrintSettings({ ...printSettings, invoiceNumber: e.target.checked })} className="w-4 h-4" />
+                      <input type="checkbox" checked={printSettings.invoiceNumber} onChange={(e) => handlePrintSettingChange('invoiceNumber', e.target.checked)} className="w-4 h-4" />
                       <span className="text-sm">رقم الفاتورة</span>
                     </label>
                     <label className="flex items-center gap-2 cursor-pointer">
-                      <input type="checkbox" checked={printSettings.dateTime} onChange={(e) => setPrintSettings({ ...printSettings, dateTime: e.target.checked })} className="w-4 h-4" />
+                      <input type="checkbox" checked={printSettings.dateTime} onChange={(e) => handlePrintSettingChange('dateTime', e.target.checked)} className="w-4 h-4" />
                       <span className="text-sm">التاريخ والوقت</span>
                     </label>
                     <label className="flex items-center gap-2 cursor-pointer">
-                      <input type="checkbox" checked={printSettings.customerName} onChange={(e) => setPrintSettings({ ...printSettings, customerName: e.target.checked })} className="w-4 h-4" />
+                      <input type="checkbox" checked={printSettings.customerName} onChange={(e) => handlePrintSettingChange('customerName', e.target.checked)} className="w-4 h-4" />
                       <span className="text-sm">اسم العميل</span>
                     </label>
                     <label className="flex items-center gap-2 cursor-pointer">
-                      <input type="checkbox" checked={printSettings.customerPhone} onChange={(e) => setPrintSettings({ ...printSettings, customerPhone: e.target.checked })} className="w-4 h-4" />
+                      <input type="checkbox" checked={printSettings.customerPhone} onChange={(e) => handlePrintSettingChange('customerPhone', e.target.checked)} className="w-4 h-4" />
                       <span className="text-sm">هاتف العميل</span>
                     </label>
                     <label className="flex items-center gap-2 cursor-pointer">
-                      <input type="checkbox" checked={printSettings.deliveryAddress} onChange={(e) => setPrintSettings({ ...printSettings, deliveryAddress: e.target.checked })} className="w-4 h-4" />
+                      <input type="checkbox" checked={printSettings.deliveryAddress} onChange={(e) => handlePrintSettingChange('deliveryAddress', e.target.checked)} className="w-4 h-4" />
                       <span className="text-sm">العنوان</span>
                     </label>
                     <label className="flex items-center gap-2 cursor-pointer">
-                      <input type="checkbox" checked={printSettings.paymentMethod} onChange={(e) => setPrintSettings({ ...printSettings, paymentMethod: e.target.checked })} className="w-4 h-4" />
+                      <input type="checkbox" checked={printSettings.paymentMethod} onChange={(e) => handlePrintSettingChange('paymentMethod', e.target.checked)} className="w-4 h-4" />
                       <span className="text-sm">طريقة الدفع</span>
                     </label>
                     <label className="flex items-center gap-2 cursor-pointer">
-                      <input type="checkbox" checked={printSettings.status} onChange={(e) => setPrintSettings({ ...printSettings, status: e.target.checked })} className="w-4 h-4" />
+                      <input type="checkbox" checked={printSettings.status} onChange={(e) => handlePrintSettingChange('status', e.target.checked)} className="w-4 h-4" />
                       <span className="text-sm">الحالة</span>
                     </label>
                     <label className="flex items-center gap-2 cursor-pointer">
-                      <input type="checkbox" checked={printSettings.items} onChange={(e) => setPrintSettings({ ...printSettings, items: e.target.checked })} className="w-4 h-4" />
+                      <input type="checkbox" checked={printSettings.items} onChange={(e) => handlePrintSettingChange('items', e.target.checked)} className="w-4 h-4" />
                       <span className="text-sm">الأصناف</span>
                     </label>
                     <label className="flex items-center gap-2 cursor-pointer">
-                      <input type="checkbox" checked={printSettings.subtotal} onChange={(e) => setPrintSettings({ ...printSettings, subtotal: e.target.checked })} className="w-4 h-4" />
+                      <input type="checkbox" checked={printSettings.subtotal} onChange={(e) => handlePrintSettingChange('subtotal', e.target.checked)} className="w-4 h-4" />
                       <span className="text-sm">المجموع الفرعي</span>
                     </label>
                     <label className="flex items-center gap-2 cursor-pointer">
-                      <input type="checkbox" checked={printSettings.discount} onChange={(e) => setPrintSettings({ ...printSettings, discount: e.target.checked })} className="w-4 h-4" />
+                      <input type="checkbox" checked={printSettings.discount} onChange={(e) => handlePrintSettingChange('discount', e.target.checked)} className="w-4 h-4" />
                       <span className="text-sm">الخصم</span>
                     </label>
                     <label className="flex items-center gap-2 cursor-pointer">
-                      <input type="checkbox" checked={printSettings.tax} onChange={(e) => setPrintSettings({ ...printSettings, tax: e.target.checked })} className="w-4 h-4" />
+                      <input type="checkbox" checked={printSettings.tax} onChange={(e) => handlePrintSettingChange('tax', e.target.checked)} className="w-4 h-4" />
                       <span className="text-sm">الضريبة</span>
                     </label>
                     <label className="flex items-center gap-2 cursor-pointer">
-                      <input type="checkbox" checked={printSettings.total} onChange={(e) => setPrintSettings({ ...printSettings, total: e.target.checked })} className="w-4 h-4" />
+                      <input type="checkbox" checked={printSettings.total} onChange={(e) => handlePrintSettingChange('total', e.target.checked)} className="w-4 h-4" />
                       <span className="text-sm">الإجمالي</span>
                     </label>
                     <label className="flex items-center gap-2 cursor-pointer">
-                      <input type="checkbox" checked={printSettings.paidAmount} onChange={(e) => setPrintSettings({ ...printSettings, paidAmount: e.target.checked })} className="w-4 h-4" />
+                      <input type="checkbox" checked={printSettings.paidAmount} onChange={(e) => handlePrintSettingChange('paidAmount', e.target.checked)} className="w-4 h-4" />
                       <span className="text-sm">المدفوع</span>
                     </label>
                     <label className="flex items-center gap-2 cursor-pointer">
-                      <input type="checkbox" checked={printSettings.remaining} onChange={(e) => setPrintSettings({ ...printSettings, remaining: e.target.checked })} className="w-4 h-4" />
+                      <input type="checkbox" checked={printSettings.remaining} onChange={(e) => handlePrintSettingChange('remaining', e.target.checked)} className="w-4 h-4" />
                       <span className="text-sm">المتبقي</span>
                     </label>
                     <label className="flex items-center gap-2 cursor-pointer">
-                      <input type="checkbox" checked={printSettings.notes} onChange={(e) => setPrintSettings({ ...printSettings, notes: e.target.checked })} className="w-4 h-4" />
+                      <input type="checkbox" checked={printSettings.notes} onChange={(e) => handlePrintSettingChange('notes', e.target.checked)} className="w-4 h-4" />
                       <span className="text-sm">الملاحظات</span>
                     </label>
                     <label className="flex items-center gap-2 cursor-pointer">
-                      <input type="checkbox" checked={printSettings.thankYou} onChange={(e) => setPrintSettings({ ...printSettings, thankYou: e.target.checked })} className="w-4 h-4" />
+                      <input type="checkbox" checked={printSettings.thankYou} onChange={(e) => handlePrintSettingChange('thankYou', e.target.checked)} className="w-4 h-4" />
                       <span className="text-sm">شكراً لتعاملكم</span>
                     </label>
                     <label className="flex items-center gap-2 cursor-pointer">
-                      <input type="checkbox" checked={printSettings.poweredBy} onChange={(e) => setPrintSettings({ ...printSettings, poweredBy: e.target.checked })} className="w-4 h-4" />
+                      <input type="checkbox" checked={printSettings.poweredBy} onChange={(e) => handlePrintSettingChange('poweredBy', e.target.checked)} className="w-4 h-4" />
                       <span className="text-sm">Powered by Auditry</span>
                     </label>
                   </div>
                 </div>
-                
-                <Button onClick={() => setShowPrintSettings(false)} className="w-full gradient-bg text-primary-foreground border-0">حفظ</Button>
+
+                <Button onClick={() => setShowPrintSettings(false)} className="w-full gradient-bg text-primary-foreground border-0">إغلاق</Button>
               </motion.div>
             </div>
           )}

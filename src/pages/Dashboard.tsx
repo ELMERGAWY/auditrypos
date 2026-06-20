@@ -721,6 +721,7 @@ export default function Dashboard() {
             currency={currency}
             restaurantName={restaurant?.name}
             restaurantLogo={restaurant?.logo}
+            restaurantId={restaurant?.id}
           />
         )}
         
