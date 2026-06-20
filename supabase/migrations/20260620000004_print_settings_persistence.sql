@@ -26,12 +26,8 @@ CREATE POLICY owner_all_print_settings ON public.print_settings
 
 CREATE POLICY accounting_staff_print_settings ON public.print_settings
     FOR ALL USING (
-        restaurant_id IN (
-            SELECT r.id FROM public.restaurants r
-            JOIN public.restaurant_staff rs ON rs.restaurant_id = r.id
-            WHERE rs.user_id = auth.uid()
-            AND rs.role IN ('owner', 'admin', 'accountant')
-        )
+        is_restaurant_owner(auth.uid(), restaurant_id)
+        OR has_role(auth.uid(), 'super_admin'::app_role)
     );
 
 -- 4. Create function to get or create print settings
