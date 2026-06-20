@@ -30,7 +30,7 @@ export type SidebarTab =
   | 'sales_orders' | 'purchase_orders' | 'projects' | 'manual_journal'
   | 'chart_of_accounts' | 'accounting_mapping' | 'fixed_assets'
   | 'loyalty' | 'gift_cards' | 'branches' | 'contracting' | 'bom' | 'service_packages' | 'payroll' | 'chat'
-  | 'employees' | 'supplier_contracts' | 'marketing_services' | 'marketing_quotes' | 'marketing_contracts';
+  | 'employees' | 'supplier_contracts' | 'marketing_services' | 'marketing_quotes' | 'marketing_contracts' | 'contractors';
 
 interface NavItem {
   id: SidebarTab;
@@ -191,6 +191,7 @@ export const ProfessionalSidebar = memo(function ProfessionalSidebar({
     marketing_services: { label: 'خدمات التسويق', icon: Sparkles, section: 'main' },
     marketing_quotes: { label: 'عروض الأسعار', icon: FileText, section: 'main' },
     marketing_contracts: { label: 'عقود التسويق', icon: FileCheck, section: 'main' },
+    contractors: { label: 'الصنايعية', icon: UsersRound, section: 'main' },
   };
 
   const navItems = useMemo(() => {

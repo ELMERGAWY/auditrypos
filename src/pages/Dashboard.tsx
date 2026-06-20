@@ -79,6 +79,7 @@ const SupplierContracts = lazy(() => import('./dashboard/SupplierContracts').the
 const MarketingServices = lazy(() => import('./dashboard/MarketingServices').then(m => ({ default: m.MarketingServices })));
 const MarketingQuotes = lazy(() => import('./dashboard/MarketingQuotes').then(m => ({ default: m.MarketingQuotes })));
 const MarketingContracts = lazy(() => import('./dashboard/MarketingContracts').then(m => ({ default: m.MarketingContracts })));
+const ContractorsTab = lazy(() => import('./dashboard/ContractorsTab').then(m => ({ default: m.ContractorsTab })));
 
 import { BUSINESS_TYPES, BUSINESS_TABS, getBusinessConfig, getDefaultOrderType, isFoodSector, isInventoryDrivenBusiness, type BusinessType } from '@/lib/businessTypes';
 import { useAuth } from '@/lib/AuthContext';
@@ -609,6 +610,7 @@ export default function Dashboard() {
         {activeTab === 'marketing_contracts' && <MarketingContracts {...commonProps} />}
         {activeTab === 'super_admin' && <SuperAdmin />}
         {activeTab === 'contracting' && <ContractingDashboard {...commonProps} />}
+        {activeTab === 'contractors' && <ContractorsTab {...commonProps} />}
          {activeTab === 'projects' && (businessType === 'marketing_agency' ? <MarketingProjects {...commonProps} /> : <ContractingDashboard {...commonProps} />)}
          {activeTab === 'expenses' && <ExpensesTab {...commonProps} />}
         {activeTab === 'overheads' && <OverheadManager {...commonProps} />}
