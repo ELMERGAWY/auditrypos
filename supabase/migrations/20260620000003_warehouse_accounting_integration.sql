@@ -153,6 +153,7 @@ CREATE POLICY owner_all_warehouses ON public.warehouses
     );
 
 -- Add policy for accounting staff (company admin)
+DROP POLICY IF EXISTS accounting_staff_warehouses ON public.warehouses;
 CREATE POLICY accounting_staff_warehouses ON public.warehouses
     FOR ALL USING (
         is_restaurant_owner(auth.uid(), restaurant_id)

@@ -16,6 +16,7 @@ CREATE TABLE IF NOT EXISTS public.print_settings (
 ALTER TABLE public.print_settings ENABLE ROW LEVEL SECURITY;
 
 -- 3. Create RLS policies
+DROP POLICY IF EXISTS owner_all_print_settings ON public.print_settings;
 CREATE POLICY owner_all_print_settings ON public.print_settings
     FOR ALL USING (
         restaurant_id IN (
@@ -24,6 +25,7 @@ CREATE POLICY owner_all_print_settings ON public.print_settings
         )
     );
 
+DROP POLICY IF EXISTS accounting_staff_print_settings ON public.print_settings;
 CREATE POLICY accounting_staff_print_settings ON public.print_settings
     FOR ALL USING (
         is_restaurant_owner(auth.uid(), restaurant_id)
