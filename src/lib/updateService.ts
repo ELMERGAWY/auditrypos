@@ -46,6 +46,10 @@ class UpdateService {
   }
 
   async recordCheckIn(restaurantId: string): Promise<void> {
+    if (!restaurantId) {
+      console.warn('Cannot record check-in: restaurantId is null');
+      return;
+    }
     this.restaurantId = restaurantId;
     try {
       await supabase.rpc('record_device_check_in', {
@@ -62,6 +66,10 @@ class UpdateService {
   }
 
   async checkForUpdates(restaurantId: string): Promise<UpdateInfo | null> {
+    if (!restaurantId) {
+      console.warn('Cannot check for updates: restaurantId is null');
+      return null;
+    }
     try {
       const { data, error } = await supabase.rpc('check_for_update', {
         p_current_version: APP_VERSION,

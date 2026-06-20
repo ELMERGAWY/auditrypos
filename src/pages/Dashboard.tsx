@@ -726,7 +726,11 @@ export default function Dashboard() {
     fetchAccountingAccounts();
 
     // Start update checking service
-    updateService.startPeriodicCheck(restaurant.id);
+    try {
+      updateService.startPeriodicCheck(restaurant.id);
+    } catch (error) {
+      console.error('Failed to start update service:', error);
+    }
   }, [restaurant?.id]);
 
   const sidebarTabs = useMemo(() => {
