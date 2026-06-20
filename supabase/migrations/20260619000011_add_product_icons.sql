@@ -25,12 +25,12 @@ SELECT
   p.available,
   p.sort_order,
   p.unit,
-  p.icon_url,
   COALESCE(p.quantity, 0) as quantity,
   CASE
     WHEN COALESCE(p.quantity, 0) > 0 THEN true
     ELSE false
-  END as in_stock
+  END as in_stock,
+  p.icon_url
 FROM public.products p
 WHERE p.available = true;
 
@@ -48,7 +48,6 @@ SELECT
   mi.sort_order,
   mi.product_type,
   mi.inventory_mode,
-  mi.icon_url,
   CASE
     WHEN mi.inventory_mode = 'none' THEN true
     WHEN mi.inventory_mode = 'direct' AND mi.product_id IS NOT NULL THEN
@@ -61,7 +60,8 @@ SELECT
         AND COALESCE(p.quantity, 0) > 0
       )
     ELSE true
-  END as in_stock
+  END as in_stock,
+  mi.icon_url
 FROM public.menu_items mi
 WHERE mi.available = true;
 
