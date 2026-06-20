@@ -301,7 +301,7 @@ export function useDashboardData() {
 
   // Realtime: waiter calls + agent locations + new orders + notifications
   useEffect(() => {
-    if (!restaurant || !isOnline) return;
+    if (!restaurant?.id || !isOnline) return;
     
     const setupChannel = () => {
       const channel = supabase

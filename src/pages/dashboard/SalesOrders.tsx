@@ -125,6 +125,10 @@ export function SalesOrders({ restaurantId, currency }: Props) {
 
   const handleDeleteAndRecreateOrder = async () => {
     if (!editingOrder) return;
+    if (!restaurantId) {
+      toast.error('خطأ: بيانات المطعم غير متاحة');
+      return;
+    }
     if (!confirm('هل أنت متأكد من حذف هذا الأمر وإعادة إنشائه؟ سيتم حذف جميع القيود المحاسبية المرتبطة به.')) return;
 
     try {

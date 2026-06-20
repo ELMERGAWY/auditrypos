@@ -549,7 +549,7 @@ export default function Dashboard() {
 
   // Performance Optimization: Memoize the active tab content
   const activeTabContent = useMemo(() => {
-    if (!restaurant) return null;
+    if (!restaurant?.id) return null;
     const commonProps = { restaurantId: restaurant.id, currency, restaurant, isSuperAdmin, isOwner: profileName === restaurant.owner_name };
 
     return (
@@ -705,10 +705,10 @@ export default function Dashboard() {
         {/* System Tabs */}
         {activeTab === 'staff' && <StaffTab {...commonProps} />}
         {activeTab === 'payroll' && <PayrollTab {...commonProps} businessType={businessType} />}
-        {activeTab === 'chat' && <EmployeeChat restaurantId={restaurant.id} />}
+        {activeTab === 'chat' && restaurant?.id && <EmployeeChat restaurantId={restaurant.id} />}
         {activeTab === 'settings' && <SettingsTab restaurant={restaurant} businessType={businessType} profileName={profileName} user={user} agents={agents} isSuspended={isSuspended} isSuperAdmin={isSuperAdmin} loadData={loadData} />}
         {activeTab === 'notifications' && <NotificationsTab {...commonProps} />}
-        {activeTab === 'qr' && (
+        {activeTab === 'qr' && restaurant?.id && (
           <div className="p-10 flex flex-col items-center justify-center space-y-8 h-full">
             <div className="p-8 bg-white rounded-3xl shadow-2xl scale-110">
               <QRCodeSVG value={`${window.location.origin}/menu/${restaurant.id}`} size={250} level="H" />

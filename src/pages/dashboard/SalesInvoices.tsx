@@ -195,6 +195,10 @@ export function SalesInvoices({ restaurantId, currency, restaurant, isSuperAdmin
 
   const handleDeleteAndRecreateInvoice = async () => {
     if (!editingInvoice) return;
+    if (!restaurantId) {
+      toast.error('خطأ: بيانات المطعم غير متاحة');
+      return;
+    }
     if (!confirm('هل أنت متأكد من حذف هذه الفاتورة وإعادة إنشائها؟ سيتم حذف جميع القيود المحاسبية المرتبطة بها.')) return;
 
     try {

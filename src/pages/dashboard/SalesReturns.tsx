@@ -94,6 +94,10 @@ export function SalesReturnsManager({ restaurantId, currency }: Props) {
   }, [restaurantId]);
 
   const loadReturns = async () => {
+    if (!restaurantId) {
+      setLoading(false);
+      return;
+    }
     try {
       setLoading(true);
       const { data, error } = await supabase
