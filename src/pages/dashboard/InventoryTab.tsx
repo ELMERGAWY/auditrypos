@@ -809,7 +809,7 @@ export function InventoryTab({ restaurantId, currency, businessType }: Props) {
 function WarehousesManager({ restaurantId, warehouses, onRefresh }: { restaurantId: string; warehouses: Warehouse[]; onRefresh: () => void }) {
   const [showForm, setShowForm] = useState(false);
   const [editingWarehouse, setEditingWarehouse] = useState<Warehouse | null>(null);
-  const [form, setForm] = useState({ name: '', code: '', type: 'main', location: '' });
+  const [form, setForm] = useState({ name: '', type: 'main', location: '' });
 
   const handleSave = async () => {
     if (!form.name) return toast.error('أدخل اسم المخزن');
@@ -855,7 +855,7 @@ function WarehousesManager({ restaurantId, warehouses, onRefresh }: { restaurant
         <h3 className="font-display font-bold text-lg flex items-center gap-2">
           <Truck className="w-5 h-5 text-primary" /> قائمة الفروع والمستودعات
         </h3>
-        <Button onClick={() => { setForm({ name: '', code: '', type: 'main', location: '' }); setShowForm(true); }} size="sm" className="gradient-bg text-primary-foreground border-0 rounded-xl">
+        <Button onClick={() => { setForm({ name: '', type: 'main', location: '' }); setShowForm(true); }} size="sm" className="gradient-bg text-primary-foreground border-0 rounded-xl">
           <Plus className="w-4 h-4 ml-1" /> إضافة مخزن/فرع
         </Button>
       </div>
@@ -897,7 +897,6 @@ function WarehousesManager({ restaurantId, warehouses, onRefresh }: { restaurant
               <h3 className="font-display font-bold text-lg">{editingWarehouse ? 'تعديل مخزن' : 'مخزن جديد'}</h3>
               <div className="space-y-3">
                 <Input placeholder="اسم المخزن / الفرع" value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} className="h-11 rounded-xl" />
-                <Input placeholder="كود المخزن (اختياري)" value={form.code} onChange={e => setForm({ ...form, code: e.target.value })} className="h-11 rounded-xl" />
                 <select value={form.type} onChange={e => setForm({ ...form, type: e.target.value })} className="w-full h-11 rounded-xl border border-input bg-background px-3 text-sm">
                   <option value="main">مخزن رئيسي</option>
                   <option value="sub">مخزن فرعي</option>

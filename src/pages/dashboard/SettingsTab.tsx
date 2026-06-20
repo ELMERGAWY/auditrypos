@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { Store, Shield, Percent, Lock, Building2, BookOpen, Share2 } from 'lucide-react';
+import { Store, Shield, Percent, Lock, Building2, BookOpen, Share2, Printer } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { useNavigate } from 'react-router-dom';
@@ -11,6 +11,7 @@ import { TaxManager } from './settings/TaxManager';
 import { AccountingSettings } from './settings/AccountingSettings';
 import { MarketingSettings } from './settings/MarketingSettings';
 import { DatabaseAuditTool } from '@/components/DatabaseAuditTool';
+import { PrintSettingsManager } from './settings/PrintSettingsManager';
 
 interface SettingsTabProps {
   restaurant: any;
@@ -34,7 +35,7 @@ export function SettingsTab({
   loadData
 }: SettingsTabProps) {
   const navigate = useNavigate();
-  const [activeSubTab, setActiveSubTab] = useState<'profile' | 'roles' | 'taxes' | 'accounting' | 'marketing' | 'audit'>('profile');
+  const [activeSubTab, setActiveSubTab] = useState<'profile' | 'roles' | 'taxes' | 'accounting' | 'marketing' | 'audit' | 'print'>('profile');
 
 
   const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -89,6 +90,12 @@ export function SettingsTab({
           className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm transition-colors whitespace-nowrap ${activeSubTab === 'audit' ? 'gradient-bg text-primary-foreground' : 'bg-secondary hover:bg-secondary/80'}`}
         >
           <Shield className="w-4 h-4" /> صحة النظام والتدقيق
+        </button>
+        <button
+          onClick={() => setActiveSubTab('print')}
+          className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm transition-colors whitespace-nowrap ${activeSubTab === 'print' ? 'gradient-bg text-primary-foreground' : 'bg-secondary hover:bg-secondary/80'}`}
+        >
+          <Printer className="w-4 h-4" /> إعدادات الطباعة
         </button>
       </div>
 
@@ -205,6 +212,11 @@ export function SettingsTab({
         {activeSubTab === 'audit' && (
           <div className="max-w-4xl">
             <DatabaseAuditTool />
+          </div>
+        )}
+        {activeSubTab === 'print' && restaurant?.id && (
+          <div className="max-w-4xl">
+            <PrintSettingsManager restaurantId={restaurant.id} />
           </div>
         )}
       </div>

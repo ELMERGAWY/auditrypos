@@ -170,7 +170,9 @@ export function SalesInvoices({ restaurantId, currency, restaurant, isSuperAdmin
           notes: form.notes || '',
           payment_method: form.payment_method
         } as any)
-        .eq('id', editingInvoice.id);
+        .eq('id', editingInvoice.id)
+        .select()
+        .single();
 
       if (orderError) throw orderError;
 
