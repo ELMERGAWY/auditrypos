@@ -33,14 +33,18 @@ export function AccountingSettings({ restaurant, loadData, isSuperAdmin, isOwner
   const canManageInvoiceEditing = isSuperAdmin || isOwner;
   const [loading, setLoading] = useState(false);
   const [form, setForm] = useState({
-    accounting_standard: restaurant.accounting_standard || 'IFRS',
-    inventory_method: restaurant.inventory_method || 'FIFO',
-    inventory_system: restaurant.inventory_system || 'PERPETUAL',
-    business_type: restaurant.business_type || 'restaurant',
-    allow_invoice_editing: restaurant.allow_invoice_editing ?? false
+    accounting_standard: restaurant?.accounting_standard || 'IFRS',
+    inventory_method: restaurant?.inventory_method || 'FIFO',
+    inventory_system: restaurant?.inventory_system || 'PERPETUAL',
+    business_type: restaurant?.business_type || 'restaurant',
+    allow_invoice_editing: restaurant?.allow_invoice_editing ?? false
   });
 
   const handleSave = async () => {
+    if (!restaurant?.id) {
+      toast.error('خطأ: بيانات المطعم غير متاحة');
+      return;
+    }
     // Validation
     const standard = STANDARDS.find(s => s.id === form.accounting_standard);
     if (standard?.forbidden.includes(form.inventory_method)) {
@@ -253,6 +257,10 @@ export function AccountingSettings({ restaurant, loadData, isSuperAdmin, isOwner
         <Button 
           variant="outline" 
           onClick={async () => {
+            if (!restaurant?.id) {
+              toast.error('خطأ: بيانات المطعم غير متاحة');
+              return;
+            }
             setLoading(true);
             const { journalService } = await import('@/lib/accounting/journalService');
             const success = await journalService.ensureAccountingSetup(restaurant.id, restaurant.currency || 'ج.م');
