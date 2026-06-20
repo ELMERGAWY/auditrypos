@@ -41,15 +41,16 @@ export function ShiftsTab({ restaurant, currentShift, setCurrentShift, profileNa
   const [selectedCashier, setSelectedCashier] = useState('');
 
   useEffect(() => {
+    if (!restaurant?.id) return;
     (supabase.from as any)('restaurant_staff')
       .select('id, name, role, is_active')
       .eq('restaurant_id', restaurant.id)
       .eq('is_active', true)
       .then(({ data }: any) => setStaff((data || []) as StaffMember[]));
-  }, [restaurant.id]);
+  }, [restaurant?.id]);
 
   const loadHistory = async () => {
-    if (loadedHistory) return;
+    if (loadedHistory || !restaurant?.id) return;
     const { data } = await supabase.from('shifts').select('*')
       .eq('restaurant_id', restaurant.id)
       .order('opened_at', { ascending: false })
@@ -60,6 +61,7 @@ export function ShiftsTab({ restaurant, currentShift, setCurrentShift, profileNa
 
   const handleOpenShift = async () => {
     if (currentShift) { toast.error('يوجد شفت مفتوح بالفعل'); return; }
+    if (!restaurant?.id) { toast.error('خطأ: بيانات المطعم غير متاحة'); return; }
     const cashierName = selectedCashier
       ? staff.find(s => s.id === selectedCashier)?.name || profileName
       : profileName;
@@ -81,7 +83,7 @@ export function ShiftsTab({ restaurant, currentShift, setCurrentShift, profileNa
   };
 
   const postShiftOrders = async () => {
-    if (!currentShift) return { posted: 0, skipped: 0 };
+    if (!currentShift || !restaurant?.id) return { posted: 0, skipped: 0 };
 
     const closeTime = new Date().toISOString();
     const { data: shiftOrders, error: ordersError } = await supabase
@@ -131,7 +133,7 @@ export function ShiftsTab({ restaurant, currentShift, setCurrentShift, profileNa
   };
 
   const handleCloseShift = async () => {
-    if (!currentShift) return;
+    if (!currentShift || !restaurant?.id) return;
     const { error } = await supabase.from('shifts').update({
       status: 'closed',
       closed_at: new Date().toISOString(),
@@ -171,14 +173,15 @@ export function ShiftsTab({ restaurant, currentShift, setCurrentShift, profileNa
       setLoadedHistory(false);
       toast.success('تم إغلاق الشيفت وحفظ التقرير. الترحيل المحاسبي سيكتمل في الخلفية.');
 
-      void postUnpostedOrders({
-        restaurantId: restaurant.id,
-        businessType: restaurant.business_type || 'restaurant',
-        from: shiftToClose.opened_at,
-        to: closeTime,
-        batchSize: 25,
-        maxOrders: 25,
-      })
+      if (restaurant?.id) {
+        void postUnpostedOrders({
+          restaurantId: restaurant.id,
+          businessType: restaurant.business_type || 'restaurant',
+          from: shiftToClose.opened_at,
+          to: closeTime,
+          batchSize: 25,
+          maxOrders: 25,
+        })
         .then(summary => {
           setPostingSummary(summary);
           if (summary.posted > 0) toast.success(`تم ترحيل ${summary.posted} فاتورة محاسبياً`);
@@ -188,6 +191,7 @@ export function ShiftsTab({ restaurant, currentShift, setCurrentShift, profileNa
           console.warn('[shift] background posting failed:', error);
           toast.error('تعذر إكمال الترحيل المحاسبي في الخلفية');
         });
+      }
     } catch (error: any) {
       toast.error(error?.message || 'فشل إغلاق الشيفت أو ترحيل الفواتير محاسبيا');
     } finally {
