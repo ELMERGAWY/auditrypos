@@ -31,7 +31,8 @@ BEGIN
 END $$;
 
 -- 2. Create function to auto-create warehouse accounts if they don't exist
-CREATE OR REPLACE FUNCTION public.ensure_warehouse_accounts(warehouse_id UUID, restaurant_id UUID)
+DROP FUNCTION IF EXISTS public.ensure_warehouse_accounts(uuid, uuid);
+CREATE FUNCTION public.ensure_warehouse_accounts(warehouse_id UUID, restaurant_id UUID)
 RETURNS VOID AS $$
 DECLARE
     wh_name TEXT;
@@ -178,6 +179,7 @@ CREATE TABLE IF NOT EXISTS public.warehouse_permissions (
 ALTER TABLE public.warehouse_permissions ENABLE ROW LEVEL SECURITY;
 
 -- RLS for warehouse permissions
+DROP POLICY IF EXISTS owner_all_warehouse_permissions ON public.warehouse_permissions;
 CREATE POLICY owner_all_warehouse_permissions ON public.warehouse_permissions
     FOR ALL USING (
         warehouse_id IN (
@@ -202,6 +204,7 @@ CREATE TABLE IF NOT EXISTS public.warehouse_settings (
 ALTER TABLE public.warehouse_settings ENABLE ROW LEVEL SECURITY;
 
 -- RLS for warehouse settings
+DROP POLICY IF EXISTS owner_all_warehouse_settings ON public.warehouse_settings;
 CREATE POLICY owner_all_warehouse_settings ON public.warehouse_settings
     FOR ALL USING (
         warehouse_id IN (

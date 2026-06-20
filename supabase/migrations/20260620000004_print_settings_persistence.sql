@@ -33,7 +33,8 @@ CREATE POLICY accounting_staff_print_settings ON public.print_settings
     );
 
 -- 4. Create function to get or create print settings
-CREATE OR REPLACE FUNCTION public.get_or_create_print_settings(restaurant_id UUID)
+DROP FUNCTION IF EXISTS public.get_or_create_print_settings(uuid);
+CREATE FUNCTION public.get_or_create_print_settings(restaurant_id UUID)
 RETURNS JSONB AS $$
 DECLARE
     settings JSONB;
@@ -81,7 +82,8 @@ END;
 $$ LANGUAGE plpgsql;
 
 -- 5. Create function to update print settings
-CREATE OR REPLACE FUNCTION public.update_print_settings(restaurant_id UUID, new_settings JSONB)
+DROP FUNCTION IF EXISTS public.update_print_settings(uuid, jsonb);
+CREATE FUNCTION public.update_print_settings(restaurant_id UUID, new_settings JSONB)
 RETURNS VOID AS $$
 BEGIN
     INSERT INTO public.print_settings (restaurant_id, settings)
