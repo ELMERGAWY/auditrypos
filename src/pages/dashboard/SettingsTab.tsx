@@ -39,7 +39,7 @@ export function SettingsTab({
 
   const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (!file) return;
+    if (!file || !restaurant?.id) return;
     const ext = file.name.split('.').pop();
     const path = `logos/${restaurant.id}.${ext}`;
     const { error: upErr } = await supabase.storage.from('restaurant-assets').upload(path, file, { upsert: true });
@@ -155,15 +155,17 @@ export function SettingsTab({
               </div>
 
               {/* Store Link */}
-              <div className="pt-4 border-t border-border mt-2">
-                <p className="text-sm text-muted-foreground mb-2">رابط المتجر الإلكتروني (لعملائك)</p>
-                <div className="flex gap-2">
-                  <code className="text-xs bg-secondary px-3 py-2 rounded-lg flex-1 truncate">{window.location.origin}/store/{restaurant.id}</code>
-                  <Button size="sm" variant="outline" onClick={() => navigator.clipboard.writeText(`${window.location.origin}/store/${restaurant.id}`).then(() => toast.success('تم نسخ الرابط'))}>
-                    نسخ
-                  </Button>
+              {restaurant?.id && (
+                <div className="pt-4 border-t border-border mt-2">
+                  <p className="text-sm text-muted-foreground mb-2">رابط المتجر الإلكتروني (لعملائك)</p>
+                  <div className="flex gap-2">
+                    <code className="text-xs bg-secondary px-3 py-2 rounded-lg flex-1 truncate">{window.location.origin}/store/{restaurant.id}</code>
+                    <Button size="sm" variant="outline" onClick={() => navigator.clipboard.writeText(`${window.location.origin}/store/${restaurant.id}`).then(() => toast.success('تم نسخ الرابط'))}>
+                      نسخ
+                    </Button>
+                  </div>
                 </div>
-              </div>
+              )}
 
               {/* Super Admin Portal Link */}
               {isSuperAdmin && (
@@ -179,13 +181,13 @@ export function SettingsTab({
           </div>
         )}
 
-        {activeSubTab === 'roles' && (
+        {activeSubTab === 'roles' && restaurant?.id && (
           <div className="max-w-4xl">
             <RoleManager companyId={restaurant.id} />
           </div>
         )}
 
-        {activeSubTab === 'taxes' && (
+        {activeSubTab === 'taxes' && restaurant?.id && (
           <div className="max-w-3xl">
             <TaxManager companyId={restaurant.id} />
           </div>
