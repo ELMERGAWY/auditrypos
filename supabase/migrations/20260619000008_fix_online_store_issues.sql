@@ -209,6 +209,7 @@ CREATE POLICY "Owner manages notifications" ON public.notifications
   WITH CHECK (is_restaurant_owner(auth.uid(), restaurant_id) OR has_role(auth.uid(), 'super_admin'::app_role));
 
 -- Allow service role to create notifications (for system notifications)
+DROP POLICY IF EXISTS "Service role can create notifications" ON public.notifications;
 CREATE POLICY "Service role can create notifications" ON public.notifications
   FOR INSERT TO service_role
   WITH CHECK (true);
