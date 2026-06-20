@@ -6,7 +6,7 @@ BEGIN;
 
 -- 1. Update public_products view to include stock information
 CREATE OR REPLACE VIEW public.public_products
-WITH (security_invoker = true) AS
+WITH (security_invoker = false) AS
 SELECT
   p.id,
   p.restaurant_id,
@@ -27,7 +27,7 @@ WHERE p.available = true;
 
 -- 2. Update public_menu_items view to include stock information
 CREATE OR REPLACE VIEW public.public_menu_items
-WITH (security_invoker = true) AS
+WITH (security_invoker = false) AS
 SELECT
   mi.id,
   mi.restaurant_id,
@@ -186,7 +186,22 @@ $$;
 -- 4. Grant execute permissions
 GRANT EXECUTE ON FUNCTION public.create_storefront_order TO anon, authenticated;
 
--- 5. Update RLS policies for notifications to allow system to create
+-- 5. Grant SELECT on views to anon users
+GRANT SELECT ON public.public_products TO anon, authenticated;
+GRANT SELECT ON public.public_menu_items TO anon, authenticated;
+
+-- 6. Ensure RLS policies allow anon users to read available products/menu items
+DROP POLICY IF EXISTS "Public storefront reads available menu" ON public.menu_items;
+CREATE POLICY "Public storefront reads available menu" ON public.menu_items
+  FOR SELECT TO anon, authenticated
+  USING (available = true);
+
+DROP POLICY IF EXISTS "Public storefront reads available products" ON public.products;
+CREATE POLICY "Public storefront reads available products" ON public.products
+  FOR SELECT TO anon, authenticated
+  USING (available = true);
+
+-- 7. Update RLS policies for notifications to allow system to create
 DROP POLICY IF EXISTS "Owner manages notifications" ON public.notifications;
 CREATE POLICY "Owner manages notifications" ON public.notifications
   FOR ALL TO authenticated
