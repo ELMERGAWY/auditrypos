@@ -342,9 +342,6 @@ export function ReceiptModalWrapper({ order, restaurant, onClose, onComplete, is
   };
 
   const printReceipt = () => {
-    if (!ref.current) return;
-    
-    const content = ref.current.innerHTML;
     const isFood = restaurant.business_type === 'restaurant' || restaurant.business_type === 'cafe';
     const isWholesale = restaurant.business_type === 'wholesale';
     const kitchenTitle = isFood ? 'طلب تحضير (مطبخ)' : (isWholesale ? 'طلب تجهيز (مخزن)' : 'نسخة تحضير');
@@ -354,6 +351,129 @@ export function ReceiptModalWrapper({ order, restaurant, onClose, onComplete, is
       alert('يرجى السماح بالنوافذ المنبثقة للطباعة'); 
       return; 
     }
+
+    // Generate receipt content with current print settings
+    const generateReceiptContent = () => {
+      const currency = restaurant.currency || 'ج.م';
+      const items = Array.isArray(order.items) ? order.items : [];
+      const subtotal = items.reduce((s, i) => s + (Number(i.price) || 0) * (Number(i.quantity) || 0), 0);
+      const itemCount = items.reduce((s, i) => s + (Number(i.quantity) || 0), 0);
+      const paidAmount = Number((order as any).paid_amount) || 0;
+      const paymentMethod = (order as any).payment_method || 'cash';
+      const remaining = Math.max(0, Number(order.total) - paidAmount);
+      const change = paidAmount > Number(order.total) ? paidAmount - Number(order.total) : 0;
+
+      let content = '';
+      
+      // Header
+      content += '<div class="center">';
+      if (printSettings.logo && restaurant.logo_url) {
+        content += `<img src="${restaurant.logo_url}" alt="" style="width: 64; height: 64; object-fit: contain; margin: 0 auto 4px" />`;
+      }
+      if (printSettings.restaurantName) {
+        content += `<div class="logo-name">${restaurant.name}</div>`;
+      }
+      content += '</div>';
+      content += '<hr class="divider" />';
+
+      // Order Info
+      if (printSettings.dateTime) {
+        content += `<div class="row"><span class="info-label">التاريخ / ${new Date(order.created_at).toLocaleDateString('ar-EG')}</span><span>م ${new Date(order.created_at).toLocaleTimeString('ar-EG')}</span></div>`;
+      }
+      content += '<div class="row">';
+      if (printSettings.invoiceNumber) {
+        content += `<span class="info-label">الفاتورة / <span class="bold">${order.order_number.slice(-4)}</span></span>`;
+      }
+      if (printSettings.itemCount) {
+        content += `<span class="info-label">عدد الأصناف / <span class="bold">${order.items.length}</span></span>`;
+      }
+      content += '</div>';
+      if (printSettings.customerName && order.customer_name) {
+        content += `<div class="row"><span class="info-label">إسم العميل / <span class="bold">${order.customer_name}</span></span></div>`;
+      }
+      if (printSettings.customerPhone && order.customer_phone) {
+        content += `<div class="row"><span class="info-label">التليفون / <span dir="ltr">${order.customer_phone}</span></span></div>`;
+      }
+      if (printSettings.customerRef && extractCustomerRef(order)) {
+        content += `<div class="row"><span class="info-label">مرجع العميل / <span class="bold">${extractCustomerRef(order)}</span></span></div>`;
+      }
+      if (printSettings.deliveryAddress && order.delivery_address) {
+        content += `<div class="row"><span class="info-label">العنوان / ${order.delivery_address}</span></div>`;
+      }
+
+      // Items Section
+      if (printSettings.items) {
+        content += '<div class="items-section">';
+        content += '<div class="items-header">';
+        content += '<span class="item-name">الصنف</span>';
+        content += '<span class="item-qty">كمية</span>';
+        content += '<span class="item-price">السعر</span>';
+        content += '<span class="item-total">الإجمالي</span>';
+        content += '</div>';
+        if (order.items && order.items.length > 0) {
+          order.items.forEach((item) => {
+            content += `<div class="item-row">`;
+            content += `<span class="item-name">${item.menu_item_name || 'صنف'}</span>`;
+            content += `<span class="item-qty">${item.quantity}</span>`;
+            content += `<span class="item-price">${Number(item.price).toFixed(2)}</span>`;
+            content += `<span class="item-total">${(Number(item.price) * Number(item.quantity)).toFixed(2)}</span>`;
+            content += '</div>';
+          });
+        } else {
+          content += '<div class="item-row" style="text-align: center; color: #000">لا توجد أصناف</div>';
+        }
+        content += '</div>';
+      }
+
+      // Summary Table
+      content += '<table class="summary-table"><tbody>';
+      if (printSettings.totalQty) {
+        content += `<tr><td>إجمالي الكمية</td><td>${itemCount.toFixed(2)}</td></tr>`;
+      }
+      if (printSettings.subtotal) {
+        content += `<tr><td>الإجمالي</td><td>${subtotal.toFixed(2)}</td></tr>`;
+      }
+      if (printSettings.discount && Number(order.discount) > 0) {
+        content += `<tr><td>الخصم</td><td>${Number(order.discount).toFixed(2)}</td></tr>`;
+      }
+      if (printSettings.total) {
+        content += `<tr><td>المجموع النهائي</td><td>${Number(order.total).toFixed(2)} ${currency}</td></tr>`;
+      }
+      if (printSettings.paymentMethod) {
+        content += `<tr><td>طريقة الدفع</td><td>${PAYMENT_LABELS[paymentMethod] || paymentMethod}</td></tr>`;
+      }
+      if (printSettings.paidAmount) {
+        content += `<tr><td>المدفوع</td><td>${paidAmount.toFixed(2)} ${currency}</td></tr>`;
+      }
+      if (printSettings.remaining && remaining > 0) {
+        content += `<tr><td>المتبقي</td><td>${remaining.toFixed(2)} ${currency}</td></tr>`;
+      }
+      if (printSettings.change && change > 0) {
+        content += `<tr><td>الباقي للعميل</td><td>${change.toFixed(2)} ${currency}</td></tr>`;
+      }
+      content += '</tbody></table>';
+
+      // Notes
+      if (printSettings.notes && order.notes) {
+        content += `<div class="row" style="margin-top: 8px; border-top: 1px dashed #000; padding-top: 4px;">`;
+        content += `<span class="info-label">ملاحظات: ${order.notes}</span>`;
+        content += '</div>';
+      }
+
+      // Footer
+      if (printSettings.thankYou) {
+        content += '<div class="center footer" style="margin-top: 8px;">';
+        content += '<p>شكراً لزيارتكم</p>';
+        content += '</div>';
+      }
+      if (printSettings.poweredBy) {
+        content += '<div class="center footer" style="margin-top: 4px;">';
+        content += '<p>Powered by Auditry</p>';
+        content += '</div>';
+      }
+
+      return content;
+    };
 
     // Kitchen/Warehouse Copy (Items only)
     const kitchenItems = Array.isArray(order.items) ? order.items : [];
@@ -386,7 +506,7 @@ export function ReceiptModalWrapper({ order, restaurant, onClose, onComplete, is
       printContent += `
         <div class="receipt page-break">
           <div class="center bold" style="margin-bottom: 5px;">نسخة العميل</div>
-          ${content}
+          ${generateReceiptContent()}
         </div>
       `;
     }
@@ -395,7 +515,7 @@ export function ReceiptModalWrapper({ order, restaurant, onClose, onComplete, is
       printContent += `
         <div class="receipt page-break">
           <div class="center bold" style="margin-bottom: 5px;">نسخة المؤسسة</div>
-          ${content}
+          ${generateReceiptContent()}
         </div>
       `;
     }
