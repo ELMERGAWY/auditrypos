@@ -297,12 +297,19 @@ export function ReceiptModalWrapper({ order, restaurant, onClose, onComplete, is
     const loadPrintSettings = async () => {
       if (!restaurant?.id) return;
       try {
-        const { data, error } = await supabase.rpc('get_or_create_print_settings' as any, { 
-          restaurant_id: restaurant.id 
-        });
-        if (error) throw error;
-        if (data) {
-          setPrintSettings(data as CombinedPrintSettings);
+        const { data, error } = await supabase
+          .from('print_settings')
+          .select('settings')
+          .eq('restaurant_id', restaurant.id)
+          .single();
+        
+        if (error && error.code !== 'PGRST116') {
+          // PGRST116 = no rows returned, which is expected for new restaurants
+          throw error;
+        }
+        
+        if (data?.settings) {
+          setPrintSettings(data.settings as CombinedPrintSettings);
         }
       } catch (error) {
         console.error('Failed to load print settings:', error);
@@ -316,10 +323,16 @@ export function ReceiptModalWrapper({ order, restaurant, onClose, onComplete, is
   const savePrintSettings = async (newSettings: CombinedPrintSettings) => {
     if (!restaurant?.id) return;
     try {
-      const { error } = await supabase.rpc('update_print_settings' as any, { 
-        restaurant_id: restaurant.id, 
-        new_settings: newSettings 
-      });
+      const { error } = await supabase
+        .from('print_settings')
+        .upsert({
+          restaurant_id: restaurant.id,
+          settings: newSettings,
+          updated_at: new Date().toISOString()
+        }, {
+          onConflict: 'restaurant_id'
+        });
+      
       if (error) throw error;
       return true;
     } catch (error) {
