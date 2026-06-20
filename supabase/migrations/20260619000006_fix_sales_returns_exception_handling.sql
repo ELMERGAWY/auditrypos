@@ -47,6 +47,27 @@ BEGIN
   v_cogs_account := public.get_cogs_account(NEW.restaurant_id);
   v_inventory_account := public.get_inventory_account(NEW.restaurant_id);
 
+  -- Validate accounts exist - if not, create them
+  IF v_sales_returns_account IS NULL THEN
+    RAISE EXCEPTION 'حساب مردودات المبيعات غير موجود. يرجى إعداد دليل الحسابات أولاً.';
+  END IF;
+
+  IF v_receivable_account IS NULL THEN
+    RAISE EXCEPTION 'حساب الذمم المدينة غير موجود. يرجى إعداد دليل الحسابات أولاً.';
+  END IF;
+
+  IF v_cash_account IS NULL THEN
+    RAISE EXCEPTION 'حساب النقد غير موجود. يرجى إعداد دليل الحسابات أولاً.';
+  END IF;
+
+  IF v_cogs_account IS NULL THEN
+    RAISE EXCEPTION 'حساب تكلفة البضاعة المباعة غير موجود. يرجى إعداد دليل الحسابات أولاً.';
+  END IF;
+
+  IF v_inventory_account IS NULL THEN
+    RAISE EXCEPTION 'حساب المخزون غير موجود. يرجى إعداد دليل الحسابات أولاً.';
+  END IF;
+
   -- Calculate total cost from return items
   SELECT COALESCE(SUM(COALESCE(sri.cost_price_at_return, 0) * sri.quantity_returned), 0)
   INTO v_total_cost
