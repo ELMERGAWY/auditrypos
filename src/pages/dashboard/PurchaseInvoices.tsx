@@ -40,6 +40,7 @@ interface LineItem {
   product_id?: string;
   gl_account_id?: string;
   warehouse_id?: string;
+  sub_warehouse_id?: string;
   description: string;
   quantity: number;
   unit_cost: number;
@@ -65,9 +66,11 @@ export function PurchaseInvoices({ restaurantId, currency }: Props) {
   const [suppliers, setSuppliers] = useState<{ id: string; name: string }[]>([]);
   const [supplierContracts, setSupplierContracts] = useState<any[]>([]);
   const [projects, setProjects] = useState<any[]>([]);
-  const [products, setProducts] = useState<{ id: string; name: string; cost_price: number; unit: string }[]>([]);
+  const [products, setProducts] = useState<{ id: string; name: string; cost_price: number; unit: string; item_type_id?: string }[]>([]);
   const [glAccounts, setGlAccounts] = useState<{ id: string; code: string; name: string; account_type: string }[]>([]);
   const [warehouses, setWarehouses] = useState<{ id: string; name: string }[]>([]);
+  const [subWarehouses, setSubWarehouses] = useState<{ id: string; name: string; main_warehouse_id: string }[]>([]);
+  const [itemTypes, setItemTypes] = useState<{ id: string; code: string; name_ar: string }[]>([]);
   const [costingMethod, setCostingMethod] = useState<'fifo' | 'lifo' | 'wac' | 'specific'>('fifo');
 
   const [form, setForm] = useState({
@@ -96,18 +99,22 @@ export function PurchaseInvoices({ restaurantId, currency }: Props) {
       supabase.from('suppliers').select('id,name').eq('restaurant_id', restaurantId),
       supabase.from('supplier_contracts').select('*').eq('restaurant_id', restaurantId).eq('status', 'active'),
       supabase.from('projects').select('id,name').eq('restaurant_id', restaurantId),
-      supabase.from('products').select('id,name,cost_price,unit').eq('restaurant_id', restaurantId).eq('available', true),
+      supabase.from('products').select('id,name,cost_price,unit,item_type_id').eq('restaurant_id', restaurantId).eq('available', true),
       supabase.from('chart_of_accounts').select('id,code,name,account_type').eq('restaurant_id', restaurantId).eq('is_active', true).eq('posting_allowed', true),
       supabase.from('warehouses').select('id,name').eq('restaurant_id', restaurantId),
+      supabase.from('sub_warehouses').select('id,name,main_warehouse_id').eq('restaurant_id', restaurantId),
+      supabase.from('item_types').select('id,code,name_ar').eq('is_active', true),
       supabase.from('restaurants').select('inventory_method').eq('id', restaurantId).single(),
       supabase.from('inventory_settings').select('costing_method').eq('restaurant_id', restaurantId).maybeSingle(),
-    ]).then(([s, sc, prj, p, a, w, rest, settings]: any) => {
+    ]).then(([s, sc, prj, p, a, w, sw, it, rest, settings]: any) => {
       setSuppliers(s.data || []);
       setSupplierContracts(sc.data || []);
       setProjects(prj.data || []);
       setProducts(p.data || []);
       setGlAccounts((a.data || []).filter((acc: any) => ['expense', 'asset'].includes(acc.account_type)));
       setWarehouses(w.data || []);
+      setSubWarehouses(sw.data || []);
+      setItemTypes(it.data || []);
       
       // Get costing method from restaurant settings first, then fallback to old settings
       let method = 'fifo';
@@ -247,6 +254,7 @@ export function PurchaseInvoices({ restaurantId, currency }: Props) {
         product_id: l.line_type === 'inventory' ? l.product_id : null,
         gl_account_id: l.line_type === 'gl' ? l.gl_account_id : null,
         warehouse_id: l.line_type === 'inventory' ? (l.warehouse_id || null) : null,
+        sub_warehouse_id: l.line_type === 'inventory' ? (l.sub_warehouse_id || null) : null,
         description: l.description || '',
         quantity: Number(l.quantity),
         unit_cost: Number(l.unit_cost),
@@ -254,6 +262,22 @@ export function PurchaseInvoices({ restaurantId, currency }: Props) {
         tax_amount: Number(l.tax_amount || 0),
       }));
       await supabase.from('purchase_invoice_items').insert(linesData as any);
+
+      // Create inventory movements for inventory items
+      for (const l of lines) {
+        if (l.line_type === 'inventory' && l.warehouse_id && l.product_id) {
+          await supabase.from('inventory_movements').insert({
+            product_id: l.product_id,
+            warehouse_id: l.warehouse_id,
+            sub_warehouse_id: l.sub_warehouse_id || null,
+            movement_type: 'IN',
+            quantity: Number(l.quantity),
+            reference_type: 'PURCHASE',
+            reference_id: inv.id,
+            created_at: new Date().toISOString()
+          });
+        }
+      }
 
       // Auto journal entry
       try {
@@ -679,6 +703,7 @@ export function PurchaseInvoices({ restaurantId, currency }: Props) {
                     <th className="px-2 py-2 text-right">النوع</th>
                     <th className="px-2 py-2 text-right min-w-[200px]">المنتج / الحساب (بحث)</th>
                     <th className="px-2 py-2 text-right">المخزن</th>
+                    <th className="px-2 py-2 text-right">المخزن الفرعي</th>
                     <th className="px-2 py-2 text-right">الوصف</th>
                     <th className="px-2 py-2 text-center w-32">الكمية</th>
                     <th className="px-2 py-2 text-right w-24">التكلفة</th>
@@ -739,11 +764,25 @@ export function PurchaseInvoices({ restaurantId, currency }: Props) {
                         {l.line_type === 'inventory' ? (
                           <select
                             value={l.warehouse_id || ''}
-                            onChange={e => updateLine(i, { warehouse_id: e.target.value })}
+                            onChange={e => updateLine(i, { warehouse_id: e.target.value, sub_warehouse_id: '' })}
                             className="w-full px-2 py-1 rounded bg-background border border-input h-8"
                           >
                             <option value="">افتراضي</option>
                             {warehouses.map(w => <option key={w.id} value={w.id}>{w.name}</option>)}
+                          </select>
+                        ) : <span className="text-muted-foreground">-</span>}
+                      </td>
+                      <td className="px-2 py-1">
+                        {l.line_type === 'inventory' && l.warehouse_id ? (
+                          <select
+                            value={l.sub_warehouse_id || ''}
+                            onChange={e => updateLine(i, { sub_warehouse_id: e.target.value })}
+                            className="w-full px-2 py-1 rounded bg-background border border-input h-8"
+                          >
+                            <option value="">اختر المخزن الفرعي</option>
+                            {subWarehouses.filter(sw => sw.main_warehouse_id === l.warehouse_id).map(sw => 
+                              <option key={sw.id} value={sw.id}>{sw.name}</option>
+                            )}
                           </select>
                         ) : <span className="text-muted-foreground">-</span>}
                       </td>
@@ -778,17 +817,17 @@ export function PurchaseInvoices({ restaurantId, currency }: Props) {
                 </tbody>
                 <tfoot className="bg-muted/30 font-bold">
                   <tr>
-                    <td colSpan={7} className="px-2 py-2 text-left">المجموع</td>
+                    <td colSpan={8} className="px-2 py-2 text-left">المجموع</td>
                     <td className="px-2 py-2">{subTotal.toFixed(2)}</td>
                     <td></td>
                   </tr>
                   <tr>
-                    <td colSpan={7} className="px-2 py-2 text-left">الضريبة</td>
+                    <td colSpan={8} className="px-2 py-2 text-left">الضريبة</td>
                     <td className="px-2 py-2">{taxTotal.toFixed(2)}</td>
                     <td></td>
                   </tr>
                   <tr className="text-primary text-base">
-                    <td colSpan={7} className="px-2 py-2 text-left">الصافي</td>
+                    <td colSpan={8} className="px-2 py-2 text-left">الصافي</td>
                     <td className="px-2 py-2">{netTotal.toFixed(2)} {currency}</td>
                     <td></td>
                   </tr>
