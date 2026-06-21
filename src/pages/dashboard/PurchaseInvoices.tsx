@@ -387,9 +387,23 @@ export function PurchaseInvoices({ restaurantId, currency }: Props) {
           warehouse_location: l.warehouse_id || null,
         } as any);
 
-        // Apply costing method via service
+        // Apply costing method via service (using new inventoryCosting)
         try {
-          await inventoryCosting.addCostLayer(restaurantId, l.product_id, Number(l.quantity), Number(l.unit_cost), 'purchase', receipt.id);
+          // Use sub_warehouse_id if provided, otherwise use warehouse_id
+          const subWarehouseId = l.sub_warehouse_id || l.warehouse_id;
+          if (subWarehouseId) {
+            await inventoryCosting.addCostLayer(
+              l.product_id,
+              subWarehouseId,
+              Number(l.quantity),
+              Number(l.unit_cost),
+              'PURCHASE',
+              'PURCHASE_INVOICE',
+              receipt.id,
+              receipt.invoice_number,
+              'IFRS'
+            );
+          }
         } catch (e) { console.warn('cost layer:', e); }
 
         // Update product on-hand quantity + new cost (WAC) or last cost (FIFO/LIFO)

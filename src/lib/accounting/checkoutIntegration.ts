@@ -123,7 +123,7 @@ class CheckoutIntegration {
         return { subtotal: 0, taxAmount: 0, total: 0, isInclusive: true, taxLines: [] as any[] };
       });
 
-      const safeCogs = inventoryCosting.calculateOrderCOGS(inventoryItemsForCosting, context.restaurantId)
+      const safeCogs = this.calculateOrderCOGSNew(inventoryItemsForCosting, context.restaurantId)
         .catch((e) => {
           console.warn('[checkout] COGS calc failed:', e);
           return { totalCOGS: 0, itemsWithCost: [] as any[] };
@@ -566,6 +566,97 @@ class CheckoutIntegration {
     }));
 
     await supabase.from('inventory_consumption').insert(records as any);
+  }
+
+  // ============================================================
+  // NEW COGS CALCULATION (using new inventoryCosting)
+  // ============================================================
+
+  private async calculateOrderCOGSNew(
+    items: OrderItem[],
+    restaurantId: string
+  ): Promise<{ totalCOGS: number; itemsWithCost: (OrderItem & { cogs: number; unitCost: number })[] }> {
+    let totalCOGS = 0;
+    const itemsWithCost: (OrderItem & { cogs: number; unitCost: number })[] = [];
+
+    for (const item of items) {
+      const productId = (item as any).product_id || item.menu_item_id;
+      
+      if (!productId) {
+        itemsWithCost.push({ ...item, cogs: 0, unitCost: 0 });
+        continue;
+      }
+
+      try {
+        // Get item warehouse assignments to find sub_warehouse_id
+        const { data: assignments } = await supabase
+          .from('item_warehouse_assignments')
+          .select('sub_warehouse_id, costing_method, accounting_standard')
+          .eq('item_id', productId)
+          .eq('is_primary', true)
+          .limit(1);
+
+        if (!assignments || assignments.length === 0) {
+          // Fallback: use product cost_price
+          const { data: product } = await supabase
+            .from('products')
+            .select('cost_price')
+            .eq('id', productId)
+            .single();
+          
+          const unitCost = product?.cost_price || 0;
+          const cogs = unitCost * item.quantity;
+          totalCOGS += cogs;
+          itemsWithCost.push({ ...item, cogs, unitCost });
+          continue;
+        }
+
+        const assignment = assignments[0];
+        const subWarehouseId = assignment.sub_warehouse_id;
+        const costingMethod = assignment.costing_method as any;
+        const accountingStandard = assignment.accounting_standard as any;
+
+        if (subWarehouseId) {
+          const result = await inventoryCosting.calculateCost(
+            productId,
+            subWarehouseId,
+            item.quantity,
+            costingMethod,
+            accountingStandard
+          );
+          
+          totalCOGS += result.totalCost;
+          itemsWithCost.push({ ...item, cogs: result.totalCost, unitCost: result.avgUnitCost });
+        } else {
+          // Fallback: use product cost_price
+          const { data: product } = await supabase
+            .from('products')
+            .select('cost_price')
+            .eq('id', productId)
+            .single();
+          
+          const unitCost = product?.cost_price || 0;
+          const cogs = unitCost * item.quantity;
+          totalCOGS += cogs;
+          itemsWithCost.push({ ...item, cogs, unitCost });
+        }
+      } catch (error) {
+        console.warn('[checkout] COGS calc failed for item:', productId, error);
+        // Fallback: use product cost_price
+        const { data: product } = await supabase
+          .from('products')
+          .select('cost_price')
+          .eq('id', productId)
+          .single();
+        
+        const unitCost = product?.cost_price || 0;
+        const cogs = unitCost * item.quantity;
+        totalCOGS += cogs;
+        itemsWithCost.push({ ...item, cogs, unitCost });
+      }
+    }
+
+    return { totalCOGS, itemsWithCost };
   }
 
   // Business-specific helpers

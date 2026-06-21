@@ -7,6 +7,7 @@ import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Upload, Plus, Save, Trash2, Edit, ToggleLeft, ToggleRight, FileSpreadsheet, Image, ChefHat, Package } from 'lucide-react';
 import { RecipeManager } from './RecipeManager';
+import { ItemWarehouseAssignments } from '@/components/inventory/ItemWarehouseAssignments';
 import * as XLSX from 'xlsx';
 import type { MenuItem, Restaurant } from './types';
 import { AnimatePresence, motion } from 'framer-motion';
@@ -144,6 +145,8 @@ export function MenuTab({
       })
     };
 
+    let savedItemId: string | null = null;
+
     if (editingItem) {
       const { error } = await supabase.from(targetTable).update(payload).eq('id', editingItem.id);
       if (error) { 
@@ -151,16 +154,24 @@ export function MenuTab({
         toast.error('خطأ في التحديث: ' + error.message); 
         return; 
       }
+      savedItemId = editingItem.id;
       toast.success('تم تحديث العنصر');
     } else {
-      const { error } = await supabase.from(targetTable).insert(payload);
+      const { data, error } = await supabase.from(targetTable).insert(payload).select('id').single();
       if (error) { 
         console.error('Save error:', error);
         toast.error('خطأ في الإضافة: ' + error.message); 
         return; 
       }
+      savedItemId = data.id;
       toast.success('تم إضافة العنصر');
     }
+    
+    // Show warehouse assignments modal for inventory businesses
+    if (isInventoryBusiness && savedItemId) {
+      setWarehouseAssignmentItem({ id: savedItemId, name: menuForm.name });
+    }
+    
     resetForm();
     loadData();
   };
@@ -201,6 +212,9 @@ export function MenuTab({
 
   // Recipe Manager
   const [recipeModalItem, setRecipeModalItem] = useState<MenuItem | null>(null);
+  
+  // Warehouse Assignments
+  const [warehouseAssignmentItem, setWarehouseAssignmentItem] = useState<{id: string; name: string} | null>(null);
 
   // Bulk import via Excel/CSV
   const handleBulkImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -562,6 +576,30 @@ export function MenuTab({
               currency={restaurant.currency || 'ج.م'}
               onClose={() => setRecipeModalItem(null)}
             />
+          </div>
+        </div>
+      )}
+
+      {/* Warehouse Assignments Modal */}
+      {warehouseAssignmentItem && (
+        <div className="fixed inset-0 z-50 bg-background/80 backdrop-blur-sm flex items-center justify-center p-4" onClick={() => setWarehouseAssignmentItem(null)}>
+          <div onClick={e => e.stopPropagation()} className="w-full max-w-4xl max-h-[90vh] overflow-y-auto">
+            <div className="bg-card border border-border rounded-xl p-6 shadow-2xl">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-xl font-bold">ربط الصنف بالمخازن الفرعية</h3>
+                <button onClick={() => setWarehouseAssignmentItem(null)} className="text-muted-foreground hover:text-foreground">
+                  ✕
+                </button>
+              </div>
+              <p className="text-muted-foreground mb-4">الصنف: {warehouseAssignmentItem.name}</p>
+              <ItemWarehouseAssignments
+                itemId={warehouseAssignmentItem.id}
+                itemName={warehouseAssignmentItem.name}
+              />
+              <div className="mt-4 flex justify-end">
+                <Button onClick={() => setWarehouseAssignmentItem(null)}>إغلاق</Button>
+              </div>
+            </div>
           </div>
         </div>
       )}
