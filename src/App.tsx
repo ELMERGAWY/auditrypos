@@ -21,6 +21,7 @@ const DriverLogin = lazy(() => import("./pages/DriverLogin"));
 const DriverDashboard = lazy(() => import("./pages/DriverDashboard"));
 const TrackOrder = lazy(() => import("./pages/TrackOrder"));
 const Warehouses = lazy(() => import("./pages/Warehouses"));
+const SubWarehouses = lazy(() => import("./pages/SubWarehouses"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 
 const queryClient = new QueryClient();
@@ -73,6 +74,7 @@ const App = () => (
               <Route path="/register" element={<Register />} />
               <Route path="/dashboard" element={<Dashboard />} />
               <Route path="/warehouses" element={<Warehouses />} />
+              <Route path="/sub-warehouses" element={<SubWarehouses />} />
               <Route path="/qr-menu/:restaurantId" element={<QRMenu />} />
               <Route path="/store/:restaurantId" element={<StoreFront />} />
               <Route path="/payment" element={<Payment />} />
