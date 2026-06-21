@@ -17,6 +17,8 @@ import { toast } from 'sonner';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 
 import { hasFeature, type BusinessType } from '@/lib/businessTypes';
+import { WarehouseManager } from '@/components/inventory/WarehouseManager';
+import { ItemWarehouseAssignments } from '@/components/inventory/ItemWarehouseAssignments';
 
 interface Warehouse {
   id: string;
@@ -722,6 +724,28 @@ export function InventoryTab({ restaurantId, currency, businessType }: Props) {
                   </div>
                 </div>
               </div>
+
+              {/* Warehouse Management Components */}
+              {editingProduct && (
+                <div className="space-y-6 pt-4 border-t border-border">
+                  <div>
+                    <h4 className="font-bold text-sm mb-3 flex items-center gap-2 text-primary">
+                      <Truck className="w-4 h-4" /> إدارة المخازن
+                    </h4>
+                    <WarehouseManager />
+                  </div>
+                  
+                  <div>
+                    <h4 className="font-bold text-sm mb-3 flex items-center gap-2 text-primary">
+                      <Package className="w-4 h-4" /> ارتباطات الصنف بالمخازن
+                    </h4>
+                    <ItemWarehouseAssignments 
+                      itemId={editingProduct.id} 
+                      itemName={editingProduct.name} 
+                    />
+                  </div>
+                </div>
+              )}
               
               <div className="flex gap-3 pt-4">
                 <Button onClick={handleSave} className="flex-1 h-12 rounded-2xl gradient-bg text-primary-foreground border-0 text-sm font-bold shadow-lg shadow-primary/20">
