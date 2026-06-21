@@ -12,6 +12,7 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
@@ -56,6 +57,14 @@ interface StockMovement {
   created_at: string;
 }
 
+interface ItemType {
+  id: string;
+  name: string;
+  name_ar: string;
+  code: string;
+  is_active: boolean;
+}
+
 interface Props {
   restaurantId: string;
   currency: string;
@@ -82,11 +91,12 @@ export function InventoryTab({ restaurantId, currency, businessType }: Props) {
   const [form, setForm] = useState({
     name: '', barcode: '', sku: '', category: 'عام', price: '', cost_price: '',
     quantity: '', min_quantity: '5', unit: 'قطعة', image: '📦', expiry_date: '',
-    secondary_unit: '', unit_conversion_factor: '', batch_number: '',
+    secondary_unit: '', unit_conversion_factor: '', batch_number: '', item_type_id: '',
   });
   const [filterCategory, setFilterCategory] = useState('all');
   const [projects, setProjects] = useState<any[]>([]);
   const [selectedProjectId, setSelectedProjectId] = useState<string>('');
+  const [itemTypes, setItemTypes] = useState<ItemType[]>([]);
 
   const load = async () => {
     // Load Products
@@ -96,6 +106,10 @@ export function InventoryTab({ restaurantId, currency, businessType }: Props) {
     // Load Warehouses
     const { data: whData } = await supabase.from('warehouses').select('*').eq('restaurant_id', restaurantId).order('name');
     setWarehouses((whData || []) as Warehouse[]);
+
+    // Load Item Types
+    const { data: itemTypeData } = await supabase.from('item_types').select('*').eq('is_active', true);
+    setItemTypes((itemTypeData || []) as ItemType[]);
 
     if (businessType === 'contracting' || hasFeature(businessType, 'projects')) {
       const { data: projData } = await supabase.from('projects').select('id, name').eq('restaurant_id', restaurantId);
@@ -129,6 +143,7 @@ export function InventoryTab({ restaurantId, currency, businessType }: Props) {
       expiry_date: form.expiry_date || null,
       secondary_unit: form.secondary_unit || '',
       unit_conversion_factor: Number(form.unit_conversion_factor) || 1,
+      item_type_id: form.item_type_id || null,
     };
     try {
       if (editingProduct) {
@@ -233,7 +248,7 @@ export function InventoryTab({ restaurantId, currency, businessType }: Props) {
 
   const resetForm = () => {
     setShowForm(false); setEditingProduct(null); setPricingMode('fixed'); setMarkupValue('');
-    setForm({ name: '', barcode: '', sku: '', category: 'عام', price: '', cost_price: '', quantity: '', min_quantity: '5', unit: 'قطعة', image: '📦', expiry_date: '', secondary_unit: '', unit_conversion_factor: '', batch_number: '' });
+    setForm({ name: '', barcode: '', sku: '', category: 'عام', price: '', cost_price: '', quantity: '', min_quantity: '5', unit: 'قطعة', image: '📦', expiry_date: '', secondary_unit: '', unit_conversion_factor: '', batch_number: '', item_type_id: '' });
   };
 
   const calcSellingPrice = (costStr: string) => {
@@ -253,6 +268,7 @@ export function InventoryTab({ restaurantId, currency, businessType }: Props) {
       secondary_unit: p.secondary_unit || '',
       unit_conversion_factor: String(p.unit_conversion_factor || 1),
       batch_number: (p as any).batch_number || '',
+      item_type_id: (p as any).item_type_id || '',
     });
     setShowForm(true);
   };
@@ -703,6 +719,24 @@ export function InventoryTab({ restaurantId, currency, businessType }: Props) {
                   <Input placeholder="مثال: مجمدات" value={form.category} onChange={e => setForm(f => ({ ...f, category: e.target.value }))} className="h-11 rounded-xl" list="cat-list" />
                 </div>
                 <div>
+                  <Label className="text-xs mb-1 block">نوع الصنف</Label>
+                  <Select
+                    value={form.item_type_id}
+                    onValueChange={(value) => setForm(f => ({ ...f, item_type_id: value }))}
+                  >
+                    <SelectTrigger className="h-11 rounded-xl">
+                      <SelectValue placeholder="اختر نوع الصنف" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {itemTypes.map(type => (
+                        <SelectItem key={type.id} value={type.id}>
+                          {type.name_ar || type.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
                   <Label className="text-xs mb-1 block">وحدة القياس</Label>
                   <Input placeholder="كيلو، علبة، لتر" value={form.unit} onChange={e => setForm(f => ({ ...f, unit: e.target.value }))} className="h-11 rounded-xl" />
                 </div>
@@ -739,10 +773,26 @@ export function InventoryTab({ restaurantId, currency, businessType }: Props) {
                     <h4 className="font-bold text-sm mb-3 flex items-center gap-2 text-primary">
                       <Package className="w-4 h-4" /> ارتباطات الصنف بالمخازن
                     </h4>
-                    <ItemWarehouseAssignments 
-                      itemId={editingProduct.id} 
-                      itemName={editingProduct.name} 
-                    />
+                    {(() => {
+                      const selectedItemType = itemTypes.find(t => t.id === form.item_type_id);
+                      const shouldHideWarehouseAssignments = selectedItemType && 
+                        (selectedItemType.code === 'NON_INVENTORY' || selectedItemType.code === 'SERVICE');
+                      
+                      if (shouldHideWarehouseAssignments) {
+                        return (
+                          <div className="text-sm text-muted-foreground p-3 bg-secondary/30 rounded-xl">
+                            هذا النوع من الأصناف لا يتطلب إدارة مخزون
+                          </div>
+                        );
+                      }
+                      
+                      return (
+                        <ItemWarehouseAssignments 
+                          itemId={editingProduct.id} 
+                          itemName={editingProduct.name} 
+                        />
+                      );
+                    })()}
                   </div>
                 </div>
               )}
