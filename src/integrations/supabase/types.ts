@@ -9786,42 +9786,84 @@ export type Database = {
       warehouses: {
         Row: {
           id: string
-          code: string | null
+          code: string
           name: string
           name_ar: string | null
-          type: string | null
-          accounting_standard: string | null
-          parent_id: string | null
-          location: string | null
-          is_default: boolean | null
-          restaurant_id: string
-          created_at: string | null
+          type: string
+          warehouse_category: string
+          parent_warehouse_id: string | null
+          address: string | null
+          city: string | null
+          country: string
+          phone: string | null
+          email: string | null
+          manager_name: string | null
+          is_active: boolean
+          is_default: boolean
+          currency: string
+          accounting_account_code: string | null
+          inventory_account_code: string | null
+          cogs_account_code: string | null
+          accounting_standard: string
+          notes: string | null
+          created_by: string | null
+          created_at: string
+          updated_at: string
+          deleted_at: string | null
         }
         Insert: {
           id?: string
-          code?: string
+          code: string
           name: string
-          name_ar?: string
+          name_ar?: string | null
           type?: string
+          warehouse_category?: string
+          parent_warehouse_id?: string | null
+          address?: string | null
+          city?: string | null
+          country?: string
+          phone?: string | null
+          email?: string | null
+          manager_name?: string | null
+          is_active?: boolean
+          is_default?: boolean
+          currency?: string
+          accounting_account_code?: string | null
+          inventory_account_code?: string | null
+          cogs_account_code?: string | null
           accounting_standard?: string
-          parent_id?: string
-          location?: string | null
-          is_default?: boolean | null
-          restaurant_id: string
-          created_at?: string | null
+          notes?: string | null
+          created_by?: string | null
+          created_at?: string
+          updated_at?: string
+          deleted_at?: string | null
         }
         Update: {
           id?: string
           code?: string
           name?: string
-          name_ar?: string
+          name_ar?: string | null
           type?: string
+          warehouse_category?: string
+          parent_warehouse_id?: string | null
+          address?: string | null
+          city?: string | null
+          country?: string
+          phone?: string | null
+          email?: string | null
+          manager_name?: string | null
+          is_active?: boolean
+          is_default?: boolean
+          currency?: string
+          accounting_account_code?: string | null
+          inventory_account_code?: string | null
+          cogs_account_code?: string | null
           accounting_standard?: string
-          parent_id?: string
-          location?: string | null
-          is_default?: boolean | null
-          restaurant_id?: string
-          created_at?: string | null
+          notes?: string | null
+          created_by?: string | null
+          created_at?: string
+          updated_at?: string
+          deleted_at?: string | null
         }
         Relationships: [
           {

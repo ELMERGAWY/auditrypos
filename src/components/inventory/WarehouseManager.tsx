@@ -18,12 +18,17 @@ interface Warehouse {
   id: string;
   code: string;
   name: string;
-  name_ar: string;
-  type: WarehouseType;
-  accounting_standard: AccountingStandard;
-  parent_id: string | null;
+  name_ar: string | null;
+  type: string;
+  warehouse_category: string;
+  parent_warehouse_id: string | null;
   parent?: Warehouse;
+  is_active: boolean;
+  is_default: boolean;
+  currency: string;
+  accounting_standard: string;
   created_at: string;
+  updated_at: string;
 }
 
 interface CategoryGroup {
@@ -79,9 +84,10 @@ export function WarehouseManager() {
     code: '',
     name: '',
     name_ar: '',
-    type: 'MAIN' as WarehouseType,
-    accounting_standard: 'IFRS' as AccountingStandard,
-    parent_id: '' as string
+    type: 'MAIN',
+    warehouse_category: 'STANDARD',
+    accounting_standard: 'IFRS',
+    parent_warehouse_id: '' as string
   });
   const [mainWarehouses, setMainWarehouses] = useState<Warehouse[]>([]);
 
@@ -101,11 +107,11 @@ export function WarehouseManager() {
       
       const warehousesWithParents = await Promise.all(
         (data || []).map(async (warehouse: Warehouse) => {
-          if (warehouse.parent_id) {
+          if (warehouse.parent_warehouse_id) {
             const { data: parent } = await supabase
               .from('warehouses')
               .select('*')
-              .eq('id', warehouse.parent_id)
+              .eq('id', warehouse.parent_warehouse_id)
               .single();
             return { ...warehouse, parent };
           }
@@ -139,8 +145,9 @@ export function WarehouseManager() {
           name: formData.name,
           name_ar: formData.name_ar,
           type: formData.type,
+          warehouse_category: formData.warehouse_category,
           accounting_standard: formData.accounting_standard,
-          parent_id: formData.parent_id || null
+          parent_warehouse_id: formData.parent_warehouse_id || null
         });
 
       if (error) throw error;
@@ -152,8 +159,9 @@ export function WarehouseManager() {
         name: '',
         name_ar: '',
         type: 'MAIN',
+        warehouse_category: 'STANDARD',
         accounting_standard: 'IFRS',
-        parent_id: ''
+        parent_warehouse_id: ''
       });
       fetchWarehouses();
     } catch (error) {
@@ -181,7 +189,7 @@ export function WarehouseManager() {
     }
   };
 
-  const getWarehousesByType = (types: WarehouseType[]) => {
+  const getWarehousesByType = (types: string[]) => {
     return warehouses.filter(w => types.includes(w.type));
   };
 
@@ -241,7 +249,7 @@ export function WarehouseManager() {
                 <label className="text-sm font-medium">النوع *</label>
                 <Select
                   value={formData.type}
-                  onValueChange={(value: WarehouseType) => setFormData({ ...formData, type: value })}
+                  onValueChange={(value: string) => setFormData({ ...formData, type: value })}
                 >
                   <SelectTrigger>
                     <SelectValue />
@@ -259,7 +267,7 @@ export function WarehouseManager() {
                 <label className="text-sm font-medium">المعيار المحاسبي *</label>
                 <Select
                   value={formData.accounting_standard}
-                  onValueChange={(value: AccountingStandard) => setFormData({ ...formData, accounting_standard: value })}
+                  onValueChange={(value: string) => setFormData({ ...formData, accounting_standard: value })}
                 >
                   <SelectTrigger>
                     <SelectValue />
@@ -277,8 +285,8 @@ export function WarehouseManager() {
                 <div className="space-y-2">
                   <label className="text-sm font-medium">المخزن الرئيسي</label>
                   <Select
-                    value={formData.parent_id}
-                    onValueChange={(value) => setFormData({ ...formData, parent_id: value })}
+                    value={formData.parent_warehouse_id}
+                    onValueChange={(value) => setFormData({ ...formData, parent_warehouse_id: value })}
                   >
                     <SelectTrigger>
                       <SelectValue placeholder="اختر المخزن الرئيسي" />
