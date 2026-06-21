@@ -254,6 +254,7 @@ export function SalesOrders({ restaurantId, currency }: Props) {
         .order('order_date', { ascending: false });
 
       if (error) {
+        console.error('Error loading sales orders:', error);
         if (error.code === 'PGRST116' || error.message.includes('does not exist') || error.message.includes('schema cache')) {
            console.warn('Sales orders table not found, please create it in Supabase.');
            setOrders([]);
@@ -261,8 +262,10 @@ export function SalesOrders({ restaurantId, currency }: Props) {
         }
         throw error;
       }
+      console.log('Loaded sales orders:', data?.length || 0);
       setOrders(data || []);
     } catch (error: any) {
+      console.error('Failed to load sales orders:', error);
       toast.error('فشل تحميل أوامر البيع: ' + error.message);
     } finally {
       setLoading(false);

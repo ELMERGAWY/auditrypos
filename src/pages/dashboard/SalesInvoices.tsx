@@ -74,13 +74,17 @@ export function SalesInvoices({ restaurantId, currency, restaurant, isSuperAdmin
         .from('orders')
         .select('*')
         .eq('restaurant_id', restaurantId)
-        .eq('status', 'completed')
         .order('created_at', { ascending: false })
         .limit(500);
 
-      if (error) throw error;
+      if (error) {
+        console.error('Error loading invoices:', error);
+        throw error;
+      }
+      console.log('Loaded invoices:', data?.length || 0);
       setInvoices(data || []);
     } catch (error: any) {
+      console.error('Failed to load invoices:', error);
       toast.error('فشل تحميل الفواتير: ' + error.message);
     } finally {
       setLoading(false);
@@ -159,7 +163,17 @@ export function SalesInvoices({ restaurantId, currency, restaurant, isSuperAdmin
       const paidAmount = parseFloat(form.paid_amount) || amount;
       const discount = parseFloat(form.discount) || 0;
 
-      const { error: orderError } = await supabase
+      console.log('Updating invoice:', editingInvoice.id, 'with data:', {
+        customer_name: form.customer_name,
+        customer_ref: form.customer_ref,
+        total: amount,
+        paid_amount: paidAmount,
+        discount,
+        notes: form.notes,
+        payment_method: form.payment_method
+      });
+
+      const { error: orderError, data: updatedData } = await supabase
         .from('orders')
         .update({
           customer_name: form.customer_name,
@@ -175,6 +189,7 @@ export function SalesInvoices({ restaurantId, currency, restaurant, isSuperAdmin
         .single();
 
       if (orderError) throw orderError;
+      console.log('Update result:', updatedData);
 
       for (const item of editItems) {
         await supabase.from('order_items').update({
@@ -189,8 +204,9 @@ export function SalesInvoices({ restaurantId, currency, restaurant, isSuperAdmin
       setEditingInvoice(null);
       setEditItems([]);
       setForm({ customer_name: '', amount: '', description: '', payment_method: 'cash', customer_ref: '', paid_amount: '', discount: '', notes: '' });
-      loadInvoices();
+      await loadInvoices();
     } catch (e: any) {
+      console.error('Error updating invoice:', e);
       toast.error('فشل تحديث الفاتورة: ' + e.message);
     }
   };

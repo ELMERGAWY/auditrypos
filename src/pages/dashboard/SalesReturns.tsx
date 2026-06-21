@@ -111,8 +111,12 @@ export function SalesReturnsManager({ restaurantId, currency }: Props) {
         .eq('restaurant_id', restaurantId)
         .order('return_date', { ascending: false });
 
-      if (error) throw error;
+      if (error) {
+        console.error('Error loading sales returns:', error);
+        throw error;
+      }
 
+      console.log('Loaded sales returns:', data?.length || 0);
       const formattedReturns: SalesReturn[] = (data || []).map((r: any) => ({
         id: r.id,
         return_number: r.return_number,
@@ -129,6 +133,7 @@ export function SalesReturnsManager({ restaurantId, currency }: Props) {
 
       setReturns(formattedReturns);
     } catch (error: any) {
+      console.error('Failed to load sales returns:', error);
       toast.error('فشل تحميل مردودات المبيعات: ' + error.message);
     } finally {
       setLoading(false);
