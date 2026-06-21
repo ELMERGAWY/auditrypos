@@ -11,8 +11,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Plus, Trash2, Building2, Package, Factory, Wrench, FolderTree, AlertCircle } from 'lucide-react';
 import { toast } from 'sonner';
 
-type WarehouseType = 'MAIN' | 'SUB' | 'RAW_MATERIALS' | 'WORK_IN_PROGRESS' | 'FINISHED_GOODS' | 'SERVICE' | 'PROJECT';
-type AccountingStandard = 'IFRS' | 'EAS' | 'US_GAAP';
+type WarehouseType = 'main' | 'sub';
+type AccountingStandard = 'EAS' | 'IFRS' | 'US_GAAP';
 
 interface Warehouse {
   id: string;
@@ -20,54 +20,29 @@ interface Warehouse {
   name: string;
   name_ar: string | null;
   type: string;
-  warehouse_category: string;
   parent_warehouse_id: string | null;
   parent?: Warehouse;
+  address?: string;
+  city?: string;
+  country?: string;
+  phone?: string;
+  email?: string;
+  manager_name?: string;
   is_active: boolean;
   is_default: boolean;
   currency: string;
   accounting_standard: string;
+  accounting_account_code?: string;
+  inventory_account_code?: string;
+  cogs_account_code?: string;
+  notes?: string;
   created_at: string;
   updated_at: string;
 }
 
-interface CategoryGroup {
-  title: string;
-  icon: React.ReactNode;
-  types: WarehouseType[];
-}
-
-const categoryGroups: CategoryGroup[] = [
-  {
-    title: 'تقليدي',
-    icon: <Building2 className="h-5 w-5" />,
-    types: ['MAIN', 'SUB']
-  },
-  {
-    title: 'تصنيعي',
-    icon: <Factory className="h-5 w-5" />,
-    types: ['RAW_MATERIALS', 'WORK_IN_PROGRESS', 'FINISHED_GOODS']
-  },
-  {
-    title: 'خدمي',
-    icon: <Wrench className="h-5 w-5" />,
-    types: ['SERVICE']
-  },
-  {
-    title: 'مشاريع',
-    icon: <Package className="h-5 w-5" />,
-    types: ['PROJECT']
-  }
-];
-
 const warehouseTypeLabels: Record<WarehouseType, string> = {
-  MAIN: 'رئيسي',
-  SUB: 'فرعي',
-  RAW_MATERIALS: 'مواد خام',
-  WORK_IN_PROGRESS: 'تحت التصنيع',
-  FINISHED_GOODS: 'منتج تام',
-  SERVICE: 'خدمي',
-  PROJECT: 'مشروع'
+  main: 'رئيسي',
+  sub: 'فرعي'
 };
 
 const accountingStandardLabels: Record<AccountingStandard, string> = {
@@ -84,10 +59,20 @@ export function WarehouseManager() {
     code: '',
     name: '',
     name_ar: '',
-    type: 'MAIN',
-    warehouse_category: 'STANDARD',
-    accounting_standard: 'IFRS',
-    parent_warehouse_id: '' as string
+    type: 'main' as WarehouseType,
+    accounting_standard: 'IFRS' as AccountingStandard,
+    parent_warehouse_id: '' as string,
+    address: '',
+    city: '',
+    country: 'Egypt',
+    phone: '',
+    email: '',
+    manager_name: '',
+    currency: 'EGP',
+    accounting_account_code: '',
+    inventory_account_code: '',
+    cogs_account_code: '',
+    notes: ''
   });
   const [mainWarehouses, setMainWarehouses] = useState<Warehouse[]>([]);
 
@@ -120,7 +105,7 @@ export function WarehouseManager() {
       );
 
       setWarehouses(warehousesWithParents);
-      setMainWarehouses((data || []).filter((w: Warehouse) => w.type === 'MAIN'));
+      setMainWarehouses((data || []).filter((w: Warehouse) => w.type === 'main'));
     } catch (error) {
       console.error('Error fetching warehouses:', error);
       toast.error('فشل في تحميل بيانات المخازن');
@@ -145,9 +130,19 @@ export function WarehouseManager() {
           name: formData.name,
           name_ar: formData.name_ar,
           type: formData.type,
-          warehouse_category: formData.warehouse_category,
           accounting_standard: formData.accounting_standard,
-          parent_warehouse_id: formData.parent_warehouse_id || null
+          parent_warehouse_id: formData.parent_warehouse_id || null,
+          address: formData.address || null,
+          city: formData.city || null,
+          country: formData.country || 'Egypt',
+          phone: formData.phone || null,
+          email: formData.email || null,
+          manager_name: formData.manager_name || null,
+          currency: formData.currency || 'EGP',
+          accounting_account_code: formData.accounting_account_code || null,
+          inventory_account_code: formData.inventory_account_code || null,
+          cogs_account_code: formData.cogs_account_code || null,
+          notes: formData.notes || null
         });
 
       if (error) throw error;
@@ -158,10 +153,20 @@ export function WarehouseManager() {
         code: '',
         name: '',
         name_ar: '',
-        type: 'MAIN',
-        warehouse_category: 'STANDARD',
+        type: 'main',
         accounting_standard: 'IFRS',
-        parent_warehouse_id: ''
+        parent_warehouse_id: '',
+        address: '',
+        city: '',
+        country: 'Egypt',
+        phone: '',
+        email: '',
+        manager_name: '',
+        currency: 'EGP',
+        accounting_account_code: '',
+        inventory_account_code: '',
+        cogs_account_code: '',
+        notes: ''
       });
       fetchWarehouses();
     } catch (error) {
@@ -281,7 +286,7 @@ export function WarehouseManager() {
                   </SelectContent>
                 </Select>
               </div>
-              {formData.type === 'SUB' && (
+              {formData.type === 'sub' && (
                 <div className="space-y-2">
                   <label className="text-sm font-medium">المخزن الرئيسي</label>
                   <Select
@@ -318,16 +323,16 @@ export function WarehouseManager() {
         </Alert>
       ) : (
         <div className="space-y-6">
-          {categoryGroups.map((group) => {
-            const groupWarehouses = getWarehousesByType(group.types);
-            if (groupWarehouses.length === 0) return null;
+          {(['main', 'sub'] as WarehouseType[]).map((type) => {
+            const typeWarehouses = warehouses.filter(w => w.type === type);
+            if (typeWarehouses.length === 0) return null;
 
             return (
-              <Card key={group.title}>
+              <Card key={type}>
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
-                    {group.icon}
-                    {group.title}
+                    <Building2 className="h-5 w-5" />
+                    {warehouseTypeLabels[type]}
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
@@ -337,27 +342,25 @@ export function WarehouseManager() {
                         <TableHead>الرمز</TableHead>
                         <TableHead>الاسم</TableHead>
                         <TableHead>الاسم بالعربية</TableHead>
-                        <TableHead>النوع</TableHead>
                         <TableHead>المعيار المحاسبي</TableHead>
+                        <TableHead>العملة</TableHead>
                         <TableHead>المخزن الرئيسي</TableHead>
                         <TableHead>إجراءات</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {groupWarehouses.map((warehouse) => (
+                      {typeWarehouses.map((warehouse) => (
                         <TableRow key={warehouse.id}>
                           <TableCell className="font-medium">{warehouse.code}</TableCell>
                           <TableCell>{warehouse.name}</TableCell>
                           <TableCell dir="rtl">{warehouse.name_ar}</TableCell>
                           <TableCell>
-                            <Badge variant="outline">
-                              {warehouseTypeLabels[warehouse.type]}
+                            <Badge variant="secondary">
+                              {accountingStandardLabels[warehouse.accounting_standard as AccountingStandard]}
                             </Badge>
                           </TableCell>
                           <TableCell>
-                            <Badge variant="secondary">
-                              {accountingStandardLabels[warehouse.accounting_standard]}
-                            </Badge>
+                            <span className="text-sm">{warehouse.currency}</span>
                           </TableCell>
                           <TableCell>
                             {warehouse.parent ? (

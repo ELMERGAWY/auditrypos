@@ -431,26 +431,59 @@ export function SalesInvoices({ restaurantId, currency, restaurant, isSuperAdmin
                   <div className="space-y-2 max-h-40 overflow-y-auto border rounded-lg p-2">
                     <Label>بنود الفاتورة</Label>
                     {editItems.map((item, idx) => (
-                      <div key={item.id || idx} className="grid grid-cols-3 gap-2 text-sm">
-                        <Input value={item.menu_item_name || ''} onChange={e => {
-                          const next = [...editItems];
-                          next[idx] = { ...item, menu_item_name: e.target.value };
-                          setEditItems(next);
-                        }} />
-                        <Input type="number" value={item.quantity || 0} onChange={e => {
-                          const next = [...editItems];
-                          next[idx] = { ...item, quantity: Number(e.target.value) };
-                          setEditItems(next);
-                          const newTotal = next.reduce((sum, it) => sum + (Number(it.price || 0) * Number(it.quantity || 0)), 0);
-                          setForm(f => ({ ...f, amount: String(newTotal), paid_amount: String(newTotal) }));
-                        }} />
-                        <Input type="number" value={item.price || 0} onChange={e => {
-                          const next = [...editItems];
-                          next[idx] = { ...item, price: Number(e.target.value) };
-                          setEditItems(next);
-                          const newTotal = next.reduce((sum, it) => sum + (Number(it.price || 0) * Number(it.quantity || 0)), 0);
-                          setForm(f => ({ ...f, amount: String(newTotal), paid_amount: String(newTotal) }));
-                        }} />
+                      <div key={item.id || idx} className="grid grid-cols-4 gap-2 text-sm">
+                        <Input 
+                          value={item.menu_item_name || ''} 
+                          onChange={e => {
+                            const next = [...editItems];
+                            next[idx] = { ...item, menu_item_name: e.target.value };
+                            setEditItems(next);
+                          }} 
+                          placeholder="اسم الصنف"
+                        />
+                        <Input 
+                          type="number" 
+                          value={item.quantity || 0} 
+                          onChange={e => {
+                            const newQuantity = Number(e.target.value) || 0;
+                            const next = [...editItems];
+                            next[idx] = { ...item, quantity: newQuantity };
+                            setEditItems(next);
+                            const newTotal = next.reduce((sum, it) => sum + (Number(it.price || 0) * Number(it.quantity || 0)), 0);
+                            setForm(f => ({ ...f, amount: String(newTotal), paid_amount: String(newTotal) }));
+                          }} 
+                          placeholder="الكمية"
+                        />
+                        <Input 
+                          type="number" 
+                          value={item.price || 0} 
+                          onChange={e => {
+                            const newPrice = Number(e.target.value) || 0;
+                            const next = [...editItems];
+                            next[idx] = { ...item, price: newPrice };
+                            setEditItems(next);
+                            const newTotal = next.reduce((sum, it) => sum + (Number(it.price || 0) * Number(it.quantity || 0)), 0);
+                            setForm(f => ({ ...f, amount: String(newTotal), paid_amount: String(newTotal) }));
+                          }} 
+                          placeholder="السعر"
+                        />
+                        <Input 
+                          type="number" 
+                          value={(Number(item.price || 0) * Number(item.quantity || 0)).toFixed(2)} 
+                          onChange={e => {
+                            const newTotal = Number(e.target.value) || 0;
+                            const currentPrice = Number(item.price) || 0;
+                            if (currentPrice > 0) {
+                              const calculatedQuantity = newTotal / currentPrice;
+                              const next = [...editItems];
+                              next[idx] = { ...item, quantity: calculatedQuantity };
+                              setEditItems(next);
+                              const newFormTotal = next.reduce((sum, it) => sum + (Number(it.price || 0) * Number(it.quantity || 0)), 0);
+                              setForm(f => ({ ...f, amount: String(newFormTotal), paid_amount: String(newFormTotal) }));
+                            }
+                          }} 
+                          placeholder="الإجمالي (اكتب لحساب الكمية)"
+                        />
                       </div>
                     ))}
                   </div>

@@ -22,7 +22,7 @@ interface MainWarehouse {
 
 interface SubWarehouse {
   id: string;
-  main_warehouse_id: string;
+  warehouse_id: string;
   code: string;
   name: string;
   name_ar: string;
@@ -31,7 +31,16 @@ interface SubWarehouse {
   bin?: string;
   floor?: string;
   building?: string;
-  main_warehouse?: MainWarehouse;
+  capacity_quantity?: number;
+  capacity_volume?: number;
+  is_active: boolean;
+  is_default: boolean;
+  temperature_control?: boolean;
+  humidity_control?: boolean;
+  security_level?: string;
+  accounting_account_code?: string;
+  notes?: string;
+  warehouse?: MainWarehouse;
   created_at: string;
 }
 
@@ -42,7 +51,7 @@ export default function SubWarehouses() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingSubWarehouse, setEditingSubWarehouse] = useState<SubWarehouse | null>(null);
   const [formData, setFormData] = useState({
-    main_warehouse_id: '',
+    warehouse_id: '',
     code: '',
     name: '',
     name_ar: '',
@@ -50,7 +59,14 @@ export default function SubWarehouses() {
     aisle: '',
     bin: '',
     floor: '',
-    building: ''
+    building: '',
+    capacity_quantity: '',
+    capacity_volume: '',
+    temperature_control: false,
+    humidity_control: false,
+    security_level: 'normal',
+    accounting_account_code: '',
+    notes: ''
   });
 
   useEffect(() => {
@@ -63,7 +79,7 @@ export default function SubWarehouses() {
       const { data, error } = await supabase
         .from('warehouses')
         .select('*')
-        .eq('type', 'MAIN')
+        .eq('type', 'main')
         .order('name_ar');
 
       if (error) throw error;
@@ -79,7 +95,7 @@ export default function SubWarehouses() {
       setLoading(true);
       const { data, error } = await supabase
         .from('sub_warehouses')
-        .select('*, main_warehouse:warehouses(*)')
+        .select('*, warehouse:warehouses(*)')
         .order('created_at', { ascending: false });
 
       if (error) throw error;
@@ -95,14 +111,14 @@ export default function SubWarehouses() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!formData.main_warehouse_id || !formData.code || !formData.name || !formData.name_ar) {
+    if (!formData.warehouse_id || !formData.code || !formData.name || !formData.name_ar) {
       toast.error('يرجى ملء جميع الحقول المطلوبة');
       return;
     }
 
     try {
       const data: any = {
-        main_warehouse_id: formData.main_warehouse_id,
+        warehouse_id: formData.warehouse_id,
         code: formData.code,
         name: formData.name,
         name_ar: formData.name_ar,
@@ -111,6 +127,13 @@ export default function SubWarehouses() {
         bin: formData.bin || null,
         floor: formData.floor || null,
         building: formData.building || null,
+        capacity_quantity: formData.capacity_quantity ? parseFloat(formData.capacity_quantity) : null,
+        capacity_volume: formData.capacity_volume ? parseFloat(formData.capacity_volume) : null,
+        temperature_control: formData.temperature_control,
+        humidity_control: formData.humidity_control,
+        security_level: formData.security_level,
+        accounting_account_code: formData.accounting_account_code || null,
+        notes: formData.notes || null,
       };
 
       if (editingSubWarehouse) {
@@ -161,7 +184,7 @@ export default function SubWarehouses() {
   const handleEdit = (subWarehouse: SubWarehouse) => {
     setEditingSubWarehouse(subWarehouse);
     setFormData({
-      main_warehouse_id: subWarehouse.main_warehouse_id,
+      warehouse_id: subWarehouse.warehouse_id,
       code: subWarehouse.code,
       name: subWarehouse.name,
       name_ar: subWarehouse.name_ar,
@@ -170,6 +193,13 @@ export default function SubWarehouses() {
       bin: subWarehouse.bin || '',
       floor: subWarehouse.floor || '',
       building: subWarehouse.building || '',
+      capacity_quantity: subWarehouse.capacity_quantity?.toString() || '',
+      capacity_volume: subWarehouse.capacity_volume?.toString() || '',
+      temperature_control: subWarehouse.temperature_control || false,
+      humidity_control: subWarehouse.humidity_control || false,
+      security_level: subWarehouse.security_level || 'normal',
+      accounting_account_code: subWarehouse.accounting_account_code || '',
+      notes: subWarehouse.notes || '',
     });
     setDialogOpen(true);
   };
@@ -177,7 +207,7 @@ export default function SubWarehouses() {
   const resetForm = () => {
     setEditingSubWarehouse(null);
     setFormData({
-      main_warehouse_id: '',
+      warehouse_id: '',
       code: '',
       name: '',
       name_ar: '',
@@ -185,7 +215,14 @@ export default function SubWarehouses() {
       aisle: '',
       bin: '',
       floor: '',
-      building: ''
+      building: '',
+      capacity_quantity: '',
+      capacity_volume: '',
+      temperature_control: false,
+      humidity_control: false,
+      security_level: 'normal',
+      accounting_account_code: '',
+      notes: ''
     });
   };
 
@@ -238,8 +275,8 @@ export default function SubWarehouses() {
                     <div className="col-span-2">
                       <Label className="text-sm mb-1 block">المخزن الرئيسي *</Label>
                       <Select
-                        value={formData.main_warehouse_id}
-                        onValueChange={(value) => setFormData({ ...formData, main_warehouse_id: value })}
+                        value={formData.warehouse_id}
+                        onValueChange={(value) => setFormData({ ...formData, warehouse_id: value })}
                       >
                         <SelectTrigger>
                           <SelectValue placeholder="اختر المخزن الرئيسي" />
@@ -331,6 +368,85 @@ export default function SubWarehouses() {
                     </div>
                   </div>
 
+                  <div className="space-y-3 pt-4 border-t border-border">
+                    <h4 className="font-bold text-sm flex items-center gap-2 text-primary">
+                      <Package className="w-4 h-4" /> السعة والتحكم
+                    </h4>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <Label className="text-sm mb-1 block">السعة (الكمية)</Label>
+                        <Input
+                          type="number"
+                          value={formData.capacity_quantity}
+                          onChange={(e) => setFormData({ ...formData, capacity_quantity: e.target.value })}
+                          placeholder="0"
+                        />
+                      </div>
+                      <div>
+                        <Label className="text-sm mb-1 block">السعة (الحجم م³)</Label>
+                        <Input
+                          type="number"
+                          step="0.001"
+                          value={formData.capacity_volume}
+                          onChange={(e) => setFormData({ ...formData, capacity_volume: e.target.value })}
+                          placeholder="0.000"
+                        />
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="checkbox"
+                          id="temp-control"
+                          checked={formData.temperature_control}
+                          onChange={(e) => setFormData({ ...formData, temperature_control: e.target.checked })}
+                          className="rounded"
+                        />
+                        <Label htmlFor="temp-control" className="text-sm">تحكم في درجة الحرارة</Label>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="checkbox"
+                          id="humidity-control"
+                          checked={formData.humidity_control}
+                          onChange={(e) => setFormData({ ...formData, humidity_control: e.target.checked })}
+                          className="rounded"
+                        />
+                        <Label htmlFor="humidity-control" className="text-sm">تحكم في الرطوبة</Label>
+                      </div>
+                      <div>
+                        <Label className="text-sm mb-1 block">مستوى الأمان</Label>
+                        <Select
+                          value={formData.security_level}
+                          onValueChange={(value) => setFormData({ ...formData, security_level: value })}
+                        >
+                          <SelectTrigger>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="normal">عادي</SelectItem>
+                            <SelectItem value="high">عالي</SelectItem>
+                            <SelectItem value="restricted">مقيد</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div>
+                        <Label className="text-sm mb-1 block">كود الحساب المحاسبي</Label>
+                        <Input
+                          value={formData.accounting_account_code}
+                          onChange={(e) => setFormData({ ...formData, accounting_account_code: e.target.value })}
+                          placeholder="مثال: 1200"
+                        />
+                      </div>
+                      <div className="col-span-2">
+                        <Label className="text-sm mb-1 block">ملاحظات</Label>
+                        <Input
+                          value={formData.notes}
+                          onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+                          placeholder="ملاحظات إضافية..."
+                        />
+                      </div>
+                    </div>
+                  </div>
+
                   <DialogFooter>
                     <Button type="submit">
                       {editingSubWarehouse ? 'حفظ التعديلات' : 'إضافة المخزن الفرعي'}
@@ -381,9 +497,9 @@ export default function SubWarehouses() {
                         <TableCell>{subWarehouse.name}</TableCell>
                         <TableCell dir="rtl">{subWarehouse.name_ar}</TableCell>
                         <TableCell>
-                          {subWarehouse.main_warehouse ? (
+                          {subWarehouse.warehouse ? (
                             <Badge variant="outline">
-                              {subWarehouse.main_warehouse.name_ar}
+                              {subWarehouse.warehouse.name_ar}
                             </Badge>
                           ) : (
                             <span className="text-muted-foreground">-</span>

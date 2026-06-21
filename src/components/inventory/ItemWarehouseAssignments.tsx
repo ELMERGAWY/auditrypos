@@ -8,28 +8,41 @@ import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Label } from '@/components/ui/label';
 import { Plus, Trash2, Link2, AlertCircle, Package } from 'lucide-react';
 import { toast } from 'sonner';
 
-type CostPolicy = 'FIFO' | 'AVERAGE' | 'SPECIFIC';
-type AccountingStandard = 'IFRS' | 'EAS' | 'US_GAAP';
+type CostingMethod = 'FIFO' | 'AVERAGE' | 'SPECIFIC' | 'LIFO';
+type AccountingStandard = 'EAS' | 'IFRS' | 'US_GAAP';
+type InventoryValuationRule = 'IAS2_FIFO' | 'IAS2_AVERAGE' | 'IAS2_SPECIFIC' | 'GAAP_FIFO' | 'GAAP_AVERAGE' | 'GAAP_LIFO';
 
-interface Warehouse {
+interface SubWarehouse {
   id: string;
   code: string;
   name: string;
   name_ar: string;
-  type: string;
+  warehouse_id: string;
 }
 
 interface ItemWarehouseAssignment {
   id: string;
   item_id: string;
-  warehouse_id: string;
-  cost_policy: CostPolicy;
+  sub_warehouse_id: string;
+  costing_method: CostingMethod;
   accounting_standard: AccountingStandard;
-  minimum_stock: number;
-  warehouse?: Warehouse;
+  inventory_valuation_rule: InventoryValuationRule;
+  is_primary: boolean;
+  min_stock_level: number;
+  max_stock_level: number | null;
+  reorder_point: number | null;
+  reorder_quantity: number | null;
+  stock_unit: string | null;
+  sales_unit: string | null;
+  purchase_unit: string | null;
+  lead_time_days: number;
+  low_stock_alert: boolean;
+  overstock_alert: boolean;
+  sub_warehouse?: SubWarehouse;
   created_at: string;
 }
 
@@ -38,10 +51,11 @@ interface ItemWarehouseAssignmentsProps {
   itemName?: string;
 }
 
-const costPolicyLabels: Record<CostPolicy, string> = {
+const costingMethodLabels: Record<CostingMethod, string> = {
   FIFO: 'FIFO',
   AVERAGE: 'متوسط',
-  SPECIFIC: 'محدد'
+  SPECIFIC: 'محدد',
+  LIFO: 'LIFO'
 };
 
 const accountingStandardLabels: Record<AccountingStandard, string> = {
@@ -50,16 +64,36 @@ const accountingStandardLabels: Record<AccountingStandard, string> = {
   US_GAAP: 'US GAAP'
 };
 
+const inventoryValuationRuleLabels: Record<InventoryValuationRule, string> = {
+  IAS2_FIFO: 'IAS2 FIFO',
+  IAS2_AVERAGE: 'IAS2 متوسط',
+  IAS2_SPECIFIC: 'IAS2 محدد',
+  GAAP_FIFO: 'GAAP FIFO',
+  GAAP_AVERAGE: 'GAAP متوسط',
+  GAAP_LIFO: 'GAAP LIFO'
+};
+
 export function ItemWarehouseAssignments({ itemId, itemName }: ItemWarehouseAssignmentsProps) {
   const [assignments, setAssignments] = useState<ItemWarehouseAssignment[]>([]);
-  const [subWarehouses, setSubWarehouses] = useState<Warehouse[]>([]);
+  const [subWarehouses, setSubWarehouses] = useState<SubWarehouse[]>([]);
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [formData, setFormData] = useState({
-    warehouse_id: '',
-    cost_policy: 'FIFO' as CostPolicy,
+    sub_warehouse_id: '',
+    costing_method: 'AVERAGE' as CostingMethod,
     accounting_standard: 'IFRS' as AccountingStandard,
-    minimum_stock: 0
+    inventory_valuation_rule: 'IAS2_AVERAGE' as InventoryValuationRule,
+    is_primary: false,
+    min_stock_level: 0,
+    max_stock_level: '',
+    reorder_point: '',
+    reorder_quantity: '',
+    stock_unit: '',
+    sales_unit: '',
+    purchase_unit: '',
+    lead_time_days: 0,
+    low_stock_alert: true,
+    overstock_alert: false
   });
 
   useEffect(() => {
@@ -74,7 +108,7 @@ export function ItemWarehouseAssignments({ itemId, itemName }: ItemWarehouseAssi
       setLoading(true);
       const { data, error } = await supabase
         .from('item_warehouse_assignments')
-        .select('*, warehouse:warehouses(*)')
+        .select('*, sub_warehouse:sub_warehouses(*)')
         .eq('item_id', itemId)
         .order('created_at', { ascending: false });
 
@@ -91,9 +125,9 @@ export function ItemWarehouseAssignments({ itemId, itemName }: ItemWarehouseAssi
   const fetchSubWarehouses = async () => {
     try {
       const { data, error } = await supabase
-        .from('warehouses')
+        .from('sub_warehouses')
         .select('*')
-        .eq('type', 'SUB')
+        .eq('is_active', true)
         .order('name_ar', { ascending: true });
 
       if (error) throw error;
@@ -106,7 +140,7 @@ export function ItemWarehouseAssignments({ itemId, itemName }: ItemWarehouseAssi
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!formData.warehouse_id) {
+    if (!formData.sub_warehouse_id) {
       toast.error('يرجى اختيار مخزن فرعي');
       return;
     }
@@ -116,10 +150,21 @@ export function ItemWarehouseAssignments({ itemId, itemName }: ItemWarehouseAssi
         .from('item_warehouse_assignments')
         .insert({
           item_id: itemId,
-          warehouse_id: formData.warehouse_id,
-          cost_policy: formData.cost_policy,
+          sub_warehouse_id: formData.sub_warehouse_id,
+          costing_method: formData.costing_method,
           accounting_standard: formData.accounting_standard,
-          minimum_stock: formData.minimum_stock
+          inventory_valuation_rule: formData.inventory_valuation_rule,
+          is_primary: formData.is_primary,
+          min_stock_level: formData.min_stock_level,
+          max_stock_level: formData.max_stock_level ? parseFloat(formData.max_stock_level) : null,
+          reorder_point: formData.reorder_point ? parseFloat(formData.reorder_point) : null,
+          reorder_quantity: formData.reorder_quantity ? parseFloat(formData.reorder_quantity) : null,
+          stock_unit: formData.stock_unit || null,
+          sales_unit: formData.sales_unit || null,
+          purchase_unit: formData.purchase_unit || null,
+          lead_time_days: formData.lead_time_days,
+          low_stock_alert: formData.low_stock_alert,
+          overstock_alert: formData.overstock_alert
         });
 
       if (error) throw error;
@@ -127,10 +172,21 @@ export function ItemWarehouseAssignments({ itemId, itemName }: ItemWarehouseAssi
       toast.success('تم إضافة الارتباط بنجاح');
       setDialogOpen(false);
       setFormData({
-        warehouse_id: '',
-        cost_policy: 'FIFO',
+        sub_warehouse_id: '',
+        costing_method: 'AVERAGE',
         accounting_standard: 'IFRS',
-        minimum_stock: 0
+        inventory_valuation_rule: 'IAS2_AVERAGE',
+        is_primary: false,
+        min_stock_level: 0,
+        max_stock_level: '',
+        reorder_point: '',
+        reorder_quantity: '',
+        stock_unit: '',
+        sales_unit: '',
+        purchase_unit: '',
+        lead_time_days: 0,
+        low_stock_alert: true,
+        overstock_alert: false
       });
       fetchAssignments();
     } catch (error) {
@@ -190,8 +246,8 @@ export function ItemWarehouseAssignments({ itemId, itemName }: ItemWarehouseAssi
               <div className="space-y-2">
                 <label className="text-sm font-medium">المخزن الفرعي *</label>
                 <Select
-                  value={formData.warehouse_id}
-                  onValueChange={(value) => setFormData({ ...formData, warehouse_id: value })}
+                  value={formData.sub_warehouse_id}
+                  onValueChange={(value) => setFormData({ ...formData, sub_warehouse_id: value })}
                 >
                   <SelectTrigger>
                     <SelectValue placeholder="اختر المخزن الفرعي" />
@@ -212,16 +268,20 @@ export function ItemWarehouseAssignments({ itemId, itemName }: ItemWarehouseAssi
                 </Select>
               </div>
               <div className="space-y-2">
-                <label className="text-sm font-medium">سياسة التكلفة *</label>
+                <label className="text-sm font-medium">طريقة التكلفة *</label>
                 <Select
-                  value={formData.cost_policy}
-                  onValueChange={(value: CostPolicy) => setFormData({ ...formData, cost_policy: value })}
+                  value={formData.costing_method}
+                  onValueChange={(value: CostingMethod) => {
+                    const newValuationRule = value === 'LIFO' ? 'GAAP_LIFO' : 
+                                            value === 'FIFO' ? 'IAS2_FIFO' : 'IAS2_AVERAGE';
+                    setFormData({ ...formData, costing_method: value, inventory_valuation_rule: newValuationRule as InventoryValuationRule });
+                  }}
                 >
                   <SelectTrigger>
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    {Object.entries(costPolicyLabels).map(([key, label]) => (
+                    {Object.entries(costingMethodLabels).map(([key, label]) => (
                       <SelectItem key={key} value={key}>
                         {label}
                       </SelectItem>
@@ -248,14 +308,132 @@ export function ItemWarehouseAssignments({ itemId, itemName }: ItemWarehouseAssi
                 </Select>
               </div>
               <div className="space-y-2">
-                <label className="text-sm font-medium">الحد الأدنى للمخزون</label>
-                <Input
-                  type="number"
-                  min="0"
-                  value={formData.minimum_stock}
-                  onChange={(e) => setFormData({ ...formData, minimum_stock: parseInt(e.target.value) || 0 })}
-                  placeholder="0"
+                <label className="text-sm font-medium">قاعدة تقييم المخزون</label>
+                <Select
+                  value={formData.inventory_valuation_rule}
+                  onValueChange={(value: InventoryValuationRule) => setFormData({ ...formData, inventory_valuation_rule: value })}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {Object.entries(inventoryValuationRuleLabels).map(([key, label]) => (
+                      <SelectItem key={key} value={key}>
+                        {label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  id="is-primary"
+                  checked={formData.is_primary}
+                  onChange={(e) => setFormData({ ...formData, is_primary: e.target.checked })}
+                  className="rounded"
                 />
+                <Label htmlFor="is-primary" className="text-sm">مخزن رئيسي للصنف</Label>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">الحد الأدنى للمخزون</label>
+                  <Input
+                    type="number"
+                    min="0"
+                    value={formData.min_stock_level}
+                    onChange={(e) => setFormData({ ...formData, min_stock_level: parseFloat(e.target.value) || 0 })}
+                    placeholder="0"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">الحد الأقصى للمخزون</label>
+                  <Input
+                    type="number"
+                    min="0"
+                    value={formData.max_stock_level}
+                    onChange={(e) => setFormData({ ...formData, max_stock_level: e.target.value })}
+                    placeholder="اختياري"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">نقطة إعادة الطلب</label>
+                  <Input
+                    type="number"
+                    min="0"
+                    value={formData.reorder_point}
+                    onChange={(e) => setFormData({ ...formData, reorder_point: e.target.value })}
+                    placeholder="اختياري"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">كمية إعادة الطلب</label>
+                  <Input
+                    type="number"
+                    min="0"
+                    value={formData.reorder_quantity}
+                    onChange={(e) => setFormData({ ...formData, reorder_quantity: e.target.value })}
+                    placeholder="اختياري"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">زمن التوريد (أيام)</label>
+                  <Input
+                    type="number"
+                    min="0"
+                    value={formData.lead_time_days}
+                    onChange={(e) => setFormData({ ...formData, lead_time_days: parseInt(e.target.value) || 0 })}
+                    placeholder="0"
+                  />
+                </div>
+              </div>
+              <div className="grid grid-cols-3 gap-4">
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">وحدة المخزون</label>
+                  <Input
+                    value={formData.stock_unit}
+                    onChange={(e) => setFormData({ ...formData, stock_unit: e.target.value })}
+                    placeholder="مثال: قطعة"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">وحدة البيع</label>
+                  <Input
+                    value={formData.sales_unit}
+                    onChange={(e) => setFormData({ ...formData, sales_unit: e.target.value })}
+                    placeholder="مثال: علبة"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">وحدة الشراء</label>
+                  <Input
+                    value={formData.purchase_unit}
+                    onChange={(e) => setFormData({ ...formData, purchase_unit: e.target.value })}
+                    placeholder="مثال: كرتون"
+                  />
+                </div>
+              </div>
+              <div className="flex gap-4">
+                <div className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    id="low-stock-alert"
+                    checked={formData.low_stock_alert}
+                    onChange={(e) => setFormData({ ...formData, low_stock_alert: e.target.checked })}
+                    className="rounded"
+                  />
+                  <Label htmlFor="low-stock-alert" className="text-sm">تنبيه انخفاض المخزون</Label>
+                </div>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    id="overstock-alert"
+                    checked={formData.overstock_alert}
+                    onChange={(e) => setFormData({ ...formData, overstock_alert: e.target.checked })}
+                    className="rounded"
+                  />
+                  <Label htmlFor="overstock-alert" className="text-sm">تنبيه زيادة المخزون</Label>
+                </div>
               </div>
               <DialogFooter>
                 <Button type="submit">حفظ</Button>
@@ -286,9 +464,10 @@ export function ItemWarehouseAssignments({ itemId, itemName }: ItemWarehouseAssi
                 <TableRow>
                   <TableHead>المخزن</TableHead>
                   <TableHead>الرمز</TableHead>
-                  <TableHead>سياسة التكلفة</TableHead>
+                  <TableHead>طريقة التكلفة</TableHead>
                   <TableHead>المعيار المحاسبي</TableHead>
-                  <TableHead>الحد الأدنى للمخزون</TableHead>
+                  <TableHead>رئيسي</TableHead>
+                  <TableHead>الحد الأدنى</TableHead>
                   <TableHead>إجراءات</TableHead>
                 </TableRow>
               </TableHeader>
@@ -296,21 +475,21 @@ export function ItemWarehouseAssignments({ itemId, itemName }: ItemWarehouseAssi
                 {assignments.map((assignment) => (
                   <TableRow key={assignment.id}>
                     <TableCell className="font-medium">
-                      {assignment.warehouse ? (
+                      {assignment.sub_warehouse ? (
                         <div className="flex items-center gap-2">
                           <Package className="h-4 w-4 text-muted-foreground" />
-                          <span dir="rtl">{assignment.warehouse.name_ar}</span>
+                          <span dir="rtl">{assignment.sub_warehouse.name_ar}</span>
                         </div>
                       ) : (
                         <span className="text-muted-foreground">-</span>
                       )}
                     </TableCell>
                     <TableCell>
-                      {assignment.warehouse?.code || '-'}
+                      {assignment.sub_warehouse?.code || '-'}
                     </TableCell>
                     <TableCell>
                       <Badge variant="outline">
-                        {costPolicyLabels[assignment.cost_policy]}
+                        {costingMethodLabels[assignment.costing_method]}
                       </Badge>
                     </TableCell>
                     <TableCell>
@@ -319,7 +498,14 @@ export function ItemWarehouseAssignments({ itemId, itemName }: ItemWarehouseAssi
                       </Badge>
                     </TableCell>
                     <TableCell>
-                      {assignment.minimum_stock.toLocaleString('ar-EG')}
+                      {assignment.is_primary ? (
+                        <Badge variant="default">نعم</Badge>
+                      ) : (
+                        <span className="text-muted-foreground">لا</span>
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      {assignment.min_stock_level.toLocaleString('ar-EG')}
                     </TableCell>
                     <TableCell>
                       <Button
