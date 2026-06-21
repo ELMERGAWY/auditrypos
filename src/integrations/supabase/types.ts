@@ -9785,28 +9785,43 @@ export type Database = {
       }
       warehouses: {
         Row: {
-          created_at: string | null
           id: string
-          is_default: boolean | null
-          location: string | null
+          code: string | null
           name: string
+          name_ar: string | null
+          type: string | null
+          accounting_standard: string | null
+          parent_id: string | null
+          location: string | null
+          is_default: boolean | null
           restaurant_id: string
+          created_at: string | null
         }
         Insert: {
-          created_at?: string | null
           id?: string
-          is_default?: boolean | null
-          location?: string | null
+          code?: string
           name: string
+          name_ar?: string
+          type?: string
+          accounting_standard?: string
+          parent_id?: string
+          location?: string | null
+          is_default?: boolean | null
           restaurant_id: string
+          created_at?: string | null
         }
         Update: {
-          created_at?: string | null
           id?: string
-          is_default?: boolean | null
-          location?: string | null
+          code?: string
           name?: string
+          name_ar?: string
+          type?: string
+          accounting_standard?: string
+          parent_id?: string
+          location?: string | null
+          is_default?: boolean | null
           restaurant_id?: string
+          created_at?: string | null
         }
         Relationships: [
           {
