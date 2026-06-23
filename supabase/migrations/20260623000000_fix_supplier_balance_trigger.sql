@@ -40,8 +40,7 @@ BEGIN
   
   -- Update supplier balance
   UPDATE public.suppliers
-  SET balance = v_balance,
-      updated_at = NOW()
+  SET balance = v_balance
   WHERE id = p_supplier_id;
   
   RETURN v_balance;
