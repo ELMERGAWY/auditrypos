@@ -6,6 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Plus, Save, Trash2, Edit, User, Phone, MapPin, DollarSign, CheckCircle, Clock, AlertCircle, Receipt, ShoppingCart } from 'lucide-react';
 import { AnimatePresence, motion } from 'framer-motion';
@@ -51,8 +52,6 @@ export function ContractorsTab({ restaurant }: Props) {
   const [showAddServiceDialog, setShowAddServiceDialog] = useState(false);
   const [showPaymentDialog, setShowPaymentDialog] = useState(false);
   const [showSummaryDialog, setShowSummaryDialog] = useState(false);
-  const [showInvoiceSelect, setShowInvoiceSelect] = useState(false);
-  const [showOrderSelect, setShowOrderSelect] = useState(false);
   const [invoices, setInvoices] = useState<any[]>([]);
   const [orders, setOrders] = useState<any[]>([]);
   const [payments, setPayments] = useState<any[]>([]);
@@ -488,17 +487,14 @@ export function ContractorsTab({ restaurant }: Props) {
                 <div>
                   <Label>المصدر (اختياري)</Label>
                   <div className="grid grid-cols-2 gap-2">
-                    <Dialog open={showInvoiceSelect} onOpenChange={(open) => { setShowInvoiceSelect(open); if (!open) setInvoiceSearch(''); }}>
-                      <DialogTrigger asChild>
+                    <Popover>
+                      <PopoverTrigger asChild>
                         <Button variant="outline" className="w-full justify-start text-left">
                           {selectedInvoice ? invoices.find(i => i.id === selectedInvoice)?.invoice_number : 'اختر فاتورة'}
                         </Button>
-                      </DialogTrigger>
-                      <DialogContent className="max-w-md">
-                        <DialogHeader>
-                          <DialogTitle>اختر فاتورة</DialogTitle>
-                        </DialogHeader>
-                        <div className="space-y-4">
+                      </PopoverTrigger>
+                      <PopoverContent className="w-80 p-3">
+                        <div className="space-y-3">
                           <Input
                             placeholder="بحث برقم الفاتورة أو العميل..."
                             value={invoiceSearch}
@@ -508,7 +504,7 @@ export function ContractorsTab({ restaurant }: Props) {
                             {filteredInvoices.map(inv => (
                               <div
                                 key={inv.id}
-                                onClick={() => { handleInvoiceSelect(inv.id); setShowInvoiceSelect(false); }}
+                                onClick={() => handleInvoiceSelect(inv.id)}
                                 className="p-3 rounded cursor-pointer hover:bg-primary/10 border-b"
                               >
                                 <div className="font-medium">{inv.invoice_number}</div>
@@ -517,19 +513,16 @@ export function ContractorsTab({ restaurant }: Props) {
                             ))}
                           </div>
                         </div>
-                      </DialogContent>
-                    </Dialog>
-                    <Dialog open={showOrderSelect} onOpenChange={(open) => { setShowOrderSelect(open); if (!open) setOrderSearch(''); }}>
-                      <DialogTrigger asChild>
+                      </PopoverContent>
+                    </Popover>
+                    <Popover>
+                      <PopoverTrigger asChild>
                         <Button variant="outline" className="w-full justify-start text-left">
                           {selectedOrder ? orders.find(o => o.id === selectedOrder)?.order_number : 'اختر طلب'}
                         </Button>
-                      </DialogTrigger>
-                      <DialogContent className="max-w-md">
-                        <DialogHeader>
-                          <DialogTitle>اختر طلب</DialogTitle>
-                        </DialogHeader>
-                        <div className="space-y-4">
+                      </PopoverTrigger>
+                      <PopoverContent className="w-80 p-3">
+                        <div className="space-y-3">
                           <Input
                             placeholder="بحث برقم الطلب أو العميل..."
                             value={orderSearch}
@@ -539,7 +532,7 @@ export function ContractorsTab({ restaurant }: Props) {
                             {filteredOrders.map(ord => (
                               <div
                                 key={ord.id}
-                                onClick={() => { handleOrderSelect(ord.id); setShowOrderSelect(false); }}
+                                onClick={() => handleOrderSelect(ord.id)}
                                 className="p-3 rounded cursor-pointer hover:bg-primary/10 border-b"
                               >
                                 <div className="font-medium">{ord.order_number}</div>
@@ -548,8 +541,8 @@ export function ContractorsTab({ restaurant }: Props) {
                             ))}
                           </div>
                         </div>
-                      </DialogContent>
-                    </Dialog>
+                      </PopoverContent>
+                    </Popover>
                   </div>
                 </div>
 
