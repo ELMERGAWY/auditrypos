@@ -74,7 +74,11 @@ export function CustomersTab({ restaurantId, currency }: Props) {
   const totalCredit = customers.reduce((s, c) => s + Math.abs(Math.min(0, c.balance)), 0);
 
   const filtered = customers.filter(c =>
-    !search || c.name.toLowerCase().includes(search.toLowerCase()) || c.phone.includes(search)
+    !search ||
+    c.name.toLowerCase().includes(search.toLowerCase()) ||
+    c.phone?.includes(search) ||
+    c.email?.toLowerCase().includes(search.toLowerCase()) ||
+    c.address?.toLowerCase().includes(search.toLowerCase())
   );
 
   const handleSave = async () => {

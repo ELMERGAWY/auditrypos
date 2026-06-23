@@ -93,6 +93,7 @@ export function CustomerManager({ restaurantId, currency }: Props) {
 
   // Receipt Vouchers
   const [receiptVouchers, setReceiptVouchers] = useState<ReceiptVoucher[]>([]);
+  const [receiptVoucherSearch, setReceiptVoucherSearch] = useState('');
   const [showReceiptVoucherModal, setShowReceiptVoucherModal] = useState(false);
   const [editingReceiptVoucher, setEditingReceiptVoucher] = useState<ReceiptVoucher | null>(null);
   const [receiptVoucherForm, setReceiptVoucherForm] = useState({
@@ -146,6 +147,13 @@ export function CustomerManager({ restaurantId, currency }: Props) {
       toast.error('فشل تحميل الحسابات: ' + error.message);
     }
   };
+
+  const filteredReceiptVouchers = receiptVouchers.filter(v =>
+    !receiptVoucherSearch ||
+    v.voucher_number.toLowerCase().includes(receiptVoucherSearch.toLowerCase()) ||
+    v.customer_name?.toLowerCase().includes(receiptVoucherSearch.toLowerCase()) ||
+    v.notes?.toLowerCase().includes(receiptVoucherSearch.toLowerCase())
+  );
 
   const isReceivableAccount = (accountId: string) => {
     const acc = accounts.find(a => a.id === accountId);
@@ -1438,6 +1446,17 @@ export function CustomerManager({ restaurantId, currency }: Props) {
             </Button>
           </div>
 
+          {/* Search */}
+          <div className="relative">
+            <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+            <Input
+              placeholder="بحث برقم السند، اسم العميل، الملاحظات..."
+              value={receiptVoucherSearch}
+              onChange={(e) => setReceiptVoucherSearch(e.target.value)}
+              className="pr-10"
+            />
+          </div>
+
           {/* Receipt Vouchers Table */}
           <div className="glass-card overflow-hidden">
             <div className="overflow-x-auto">
@@ -1454,12 +1473,12 @@ export function CustomerManager({ restaurantId, currency }: Props) {
                   </tr>
                 </thead>
                 <tbody>
-                  {receiptVouchers.length === 0 ? (
+                  {filteredReceiptVouchers.length === 0 ? (
                     <tr>
                       <td colSpan={7} className="px-4 py-12 text-center text-muted-foreground">لا توجد سندات</td>
                     </tr>
                   ) : (
-                    receiptVouchers.map((voucher) => (
+                    filteredReceiptVouchers.map((voucher) => (
                       <tr key={voucher.id} className="border-b border-border/50 hover:bg-primary/5">
                         <td className="px-4 py-3 font-medium">
                           {voucher.voucher_number}

@@ -35,7 +35,13 @@ export function SuppliersTab({ restaurantId, currency }: Props) {
 
   useEffect(() => { load(); }, [restaurantId]);
 
-  const filtered = suppliers.filter(s => !search || s.name.toLowerCase().includes(search.toLowerCase()) || s.phone.includes(search));
+  const filtered = suppliers.filter(s =>
+    !search ||
+    s.name.toLowerCase().includes(search.toLowerCase()) ||
+    s.phone?.includes(search) ||
+    s.email?.toLowerCase().includes(search.toLowerCase()) ||
+    s.address?.toLowerCase().includes(search.toLowerCase())
+  );
 
   const handleSave = async () => {
     if (!form.name) { toast.error('أدخل اسم المورد'); return; }
@@ -69,7 +75,7 @@ export function SuppliersTab({ restaurantId, currency }: Props) {
       <div className="flex gap-2">
         <div className="relative flex-1">
           <Search className="w-4 h-4 absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
-          <Input value={search} onChange={e => setSearch(e.target.value)} placeholder="بحث بالاسم أو الرقم..." className="pr-10 h-9 text-xs" />
+          <Input value={search} onChange={e => setSearch(e.target.value)} placeholder="بحث بالاسم، الهاتف، البريد، العنوان..." className="pr-10 h-9 text-xs" />
         </div>
         <Button onClick={() => { resetForm(); setShowForm(true); }} className="gradient-bg text-primary-foreground border-0" size="sm">
           <Plus className="w-4 h-4 ml-1" /> إضافة مورد
