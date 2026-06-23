@@ -437,12 +437,6 @@ class JournalService {
         description: `تخفيض مديونية عميل - مردودات ${returnData.orderNumber}`,
         line_order: 3,
       });
-      
-      // Update Customer Balance
-      await supabase.rpc('update_customer_balance', {
-        p_customer_id: returnData.customerId,
-        p_amount: -returnData.amount
-      });
     } else if (cashAcc) {
       lines.push({
         account_id: cashAcc.id,
@@ -524,12 +518,6 @@ class JournalService {
         credit: purchase.amount,
         description: `ذمم موردين - ${purchase.supplierName}`,
         line_order: 2,
-      });
-
-      // Update Supplier Balance
-      await supabase.rpc('update_supplier_balance', {
-        p_supplier_id: purchase.supplierId,
-        p_amount: purchase.amount
       });
     } else if (cashAcc) {
       lines.push({
@@ -782,12 +770,6 @@ class JournalService {
       source: 'customers',
       is_posted: true,
       lines,
-    });
-
-    // Update customer balance (already handled in CustomersTab, but just in case)
-    await supabase.rpc('update_customer_balance', {
-      p_customer_id: payment.customerId,
-      p_amount: -payment.amount
     });
 
     return entry;

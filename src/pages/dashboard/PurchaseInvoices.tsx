@@ -451,11 +451,8 @@ export function PurchaseInvoices({ restaurantId, currency }: Props) {
     try {
       const newPaid = viewInvoice.paid_amount + amount;
       await supabase.from('purchase_invoices').update({ paid_amount: newPaid }).eq('id', viewInvoice.id);
-      // Decrease supplier balance (less we owe them)
+      // Insert supplier transaction - database trigger will automatically update supplier balance
       if (viewInvoice.supplier_id) {
-        const { data: sup } = await supabase.from('suppliers').select('balance').eq('id', viewInvoice.supplier_id).single();
-        const newBalance = Number(sup?.balance || 0) - amount;
-        await supabase.from('suppliers').update({ balance: newBalance }).eq('id', viewInvoice.supplier_id);
         await supabase.from('supplier_transactions').insert({
           supplier_id: viewInvoice.supplier_id,
           restaurant_id: restaurantId,

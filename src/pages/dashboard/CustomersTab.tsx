@@ -104,8 +104,8 @@ export function CustomersTab({ restaurantId, currency }: Props) {
   const handleSavePayment = async () => {
     if (!showPayment || !paymentAmount) return;
     const amount = Number(paymentAmount);
-    const newBalance = showPayment.balance - amount;
-    await supabase.from('customers').update({ balance: newBalance }).eq('id', showPayment.id);
+    
+    // Insert transaction - database trigger will automatically update customer balance
     await supabase.from('customer_transactions').insert({
       customer_id: showPayment.id, restaurant_id: restaurantId,
       type: 'payment', amount: -amount, description: paymentDesc || 'دفعة نقدية',
@@ -119,7 +119,7 @@ export function CustomersTab({ restaurantId, currency }: Props) {
         customerId: showPayment.id,
         customerName: showPayment.name,
         amount,
-        paymentMethod: paymentMethodLocal,
+        paymentMethod: paymentMethodLocal as 'cash' | 'bank' | 'instapay' | 'vodafone_cash',
         description: paymentDesc,
       },
       currency
