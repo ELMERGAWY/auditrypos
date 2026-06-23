@@ -64,6 +64,7 @@ const ALL_TABS_CONFIG = {
   fixed_assets: { label: 'الأصول الثابتة', icon: '🏢' },
   accounting_mapping: { label: 'توجيه المحاسبة', icon: '⚙️' },
   contracting: { label: 'المقاولات', icon: '🏗️' },
+  contractors: { label: 'الصنايعية والخدمات', icon: '👷' },
   projects: { label: 'المشاريع', icon: '🏗️' },
   analytics: { label: 'التقارير والإحصائيات', icon: '📊' },
   ai_assistant: { label: 'المساعد الذكي (AI)', icon: '✨' },
@@ -662,7 +663,8 @@ const SuperAdmin = () => {
                   .eq('id', selectedRestForTabs.id);
 
                 if (error) {
-                  toast.error('حدث خطأ أثناء حفظ التبويبات المخصصة');
+                  console.error('Custom tabs save error:', error);
+                  toast.error('حدث خطأ أثناء حفظ التبويبات المخصصة: ' + error.message);
                 } else {
                   toast.success(`تم تطبيق ${customTabsForm.length} تبويب على ${selectedRestForTabs.name}`);
                   setSelectedRestForTabs(null);
