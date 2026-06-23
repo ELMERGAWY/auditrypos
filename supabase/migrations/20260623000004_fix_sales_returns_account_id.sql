@@ -152,27 +152,33 @@ BEGIN
   ) RETURNING id INTO v_entry_id;
 
   -- Insert all journal lines with explicit NULL checks
+  -- Ensure balance by inserting debit and credit together
   IF v_sales_returns_account IS NOT NULL THEN
     INSERT INTO public.journal_entry_lines (entry_id, account_id, debit, credit, description, line_order)
     VALUES (v_entry_id, v_sales_returns_account, NEW.total_amount, 0, 'مردود مبيعات', 1);
+
+    -- Insert corresponding credit line
+    IF NEW.customer_id IS NOT NULL AND v_receivable_account IS NOT NULL THEN
+      INSERT INTO public.journal_entry_lines (entry_id, account_id, debit, credit, description, line_order)
+      VALUES (v_entry_id, v_receivable_account, 0, NEW.total_amount, 'مستحق من العميل', 2);
+    ELSIF v_cash_account IS NOT NULL THEN
+      INSERT INTO public.journal_entry_lines (entry_id, account_id, debit, credit, description, line_order)
+      VALUES (v_entry_id, v_cash_account, 0, NEW.total_amount, 'استرداد نقدي', 2);
+    ELSE
+      -- If no customer or cash account, use a default suspense account or raise error
+      RAISE EXCEPTION 'لا يمكن إنشاء قيد مردود المبيعات: لا يوجد حساب عميل أو صندوق';
+    END IF;
   END IF;
 
-  IF NEW.customer_id IS NOT NULL AND v_receivable_account IS NOT NULL THEN
-    INSERT INTO public.journal_entry_lines (entry_id, account_id, debit, credit, description, line_order)
-    VALUES (v_entry_id, v_receivable_account, 0, NEW.total_amount, 'مستحق من العميل', 2);
-  ELSIF v_cash_account IS NOT NULL THEN
-    INSERT INTO public.journal_entry_lines (entry_id, account_id, debit, credit, description, line_order)
-    VALUES (v_entry_id, v_cash_account, 0, NEW.total_amount, 'استرداد نقدي', 2);
-  END IF;
+  -- Insert inventory and COGS lines together to maintain balance
+  IF v_total_cost > 0 THEN
+    IF v_inventory_account IS NOT NULL AND v_cogs_account IS NOT NULL THEN
+      INSERT INTO public.journal_entry_lines (entry_id, account_id, debit, credit, description, line_order)
+      VALUES (v_entry_id, v_inventory_account, v_total_cost, 0, 'إعادة للمخزن', 3);
 
-  IF v_total_cost > 0 AND v_inventory_account IS NOT NULL THEN
-    INSERT INTO public.journal_entry_lines (entry_id, account_id, debit, credit, description, line_order)
-    VALUES (v_entry_id, v_inventory_account, v_total_cost, 0, 'إعادة للمخزن', 3);
-  END IF;
-
-  IF v_total_cost > 0 AND v_cogs_account IS NOT NULL THEN
-    INSERT INTO public.journal_entry_lines (entry_id, account_id, debit, credit, description, line_order)
-    VALUES (v_entry_id, v_cogs_account, 0, v_total_cost, 'عكس تكلفة', 4);
+      INSERT INTO public.journal_entry_lines (entry_id, account_id, debit, credit, description, line_order)
+      VALUES (v_entry_id, v_cogs_account, 0, v_total_cost, 'عكس تكلفة', 4);
+    END IF;
   END IF;
 
   -- Calculate totals from the actual lines and update journal entry
