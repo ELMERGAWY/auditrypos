@@ -132,7 +132,7 @@ export default function Dashboard() {
   });
 
   // POS State
-  const [cart, setCart] = useState<{ item: MenuItem; qty: number; qtyText: string; unitMode: string; unitFactor: number; price: number }[]>([]);
+  const [cart, setCart] = useState<{ item: MenuItem; qty: number; qtyText: string; unitMode: string; unitFactor: number; price: number; service_details?: string }[]>([]);
   const [tableNumber, setTableNumber] = useState('');
   const [customOrderNumber, setCustomOrderNumber] = useState(''); // New state for manual invoice number
   const [customerName, setCustomerName] = useState('');
@@ -331,8 +331,9 @@ export default function Dashboard() {
     setCart(prev => prev.map(c => {
       if (c.item.id !== id) return c;
       const price = Number(c.price) || 0;
-      if (price <= 0) {
-        // No unit price yet — set value as price, keep qty = 1
+      const isService = c.item.product_type === 'service';
+      if (price <= 0 || isService) {
+        // No unit price yet OR it's a service — set value as price, keep qty = 1
         return { ...c, price: value, qty: 1, qtyText: '1' };
       }
       const newQty = Math.round((value / price) * 1000) / 1000;
@@ -346,6 +347,13 @@ export default function Dashboard() {
     setCart(prev => prev.map(c => {
       if (c.item.id !== id) return c;
       return { ...c, price: newPrice };
+    }));
+  }, []);
+
+  const updateServiceDetails = useCallback((id: string, details: string) => {
+    setCart(prev => prev.map(c => {
+      if (c.item.id !== id) return c;
+      return { ...c, service_details: details };
     }));
   }, []);
 
@@ -563,7 +571,7 @@ export default function Dashboard() {
         {activeTab === 'pos' && (
           <div className="flex flex-col lg:flex-row h-full gap-4 overflow-hidden">
             <POSGrid restaurant={restaurant} currency={currency} categories={categories} selectedCategory={selectedCategory} setSelectedCategory={setSelectedCategory} searchQuery={searchQuery} setSearchQuery={setSearchQuery} filteredItems={filteredItems} addToCart={addToCart} servicePackages={servicePackages} addPackageToCart={addPackageToCart} businessType={businessType} todayRevenue={todayRevenue} todayOrders={todayOrdersList} avgOrderValue={avgOrderValue} pendingOrders={pendingOrders} orderType={orderType} orders={orders} tableNumber={tableNumber} setTableNumber={setTableNumber} />
-            <POSCart activeInvoiceId={activeInvoiceId} invoiceTabs={invoiceTabs} cart={cart} holdCurrentInvoice={holdCurrentInvoice} setShowInvoiceTabs={setShowInvoiceTabs} clearCart={clearCart} businessType={businessType} orderType={orderType} setOrderType={setOrderType} tableNumber={tableNumber} setTableNumber={setTableNumber} customOrderNumber={customOrderNumber} setCustomOrderNumber={setCustomOrderNumber} restaurant={restaurant} customerName={customerName} setCustomerName={selectCustomerFromSearch} customerPhone={customerPhone} setCustomerPhone={setCustomerPhone} customerRef={customerRef} setCustomerRef={setCustomerRef} deliveryAddress={deliveryAddress} setDeliveryAddress={setDeliveryAddress} agents={agents} selectedDeliveryAgent={selectedDeliveryAgent} setSelectedDeliveryAgent={setSelectedDeliveryAgent} orderNotes={orderNotes} setOrderNotes={setOrderNotes} discount={discount} setDiscount={setDiscount} discountType={discountType} setDiscountType={setDiscountType} currency={currency} getUnitOptions={getUnitOptions} updateQty={updateQty} setCartItemQty={setCartItemQty} setCartItemUnit={setCartItemUnit} updateValue={updateValue} updatePrice={updatePrice} discountAmount={discountAmount} taxAmount={totalTax} cartSubtotal={cartSubtotal} cartTotal={cartTotal} paymentMethod={paymentMethod} setPaymentMethod={setPaymentMethod} paidAmount={paidAmount} setPaidAmount={setPaidAmount} remaining={remaining} checkout={performCheckout} previewInvoice={() => { setLastReceipt({ total: cartTotal, items: cart.map(c => ({ menu_item_name: c.item.name, quantity: c.qty, price: Number(c.price) })) } as any); setAutoPrint(false); setShowReceipt(true); }} removeFromCart={(id) => setCart(prev => prev.filter(c => c.item.id !== id))} accountingAccounts={accountingAccounts} selectedAccountId={selectedAccountId} setSelectedAccountId={setSelectedAccountId} isProcessing={isProcessingCheckout} />
+            <POSCart activeInvoiceId={activeInvoiceId} invoiceTabs={invoiceTabs} cart={cart} holdCurrentInvoice={holdCurrentInvoice} setShowInvoiceTabs={setShowInvoiceTabs} clearCart={clearCart} businessType={businessType} orderType={orderType} setOrderType={setOrderType} tableNumber={tableNumber} setTableNumber={setTableNumber} customOrderNumber={customOrderNumber} setCustomOrderNumber={setCustomOrderNumber} restaurant={restaurant} customerName={customerName} setCustomerName={selectCustomerFromSearch} customerPhone={customerPhone} setCustomerPhone={setCustomerPhone} customerRef={customerRef} setCustomerRef={setCustomerRef} deliveryAddress={deliveryAddress} setDeliveryAddress={setDeliveryAddress} agents={agents} selectedDeliveryAgent={selectedDeliveryAgent} setSelectedDeliveryAgent={setSelectedDeliveryAgent} orderNotes={orderNotes} setOrderNotes={setOrderNotes} discount={discount} setDiscount={setDiscount} discountType={discountType} setDiscountType={setDiscountType} currency={currency} getUnitOptions={getUnitOptions} updateQty={updateQty} setCartItemQty={setCartItemQty} setCartItemUnit={setCartItemUnit} updateValue={updateValue} updatePrice={updatePrice} updateServiceDetails={updateServiceDetails} discountAmount={discountAmount} taxAmount={totalTax} cartSubtotal={cartSubtotal} cartTotal={cartTotal} paymentMethod={paymentMethod} setPaymentMethod={setPaymentMethod} paidAmount={paidAmount} setPaidAmount={setPaidAmount} remaining={remaining} checkout={performCheckout} previewInvoice={() => { setLastReceipt({ total: cartTotal, items: cart.map(c => ({ menu_item_name: c.item.name, quantity: c.qty, price: Number(c.price) })) } as any); setAutoPrint(false); setShowReceipt(true); }} removeFromCart={(id) => setCart(prev => prev.filter(c => c.item.id !== id))} accountingAccounts={accountingAccounts} selectedAccountId={selectedAccountId} setSelectedAccountId={setSelectedAccountId} isProcessing={isProcessingCheckout} />
           </div>
         )}
         {activeTab === 'orders' && (

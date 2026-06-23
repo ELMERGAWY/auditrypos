@@ -13,7 +13,7 @@ import { usePermissions } from '@/hooks/usePermissions';
 interface POSCartProps {
   activeInvoiceId: string | null;
   invoiceTabs: HeldInvoice[];
-  cart: { item: MenuItem; qty: number; qtyText: string; unitMode: string; unitFactor: number; price: number }[];
+  cart: { item: MenuItem; qty: number; qtyText: string; unitMode: string; unitFactor: number; price: number; service_details?: string }[];
   holdCurrentInvoice: () => void;
   setShowInvoiceTabs: (show: boolean) => void;
   clearCart: () => void;
@@ -60,6 +60,7 @@ interface POSCartProps {
   previewInvoice: () => void;
   updateValue: (id: string, value: number) => void;
   updatePrice: (id: string, price: number) => void;
+  updateServiceDetails: (id: string, details: string) => void;
   removeFromCart: (id: string) => void;
   accountingAccounts: any[];
   selectedAccountId: string | null;
@@ -76,7 +77,7 @@ export const POSCart = memo(function POSCart({
   currency, getUnitOptions, setCartItemUnit, updateQty, setCartItemQty,
   discountAmount, taxAmount, cartSubtotal, cartTotal, paymentMethod, setPaymentMethod,
   paidAmount, setPaidAmount, remaining, customerRef, setCustomerRef, checkout, previewInvoice,
-  updateValue, updatePrice, removeFromCart,
+  updateValue, updatePrice, updateServiceDetails, removeFromCart,
   accountingAccounts, selectedAccountId, setSelectedAccountId
 }: POSCartProps) {
   const { hasPermission } = usePermissions(restaurant?.id);
@@ -260,6 +261,16 @@ export const POSCart = memo(function POSCart({
                 {/* Modified price badge */}
                 {Math.abs(Number(c.price) - defaultUnitPrice) > 0.001 && Number(c.price) > 0 && editingPriceId !== c.item.id && (
                   <p className="text-[9px] text-amber-500 font-bold">✎ سعر معدل</p>
+                )}
+                {/* Service details input (only for service items) */}
+                {c.item.product_type === 'service' && (
+                  <input
+                    type="text"
+                    value={c.service_details || ''}
+                    onChange={(e) => updateServiceDetails(c.item.id, e.target.value)}
+                    placeholder="تفاصيل الخدمة (مثل: اللون، الحجم، الخ)"
+                    className="w-full mt-1 h-6 text-[10px] bg-secondary rounded border border-border px-1 focus:ring-1 focus:ring-primary outline-none"
+                  />
                 )}
               </div>
 

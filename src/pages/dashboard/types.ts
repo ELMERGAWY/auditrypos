@@ -23,7 +23,7 @@ export interface MenuItem {
   sort_order: number;
   product_id?: string | null;
   inventory_mode?: 'none' | 'direct' | 'recipe';
-  product_type?: 'inventory' | 'manufactured';
+  product_type?: 'inventory' | 'manufactured' | 'service';
   pricing_method?: 'fixed' | 'cost_plus';
   profit_margin_percent?: number;
   calculated_cost_price?: number;
@@ -89,7 +89,7 @@ export interface Restaurant {
   export interface HeldInvoice {
     id: string;
     label: string;
-    cart: { item: MenuItem; qty: number; qtyText?: string; unitMode?: string; unitFactor?: number; price?: number }[];
+    cart: { item: MenuItem; qty: number; qtyText?: string; unitMode?: string; unitFactor?: number; price?: number; service_details?: string }[];
     tableNumber: string;
     customerName: string;
     notes: string;
