@@ -112,6 +112,7 @@ export function InventoryTab({ restaurantId, currency, businessType }: Props) {
     name: '', barcode: '', sku: '', category: 'عام', price: '', cost_price: '',
     quantity: '', min_quantity: '5', unit: 'قطعة', image: '📦', expiry_date: '',
     secondary_unit: '', unit_conversion_factor: '', batch_number: '', item_type_id: '',
+    warehouse_id: '',
   });
   const [filterCategory, setFilterCategory] = useState('all');
   const [projects, setProjects] = useState<any[]>([]);
@@ -164,6 +165,7 @@ export function InventoryTab({ restaurantId, currency, businessType }: Props) {
       secondary_unit: form.secondary_unit || '',
       unit_conversion_factor: Number(form.unit_conversion_factor) || 1,
       item_type_id: form.item_type_id || null,
+      warehouse_id: form.warehouse_id || null,
     };
     try {
       if (editingProduct) {
@@ -268,7 +270,7 @@ export function InventoryTab({ restaurantId, currency, businessType }: Props) {
 
   const resetForm = () => {
     setShowForm(false); setEditingProduct(null); setPricingMode('fixed'); setMarkupValue('');
-    setForm({ name: '', barcode: '', sku: '', category: 'عام', price: '', cost_price: '', quantity: '', min_quantity: '5', unit: 'قطعة', image: '📦', expiry_date: '', secondary_unit: '', unit_conversion_factor: '', batch_number: '', item_type_id: '' });
+    setForm({ name: '', barcode: '', sku: '', category: 'عام', price: '', cost_price: '', quantity: '', min_quantity: '5', unit: 'قطعة', image: '📦', expiry_date: '', secondary_unit: '', unit_conversion_factor: '', batch_number: '', item_type_id: '', warehouse_id: '' });
   };
 
   const calcSellingPrice = (costStr: string) => {
@@ -289,6 +291,7 @@ export function InventoryTab({ restaurantId, currency, businessType }: Props) {
       unit_conversion_factor: String(p.unit_conversion_factor || 1),
       batch_number: (p as any).batch_number || '',
       item_type_id: (p as any).item_type_id || '',
+      warehouse_id: (p as any).warehouse_id || '',
     });
     setShowForm(true);
   };
@@ -751,6 +754,24 @@ export function InventoryTab({ restaurantId, currency, businessType }: Props) {
                       {itemTypes.map(type => (
                         <SelectItem key={type.id} value={type.id}>
                           {type.name_ar || type.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label className="text-xs mb-1 block">المخزن</Label>
+                  <Select
+                    value={form.warehouse_id}
+                    onValueChange={(value) => setForm(f => ({ ...f, warehouse_id: value }))}
+                  >
+                    <SelectTrigger className="h-11 rounded-xl">
+                      <SelectValue placeholder="اختر المخزن" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {warehouses.map(wh => (
+                        <SelectItem key={wh.id} value={wh.id}>
+                          {wh.name}
                         </SelectItem>
                       ))}
                     </SelectContent>
