@@ -957,13 +957,36 @@ function WarehousesManager({ restaurantId, warehouses, onRefresh }: { restaurant
     setMainWarehouses(warehouses.filter(w => w.type === 'main'));
   }, [warehouses]);
 
+  const generateAccountingCodes = (warehouseType: string, warehouseCode: string) => {
+    // Generate accounting codes based on warehouse type
+    const baseCode = warehouseCode.replace('WH-', '').padStart(4, '0');
+    
+    // Inventory account code (Asset account - 1xxx series)
+    const inventoryAccountCode = `13${baseCode}`;
+    
+    // COGS account code (Expense account - 5xxx series)
+    const cogsAccountCode = `52${baseCode}`;
+    
+    // General accounting account code (could be same as inventory or different)
+    const accountingAccountCode = inventoryAccountCode;
+    
+    return {
+      accounting_account_code: accountingAccountCode,
+      inventory_account_code: inventoryAccountCode,
+      cogs_account_code: cogsAccountCode
+    };
+  };
+
   const handleSave = async () => {
     if (!form.code || !form.name || !form.name_ar) {
       return toast.error('يرجى ملء جميع الحقول المطلوبة');
     }
     
+    // Auto-generate accounting codes if not provided
+    const autoCodes = generateAccountingCodes(form.type, form.code);
     const data = {
       ...form,
+      ...autoCodes,
       restaurant_id: restaurantId,
       parent_warehouse_id: form.parent_warehouse_id || null,
       type: form.type.toUpperCase(),
