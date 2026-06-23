@@ -5,7 +5,7 @@ import {
   Package, Plus, Search, AlertTriangle, Edit2, Trash2, 
   ArrowDown, ArrowUp, BarChart3, X, TrendingUp, DollarSign,
   Truck, Calculator, History, FileSpreadsheet, Layers, Boxes, Save, RefreshCw, Download,
-  Bell, ShoppingCart, RotateCcw, Scale, Zap, CheckCircle
+  Bell, ShoppingCart, RotateCcw, Scale, Zap, CheckCircle, Building2, FolderTree
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -23,11 +23,31 @@ import { ItemWarehouseAssignments } from '@/components/inventory/ItemWarehouseAs
 
 interface Warehouse {
   id: string;
-  name: string;
   code: string;
+  name: string;
+  name_ar: string | null;
   type: string;
-  location: string;
+  warehouse_category: string;
+  parent_warehouse_id: string | null;
+  parent?: Warehouse;
+  address: string | null;
+  city: string | null;
+  country: string;
+  phone: string | null;
+  email: string | null;
+  manager_name: string | null;
   is_active: boolean;
+  is_default: boolean;
+  currency: string;
+  accounting_account_code: string | null;
+  inventory_account_code: string | null;
+  cogs_account_code: string | null;
+  accounting_standard: string;
+  notes: string | null;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+  deleted_at: string | null;
 }
 
 interface Product {
@@ -436,7 +456,7 @@ export function InventoryTab({ restaurantId, currency, businessType }: Props) {
         </TabsContent>
 
         <TabsContent value="landed_costs" className="space-y-4">
-          <LandedCostsManager restaurantId={restaurantId} currency={currency} onRefresh={load} />
+          <LandedCostsManager restaurantId={restaurantId} currency={currency} products={products} onRefresh={load} />
         </TabsContent>
       </Tabs>
 
@@ -883,11 +903,43 @@ export function InventoryTab({ restaurantId, currency, businessType }: Props) {
 function WarehousesManager({ restaurantId, warehouses, onRefresh }: { restaurantId: string; warehouses: Warehouse[]; onRefresh: () => void }) {
   const [showForm, setShowForm] = useState(false);
   const [editingWarehouse, setEditingWarehouse] = useState<Warehouse | null>(null);
-  const [form, setForm] = useState({ name: '', type: 'main', location: '' });
+  const [mainWarehouses, setMainWarehouses] = useState<Warehouse[]>([]);
+  const [form, setForm] = useState({
+    code: '',
+    name: '',
+    name_ar: '',
+    type: 'main',
+    accounting_standard: 'IFRS',
+    parent_warehouse_id: '',
+    address: '',
+    city: '',
+    country: 'Egypt',
+    phone: '',
+    email: '',
+    manager_name: '',
+    currency: 'EGP',
+    accounting_account_code: '',
+    inventory_account_code: '',
+    cogs_account_code: '',
+    notes: ''
+  });
+
+  useEffect(() => {
+    setMainWarehouses(warehouses.filter(w => w.type === 'main'));
+  }, [warehouses]);
 
   const handleSave = async () => {
-    if (!form.name) return toast.error('أدخل اسم المخزن');
-    const data = { ...form, restaurant_id: restaurantId };
+    if (!form.code || !form.name || !form.name_ar) {
+      return toast.error('يرجى ملء جميع الحقول المطلوبة');
+    }
+    
+    const data = {
+      ...form,
+      restaurant_id: restaurantId,
+      parent_warehouse_id: form.parent_warehouse_id || null,
+      type: form.type.toUpperCase(),
+      accounting_standard: form.accounting_standard.toUpperCase()
+    };
     
     try {
       if (editingWarehouse) {
@@ -902,6 +954,25 @@ function WarehousesManager({ restaurantId, warehouses, onRefresh }: { restaurant
       }
       setShowForm(false);
       setEditingWarehouse(null);
+      setForm({
+        code: '',
+        name: '',
+        name_ar: '',
+        type: 'main',
+        accounting_standard: 'IFRS',
+        parent_warehouse_id: '',
+        address: '',
+        city: '',
+        country: 'Egypt',
+        phone: '',
+        email: '',
+        manager_name: '',
+        currency: 'EGP',
+        accounting_account_code: '',
+        inventory_account_code: '',
+        cogs_account_code: '',
+        notes: ''
+      });
       onRefresh();
     } catch (error: any) {
       console.error('Warehouse save error:', error);
@@ -913,10 +984,10 @@ function WarehousesManager({ restaurantId, warehouses, onRefresh }: { restaurant
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <h3 className="font-display font-bold text-lg flex items-center gap-2">
-          <Truck className="w-5 h-5 text-primary" /> قائمة الفروع والمستودعات
+          <Building2 className="w-5 h-5 text-primary" /> إدارة المخازن والمستودعات
         </h3>
-        <Button onClick={() => { setForm({ name: '', type: 'main', location: '' }); setShowForm(true); }} size="sm" className="gradient-bg text-primary-foreground border-0 rounded-xl">
-          <Plus className="w-4 h-4 ml-1" /> إضافة مخزن/فرع
+        <Button onClick={() => { setShowForm(true); }} size="sm" className="gradient-bg text-primary-foreground border-0 rounded-xl">
+          <Plus className="w-4 h-4 ml-1" /> إضافة مخزن
         </Button>
       </div>
 
@@ -925,19 +996,57 @@ function WarehousesManager({ restaurantId, warehouses, onRefresh }: { restaurant
           <div key={wh.id} className="glass-card p-4 rounded-2xl border border-border/50 hover:shadow-lg transition-all">
             <div className="flex items-center justify-between mb-3">
               <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
-                <Truck className="w-5 h-5 text-primary" />
+                <Building2 className="w-5 h-5 text-primary" />
               </div>
-              <Badge variant="outline" className="text-[10px] bg-secondary/30">{wh.type === 'main' ? 'رئيسي' : wh.type === 'sub' ? 'فرعي' : 'أخرى'}</Badge>
+              <div className="flex gap-1">
+                <Badge variant="outline" className="text-[10px] bg-secondary/30">{wh.type === 'MAIN' ? 'رئيسي' : wh.type === 'SUB' ? 'فرعي' : wh.type}</Badge>
+                {wh.is_default && <Badge variant="outline" className="text-[10px] bg-primary/20 text-primary">افتراضي</Badge>}
+              </div>
             </div>
             <h4 className="font-bold text-sm mb-1">{wh.name}</h4>
+            <p className="text-[10px] text-muted-foreground mb-1">{wh.name_ar || ''}</p>
             <p className="text-[10px] text-muted-foreground mb-3 flex items-center gap-1">
-              <Search className="w-3 h-3" /> الكود: {wh.code || '---'} | {wh.location || 'بدون موقع'}
+              <Package className="w-3 h-3" /> الكود: {wh.code || '---'}
             </p>
+            {wh.parent_warehouse_id && (
+              <p className="text-[10px] text-muted-foreground mb-3 flex items-center gap-1">
+                <FolderTree className="w-3 h-3" /> تابع: {warehouses.find(w => w.id === wh.parent_warehouse_id)?.name || 'غير معروف'}
+              </p>
+            )}
             <div className="flex gap-2">
-              <Button size="sm" variant="outline" className="flex-1 h-8 rounded-lg text-xs" onClick={() => { setEditingWarehouse(wh); setForm({ name: wh.name, code: wh.code, type: wh.type, location: wh.location }); setShowForm(true); }}>
+              <Button size="sm" variant="outline" className="flex-1 h-8 rounded-lg text-xs" onClick={() => { 
+                setEditingWarehouse(wh); 
+                setForm({
+                  code: wh.code,
+                  name: wh.name,
+                  name_ar: wh.name_ar || '',
+                  type: wh.type.toLowerCase(),
+                  accounting_standard: wh.accounting_standard,
+                  parent_warehouse_id: wh.parent_warehouse_id || '',
+                  address: wh.address || '',
+                  city: wh.city || '',
+                  country: wh.country || 'Egypt',
+                  phone: wh.phone || '',
+                  email: wh.email || '',
+                  manager_name: wh.manager_name || '',
+                  currency: wh.currency,
+                  accounting_account_code: wh.accounting_account_code || '',
+                  inventory_account_code: wh.inventory_account_code || '',
+                  cogs_account_code: wh.cogs_account_code || '',
+                  notes: wh.notes || ''
+                });
+                setShowForm(true); 
+              }}>
                 <Edit2 className="w-3 h-3 ml-1" /> تعديل
               </Button>
-              <Button size="sm" variant="ghost" className="h-8 rounded-lg text-destructive hover:bg-destructive/10">
+              <Button size="sm" variant="ghost" className="h-8 rounded-lg text-destructive hover:bg-destructive/10" onClick={() => {
+                if (confirm('هل أنت متأكد من حذف هذا المخزن؟')) {
+                  supabase.from('warehouses').delete().eq('id', wh.id).then(({ error }) => {
+                    if (error) toast.error('فشل الحذف: ' + error.message);
+                    else { toast.success('تم الحذف'); onRefresh(); }
+                  });
+                }
+              }}>
                 <Trash2 className="w-3 h-3" />
               </Button>
             </div>
@@ -945,6 +1054,7 @@ function WarehousesManager({ restaurantId, warehouses, onRefresh }: { restaurant
         ))}
         {warehouses.length === 0 && (
           <div className="col-span-full py-20 text-center glass-card rounded-3xl opacity-50">
+            <Building2 className="w-12 h-12 mx-auto mb-4 text-muted-foreground" />
             <p className="text-sm">لم يتم إضافة أي مستودعات بعد</p>
           </div>
         )}
@@ -953,18 +1063,57 @@ function WarehousesManager({ restaurantId, warehouses, onRefresh }: { restaurant
       <AnimatePresence>
         {showForm && (
           <div className="fixed inset-0 z-50 bg-background/80 backdrop-blur-sm flex items-center justify-center p-4">
-            <motion.div initial={{ scale: 0.9 }} animate={{ scale: 1 }} className="glass-card p-6 max-w-sm w-full space-y-4 rounded-3xl shadow-2xl">
+            <motion.div initial={{ scale: 0.9 }} animate={{ scale: 1 }} className="glass-card p-6 max-w-lg w-full max-h-[90vh] overflow-auto space-y-4 rounded-3xl shadow-2xl">
               <h3 className="font-display font-bold text-lg">{editingWarehouse ? 'تعديل مخزن' : 'مخزن جديد'}</h3>
               <div className="space-y-3">
-                <Input placeholder="اسم المخزن / الفرع" value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} className="h-11 rounded-xl" />
+                <div className="grid grid-cols-2 gap-3">
+                  <Input placeholder="الكود" value={form.code} onChange={e => setForm({ ...form, code: e.target.value })} className="h-11 rounded-xl" />
+                  <Input placeholder="اسم المخزن" value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} className="h-11 rounded-xl" />
+                </div>
+                <Input placeholder="الاسم بالعربي" value={form.name_ar} onChange={e => setForm({ ...form, name_ar: e.target.value })} className="h-11 rounded-xl" />
                 <select value={form.type} onChange={e => setForm({ ...form, type: e.target.value })} className="w-full h-11 rounded-xl border border-input bg-background px-3 text-sm">
-                  <option value="main">مخزن رئيسي</option>
-                  <option value="sub">مخزن فرعي</option>
-                  <option value="raw">مخزن خامات</option>
-                  <option value="finished">مخزن منتج تام</option>
-                  <option value="project">مخزون مشروع</option>
+                  <option value="main">مخزن رئيسي (MAIN)</option>
+                  <option value="sub">مخزن فرعي (SUB)</option>
+                  <option value="raw_materials">مخزن خامات (RAW_MATERIALS)</option>
+                  <option value="work_in_progress">مخزن تحت التصنيع (WORK_IN_PROGRESS)</option>
+                  <option value="finished_goods">مخزن منتج تام (FINISHED_GOODS)</option>
+                  <option value="service">مخزن خدمات (SERVICE)</option>
+                  <option value="project">مخزون مشروع (PROJECT)</option>
                 </select>
-                <Input placeholder="الموقع / العنوان" value={form.location} onChange={e => setForm({ ...form, location: e.target.value })} className="h-11 rounded-xl" />
+                <select value={form.accounting_standard} onChange={e => setForm({ ...form, accounting_standard: e.target.value })} className="w-full h-11 rounded-xl border border-input bg-background px-3 text-sm">
+                  <option value="IFRS">IFRS</option>
+                  <option value="EAS">EAS</option>
+                  <option value="US_GAAP">US GAAP</option>
+                </select>
+                {form.type === 'sub' && (
+                  <select value={form.parent_warehouse_id} onChange={e => setForm({ ...form, parent_warehouse_id: e.target.value })} className="w-full h-11 rounded-xl border border-input bg-background px-3 text-sm">
+                    <option value="">اختر المخزن الرئيسي</option>
+                    {mainWarehouses.map(w => <option key={w.id} value={w.id}>{w.name} ({w.code})</option>)}
+                  </select>
+                )}
+                <Input placeholder="العنوان" value={form.address} onChange={e => setForm({ ...form, address: e.target.value })} className="h-11 rounded-xl" />
+                <div className="grid grid-cols-2 gap-3">
+                  <Input placeholder="المدينة" value={form.city} onChange={e => setForm({ ...form, city: e.target.value })} className="h-11 rounded-xl" />
+                  <Input placeholder="الدولة" value={form.country} onChange={e => setForm({ ...form, country: e.target.value })} className="h-11 rounded-xl" />
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <Input placeholder="الهاتف" value={form.phone} onChange={e => setForm({ ...form, phone: e.target.value })} className="h-11 rounded-xl" />
+                  <Input placeholder="البريد الإلكتروني" value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} className="h-11 rounded-xl" />
+                </div>
+                <Input placeholder="اسم المدير" value={form.manager_name} onChange={e => setForm({ ...form, manager_name: e.target.value })} className="h-11 rounded-xl" />
+                <select value={form.currency} onChange={e => setForm({ ...form, currency: e.target.value })} className="w-full h-11 rounded-xl border border-input bg-background px-3 text-sm">
+                  <option value="EGP">EGP - جنيه مصري</option>
+                  <option value="USD">USD - دولار أمريكي</option>
+                  <option value="EUR">EUR - يورو</option>
+                  <option value="SAR">SAR - ريال سعودي</option>
+                  <option value="AED">AED - درهم إماراتي</option>
+                </select>
+                <div className="grid grid-cols-3 gap-3">
+                  <Input placeholder="كود حساب المحاسبة" value={form.accounting_account_code} onChange={e => setForm({ ...form, accounting_account_code: e.target.value })} className="h-11 rounded-xl" />
+                  <Input placeholder="كود حساب المخزون" value={form.inventory_account_code} onChange={e => setForm({ ...form, inventory_account_code: e.target.value })} className="h-11 rounded-xl" />
+                  <Input placeholder="كود حساب تكلفة البضاعة" value={form.cogs_account_code} onChange={e => setForm({ ...form, cogs_account_code: e.target.value })} className="h-11 rounded-xl" />
+                </div>
+                <textarea placeholder="ملاحظات" value={form.notes} onChange={e => setForm({ ...form, notes: e.target.value })} className="w-full h-20 rounded-xl border border-input bg-background px-3 text-sm resize-none" />
               </div>
               <div className="flex gap-2">
                 <Button onClick={handleSave} className="flex-1 h-11 gradient-bg text-primary-foreground border-0 rounded-xl font-bold">حفظ</Button>
@@ -1108,7 +1257,7 @@ function InventoryTransfersManager({ restaurantId, warehouses, products, onRefre
   );
 }
 
-function LandedCostsManager({ restaurantId, currency, onRefresh }: { restaurantId: string; currency: string; onRefresh: () => void }) {
+function LandedCostsManager({ restaurantId, currency, products, onRefresh }: { restaurantId: string; currency: string; products: Product[]; onRefresh: () => void }) {
   const [showAdd, setShowAdd] = useState(false);
   const [landedCosts, setLandedCosts] = useState<any[]>([]);
   const [receipts, setReceipts] = useState<any[]>([]);
