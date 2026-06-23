@@ -119,8 +119,8 @@ export function ContractorsTab({ restaurant }: Props) {
 
   const loadInvoices = async () => {
     const { data } = await supabase
-      .from('sales_invoices')
-      .select('id, invoice_number, total, customer_name, created_at, sales_invoice_items(id, item_name, quantity, unit_price, total)')
+      .from('orders')
+      .select('id, order_number, total, customer_name, created_at, order_items(id, item_name, quantity, unit_price, total)')
       .eq('restaurant_id', restaurant.id)
       .order('created_at', { ascending: false })
       .limit(50);
@@ -139,7 +139,7 @@ export function ContractorsTab({ restaurant }: Props) {
 
   const filteredInvoices = invoices.filter(inv =>
     !invoiceSearch ||
-    inv.invoice_number?.toLowerCase().includes(invoiceSearch.toLowerCase()) ||
+    inv.order_number?.toLowerCase().includes(invoiceSearch.toLowerCase()) ||
     inv.customer_name?.toLowerCase().includes(invoiceSearch.toLowerCase())
   );
 
@@ -490,7 +490,7 @@ export function ContractorsTab({ restaurant }: Props) {
                     <Popover>
                       <PopoverTrigger asChild>
                         <Button variant="outline" className="w-full justify-start text-left">
-                          {selectedInvoice ? invoices.find(i => i.id === selectedInvoice)?.invoice_number : 'اختر فاتورة'}
+                          {selectedInvoice ? invoices.find(i => i.id === selectedInvoice)?.order_number : 'اختر فاتورة'}
                         </Button>
                       </PopoverTrigger>
                       <PopoverContent className="w-80 p-3">
@@ -507,7 +507,7 @@ export function ContractorsTab({ restaurant }: Props) {
                                 onClick={() => handleInvoiceSelect(inv.id)}
                                 className="p-3 rounded cursor-pointer hover:bg-primary/10 border-b"
                               >
-                                <div className="font-medium">{inv.invoice_number}</div>
+                                <div className="font-medium">{inv.order_number}</div>
                                 <div className="text-xs text-muted-foreground">{inv.customer_name || 'بدون عميل'} - {inv.total} ج.م</div>
                               </div>
                             ))}
@@ -551,7 +551,7 @@ export function ContractorsTab({ restaurant }: Props) {
                   <div>
                     <Label className="text-xs">اختر صنف من الفاتورة (اختياري)</Label>
                     <div className="max-h-40 overflow-y-auto border rounded-lg p-2 space-y-1">
-                      {invoices.find(i => i.id === selectedInvoice)?.sales_invoice_items?.map((item: any) => (
+                      {invoices.find(i => i.id === selectedInvoice)?.order_items?.map((item: any) => (
                         <div
                           key={item.id}
                           onClick={() => handleServiceSelect(item)}
