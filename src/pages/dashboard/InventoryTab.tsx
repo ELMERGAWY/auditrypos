@@ -461,6 +461,14 @@ export function InventoryTab({ restaurantId, currency, businessType }: Props) {
         <TabsContent value="landed_costs" className="space-y-4">
           <LandedCostsManager restaurantId={restaurantId} currency={currency} products={products} onRefresh={load} />
         </TabsContent>
+
+        <TabsContent value="reorder" className="space-y-4">
+          <SmartReorderTab products={products} currency={currency} restaurantId={restaurantId} />
+        </TabsContent>
+
+        <TabsContent value="wac" className="space-y-4">
+          <WACTab products={products} currency={currency} />
+        </TabsContent>
       </Tabs>
 
       {/* Modals from original code updated to fit new design */}
@@ -1411,16 +1419,6 @@ function LandedCostsManager({ restaurantId, currency, products, onRefresh }: { r
           </div>
         )}
       </AnimatePresence>
-
-      {/* ═══════════════════════════════════════════════════════════ */}
-      {/* Tab: Smart Reordering                                       */}
-      {/* ═══════════════════════════════════════════════════════════ */}
-      <SmartReorderTab products={products} currency={currency} restaurantId={restaurantId} />
-
-      {/* ═══════════════════════════════════════════════════════════ */}
-      {/* Tab: Weighted Average Cost                                   */}
-      {/* ═══════════════════════════════════════════════════════════ */}
-      <WACTab products={products} currency={currency} />
     </div>
   );
 }
