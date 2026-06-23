@@ -208,7 +208,7 @@ export const BUSINESS_TYPES: Record<BusinessType, BusinessTypeConfig> = {
       requireCustomer: false
     },
     
-    tabs: ['home', 'employees', 'marketing_services', 'marketing_quotes', 'marketing_contracts', 'pos', 'orders', 'menu', 'bom', 'service_packages', 'inventory', 'inventory_receipts', 'purchase_invoices', 'purchase_orders', 'supplier_contracts', 'sales_invoices', 'sales_orders', 'crm', 'delivery', 'customers', 'customer_accounts', 'sales_returns', 'suppliers', 'supplier_accounts', 'shifts', 'stats', 'analytics', 'ai_assistant', 'financials', 'treasury', 'chart_of_accounts', 'manual_journal', 'accounting_mapping', 'fixed_assets', 'expenses', 'staff', 'users', 'notifications', 'settings'],
+    tabs: ['home', 'employees', 'marketing_services', 'marketing_quotes', 'marketing_contracts', 'pos', 'orders', 'menu', 'bom', 'service_packages', 'inventory', 'inventory_receipts', 'purchase_invoices', 'purchase_orders', 'supplier_contracts', 'sales_invoices', 'sales_orders', 'crm', 'delivery', 'customers', 'customer_accounts', 'sales_returns', 'suppliers', 'supplier_accounts', 'contractors', 'shifts', 'stats', 'analytics', 'ai_assistant', 'financials', 'treasury', 'chart_of_accounts', 'manual_journal', 'accounting_mapping', 'fixed_assets', 'expenses', 'staff', 'users', 'notifications', 'settings'],
     
     specialFields: [
       { name: 'guest_count', type: 'number', label: 'عدد الضيوف', required: false },
