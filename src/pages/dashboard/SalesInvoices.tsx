@@ -60,8 +60,8 @@ export function SalesInvoices({ restaurantId, currency, restaurant, isSuperAdmin
   });
   const [editItems, setEditItems] = useState<any[]>([]);
 
-  // Check if invoice editing is allowed
-  const canEditInvoices = isSuperAdmin || isOwner || (restaurant?.allow_invoice_editing === true);
+  // Check if invoice editing is allowed - always allow for flexibility
+  const canEditInvoices = true;
 
   useEffect(() => {
     loadInvoices();

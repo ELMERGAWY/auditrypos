@@ -58,6 +58,9 @@ export function ContractorsTab({ restaurant }: Props) {
   const [selectedOrder, setSelectedOrder] = useState<string>('');
   const [selectedInvoices, setSelectedInvoices] = useState<string[]>([]);
   const [selectedOrders, setSelectedOrders] = useState<string[]>([]);
+  const [invoiceSearch, setInvoiceSearch] = useState('');
+  const [orderSearch, setOrderSearch] = useState('');
+  const [selectedService, setSelectedService] = useState<any>(null);
   const [serviceForm, setServiceForm] = useState({
     contractor_id: '',
     service_name: '',
@@ -116,7 +119,7 @@ export function ContractorsTab({ restaurant }: Props) {
   const loadInvoices = async () => {
     const { data } = await supabase
       .from('sales_invoices')
-      .select('id, invoice_number, total, customer_name, created_at')
+      .select('id, invoice_number, total, customer_name, created_at, sales_invoice_items(id, item_name, quantity, unit_price, total)')
       .eq('restaurant_id', restaurant.id)
       .order('created_at', { ascending: false })
       .limit(50);
@@ -126,11 +129,44 @@ export function ContractorsTab({ restaurant }: Props) {
   const loadOrders = async () => {
     const { data } = await supabase
       .from('orders')
-      .select('id, order_number, total, customer_name, created_at')
+      .select('id, order_number, total, customer_name, created_at, order_items(id, item_name, quantity, unit_price, total)')
       .eq('restaurant_id', restaurant.id)
       .order('created_at', { ascending: false })
       .limit(50);
     setOrders(data || []);
+  };
+
+  const filteredInvoices = invoices.filter(inv =>
+    !invoiceSearch ||
+    inv.invoice_number?.toLowerCase().includes(invoiceSearch.toLowerCase()) ||
+    inv.customer_name?.toLowerCase().includes(invoiceSearch.toLowerCase())
+  );
+
+  const filteredOrders = orders.filter(ord =>
+    !orderSearch ||
+    ord.order_number?.toLowerCase().includes(orderSearch.toLowerCase()) ||
+    ord.customer_name?.toLowerCase().includes(orderSearch.toLowerCase())
+  );
+
+  const handleInvoiceSelect = (invoiceId: string) => {
+    setSelectedInvoice(invoiceId);
+    setSelectedOrder('');
+    setSelectedService(null);
+  };
+
+  const handleOrderSelect = (orderId: string) => {
+    setSelectedOrder(orderId);
+    setSelectedInvoice('');
+    setSelectedService(null);
+  };
+
+  const handleServiceSelect = (service: any) => {
+    setSelectedService(service);
+    setServiceForm({
+      ...serviceForm,
+      service_name: service.item_name,
+      service_amount: service.unit_price?.toString() || service.total?.toString() || ''
+    });
   };
 
   const openAddServiceDialog = () => {
@@ -452,12 +488,18 @@ export function ContractorsTab({ restaurant }: Props) {
                   <div className="grid grid-cols-2 gap-2">
                     <div>
                       <Label className="text-xs">فاتورة</Label>
-                      <Select value={selectedInvoice} onValueChange={(v) => { setSelectedInvoice(v); setSelectedOrder(''); }}>
+                      <Input
+                        placeholder="بحث برقم الفاتورة أو العميل..."
+                        value={invoiceSearch}
+                        onChange={(e) => setInvoiceSearch(e.target.value)}
+                        className="mb-2 h-8 text-xs"
+                      />
+                      <Select value={selectedInvoice} onValueChange={handleInvoiceSelect}>
                         <SelectTrigger>
                           <SelectValue placeholder="اختر فاتورة" />
                         </SelectTrigger>
                         <SelectContent>
-                          {invoices.map(inv => (
+                          {filteredInvoices.map(inv => (
                             <SelectItem key={inv.id} value={inv.id}>{inv.invoice_number} - {inv.customer_name || 'بدون عميل'} ({inv.total} ج.م)</SelectItem>
                           ))}
                         </SelectContent>
@@ -465,12 +507,18 @@ export function ContractorsTab({ restaurant }: Props) {
                     </div>
                     <div>
                       <Label className="text-xs">طلب</Label>
-                      <Select value={selectedOrder} onValueChange={(v) => { setSelectedOrder(v); setSelectedInvoice(''); }}>
+                      <Input
+                        placeholder="بحث برقم الطلب أو العميل..."
+                        value={orderSearch}
+                        onChange={(e) => setOrderSearch(e.target.value)}
+                        className="mb-2 h-8 text-xs"
+                      />
+                      <Select value={selectedOrder} onValueChange={handleOrderSelect}>
                         <SelectTrigger>
                           <SelectValue placeholder="اختر طلب" />
                         </SelectTrigger>
                         <SelectContent>
-                          {orders.map(ord => (
+                          {filteredOrders.map(ord => (
                             <SelectItem key={ord.id} value={ord.id}>{ord.order_number} - {ord.customer_name || 'بدون عميل'} ({ord.total} ج.م)</SelectItem>
                           ))}
                         </SelectContent>
@@ -478,6 +526,51 @@ export function ContractorsTab({ restaurant }: Props) {
                     </div>
                   </div>
                 </div>
+
+                {/* Show items when invoice/order is selected */}
+                {selectedInvoice && (
+                  <div>
+                    <Label className="text-xs">اختر صنف من الفاتورة (اختياري)</Label>
+                    <div className="max-h-40 overflow-y-auto border rounded-lg p-2 space-y-1">
+                      {invoices.find(i => i.id === selectedInvoice)?.sales_invoice_items?.map((item: any) => (
+                        <div
+                          key={item.id}
+                          onClick={() => handleServiceSelect(item)}
+                          className={`p-2 rounded cursor-pointer hover:bg-primary/10 text-xs ${
+                            selectedService?.id === item.id ? 'bg-primary/20 border border-primary/30' : ''
+                          }`}
+                        >
+                          <div className="font-medium">{item.item_name}</div>
+                          <div className="text-muted-foreground">
+                            {item.quantity} × {item.unit_price} = {item.total} ج.م
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {selectedOrder && (
+                  <div>
+                    <Label className="text-xs">اختر صنف من الطلب (اختياري)</Label>
+                    <div className="max-h-40 overflow-y-auto border rounded-lg p-2 space-y-1">
+                      {orders.find(o => o.id === selectedOrder)?.order_items?.map((item: any) => (
+                        <div
+                          key={item.id}
+                          onClick={() => handleServiceSelect(item)}
+                          className={`p-2 rounded cursor-pointer hover:bg-primary/10 text-xs ${
+                            selectedService?.id === item.id ? 'bg-primary/20 border border-primary/30' : ''
+                          }`}
+                        >
+                          <div className="font-medium">{item.item_name}</div>
+                          <div className="text-muted-foreground">
+                            {item.quantity} × {item.unit_price} = {item.total} ج.م
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
                 <div>
                   <Label>اسم الخدمة *</Label>
                   <Input
