@@ -22,6 +22,8 @@ DECLARE
   v_inventory_mode TEXT;
   v_linked_product_id UUID;
   v_component RECORD;
+  v_credit_account UUID;
+  v_credit_desc TEXT;
 BEGIN
   -- Only process when status changes to 'approved' or 'completed'
   IF NEW.status NOT IN ('approved', 'completed') OR OLD.status IN ('approved', 'completed') THEN
@@ -152,33 +154,32 @@ BEGIN
   ) RETURNING id INTO v_entry_id;
 
   -- Insert all journal lines with explicit NULL checks
-  -- Ensure balance by inserting debit and credit together
+  -- Ensure balance by inserting debit and credit together in a single INSERT
   IF v_sales_returns_account IS NOT NULL THEN
-    INSERT INTO public.journal_entry_lines (entry_id, account_id, debit, credit, description, line_order)
-    VALUES (v_entry_id, v_sales_returns_account, NEW.total_amount, 0, 'مردود مبيعات', 1);
-
-    -- Insert corresponding credit line
+    -- Determine the credit account first
     IF NEW.customer_id IS NOT NULL AND v_receivable_account IS NOT NULL THEN
-      INSERT INTO public.journal_entry_lines (entry_id, account_id, debit, credit, description, line_order)
-      VALUES (v_entry_id, v_receivable_account, 0, NEW.total_amount, 'مستحق من العميل', 2);
+      v_credit_account := v_receivable_account;
+      v_credit_desc := 'مستحق من العميل';
     ELSIF v_cash_account IS NOT NULL THEN
-      INSERT INTO public.journal_entry_lines (entry_id, account_id, debit, credit, description, line_order)
-      VALUES (v_entry_id, v_cash_account, 0, NEW.total_amount, 'استرداد نقدي', 2);
+      v_credit_account := v_cash_account;
+      v_credit_desc := 'استرداد نقدي';
     ELSE
-      -- If no customer or cash account, use a default suspense account or raise error
       RAISE EXCEPTION 'لا يمكن إنشاء قيد مردود المبيعات: لا يوجد حساب عميل أو صندوق';
     END IF;
+
+    -- Insert both debit and credit lines together
+    INSERT INTO public.journal_entry_lines (entry_id, account_id, debit, credit, description, line_order)
+    VALUES
+      (v_entry_id, v_sales_returns_account, NEW.total_amount, 0, 'مردود مبيعات', 1),
+      (v_entry_id, v_credit_account, 0, NEW.total_amount, v_credit_desc, 2);
   END IF;
 
   -- Insert inventory and COGS lines together to maintain balance
-  IF v_total_cost > 0 THEN
-    IF v_inventory_account IS NOT NULL AND v_cogs_account IS NOT NULL THEN
-      INSERT INTO public.journal_entry_lines (entry_id, account_id, debit, credit, description, line_order)
-      VALUES (v_entry_id, v_inventory_account, v_total_cost, 0, 'إعادة للمخزن', 3);
-
-      INSERT INTO public.journal_entry_lines (entry_id, account_id, debit, credit, description, line_order)
-      VALUES (v_entry_id, v_cogs_account, 0, v_total_cost, 'عكس تكلفة', 4);
-    END IF;
+  IF v_total_cost > 0 AND v_inventory_account IS NOT NULL AND v_cogs_account IS NOT NULL THEN
+    INSERT INTO public.journal_entry_lines (entry_id, account_id, debit, credit, description, line_order)
+    VALUES
+      (v_entry_id, v_inventory_account, v_total_cost, 0, 'إعادة للمخزن', 3),
+      (v_entry_id, v_cogs_account, 0, v_total_cost, 'عكس تكلفة', 4);
   END IF;
 
   -- Calculate totals from the actual lines and update journal entry
