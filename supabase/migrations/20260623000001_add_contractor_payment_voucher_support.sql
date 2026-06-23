@@ -11,8 +11,11 @@ ADD COLUMN IF NOT EXISTS contractor_id UUID REFERENCES public.contractors(id) ON
 -- 2. Create index for contractor_id
 CREATE INDEX IF NOT EXISTS idx_payment_vouchers_contractor_id ON public.payment_vouchers(contractor_id);
 
--- 3. Update payment voucher function to support contractors
-CREATE OR REPLACE FUNCTION public.save_payment_voucher(
+-- 3. Drop existing save_payment_voucher function (all overloads)
+DROP FUNCTION IF EXISTS public.save_payment_voucher CASCADE;
+
+-- 4. Create new payment voucher function to support contractors
+CREATE FUNCTION public.save_payment_voucher(
   p_restaurant_id UUID,
   p_supplier_id UUID,
   p_contractor_id UUID,
