@@ -118,8 +118,8 @@ export function ContractorsTab({ restaurant }: Props) {
 
   const loadInvoices = async () => {
     const { data } = await supabase
-      .from('sales_invoices')
-      .select('id, invoice_number, total, customer_name, created_at, sales_invoice_items(id, item_name, quantity, unit_price, total)')
+      .from('orders')
+      .select('id, order_number, total, customer_name, created_at, order_items(id, item_name, quantity, unit_price, total)')
       .eq('restaurant_id', restaurant.id)
       .order('created_at', { ascending: false })
       .limit(50);
@@ -138,7 +138,7 @@ export function ContractorsTab({ restaurant }: Props) {
 
   const filteredInvoices = invoices.filter(inv =>
     !invoiceSearch ||
-    inv.invoice_number?.toLowerCase().includes(invoiceSearch.toLowerCase()) ||
+    inv.order_number?.toLowerCase().includes(invoiceSearch.toLowerCase()) ||
     inv.customer_name?.toLowerCase().includes(invoiceSearch.toLowerCase())
   );
 
@@ -501,7 +501,7 @@ export function ContractorsTab({ restaurant }: Props) {
                           </SelectTrigger>
                           <SelectContent>
                             {filteredInvoices.map(inv => (
-                              <SelectItem key={inv.id} value={inv.id}>{inv.invoice_number} - {inv.customer_name || 'بدون عميل'} ({inv.total} ج.م)</SelectItem>
+                              <SelectItem key={inv.id} value={inv.id}>{inv.order_number} - {inv.customer_name || 'بدون عميل'} ({inv.total} ج.م)</SelectItem>
                             ))}
                           </SelectContent>
                         </Select>
@@ -536,7 +536,7 @@ export function ContractorsTab({ restaurant }: Props) {
                   <div>
                     <Label className="text-xs">اختر صنف من الفاتورة (اختياري)</Label>
                     <div className="max-h-40 overflow-y-auto border rounded-lg p-2 space-y-1">
-                      {invoices.find(i => i.id === selectedInvoice)?.sales_invoice_items?.map((item: any) => (
+                      {invoices.find(i => i.id === selectedInvoice)?.order_items?.map((item: any) => (
                         <div
                           key={item.id}
                           onClick={() => handleServiceSelect(item)}
