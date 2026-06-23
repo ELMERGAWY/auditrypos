@@ -51,6 +51,8 @@ export function ContractorsTab({ restaurant }: Props) {
   const [showAddServiceDialog, setShowAddServiceDialog] = useState(false);
   const [showPaymentDialog, setShowPaymentDialog] = useState(false);
   const [showSummaryDialog, setShowSummaryDialog] = useState(false);
+  const [showInvoiceSelect, setShowInvoiceSelect] = useState(false);
+  const [showOrderSelect, setShowOrderSelect] = useState(false);
   const [invoices, setInvoices] = useState<any[]>([]);
   const [orders, setOrders] = useState<any[]>([]);
   const [payments, setPayments] = useState<any[]>([]);
@@ -486,48 +488,68 @@ export function ContractorsTab({ restaurant }: Props) {
                 <div>
                   <Label>المصدر (اختياري)</Label>
                   <div className="grid grid-cols-2 gap-2">
-                    <div>
-                      <Label className="text-xs">فاتورة</Label>
-                      <div className="space-y-2">
-                        <Input
-                          placeholder="بحث برقم الفاتورة أو العميل..."
-                          value={invoiceSearch}
-                          onChange={(e) => setInvoiceSearch(e.target.value)}
-                          className="h-8 text-xs"
-                        />
-                        <Select value={selectedInvoice} onValueChange={handleInvoiceSelect}>
-                          <SelectTrigger>
-                            <SelectValue placeholder="اختر فاتورة" />
-                          </SelectTrigger>
-                          <SelectContent>
+                    <Dialog open={showInvoiceSelect} onOpenChange={(open) => { setShowInvoiceSelect(open); if (!open) setInvoiceSearch(''); }}>
+                      <DialogTrigger asChild>
+                        <Button variant="outline" className="w-full justify-start text-left">
+                          {selectedInvoice ? invoices.find(i => i.id === selectedInvoice)?.invoice_number : 'اختر فاتورة'}
+                        </Button>
+                      </DialogTrigger>
+                      <DialogContent className="max-w-md">
+                        <DialogHeader>
+                          <DialogTitle>اختر فاتورة</DialogTitle>
+                        </DialogHeader>
+                        <div className="space-y-4">
+                          <Input
+                            placeholder="بحث برقم الفاتورة أو العميل..."
+                            value={invoiceSearch}
+                            onChange={(e) => setInvoiceSearch(e.target.value)}
+                          />
+                          <div className="max-h-60 overflow-y-auto space-y-1">
                             {filteredInvoices.map(inv => (
-                              <SelectItem key={inv.id} value={inv.id}>{inv.invoice_number} - {inv.customer_name || 'بدون عميل'} ({inv.total} ج.م)</SelectItem>
+                              <div
+                                key={inv.id}
+                                onClick={() => { handleInvoiceSelect(inv.id); setShowInvoiceSelect(false); }}
+                                className="p-3 rounded cursor-pointer hover:bg-primary/10 border-b"
+                              >
+                                <div className="font-medium">{inv.invoice_number}</div>
+                                <div className="text-xs text-muted-foreground">{inv.customer_name || 'بدون عميل'} - {inv.total} ج.م</div>
+                              </div>
                             ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                    </div>
-                    <div>
-                      <Label className="text-xs">طلب</Label>
-                      <div className="space-y-2">
-                        <Input
-                          placeholder="بحث برقم الطلب أو العميل..."
-                          value={orderSearch}
-                          onChange={(e) => setOrderSearch(e.target.value)}
-                          className="h-8 text-xs"
-                        />
-                        <Select value={selectedOrder} onValueChange={handleOrderSelect}>
-                          <SelectTrigger>
-                            <SelectValue placeholder="اختر طلب" />
-                          </SelectTrigger>
-                          <SelectContent>
+                          </div>
+                        </div>
+                      </DialogContent>
+                    </Dialog>
+                    <Dialog open={showOrderSelect} onOpenChange={(open) => { setShowOrderSelect(open); if (!open) setOrderSearch(''); }}>
+                      <DialogTrigger asChild>
+                        <Button variant="outline" className="w-full justify-start text-left">
+                          {selectedOrder ? orders.find(o => o.id === selectedOrder)?.order_number : 'اختر طلب'}
+                        </Button>
+                      </DialogTrigger>
+                      <DialogContent className="max-w-md">
+                        <DialogHeader>
+                          <DialogTitle>اختر طلب</DialogTitle>
+                        </DialogHeader>
+                        <div className="space-y-4">
+                          <Input
+                            placeholder="بحث برقم الطلب أو العميل..."
+                            value={orderSearch}
+                            onChange={(e) => setOrderSearch(e.target.value)}
+                          />
+                          <div className="max-h-60 overflow-y-auto space-y-1">
                             {filteredOrders.map(ord => (
-                              <SelectItem key={ord.id} value={ord.id}>{ord.order_number} - {ord.customer_name || 'بدون عميل'} ({ord.total} ج.م)</SelectItem>
+                              <div
+                                key={ord.id}
+                                onClick={() => { handleOrderSelect(ord.id); setShowOrderSelect(false); }}
+                                className="p-3 rounded cursor-pointer hover:bg-primary/10 border-b"
+                              >
+                                <div className="font-medium">{ord.order_number}</div>
+                                <div className="text-xs text-muted-foreground">{ord.customer_name || 'بدون عميل'} - {ord.total} ج.م</div>
+                              </div>
                             ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                    </div>
+                          </div>
+                        </div>
+                      </DialogContent>
+                    </Dialog>
                   </div>
                 </div>
 
