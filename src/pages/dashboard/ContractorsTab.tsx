@@ -58,6 +58,8 @@ export function ContractorsTab({ restaurant }: Props) {
   const [selectedOrder, setSelectedOrder] = useState<string>('');
   const [selectedInvoices, setSelectedInvoices] = useState<string[]>([]);
   const [selectedOrders, setSelectedOrders] = useState<string[]>([]);
+  const [invoiceSearch, setInvoiceSearch] = useState('');
+  const [orderSearch, setOrderSearch] = useState('');
   const [serviceForm, setServiceForm] = useState({
     contractor_id: '',
     service_name: '',
@@ -132,6 +134,18 @@ export function ContractorsTab({ restaurant }: Props) {
       .limit(50);
     setOrders(data || []);
   };
+
+  const filteredInvoices = invoices.filter(inv =>
+    !invoiceSearch ||
+    inv.invoice_number?.toLowerCase().includes(invoiceSearch.toLowerCase()) ||
+    inv.customer_name?.toLowerCase().includes(invoiceSearch.toLowerCase())
+  );
+
+  const filteredOrders = orders.filter(ord =>
+    !orderSearch ||
+    ord.order_number?.toLowerCase().includes(orderSearch.toLowerCase()) ||
+    ord.customer_name?.toLowerCase().includes(orderSearch.toLowerCase())
+  );
 
   const openAddServiceDialog = () => {
     loadInvoices();
