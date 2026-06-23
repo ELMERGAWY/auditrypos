@@ -14,8 +14,8 @@ CREATE INDEX IF NOT EXISTS idx_payment_vouchers_contractor_id ON public.payment_
 -- 3. Update payment voucher function to support contractors
 CREATE OR REPLACE FUNCTION public.save_payment_voucher(
   p_restaurant_id UUID,
-  p_supplier_id UUID DEFAULT NULL,
-  p_contractor_id UUID DEFAULT NULL,
+  p_supplier_id UUID,
+  p_contractor_id UUID,
   p_amount NUMERIC,
   p_payment_method TEXT DEFAULT 'cash',
   p_reference_number TEXT DEFAULT NULL,
