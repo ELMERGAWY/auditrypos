@@ -49,25 +49,32 @@ BEGIN
   v_cogs_account := public.get_cogs_account(NEW.restaurant_id);
   v_inventory_account := public.get_inventory_account(NEW.restaurant_id);
 
+  -- Log account IDs for debugging
+  RAISE NOTICE 'Sales Returns Account: %', v_sales_returns_account;
+  RAISE NOTICE 'Receivable Account: %', v_receivable_account;
+  RAISE NOTICE 'Cash Account: %', v_cash_account;
+  RAISE NOTICE 'COGS Account: %', v_cogs_account;
+  RAISE NOTICE 'Inventory Account: %', v_inventory_account;
+
   -- Final validation - should not happen if get_or_create functions work
   IF v_sales_returns_account IS NULL THEN
     RAISE EXCEPTION 'حساب مردودات المبيعات غير موجود ولم يمكن إنشاؤه';
   END IF;
 
   IF v_receivable_account IS NULL THEN
-    RAISE EXCEPTION 'حساب الذمم المدينة غير موجود ولم يمكن إنشاؤه';
+    RAISE NOTICE 'تحذير: حساب الذمم المدينة NULL - سيتم استخدام حساب الصندوق كبديل';
   END IF;
 
   IF v_cash_account IS NULL THEN
-    RAISE EXCEPTION 'حساب النقد غير موجود ولم يمكن إنشاؤه';
+    RAISE NOTICE 'تحذير: حساب الصندوق NULL - سيتم استخدام حساب الذمم المدينة كبديل';
   END IF;
 
   IF v_cogs_account IS NULL THEN
-    RAISE EXCEPTION 'حساب تكلفة البضاعة المباعة غير موجود ولم يمكن إنشاؤه';
+    RAISE NOTICE 'تحذير: حساب تكلفة البضاعة المباعة NULL - لن يتم إنشاء سطور COGS';
   END IF;
 
   IF v_inventory_account IS NULL THEN
-    RAISE EXCEPTION 'حساب المخزون غير موجود ولم يمكن إنشاؤه';
+    RAISE NOTICE 'تحذير: حساب المخزون NULL - لن يتم إنشاء سطور المخزون';
   END IF;
 
   -- Calculate total cost from return items
@@ -164,7 +171,21 @@ BEGIN
       v_credit_account := v_cash_account;
       v_credit_desc := 'استرداد نقدي';
     ELSE
-      RAISE EXCEPTION 'لا يمكن إنشاء قيد مردود المبيعات: لا يوجد حساب عميل أو صندوق';
+      -- Try to use whichever account is available
+      IF v_receivable_account IS NOT NULL THEN
+        v_credit_account := v_receivable_account;
+        v_credit_desc := 'مستحق من العميل (افتراضي)';
+      ELSIF v_cash_account IS NOT NULL THEN
+        v_credit_account := v_cash_account;
+        v_credit_desc := 'استرداد نقدي (افتراضي)';
+      ELSE
+        RAISE EXCEPTION 'لا يمكن إنشاء قيد مردود المبيعات: لا يوجد حساب عميل أو صندوق';
+      END IF;
+    END IF;
+
+    -- Final check before INSERT
+    IF v_credit_account IS NULL THEN
+      RAISE EXCEPTION 'خطأ: v_credit_account is NULL before INSERT. Receivable: %, Cash: %', v_receivable_account, v_cash_account;
     END IF;
 
     -- Insert both debit and credit lines together
