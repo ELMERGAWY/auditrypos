@@ -6,7 +6,6 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Plus, Save, Trash2, Edit, User, Phone, MapPin, DollarSign, CheckCircle, Clock, AlertCircle, Receipt, ShoppingCart } from 'lucide-react';
 import { AnimatePresence, motion } from 'framer-motion';
@@ -119,8 +118,8 @@ export function ContractorsTab({ restaurant }: Props) {
 
   const loadInvoices = async () => {
     const { data } = await supabase
-      .from('orders')
-      .select('id, order_number, total, customer_name, created_at, order_items(id, item_name, quantity, unit_price, total)')
+      .from('sales_invoices')
+      .select('id, invoice_number, total, customer_name, created_at, sales_invoice_items(id, item_name, quantity, unit_price, total)')
       .eq('restaurant_id', restaurant.id)
       .order('created_at', { ascending: false })
       .limit(50);
@@ -139,7 +138,7 @@ export function ContractorsTab({ restaurant }: Props) {
 
   const filteredInvoices = invoices.filter(inv =>
     !invoiceSearch ||
-    inv.order_number?.toLowerCase().includes(invoiceSearch.toLowerCase()) ||
+    inv.invoice_number?.toLowerCase().includes(invoiceSearch.toLowerCase()) ||
     inv.customer_name?.toLowerCase().includes(invoiceSearch.toLowerCase())
   );
 
@@ -487,62 +486,48 @@ export function ContractorsTab({ restaurant }: Props) {
                 <div>
                   <Label>المصدر (اختياري)</Label>
                   <div className="grid grid-cols-2 gap-2">
-                    <Popover>
-                      <PopoverTrigger asChild>
-                        <Button variant="outline" className="w-full justify-start text-left">
-                          {selectedInvoice ? invoices.find(i => i.id === selectedInvoice)?.order_number : 'اختر فاتورة'}
-                        </Button>
-                      </PopoverTrigger>
-                      <PopoverContent className="w-80 p-3">
-                        <div className="space-y-3">
-                          <Input
-                            placeholder="بحث برقم الفاتورة أو العميل..."
-                            value={invoiceSearch}
-                            onChange={(e) => setInvoiceSearch(e.target.value)}
-                          />
-                          <div className="max-h-60 overflow-y-auto space-y-1">
+                    <div>
+                      <Label className="text-xs">فاتورة</Label>
+                      <div className="space-y-2">
+                        <Input
+                          placeholder="بحث برقم الفاتورة أو العميل..."
+                          value={invoiceSearch}
+                          onChange={(e) => setInvoiceSearch(e.target.value)}
+                          className="h-8 text-xs"
+                        />
+                        <Select value={selectedInvoice} onValueChange={handleInvoiceSelect}>
+                          <SelectTrigger>
+                            <SelectValue placeholder="اختر فاتورة" />
+                          </SelectTrigger>
+                          <SelectContent>
                             {filteredInvoices.map(inv => (
-                              <div
-                                key={inv.id}
-                                onClick={() => handleInvoiceSelect(inv.id)}
-                                className="p-3 rounded cursor-pointer hover:bg-primary/10 border-b"
-                              >
-                                <div className="font-medium">{inv.order_number}</div>
-                                <div className="text-xs text-muted-foreground">{inv.customer_name || 'بدون عميل'} - {inv.total} ج.م</div>
-                              </div>
+                              <SelectItem key={inv.id} value={inv.id}>{inv.invoice_number} - {inv.customer_name || 'بدون عميل'} ({inv.total} ج.م)</SelectItem>
                             ))}
-                          </div>
-                        </div>
-                      </PopoverContent>
-                    </Popover>
-                    <Popover>
-                      <PopoverTrigger asChild>
-                        <Button variant="outline" className="w-full justify-start text-left">
-                          {selectedOrder ? orders.find(o => o.id === selectedOrder)?.order_number : 'اختر طلب'}
-                        </Button>
-                      </PopoverTrigger>
-                      <PopoverContent className="w-80 p-3">
-                        <div className="space-y-3">
-                          <Input
-                            placeholder="بحث برقم الطلب أو العميل..."
-                            value={orderSearch}
-                            onChange={(e) => setOrderSearch(e.target.value)}
-                          />
-                          <div className="max-h-60 overflow-y-auto space-y-1">
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+                    <div>
+                      <Label className="text-xs">طلب</Label>
+                      <div className="space-y-2">
+                        <Input
+                          placeholder="بحث برقم الطلب أو العميل..."
+                          value={orderSearch}
+                          onChange={(e) => setOrderSearch(e.target.value)}
+                          className="h-8 text-xs"
+                        />
+                        <Select value={selectedOrder} onValueChange={handleOrderSelect}>
+                          <SelectTrigger>
+                            <SelectValue placeholder="اختر طلب" />
+                          </SelectTrigger>
+                          <SelectContent>
                             {filteredOrders.map(ord => (
-                              <div
-                                key={ord.id}
-                                onClick={() => handleOrderSelect(ord.id)}
-                                className="p-3 rounded cursor-pointer hover:bg-primary/10 border-b"
-                              >
-                                <div className="font-medium">{ord.order_number}</div>
-                                <div className="text-xs text-muted-foreground">{ord.customer_name || 'بدون عميل'} - {ord.total} ج.م</div>
-                              </div>
+                              <SelectItem key={ord.id} value={ord.id}>{ord.order_number} - {ord.customer_name || 'بدون عميل'} ({ord.total} ج.م)</SelectItem>
                             ))}
-                          </div>
-                        </div>
-                      </PopoverContent>
-                    </Popover>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
                   </div>
                 </div>
 
@@ -551,7 +536,7 @@ export function ContractorsTab({ restaurant }: Props) {
                   <div>
                     <Label className="text-xs">اختر صنف من الفاتورة (اختياري)</Label>
                     <div className="max-h-40 overflow-y-auto border rounded-lg p-2 space-y-1">
-                      {invoices.find(i => i.id === selectedInvoice)?.order_items?.map((item: any) => (
+                      {invoices.find(i => i.id === selectedInvoice)?.sales_invoice_items?.map((item: any) => (
                         <div
                           key={item.id}
                           onClick={() => handleServiceSelect(item)}
