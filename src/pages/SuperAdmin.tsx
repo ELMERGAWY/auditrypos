@@ -805,7 +805,7 @@ const SuperAdmin = () => {
                   business_type: businessType,
                   custom_business_type_id: customType ? customType.id : null,
                   custom_tabs: customTabs,
-                  owner_id: newRestaurantForm.owner_id || null,
+                  owner_id: newRestaurantForm.owner_id || user?.id, // Default to current user if none selected
                   status: 'active',
                   subscription_end: trialEnd.toISOString(),
                   business_type_locked: true,
