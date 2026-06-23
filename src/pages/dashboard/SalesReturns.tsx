@@ -511,8 +511,8 @@ export function SalesReturnsManager({ restaurantId, currency }: Props) {
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex gap-1">
-                        <Button 
-                          variant="ghost" 
+                        <Button
+                          variant="ghost"
                           size="sm"
                           onClick={() => {
                             setSelectedReturn(ret);
@@ -523,32 +523,30 @@ export function SalesReturnsManager({ restaurantId, currency }: Props) {
                           <FileText className="w-4 h-4" />
                         </Button>
                         {ret.status === 'pending' && (
-                          <>
-                            <Button 
-                              variant="ghost" 
-                              size="sm"
-                              onClick={() => handleUpdateStatus(ret, 'completed')}
-                            >
-                              <CheckCircle className="w-4 h-4 text-success" />
-                            </Button>
-                            <Button 
-                              variant="ghost" 
-                              size="sm"
-                              onClick={() => handleDeleteReturn(ret.id)}
-                            >
-                              <Trash2 className="w-4 h-4 text-destructive" />
-                            </Button>
-                          </>
-                        )}
-                        {ret.status === 'approved' && (
-                          <Button 
-                            variant="ghost" 
+                          <Button
+                            variant="ghost"
                             size="sm"
                             onClick={() => handleUpdateStatus(ret, 'completed')}
                           >
                             <CheckCircle className="w-4 h-4 text-success" />
                           </Button>
                         )}
+                        {ret.status === 'approved' && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleUpdateStatus(ret, 'completed')}
+                          >
+                            <CheckCircle className="w-4 h-4 text-success" />
+                          </Button>
+                        )}
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleDeleteReturn(ret.id)}
+                        >
+                          <Trash2 className="w-4 h-4 text-destructive" />
+                        </Button>
                       </div>
                     </td>
                   </tr>
