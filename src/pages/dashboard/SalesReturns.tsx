@@ -88,6 +88,7 @@ export function SalesReturnsManager({ restaurantId, currency }: Props) {
   const [returnDate, setReturnDate] = useState<string>(new Date().toISOString().split('T')[0]);
   const [returnReason, setReturnReason] = useState('');
   const [selectedItems, setSelectedItems] = useState<Map<string, { quantity: number; condition: string; return_to_inventory: boolean }>>(new Map());
+  const [customerSearchQuery, setCustomerSearchQuery] = useState('');
 
   useEffect(() => {
     loadReturns();
@@ -305,20 +306,26 @@ export function SalesReturnsManager({ restaurantId, currency }: Props) {
   };
 
   const handleDeleteReturn = async (returnId: string) => {
-    if (!confirm('هل أنت متأكد من حذف هذا المردود؟')) return;
+    if (!confirm('هل أنت متأكد من حذف هذا المردود؟ سيتم إرجاع جميع الحسابات والمخزون لحالتهم السابقة.')) return;
 
     try {
-      const { error } = await supabase
-        .from('sales_returns')
-        .delete()
-        .eq('id', returnId);
+      const { data, error } = await supabase.rpc('delete_sales_return', {
+        p_sales_return_id: returnId
+      });
 
       if (error) throw error;
 
-      toast.success('تم حذف المردود بنجاح');
-      loadReturns();
+      const result = data as { success: boolean; message?: string; error?: string };
+      
+      if (result.success) {
+        toast.success('✅ تم حذف المردود وإرجاع الحسابات بنجاح');
+        loadReturns();
+      } else {
+        toast.error('فشل حذف المردود: ' + (result.error || 'خطأ غير معروف'));
+      }
     } catch (error: any) {
       toast.error('فشل حذف المردود: ' + error.message);
+      console.error('handleDeleteReturn error:', error);
     }
   };
 
@@ -565,16 +572,32 @@ export function SalesReturnsManager({ restaurantId, currency }: Props) {
                 <User className="w-4 h-4" />
                 اختيار العميل
               </Label>
-              <select
-                value={selectedCustomer}
-                onChange={(e) => onCustomerSelect(e.target.value)}
-                className="w-full h-10 rounded-md border border-input bg-background px-3 mt-1"
-              >
-                <option value="">اختر العميل...</option>
-                {customers.map(c => (
-                  <option key={c.id} value={c.id}>{c.name} {c.phone && `- ${c.phone}`}</option>
-                ))}
-              </select>
+              <div className="mt-1 space-y-2">
+                <div className="relative">
+                  <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                  <Input
+                    placeholder="البحث عن العميل..."
+                    value={customerSearchQuery}
+                    onChange={(e) => setCustomerSearchQuery(e.target.value)}
+                    className="pr-10"
+                  />
+                </div>
+                <select
+                  value={selectedCustomer}
+                  onChange={(e) => onCustomerSelect(e.target.value)}
+                  className="w-full h-10 rounded-md border border-input bg-background px-3"
+                >
+                  <option value="">اختر العميل...</option>
+                  {customers
+                    .filter(c => 
+                      c.name.toLowerCase().includes(customerSearchQuery.toLowerCase()) ||
+                      c.phone?.includes(customerSearchQuery)
+                    )
+                    .map(c => (
+                    <option key={c.id} value={c.id}>{c.name} {c.phone && `- ${c.phone}`}</option>
+                  ))}
+                </select>
+              </div>
             </div>
 
             {/* Order Selection */}
