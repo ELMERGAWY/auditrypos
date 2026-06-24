@@ -253,36 +253,6 @@ class CheckoutIntegration {
           const remaining = finalTotal - paidAmount;
           await this.updateCustomerBalance(customerId, context.restaurantId, remaining, order.id, orderNum);
         }
-        
-        // Record payment transaction if any amount was paid
-        if (paidAmount > 0) {
-          // Update customer balance (reduce by paid amount)
-          const { data: customer } = await supabase
-            .from('customers')
-            .select('balance')
-            .eq('id', customerId)
-            .single();
-
-          if (customer) {
-            await supabase
-              .from('customers')
-              .update({ balance: (customer.balance || 0) - paidAmount })
-              .eq('id', customerId);
-          }
-
-          // Record payment transaction
-          await supabase.from('customer_transactions').insert({
-            customer_id: customerId,
-            restaurant_id: context.restaurantId,
-            type: 'payment',
-            amount: -paidAmount,
-            description: `دفع على الفاتورة #${orderNum.slice(-4)}`,
-            order_id: order.id,
-            payment_method: orderData.paymentMethod,
-            reference_type: 'order',
-            reference_id: order.id
-          });
-        }
       }
 
       // 14. Update delivery agent status if applicable
