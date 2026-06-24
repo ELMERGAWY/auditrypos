@@ -130,7 +130,7 @@ class CheckoutIntegration {
         });
 
       const safeCustomer = orderData.customerName?.trim()
-        ? this.findOrCreateCustomer(context.restaurantId, orderData.customerName.trim(), orderData.customerPhone)
+        ? this.findOrCreateCustomer(context.restaurantId, orderData.customerName.trim(), orderData.customerPhone, orderData.customerRef)
             .catch((e) => { console.warn('[checkout] customer upsert failed:', e); return null; })
         : Promise.resolve(null);
 
@@ -247,10 +247,42 @@ class CheckoutIntegration {
         }
       }
 
-      // 13. Handle customer balance if partial payment
-      if (customerId && paidAmount < finalTotal) {
-        const remaining = finalTotal - paidAmount;
-        await this.updateCustomerBalance(customerId, context.restaurantId, remaining, order.id, orderNum);
+      // 13. Handle customer balance and transactions
+      if (customerId) {
+        if (paidAmount < finalTotal) {
+          const remaining = finalTotal - paidAmount;
+          await this.updateCustomerBalance(customerId, context.restaurantId, remaining, order.id, orderNum);
+        }
+        
+        // Record payment transaction if any amount was paid
+        if (paidAmount > 0) {
+          // Update customer balance (reduce by paid amount)
+          const { data: customer } = await supabase
+            .from('customers')
+            .select('balance')
+            .eq('id', customerId)
+            .single();
+
+          if (customer) {
+            await supabase
+              .from('customers')
+              .update({ balance: (customer.balance || 0) - paidAmount })
+              .eq('id', customerId);
+          }
+
+          // Record payment transaction
+          await supabase.from('customer_transactions').insert({
+            customer_id: customerId,
+            restaurant_id: context.restaurantId,
+            type: 'payment',
+            amount: -paidAmount,
+            description: `دفع على الفاتورة #${orderNum.slice(-4)}`,
+            order_id: order.id,
+            payment_method: orderData.paymentMethod,
+            reference_type: 'order',
+            reference_id: order.id
+          });
+        }
       }
 
       // 14. Update delivery agent status if applicable
@@ -435,21 +467,25 @@ class CheckoutIntegration {
   private async findOrCreateCustomer(
     restaurantId: string,
     name: string,
-    phone?: string
+    phone?: string,
+    customerRef?: string
   ): Promise<string | null> {
     try {
       if (!name || name === 'عميل نقدي' || name.trim() === '') return null;
 
       const trimmedName = name.trim();
       const trimmedPhone = phone?.trim();
+      const trimmedCustomerRef = customerRef?.trim();
 
-      // 1. Try to find existing customer
+      // 1. Try to find existing customer by customer_ref first, then phone/name
       let query = supabase
         .from('customers')
-        .select('id, name, phone')
+        .select('id, name, phone, customer_ref')
         .eq('restaurant_id', restaurantId);
       
-      if (trimmedPhone) {
+      if (trimmedCustomerRef) {
+        query = query.eq('customer_ref', trimmedCustomerRef);
+      } else if (trimmedPhone) {
         query = query.or(`phone.eq.${trimmedPhone},name.ilike.${trimmedName}`);
       } else {
         query = query.ilike('name', trimmedName);
@@ -463,11 +499,14 @@ class CheckoutIntegration {
 
       if (existing && existing.length > 0) {
         const customer = existing[0];
-        // If customer exists but phone was missing, update it
-        if (trimmedPhone && !customer.phone) {
+        // Update customer info if needed
+        const updates: any = {};
+        if (trimmedPhone && !customer.phone) updates.phone = trimmedPhone;
+        if (trimmedCustomerRef && !customer.customer_ref) updates.customer_ref = trimmedCustomerRef;
+        if (Object.keys(updates).length > 0) {
           await supabase
             .from('customers')
-            .update({ phone: trimmedPhone })
+            .update(updates)
             .eq('id', customer.id);
         }
         return customer.id;
@@ -481,6 +520,7 @@ class CheckoutIntegration {
           restaurant_id: restaurantId,
           name: trimmedName,
           phone: trimmedPhone || null,
+          customer_ref: trimmedCustomerRef || null,
           customer_type: 'regular',
           balance: 0
         })
@@ -489,15 +529,21 @@ class CheckoutIntegration {
 
       if (insertError) {
         console.error('[checkout] Failed to create customer:', insertError);
-        // If it's a unique constraint error on name+restaurant_id, try one last fetch
+        // If it's a unique constraint error, try one last fetch by customer_ref or name
         if (insertError.code === '23505') {
-           const { data: lastTry } = await supabase
-             .from('customers')
-             .select('id')
-             .eq('restaurant_id', restaurantId)
-             .ilike('name', trimmedName)
-             .single();
-           return lastTry?.id || null;
+          let fallbackQuery = supabase
+            .from('customers')
+            .select('id')
+            .eq('restaurant_id', restaurantId);
+          
+          if (trimmedCustomerRef) {
+            fallbackQuery = fallbackQuery.eq('customer_ref', trimmedCustomerRef);
+          } else {
+            fallbackQuery = fallbackQuery.ilike('name', trimmedName);
+          }
+          
+          const { data: lastTry } = await fallbackQuery.single();
+          return lastTry?.id || null;
         }
         return null;
       }
@@ -539,6 +585,8 @@ class CheckoutIntegration {
       description: `فاتورة #${orderNumber.slice(-4)} - متبقي`,
       order_id: orderId,
       payment_method: 'credit',
+      reference_type: 'order',
+      reference_id: orderId
     });
   }
 

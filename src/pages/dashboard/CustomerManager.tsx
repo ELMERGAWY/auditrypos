@@ -124,7 +124,8 @@ export function CustomerManager({ restaurantId, currency }: Props) {
     credit_limit: '',
     tax_number: '',
     customer_type: 'retail',
-    notes: ''
+    notes: '',
+    customer_ref: ''
   });
 
   useEffect(() => {
@@ -530,6 +531,7 @@ export function CustomerManager({ restaurantId, currency }: Props) {
           tax_number: formData.tax_number || null,
           customer_type: formData.customer_type || 'retail',
           notes: formData.notes || null,
+          customer_ref: formData.customer_ref || null,
           balance: 0
         } as any);
 
@@ -537,7 +539,7 @@ export function CustomerManager({ restaurantId, currency }: Props) {
 
       toast.success('تم إضافة العميل بنجاح');
       setShowAddModal(false);
-      setFormData({ name: '', phone: '', email: '', address: '', credit_limit: '', tax_number: '', customer_type: 'retail', notes: '' });
+      setFormData({ name: '', phone: '', email: '', address: '', credit_limit: '', tax_number: '', customer_type: 'retail', notes: '', customer_ref: '' });
       loadCustomers();
     } catch (error: any) {
       toast.error('فشل إضافة العميل: ' + error.message);
@@ -559,6 +561,7 @@ export function CustomerManager({ restaurantId, currency }: Props) {
           tax_number: formData.tax_number || null,
           customer_type: formData.customer_type || 'retail',
           notes: formData.notes || null,
+          customer_ref: formData.customer_ref || null
         } as any)
         .eq('id', selectedCustomer.id);
 
@@ -567,7 +570,7 @@ export function CustomerManager({ restaurantId, currency }: Props) {
       toast.success('تم تحديث العميل بنجاح');
       setShowAddModal(false);
       setSelectedCustomer(null);
-      setFormData({ name: '', phone: '', email: '', address: '', credit_limit: '', tax_number: '', customer_type: 'retail', notes: '' });
+      setFormData({ name: '', phone: '', email: '', address: '', credit_limit: '', tax_number: '', customer_type: 'retail', notes: '', customer_ref: '' });
       loadCustomers();
     } catch (error: any) {
       toast.error('فشل تحديث العميل: ' + error.message);
@@ -931,7 +934,8 @@ export function CustomerManager({ restaurantId, currency }: Props) {
       credit_limit: customer.credit_limit?.toString() || '',
       tax_number: customer.tax_number || '',
       customer_type: (customer as any).customer_type || 'retail',
-      notes: (customer as any).notes || ''
+      notes: (customer as any).notes || '',
+      customer_ref: (customer as any).customer_ref || ''
     });
     setShowAddModal(true);
   };
@@ -1181,6 +1185,14 @@ export function CustomerManager({ restaurantId, currency }: Props) {
                 value={formData.address} 
                 onChange={(e) => setFormData({ ...formData, address: e.target.value })}
                 placeholder="عنوان العميل"
+              />
+            </div>
+            <div>
+              <Label>الرقم المرجعي</Label>
+              <Input 
+                value={formData.customer_ref} 
+                onChange={(e) => setFormData({ ...formData, customer_ref: e.target.value })}
+                placeholder="رقم مرجعي للعميل"
               />
             </div>
             <div className="grid grid-cols-2 gap-3">
