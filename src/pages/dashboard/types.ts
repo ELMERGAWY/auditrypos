@@ -166,8 +166,17 @@ export interface Project {
   created_at: string;
 }
 
+export interface ProjectSite {
+  id: string;
+  project_id: string;
+  name: string;
+  location?: string;
+  created_at: string;
+}
+
 export interface ProjectBlock {
   id: string;
+  site_id?: string;
   project_id: string;
   name: string;
   estimated_cost?: number;

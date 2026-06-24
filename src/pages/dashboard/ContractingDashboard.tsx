@@ -6,7 +6,7 @@ import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Plus, Building2, Construction, Receipt, AlertCircle, Trash2, ArrowLeft } from 'lucide-react';
+import { Plus, Building2, Construction, Trash2, ArrowLeft, MapPin } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -19,39 +19,42 @@ export function ContractingDashboard({ restaurantId, currency }: Props) {
   const [projects, setProjects] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [showAddProject, setShowAddProject] = useState(false);
-  const [showAddBlock, setShowAddBlock] = useState<{ projectId: string } | null>(null);
+  const [showAddSite, setShowAddSite] = useState<{ projectId: string } | null>(null);
+  const [showAddBlock, setShowAddBlock] = useState<{ projectId: string; siteId?: string } | null>(null);
   
   const [newProject, setNewProject] = useState({ name: '', client: '', budget: '', pricing_type: 'fixed_price', markup_percentage: '0' });
+  const [newSite, setNewSite] = useState({ name: '', location: '' });
   const [newBlock, setNewBlock] = useState({ name: '', estimatedCost: '' });
   
   const [selectedProject, setSelectedProject] = useState<any>(null);
+  const [selectedSite, setSelectedSite] = useState<any>(null);
 
   const loadData = async () => {
     setLoading(true);
     const { data: projectsData } = await supabase
       .from('projects')
-      .select('*, project_blocks(*)')
+      .select('*, project_sites(*), project_blocks(*)')
       .eq('restaurant_id', restaurantId)
       .order('created_at', { ascending: false });
     
     // Calculate actual costs from expenses
     const { data: expensesData } = await supabase
       .from('expenses')
-      .select('project_id, block_id, amount')
+      .select('project_id, site_id, block_id, amount')
       .eq('restaurant_id', restaurantId)
       .not('project_id', 'is', null);
 
     // Calculate actual revenues from sales_invoices (مستخلصات)
     const { data: invoicesData } = await supabase
       .from('sales_invoices')
-      .select('project_id, block_id, grand_total')
+      .select('project_id, site_id, block_id, grand_total')
       .eq('restaurant_id', restaurantId)
       .not('project_id', 'is', null);
 
     // Calculate pass-through purchase invoices for projects
     const { data: passThroughData } = await supabase
       .from('purchase_invoices')
-      .select('project_id, total_amount, client_sales_amount, pass_through_markup_amount')
+      .select('project_id, site_id, total_amount, client_sales_amount, pass_through_markup_amount')
       .eq('restaurant_id', restaurantId)
       .not('project_id', 'is', null)
       .eq('is_pass_through_to_client', true);
@@ -79,13 +82,42 @@ export function ContractingDashboard({ restaurantId, currency }: Props) {
         projectedProfit = costPlusRevenue - totalCost;
       }
 
-      const enrichedBlocks = (p.project_blocks || []).map((b: any) => {
+      const projectSites = (p.project_sites || []).map((s: any) => {
+        const sExpenses = pExpenses.filter(e => e.site_id === s.id);
+        const sInvoices = pInvoices.filter(i => i.site_id === s.id);
+        const sPassThrough = pPassThrough.filter(pt => pt.site_id === s.id);
+        
+        const siteCost = sExpenses.reduce((sum, e) => sum + Number(e.amount), 0) +
+                        sPassThrough.reduce((sum, pt) => sum + Number(pt.total_amount), 0);
+        const siteRevenue = sInvoices.reduce((sum, i) => sum + Number(i.grand_total), 0) +
+                           sPassThrough.reduce((sum, pt) => sum + Number(pt.client_sales_amount), 0);
+        
+        const siteBlocks = (p.project_blocks || []).filter((b: any) => b.site_id === s.id).map((b: any) => {
+          const bExpenses = sExpenses.filter(e => e.block_id === b.id);
+          const bInvoices = sInvoices.filter(i => i.block_id === b.id);
+          return {
+            ...b,
+            actual_cost: bExpenses.reduce((sum, e) => sum + Number(e.amount), 0),
+            actual_revenue: bInvoices.reduce((sum, i) => sum + Number(i.grand_total), 0)
+          };
+        });
+
+        return {
+          ...s,
+          total_cost: siteCost,
+          total_revenue: siteRevenue,
+          project_blocks: siteBlocks
+        };
+      });
+
+      // Blocks without a site
+      const orphanBlocks = (p.project_blocks || []).filter((b: any) => !b.site_id).map((b: any) => {
         const bExpenses = pExpenses.filter(e => e.block_id === b.id);
         const bInvoices = pInvoices.filter(i => i.block_id === b.id);
         return {
           ...b,
-          actual_cost: bExpenses.reduce((s, e) => s + Number(e.amount), 0),
-          actual_revenue: bInvoices.reduce((s, i) => s + Number(i.grand_total), 0)
+          actual_cost: bExpenses.reduce((sum, e) => sum + Number(e.amount), 0),
+          actual_revenue: bInvoices.reduce((sum, i) => sum + Number(i.grand_total), 0)
         };
       });
 
@@ -95,7 +127,8 @@ export function ContractingDashboard({ restaurantId, currency }: Props) {
         total_revenue: totalRevenue,
         total_pass_through_markup: totalPassThroughMarkup,
         projected_profit: projectedProfit,
-        project_blocks: enrichedBlocks
+        project_sites: projectSites,
+        project_blocks: orphanBlocks
       };
     });
 
@@ -127,11 +160,32 @@ export function ContractingDashboard({ restaurantId, currency }: Props) {
     }
   };
 
+  const handleCreateSite = async () => {
+    if (!newSite.name || !showAddSite) { toast.error('اسم الموقع مطلوب'); return; }
+    
+    const { error } = await supabase.from('project_sites').insert({
+      project_id: showAddSite.projectId,
+      restaurant_id: restaurantId,
+      name: newSite.name,
+      location: newSite.location
+    });
+
+    if (!error) {
+      toast.success('تم إضافة الموقع بنجاح');
+      setShowAddSite(null);
+      setNewSite({ name: '', location: '' });
+      loadData();
+    } else {
+      toast.error('فشل إضافة الموقع');
+    }
+  };
+
   const handleCreateBlock = async () => {
     if (!newBlock.name || !showAddBlock) { toast.error('اسم المرحلة مطلوب'); return; }
     
     const { error } = await supabase.from('project_blocks').insert({
       project_id: showAddBlock.projectId,
+      site_id: showAddBlock.siteId || null,
       name: newBlock.name,
       estimated_cost: Number(newBlock.estimatedCost) || 0
     });
@@ -144,6 +198,12 @@ export function ContractingDashboard({ restaurantId, currency }: Props) {
     } else {
       toast.error('فشل إضافة المرحلة');
     }
+  };
+
+  const handleDeleteSite = async (siteId: string) => {
+    if (!confirm('هل أنت متأكد من حذف هذا الموقع؟')) return;
+    const { error } = await supabase.from('project_sites').delete().eq('id', siteId);
+    if (!error) { toast.success('تم الحذف'); loadData(); }
   };
 
   const handleDeleteBlock = async (blockId: string) => {
@@ -161,7 +221,7 @@ export function ContractingDashboard({ restaurantId, currency }: Props) {
           </div>
           <div>
             <h2 className="text-3xl font-black">إدارة المشاريع والمقاولات</h2>
-            <p className="text-muted-foreground">تتبع تكاليف وإيرادات ومستخلصات المشاريع ومراحلها التنفيذية.</p>
+            <p className="text-muted-foreground">تتبع تكاليف وإيرادات ومستخلصات المشاريع والمواقع والمراحل التنفيذية.</p>
           </div>
         </div>
         <Button onClick={() => setShowAddProject(true)} className="gap-2 text-lg h-12 px-6">
@@ -220,7 +280,7 @@ export function ContractingDashboard({ restaurantId, currency }: Props) {
                 </div>
               </div>
               <div className="bg-secondary/30 px-6 py-3 border-t text-xs font-bold text-muted-foreground flex justify-between">
-                <span>{p.project_blocks?.length || 0} مراحل تنفيذية</span>
+                <span>{(p.project_sites?.length || 0) + (p.project_blocks?.length || 0)} مواقع ومراحل</span>
                 <span>الموازنة: {Number(p.total_budget || 0).toLocaleString()}</span>
               </div>
             </Card>
@@ -233,7 +293,7 @@ export function ContractingDashboard({ restaurantId, currency }: Props) {
              </div>
           )}
         </div>
-      ) : (
+      ) : !selectedSite ? (
         <div className="space-y-6 animate-in slide-in-from-right-4">
            <Button variant="ghost" onClick={() => setSelectedProject(null)} className="gap-2 mb-4">
               <ArrowLeft className="w-4 h-4" /> العودة للقائمة
@@ -257,9 +317,97 @@ export function ContractingDashboard({ restaurantId, currency }: Props) {
 
               <div className="flex justify-between items-center mb-6">
                  <h3 className="text-2xl font-bold flex items-center gap-2">
+                    <Building2 className="w-6 h-6 text-primary" /> المواقع (Sites)
+                 </h3>
+                 <Button onClick={() => setShowAddSite({ projectId: selectedProject.id })} size="sm" className="gap-2">
+                    <Plus className="w-4 h-4" /> إضافة موقع
+                 </Button>
+              </div>
+
+              <div className="space-y-4 mb-8">
+                 {selectedProject.project_sites?.map((site: any) => (
+                    <Card key={site.id} className="p-6 cursor-pointer hover:shadow-md transition-all" onClick={() => setSelectedSite(site)}>
+                       <div className="flex justify-between items-center">
+                          <div>
+                             <div className="flex items-center gap-2 mb-2">
+                                <h4 className="text-xl font-bold">{site.name}</h4>
+                                {site.location && (
+                                   <span className="text-sm text-muted-foreground flex items-center gap-1">
+                                      <MapPin className="w-4 h-4" /> {site.location}
+                                   </span>
+                                )}
+                             </div>
+                             <div className="grid grid-cols-2 gap-4 text-sm">
+                                <div>
+                                   <p className="text-muted-foreground">المصروفات:</p>
+                                   <p className="font-bold text-red-500">{Number(site.total_cost || 0).toLocaleString()} {currency}</p>
+                                </div>
+                                <div>
+                                   <p className="text-muted-foreground">المستخلصات:</p>
+                                   <p className="font-bold text-green-500">{Number(site.total_revenue || 0).toLocaleString()} {currency}</p>
+                                </div>
+                             </div>
+                          </div>
+                          <div className="flex gap-2">
+                             <Button variant="ghost" size="icon" className="text-destructive hover:bg-destructive/10" onClick={(e) => { e.stopPropagation(); handleDeleteSite(site.id); }}> <Trash2 className="w-4 h-4" /> </Button>
+                          </div>
+                       </div>
+                    </Card>
+                 ))}
+              </div>
+
+              <div className="border-t pt-6">
+                 <div className="flex justify-between items-center mb-4">
+                    <h4 className="text-xl font-bold">المراحل بدون موقع (Blocks)</h4>
+                    <Button onClick={() => setShowAddBlock({ projectId: selectedProject.id })} size="sm" className="gap-2">
+                       <Plus className="w-4 h-4" /> إضافة مرحلة
+                    </Button>
+                 </div>
+                 <div className="space-y-4">
+                    {selectedProject.project_blocks?.map((block: any) => (
+                       <div key={block.id} className="grid grid-cols-12 gap-4 px-4 py-4 border rounded-lg items-center hover:bg-secondary/20 transition-colors bg-card">
+                          <div className="col-span-4 font-bold">{block.name}</div>
+                          <div className="col-span-2 text-center font-mono text-sm">{Number(block.estimated_cost || 0).toLocaleString()}</div>
+                          <div className="col-span-2 text-center font-mono text-sm font-bold text-red-500">{Number(block.actual_cost || 0).toLocaleString()}</div>
+                          <div className="col-span-2 text-center font-mono text-sm font-bold text-green-500">{Number(block.actual_revenue || 0).toLocaleString()}</div>
+                          <div className="col-span-2 flex justify-center gap-2">
+                             <Button variant="ghost" size="icon" className="text-destructive hover:bg-destructive/10" onClick={() => handleDeleteBlock(block.id)}> <Trash2 className="w-4 h-4" /> </Button>
+                          </div>
+                       </div>
+                    ))}
+                 </div>
+              </div>
+           </Card>
+        </div>
+      ) : (
+        <div className="space-y-6 animate-in slide-in-from-right-4">
+           <Button variant="ghost" onClick={() => setSelectedSite(null)} className="gap-2 mb-4">
+              <ArrowLeft className="w-4 h-4" /> العودة للمشروع
+           </Button>
+           
+           <Card className="p-8 border-t-8 border-t-primary">
+              <div className="flex justify-between items-start mb-8 pb-8 border-b">
+                 <div>
+                    <h2 className="text-3xl font-black mb-2">{selectedSite.name}</h2>
+                    {selectedSite.location && (
+                       <p className="text-muted-foreground flex items-center gap-2">
+                          <MapPin className="w-4 h-4" /> {selectedSite.location}
+                       </p>
+                    )}
+                 </div>
+                 <div className="text-left bg-secondary/20 p-4 rounded-xl border">
+                    <p className="text-sm text-muted-foreground mb-1">صافي ربح الموقع</p>
+                    <p className={`text-3xl font-black ${(selectedSite.total_revenue - selectedSite.total_cost) >= 0 ? 'text-green-500' : 'text-red-500'}`}>
+                       {(selectedSite.total_revenue - selectedSite.total_cost).toLocaleString()} {currency}
+                    </p>
+                 </div>
+              </div>
+
+              <div className="flex justify-between items-center mb-6">
+                 <h3 className="text-2xl font-bold flex items-center gap-2">
                     <Building2 className="w-6 h-6 text-primary" /> المراحل والبلوكات (WBS)
                  </h3>
-                 <Button onClick={() => setShowAddBlock({ projectId: selectedProject.id })} size="sm" className="gap-2">
+                 <Button onClick={() => setShowAddBlock({ projectId: selectedProject.id, siteId: selectedSite.id })} size="sm" className="gap-2">
                     <Plus className="w-4 h-4" /> إضافة مرحلة
                  </Button>
               </div>
@@ -273,7 +421,7 @@ export function ContractingDashboard({ restaurantId, currency }: Props) {
                     <div className="col-span-2 text-center">إجراءات</div>
                  </div>
                  
-                 {selectedProject.project_blocks?.map((block: any) => (
+                 {selectedSite.project_blocks?.map((block: any) => (
                     <div key={block.id} className="grid grid-cols-12 gap-4 px-4 py-4 border rounded-lg items-center hover:bg-secondary/20 transition-colors bg-card">
                        <div className="col-span-4 font-bold">{block.name}</div>
                        <div className="col-span-2 text-center font-mono text-sm">{Number(block.estimated_cost || 0).toLocaleString()}</div>
@@ -287,9 +435,9 @@ export function ContractingDashboard({ restaurantId, currency }: Props) {
                     </div>
                  ))}
 
-                 {(!selectedProject.project_blocks || selectedProject.project_blocks.length === 0) && (
+                 {(!selectedSite.project_blocks || selectedSite.project_blocks.length === 0) && (
                     <div className="text-center py-10 border border-dashed rounded-xl text-muted-foreground">
-                       لم يتم تقسيم المشروع لمراحل بعد.
+                       لم يتم تقسيم الموقع لمراحل بعد.
                     </div>
                  )}
               </div>
@@ -337,6 +485,31 @@ export function ContractingDashboard({ restaurantId, currency }: Props) {
                      <div className="flex gap-3 pt-6">
                         <Button className="flex-1 text-white" onClick={handleCreateProject}>حفظ وإنشاء</Button>
                         <Button variant="outline" onClick={() => setShowAddProject(false)}>إلغاء</Button>
+                     </div>
+                  </div>
+               </motion.div>
+            </div>
+         )}
+      </AnimatePresence>
+
+      {/* Add Site Modal */}
+      <AnimatePresence>
+         {showAddSite && (
+            <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+               <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.9, opacity: 0 }} className="glass-card p-8 max-w-md w-full shadow-2xl">
+                  <h3 className="text-2xl font-black mb-6">إضافة موقع تنفيذي</h3>
+                  <div className="space-y-4">
+                     <div>
+                        <Label>اسم الموقع *</Label>
+                        <Input value={newSite.name} onChange={e => setNewSite({...newSite, name: e.target.value})} placeholder="مثال: الموقع A، فيلا 1، شارع 5" />
+                     </div>
+                     <div>
+                        <Label>الموقع (العنوان)</Label>
+                        <Input value={newSite.location} onChange={e => setNewSite({...newSite, location: e.target.value})} placeholder="مثال: القاهرة، شارع الهرم" />
+                     </div>
+                     <div className="flex gap-3 pt-6">
+                        <Button className="flex-1 text-white" onClick={handleCreateSite}>حفظ الموقع</Button>
+                        <Button variant="outline" onClick={() => setShowAddSite(null)}>إلغاء</Button>
                      </div>
                   </div>
                </motion.div>
