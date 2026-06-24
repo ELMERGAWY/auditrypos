@@ -65,6 +65,7 @@ interface POSCartProps {
   accountingAccounts: any[];
   selectedAccountId: string | null;
   setSelectedAccountId: (id: string) => void;
+  isProcessing: boolean;
 }
 
 export const POSCart = memo(function POSCart({
@@ -78,7 +79,7 @@ export const POSCart = memo(function POSCart({
   discountAmount, taxAmount, cartSubtotal, cartTotal, paymentMethod, setPaymentMethod,
   paidAmount, setPaidAmount, remaining, customerRef, setCustomerRef, checkout, previewInvoice,
   updateValue, updatePrice, updateServiceDetails, removeFromCart,
-  accountingAccounts, selectedAccountId, setSelectedAccountId
+  accountingAccounts, selectedAccountId, setSelectedAccountId, isProcessing
 }: POSCartProps) {
   const { hasPermission } = usePermissions(restaurant?.id);
   const [editingPriceId, setEditingPriceId] = useState<string | null>(null);
@@ -383,18 +384,18 @@ export const POSCart = memo(function POSCart({
           </div>
         </div>
         <div className="grid grid-cols-3 gap-2">
-          <Button onClick={previewInvoice} variant="outline" className="h-10 text-[10px]" disabled={cart.length === 0}>
+          <Button onClick={previewInvoice} variant="outline" className="h-10 text-[10px]" disabled={cart.length === 0 || isProcessing}>
             <Receipt className="w-3 h-3 ml-1" /> معاينة
           </Button>
           {(isFoodSector(businessType) || businessType === 'wholesale') && (
-            <Button onClick={() => checkout(true)} className="gradient-bg text-primary-foreground border-0 h-10 text-[10px]" disabled={cart.length === 0}>
-              <Send className="w-3 h-3 ml-1" /> إرسال للتحضير
+            <Button onClick={() => checkout(true)} className="gradient-bg text-primary-foreground border-0 h-10 text-[10px]" disabled={cart.length === 0 || isProcessing}>
+              <Send className="w-3 h-3 ml-1" /> {isProcessing ? 'جاري المعالجة...' : 'إرسال للتحضير'}
             </Button>
           )}
-          <Button onClick={() => checkout(false)} className="bg-success text-success-foreground border-0 h-10 text-[10px]" disabled={cart.length === 0}>
-            <Receipt className="w-3 h-3 ml-1" /> بيع مباشر
+          <Button onClick={() => checkout(false)} className="bg-success text-success-foreground border-0 h-10 text-[10px]" disabled={cart.length === 0 || isProcessing}>
+            <Receipt className="w-3 h-3 ml-1" /> {isProcessing ? 'جاري المعالجة...' : 'بيع مباشر'}
           </Button>
-          <Button onClick={holdCurrentInvoice} variant="outline" className="h-10 text-[10px]" disabled={cart.length === 0}>
+          <Button onClick={holdCurrentInvoice} variant="outline" className="h-10 text-[10px]" disabled={cart.length === 0 || isProcessing}>
             <Pause className="w-3 h-3 ml-1" /> تعليق
           </Button>
         </div>

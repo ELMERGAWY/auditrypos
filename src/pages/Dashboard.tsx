@@ -537,6 +537,21 @@ export default function Dashboard() {
         setShowReceipt(true);
         toast.success(`✅ تم إنشاء الطلب #${result.order.order_number?.slice(-4)}`);
         clearCart();
+        // Reset all form state for next order!
+        setCustomerName('');
+        setCustomerPhone('');
+        setCustomerRef('');
+        setTableNumber('');
+        setCustomOrderNumber('');
+        setOrderNotes('');
+        setDiscount('');
+        setDiscountType('percent');
+        setSelectedDeliveryAgent('');
+        setDeliveryAddress('');
+        setPaymentMethod('cash');
+        setPaidAmount('');
+        setSelectedAccountId(null);
+        setActiveInvoiceId(null); // Reset to "فاتورة جديدة"!
       } else { throw new Error(result.error); }
     } catch (e) { toast.error(e.message || 'فشل في إتمام الطلب'); }
     finally { setIsProcessingCheckout(false); }
