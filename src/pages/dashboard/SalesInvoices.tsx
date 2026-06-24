@@ -99,7 +99,7 @@ export function SalesInvoices({ restaurantId, currency, restaurant, isSuperAdmin
 
     try {
       const amount = parseFloat(form.amount);
-      const orderNumber = `INV-${Date.now().toString().slice(-6)}`;
+      const orderNumber = form.customer_ref ? `INV-${form.customer_ref}-${Date.now().toString().slice(-6)}` : `INV-${Date.now().toString().slice(-6)}`;
       
       // 1. Create the order record
       const { data: order, error: orderError } = await supabase

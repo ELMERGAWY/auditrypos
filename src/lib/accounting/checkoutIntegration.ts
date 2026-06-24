@@ -59,7 +59,7 @@ class CheckoutIntegration {
   ): Promise<CheckoutResult> {
     // 7. Prepare order data first (so it's available in catch)
     const paidAmount = orderData.paidAmount ?? 0;
-    const orderNum = orderData.customOrderNumber || `ORD-${Date.now().toString().slice(-6)}`;
+    const orderNum = orderData.customOrderNumber || (orderData.customerRef ? `ORD-${orderData.customerRef}-${Date.now().toString().slice(-6)}` : `ORD-${Date.now().toString().slice(-6)}`);
     const clientOrderId = `${context.restaurantId}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
     
     let finalNotes = orderData.notes || '';
