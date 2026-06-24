@@ -3,6 +3,7 @@
 const DB_NAME = 'smartpos_offline';
 const DB_VERSION = 3;
 const STORES = ['pendingOrders', 'pendingStatusUpdates', 'pendingTransactions', 'cachedData', 'syncMeta'] as const;
+const CACHE_VERSION = 2; // Increment this when breaking changes are made to cached data structure
 
 function isIndexedDbAvailable() {
   return typeof window !== 'undefined' && typeof indexedDB !== 'undefined';
@@ -197,7 +198,7 @@ export async function cacheData(key: string, data: any) {
   try {
     const db = await openDB();
     const tx = db.transaction('cachedData', 'readwrite');
-    tx.objectStore('cachedData').put({ id: key, data, cachedAt: Date.now() });
+    tx.objectStore('cachedData').put({ id: key, data, cachedAt: Date.now(), version: CACHE_VERSION });
   } catch { /* silently fail */ }
 }
 
@@ -207,10 +208,30 @@ export async function getCachedData<T>(key: string): Promise<T | null> {
     const tx = db.transaction('cachedData', 'readonly');
     const req = tx.objectStore('cachedData').get(key);
     return new Promise((res) => {
-      req.onsuccess = () => res(req.result?.data ?? null);
+      req.onsuccess = () => {
+        const result = req.result;
+        // Only return data if version matches current CACHE_VERSION
+        if (result?.version === CACHE_VERSION) {
+          res(result.data ?? null);
+        } else {
+          res(null);
+        }
+      };
       req.onerror = () => res(null);
     });
   } catch { return null; }
+}
+
+export async function clearCachedData() {
+  try {
+    const db = await openDB();
+    const tx = db.transaction('cachedData', 'readwrite');
+    tx.objectStore('cachedData').clear();
+    return new Promise<void>((res) => {
+      tx.oncomplete = () => res();
+      tx.onerror = () => res();
+    });
+  } catch { /* silently fail */ }
 }
 
 // Get current sync status

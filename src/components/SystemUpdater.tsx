@@ -3,6 +3,7 @@ import { useRegisterSW } from 'virtual:pwa-register/react';
 import { Button } from './ui/button';
 import { DownloadCloud, X } from 'lucide-react';
 import { AnimatePresence, motion } from 'framer-motion';
+import { clearCachedData } from '@/lib/offlineEngine';
 
 export function SystemUpdater() {
   const {
@@ -46,7 +47,10 @@ export function SystemUpdater() {
             
             <div className="flex gap-2">
               <Button 
-                onClick={() => updateServiceWorker(true)}
+                onClick={async () => {
+                  await clearCachedData();
+                  updateServiceWorker(true);
+                }}
                 className="bg-white text-primary hover:bg-white/90 font-bold flex-1"
                 size="sm"
               >
