@@ -710,10 +710,12 @@ export function MarketingProjects({ restaurantId, currency }: Props) {
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="grid grid-cols-3 md:grid-cols-6 gap-1 h-auto bg-secondary/50 p-1 rounded-xl">
+        <TabsList className="grid grid-cols-4 md:grid-cols-8 gap-1 h-auto bg-secondary/50 p-1 rounded-xl">
           <TabsTrigger value="board" className="text-xs py-2">لوحة المهام (Kanban)</TabsTrigger>
           <TabsTrigger value="projects" className="text-xs py-2">المشاريع والحملات</TabsTrigger>
           <TabsTrigger value="tasks" className="text-xs py-2">جدول المهام</TabsTrigger>
+          <TabsTrigger value="discussions" className="text-xs py-2">المناقشات</TabsTrigger>
+          <TabsTrigger value="performance" className="text-xs py-2">مراقبة الأداء</TabsTrigger>
           <TabsTrigger value="ad_campaigns" className="text-xs py-2">الحملات الإعلانية</TabsTrigger>
           <TabsTrigger value="retainers" className="text-xs py-2">العقود والاشتراكات</TabsTrigger>
           <TabsTrigger value="influencers" className="text-xs py-2">حجوزات المؤثرين</TabsTrigger>
@@ -1174,6 +1176,120 @@ export function MarketingProjects({ restaurantId, currency }: Props) {
                 )}
               </tbody>
             </table>
+          </div>
+        </TabsContent>
+
+        {/* Discussions View */}
+        <TabsContent value="discussions" className="mt-4 space-y-4">
+          <div className="flex justify-between items-center">
+            <h3 className="text-lg font-bold">المناقشات بين الموظفين والعملاء</h3>
+            <Button size="sm"><Plus className="w-4 h-4 ml-1" /> بدء مناقشة جديدة</Button>
+          </div>
+          <div className="space-y-3">
+            <Card className="p-4 hover:shadow-md transition-all">
+              <div className="flex justify-between items-start mb-2">
+                <div className="flex items-center gap-2">
+                  <div className="w-8 h-8 bg-primary/20 rounded-full flex items-center justify-center font-bold text-xs text-primary">أح</div>
+                  <div>
+                    <p className="text-sm font-bold">مناقشة تصميم الحملة الخريفية</p>
+                    <p className="text-xs text-muted-foreground">المشروع: {projects[0]?.name || 'حملة التسويق'} • 3 مشاركات</p>
+                  </div>
+                </div>
+                <Badge className="text-[10px] bg-blue-100 text-blue-700">نشطة</Badge>
+              </div>
+              <p className="text-sm text-muted-foreground">آخر رسالة: "هل يمكن تعديل الألوان أكثر ليكونوا أكثر دفئاً؟"</p>
+            </Card>
+            <Card className="p-4 hover:shadow-md transition-all opacity-80">
+              <div className="flex justify-between items-start mb-2">
+                <div className="flex items-center gap-2">
+                  <div className="w-8 h-8 bg-secondary/40 rounded-full flex items-center justify-center font-bold text-xs">مح</div>
+                  <div>
+                    <p className="text-sm font-bold">مراجعة المحتوى الصحفي</p>
+                    <p className="text-xs text-muted-foreground">المشروع: {projects[1]?.name || 'إعلانات جوجل'} • 7 مشاركات</p>
+                  </div>
+                </div>
+                <Badge className="text-[10px] bg-emerald-100 text-emerald-700">مكتملة</Badge>
+              </div>
+              <p className="text-sm text-muted-foreground">آخر رسالة: "شكراً للجميع، تم الموافقة على المحتوى!"</p>
+            </Card>
+          </div>
+        </TabsContent>
+
+        {/* Performance Monitoring View */}
+        <TabsContent value="performance" className="mt-4 space-y-6">
+          <div className="flex justify-between items-center">
+            <h3 className="text-lg font-bold">مراقبة أداء الموظفين والمشاريع</h3>
+          </div>
+
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            <Card className="p-4 border border-primary/10 glass-card">
+              <p className="text-xs text-muted-foreground">المهام المنجزة هذا الشهر</p>
+              <p className="text-2xl font-bold text-emerald-600">{tasks.filter(t => t.status === 'done').length}</p>
+            </Card>
+            <Card className="p-4 border border-primary/10 glass-card">
+              <p className="text-xs text-muted-foreground">الكفاءة (نسبة الإنجاز)</p>
+              <p className="text-2xl font-bold text-primary">{tasks.length > 0 ? Math.round((tasks.filter(t => t.status === 'done').length / tasks.length) * 100) : 0}%</p>
+            </Card>
+            <Card className="p-4 border border-primary/10 glass-card">
+              <p className="text-xs text-muted-foreground">المشاريع النشطة</p>
+              <p className="text-2xl font-bold">{projects.filter(p => p.status === 'active' || p.status === 'planning').length}</p>
+            </Card>
+            <Card className="p-4 border border-primary/10 glass-card">
+              <p className="text-xs text-muted-foreground">المهام المتأخرة</p>
+              <p className="text-2xl font-bold text-red-600">0</p>
+            </Card>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <Card className="p-4 glass-card">
+              <h4 className="font-bold mb-4">أداء الموظفين</h4>
+              <div className="space-y-2">
+                {staff.map((s: any) => {
+                  const assignedTasks = tasks.filter(t => t.assigned_to === s.id);
+                  const completedTasks = assignedTasks.filter(t => t.status === 'done');
+                  const rate = assignedTasks.length > 0 ? Math.round((completedTasks.length / assignedTasks.length) * 100) : 0;
+                  return (
+                    <div key={s.id} className="flex items-center justify-between py-2 border-b border-border/30">
+                      <div className="flex items-center gap-2">
+                        <div className="w-8 h-8 bg-primary/20 rounded-full flex items-center justify-center font-bold text-xs text-primary">{s.full_name.slice(0, 2)}</div>
+                        <div>
+                          <p className="text-sm font-medium">{s.full_name}</p>
+                          <p className="text-xs text-muted-foreground">{s.position}</p>
+                        </div>
+                      </div>
+                      <div className="text-left">
+                        <p className="text-xs font-bold">{rate}% إنجاز</p>
+                        <div className="w-24 bg-secondary h-1.5 rounded-full overflow-hidden">
+                          <div className="bg-emerald-500 h-full" style={{ width: `${rate}%` }} />
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </Card>
+            <Card className="p-4 glass-card">
+              <h4 className="font-bold mb-4">تقدم المشاريع</h4>
+              <div className="space-y-3">
+                {projects.map((proj: any) => {
+                  const projectTasks = tasks.filter(t => t.project_id === proj.id);
+                  const completed = projectTasks.filter(t => t.status === 'done').length;
+                  const total = projectTasks.length;
+                  const progress = total > 0 ? Math.round((completed / total) * 100) : 0;
+                  return (
+                    <div key={proj.id} className="space-y-1">
+                      <div className="flex justify-between">
+                        <span className="text-sm font-medium">{proj.name}</span>
+                        <span className="text-xs text-muted-foreground">{completed}/{total}</span>
+                      </div>
+                      <div className="w-full bg-secondary h-2 rounded-full overflow-hidden">
+                        <div className="bg-primary h-full" style={{ width: `${progress}%` }} />
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </Card>
           </div>
         </TabsContent>
       </Tabs>
