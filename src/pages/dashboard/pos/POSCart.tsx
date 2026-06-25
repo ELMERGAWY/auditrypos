@@ -83,6 +83,8 @@ export const POSCart = memo(function POSCart({
 }: POSCartProps) {
   const { hasPermission } = usePermissions(restaurant?.id);
   const [editingPriceId, setEditingPriceId] = useState<string | null>(null);
+  const [editingQtyId, setEditingQtyId] = useState<string | null>(null);
+  const [editingValueId, setEditingValueId] = useState<string | null>(null);
 
   return (
     <div className="flex flex-col h-full bg-background border-r border-border shadow-xl">
@@ -276,59 +278,78 @@ export const POSCart = memo(function POSCart({
               {/* Qty + Value controls */}
               <div className="flex flex-col gap-1 items-end shrink-0">
                 <div className="flex items-center gap-1">
-                  {/* PRIMARY: editable total value field — controlled */}
-                  <div className="relative w-24">
-                    <input
-                      type="text"
-                      inputMode="decimal"
-                      value={lineTotal > 0 ? lineTotal : ''}
-                      onChange={e => {
-                        // Clean input: allow only numbers and single decimal point
-                        let val = e.target.value.replace(/[^0-9.]/g, '');
-                        const decimalPoints = val.split('.');
-                        if (decimalPoints.length > 2) {
-                          val = decimalPoints[0] + '.' + decimalPoints.slice(1).join('');
-                        }
-                        const v = parseFloat(val);
-                        if (val === '' || (!isNaN(v) && v >= 0)) {
-                          updateValue(c.item.id, val === '' ? 0 : v);
-                        }
-                      }}
-                      onFocus={e => {
-                        e.target.select();
-                      }}
-                      onClick={e => {
-                        e.target.select();
-                      }}
-                      title="القيمة الإجمالية — عدّلها مباشرة"
-                      className="w-full h-8 text-[11px] pr-6 text-center bg-blue-50/50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-md focus:ring-2 focus:ring-primary outline-none font-medium"
-                      placeholder="المبلغ"
-                    />
-                    <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[9px] text-blue-600 font-bold pointer-events-none">{currency}</span>
-                  </div>
+                  {/* PRIMARY: editable total value field — click-to-edit */}
+                  {editingValueId === c.item.id ? (
+                    <div className="relative w-24">
+                      <input
+                        type="number"
+                        autoFocus
+                        inputMode="decimal"
+                        step="0.01"
+                        defaultValue={lineTotal > 0 ? lineTotal : ''}
+                        placeholder="0"
+                        onBlur={e => {
+                          const val = parseFloat(e.target.value);
+                          if (!isNaN(val)) updateValue(c.item.id, val);
+                          setEditingValueId(null);
+                        }}
+                        onKeyDown={e => {
+                          if (e.key === 'Enter') {
+                            const val = parseFloat(e.target.value);
+                            if (!isNaN(val)) updateValue(c.item.id, val);
+                            setEditingValueId(null);
+                          }
+                          if (e.key === 'Escape') setEditingValueId(null);
+                        }}
+                        className="w-full h-8 text-[11px] pr-6 text-center bg-blue-100 dark:bg-blue-900/30 border border-blue-400 dark:border-blue-700 rounded-md focus:ring-2 focus:ring-blue-500 outline-none font-medium"
+                      />
+                      <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[9px] text-blue-600 dark:text-blue-400 font-bold pointer-events-none">{currency}</span>
+                    </div>
+                  ) : (
+                    <button
+                      onClick={() => setEditingValueId(c.item.id)}
+                      className="w-24 h-8 text-[11px] pr-6 text-center bg-blue-50/50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-md hover:bg-blue-100 dark:hover:bg-blue-900/40 transition-all font-medium flex items-center justify-center relative"
+                      title="القيمة الإجمالية — اضغط للتعديل"
+                    >
+                      {lineTotal > 0 ? lineTotal : '—'}
+                      <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[9px] text-blue-600 font-bold">{currency}</span>
+                    </button>
+                  )}
 
-                  {/* Qty stepper */}
+                  {/* Qty stepper with click-to-edit */}
                   <div className="flex items-center gap-0.5 bg-secondary rounded-md p-0.5">
                     <button onClick={() => updateQty(c.item.id, -1)} className="w-7 h-7 flex items-center justify-center hover:bg-destructive/20 rounded transition-colors text-destructive">
                       <Minus className="w-4 h-4" />
                     </button>
-                    <input
-                      type="text"
-                      inputMode="decimal"
-                      value={c.qtyText}
-                      onChange={e => {
-                        // Clean input: allow only numbers and single decimal point
-                        let val = e.target.value.replace(/[^0-9.]/g, '');
-                        const decimalPoints = val.split('.');
-                        if (decimalPoints.length > 2) {
-                          val = decimalPoints[0] + '.' + decimalPoints.slice(1).join('');
-                        }
-                        setCartItemQty(c.item.id, val);
-                      }}
-                      onFocus={e => e.target.select()}
-                      onClick={e => e.target.select()}
-                      className="w-12 text-center text-sm bg-transparent border-0 outline-none font-medium"
-                    />
+                    {editingQtyId === c.item.id ? (
+                      <input
+                        type="number"
+                        autoFocus
+                        inputMode="decimal"
+                        step="0.001"
+                        defaultValue={c.qtyText}
+                        placeholder="0"
+                        onBlur={e => {
+                          setCartItemQty(c.item.id, e.target.value);
+                          setEditingQtyId(null);
+                        }}
+                        onKeyDown={e => {
+                          if (e.key === 'Enter') {
+                            setCartItemQty(c.item.id, e.target.value);
+                            setEditingQtyId(null);
+                          }
+                          if (e.key === 'Escape') setEditingQtyId(null);
+                        }}
+                        className="w-12 text-center text-sm bg-white dark:bg-gray-800 border border-primary/30 rounded outline-none font-medium"
+                      />
+                    ) : (
+                      <button
+                        onClick={() => setEditingQtyId(c.item.id)}
+                        className="w-12 text-center text-sm bg-transparent border-0 rounded font-medium hover:bg-white/50 dark:hover:bg-gray-700/50 transition-all"
+                      >
+                        {c.qtyText}
+                      </button>
+                    )}
                     <button onClick={() => updateQty(c.item.id, 1)} className="w-7 h-7 flex items-center justify-center hover:bg-primary/20 rounded transition-colors text-primary">
                       <Plus className="w-4 h-4" />
                     </button>

@@ -131,6 +131,11 @@ export const POSGrid = memo(function POSGrid({
                 {item.stock_quantity} {item.stock_quantity <= 0 ? 'نفذ' : 'متبقي'}
               </div>
             )}
+            {item.product_type === 'service' && (
+              <div className="absolute top-2 right-2 z-10 text-[10px] font-bold px-1.5 py-0.5 rounded-md bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300 border border-amber-300 dark:border-amber-700">
+                🎨 خدمة قابلة للتخصيص
+              </div>
+            )}
             <div className="text-4xl mb-3 transform group-hover:scale-110 transition-transform duration-200 drop-shadow-md">
               {item.image || '📦'}
             </div>
