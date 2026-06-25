@@ -162,11 +162,18 @@ function ReceiptContent({
           </div>
           {order.items && order.items.length > 0 ? (
             order.items.map((item, idx) => (
-              <div key={idx} className="item-row">
-                <span className="item-name">{item.menu_item_name || 'صنف'}</span>
-                <span className="item-qty">{item.quantity}</span>
-                <span className="item-price">{Number(item.price).toFixed(2)}</span>
-                <span className="item-total">{(Number(item.price) * Number(item.quantity)).toFixed(2)}</span>
+              <div key={idx}>
+                <div className="item-row">
+                  <span className="item-name">{item.menu_item_name || 'صنف'}</span>
+                  <span className="item-qty">{item.quantity}</span>
+                  <span className="item-price">{Number(item.price).toFixed(2)}</span>
+                  <span className="item-total">{(Number(item.price) * Number(item.quantity)).toFixed(2)}</span>
+                </div>
+                {(item as any).service_details && (
+                  <div style={{ fontSize: '9px', padding: '2px 0', color: '#555' }}>
+                    📝 {(item as any).service_details}
+                  </div>
+                )}
               </div>
             ))
           ) : (
@@ -412,11 +419,16 @@ export function ReceiptModalWrapper({ order, restaurant, onClose, onComplete, is
         content += '</div>';
         if (order.items && order.items.length > 0) {
           order.items.forEach((item) => {
+            content += `<div>`;
             content += `<div class="item-row">`;
             content += `<span class="item-name">${item.menu_item_name || 'صنف'}</span>`;
             content += `<span class="item-qty">${item.quantity}</span>`;
             content += `<span class="item-price">${Number(item.price).toFixed(2)}</span>`;
             content += `<span class="item-total">${(Number(item.price) * Number(item.quantity)).toFixed(2)}</span>`;
+            content += '</div>';
+            if ((item as any).service_details) {
+              content += `<div style="font-size: 9px; padding: 2px 0; color: #555;">📝 ${(item as any).service_details}</div>`;
+            }
             content += '</div>';
           });
         } else {

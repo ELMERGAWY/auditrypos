@@ -199,13 +199,11 @@ export const POSCart = memo(function POSCart({
       <div className="flex-1 overflow-auto p-4 space-y-3">
         {cart.length === 0 && <p className="text-muted-foreground text-sm text-center py-8">السلة فارغة</p>}
         {cart.map(c => {
-          const defaultUnitPrice = (Number(c.item.price) || 0) * (c.unitFactor || 1);
-          const lineTotal = (Number(c.price) || 0) * (Number(c.qty) || 0);
-          const unitOptions = getUnitOptions(c.item);
-          // Controlled value display — always in sync with state
-          const lineTotalStr = Number.isInteger(lineTotal) ? String(lineTotal) : lineTotal.toFixed(2).replace(/\.?0+$/, '');
+    const defaultUnitPrice = (Number(c.item.price) || 0) * (c.unitFactor || 1);
+    const lineTotal = (Number(c.price) || 0) * (Number(c.qty) || 0);
+    const unitOptions = getUnitOptions(c.item);
 
-          return (
+    return (
             <motion.div key={c.item.id} initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }}
               className="flex items-center gap-2 bg-secondary/50 rounded-lg p-3 relative group">
               <button
@@ -283,7 +281,8 @@ export const POSCart = memo(function POSCart({
                     <input
                       type="number"
                       inputMode="decimal"
-                      value={lineTotalStr}
+                      step="0.01"
+                      value={lineTotal}
                       onChange={e => {
                         const v = parseFloat(e.target.value);
                         if (!isNaN(v) && v >= 0) updateValue(c.item.id, v);
@@ -302,7 +301,9 @@ export const POSCart = memo(function POSCart({
                       <Minus className="w-3 h-3" />
                     </button>
                     <input
-                      type="text"
+                      type="number"
+                      inputMode="decimal"
+                      step="0.001"
                       value={c.qtyText}
                       onChange={e => setCartItemQty(c.item.id, e.target.value)}
                       className="w-10 text-center text-xs bg-transparent border-0 outline-none"

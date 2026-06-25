@@ -132,7 +132,7 @@ export default function Dashboard() {
   });
 
   // POS State
-  const [cart, setCart] = useState<{ item: MenuItem; qty: number; qtyText: string; unitMode: string; unitFactor: number; price: number; service_details?: string }[]>([]);
+  const [cart, setCart] = useState<{ item: MenuItem; qty: number; qtyText: string; unitMode: string; unitFactor: number; price: number; service_details?: string; service_color?: string; service_type?: string }[]>([]);
   const [tableNumber, setTableNumber] = useState('');
   const [customOrderNumber, setCustomOrderNumber] = useState(''); // New state for manual invoice number
   const [customerName, setCustomerName] = useState('');
@@ -158,6 +158,12 @@ export default function Dashboard() {
   const [autoPrint, setAutoPrint] = useState(false);
   const [viewingOrderId, setViewingOrderId] = useState<string | null>(null);
   const [isProcessingCheckout, setIsProcessingCheckout] = useState(false);
+  // Service item customization modal state
+  const [showServiceModal, setShowServiceModal] = useState(false);
+  const [selectedServiceItem, setSelectedServiceItem] = useState<MenuItem | null>(null);
+  const [serviceColor, setServiceColor] = useState('');
+  const [serviceType, setServiceType] = useState('');
+  const [serviceNotes, setServiceNotes] = useState('');
 
   // Reset modals on tab change
   useEffect(() => {
@@ -246,6 +252,15 @@ export default function Dashboard() {
   }, [businessType]);
 
   const addToCart = useCallback((item: MenuItem) => {
+    // Check if it's a service item
+    if ((item as any).product_type === 'service') {
+      setSelectedServiceItem(item);
+      setServiceColor('');
+      setServiceType('');
+      setServiceNotes('');
+      setShowServiceModal(true);
+      return;
+    }
     setCart(prev => {
       const existing = prev.find(c => c.item.id === item.id);
       if (existing) return prev.map(c => c.item.id === item.id ? { ...c, qty: c.qty + 1, qtyText: String(c.qty + 1) } : c);
@@ -260,6 +275,33 @@ export default function Dashboard() {
       }];
     });
   }, [getUnitOptions]);
+
+  // Function to add service item with customization
+  const addServiceToCart = useCallback(() => {
+    if (!selectedServiceItem) return;
+    setCart(prev => {
+      const defaultUnit = getUnitOptions(selectedServiceItem)[0] || { label: 'قطعة', factor: 1 };
+      // Combine all service details into one string for service_details
+      const details = [
+        serviceColor ? `اللون: ${serviceColor}` : '',
+        serviceType ? `النوع: ${serviceType}` : '',
+        serviceNotes ? `ملاحظات: ${serviceNotes}` : ''
+      ].filter(Boolean).join(' | ');
+      return [...prev, {
+        item: selectedServiceItem,
+        qty: 1,
+        qtyText: '1',
+        unitMode: defaultUnit.label,
+        unitFactor: defaultUnit.factor,
+        price: (Number(selectedServiceItem.price) || 0) * defaultUnit.factor,
+        service_details: details,
+        service_color: serviceColor,
+        service_type: serviceType
+      }];
+    });
+    setShowServiceModal(false);
+    setSelectedServiceItem(null);
+  }, [selectedServiceItem, serviceColor, serviceType, serviceNotes, getUnitOptions]);
 
   const addPackageToCart = useCallback((pkg: any) => {
     setCart(prev => {
@@ -305,7 +347,12 @@ export default function Dashboard() {
   const setCartItemQty = useCallback((id: string, text: string) => {
     setCart(prev => prev.map(c => {
       if (c.item.id !== id) return c;
-      const cleaned = text.replace(/[^0-9.]/g, '');
+      // Allow only one decimal point
+      let cleaned = text.replace(/[^0-9.]/g, '');
+      const decimalPoints = cleaned.split('.');
+      if (decimalPoints.length > 2) {
+        cleaned = decimalPoints[0] + '.' + decimalPoints.slice(1).join('');
+      }
       const n = parseFloat(cleaned);
       return { ...c, qtyText: cleaned, qty: isNaN(n) ? c.qty : Math.max(0, n) };
     }));
@@ -518,7 +565,8 @@ export default function Dashboard() {
             price: Number(c.price),
             quantity: c.qty, 
             unitMode: c.unitMode, 
-            unitFactor: c.unitFactor || 1
+            unitFactor: c.unitFactor || 1,
+            service_details: c.service_details
           })), 
           customerName, customerPhone, customerRef, orderType: orderType as any, deliveryAddress, deliveryAgentId: selectedDeliveryAgent, paymentMethod: paymentMethod as any, paidAmount: paidNum, discount: discountAmount, discountType: discountType === 'percent' ? 'percentage' : 'fixed', notes: orderNotes, destinationAccountId: selectedAccountId, customOrderNumber: customOrderNumber || undefined }
       );
@@ -807,6 +855,38 @@ export default function Dashboard() {
           </div>
         </main>
         {showReceipt && lastReceipt && <ReceiptModalWrapper isOpen={showReceipt} onClose={() => setShowReceipt(false)} order={lastReceipt} restaurant={restaurant} autoPrint={autoPrint} />}
+
+        {/* Service Item Customization Modal */}
+        {showServiceModal && selectedServiceItem && (
+          <div className="fixed inset-0 z-[100] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+            <div className="glass-card p-6 max-w-md w-full relative">
+              <button onClick={() => { setShowServiceModal(false); setSelectedServiceItem(null); }} className="absolute left-4 top-4 text-muted-foreground hover:text-foreground">
+                <X className="w-5 h-5" />
+              </button>
+              <h3 className="text-2xl font-black mb-6">تخصيص الخدمة: {selectedServiceItem.name}</h3>
+              
+              <div className="space-y-4">
+                <div>
+                  <Label>اللون</Label>
+                  <Input value={serviceColor} onChange={e => setServiceColor(e.target.value)} placeholder="مثال: أحمر، أزرق" />
+                </div>
+                <div>
+                  <Label>نوع الخدمة</Label>
+                  <Input value={serviceType} onChange={e => setServiceType(e.target.value)} placeholder="مثال: تنظيف، صيانة" />
+                </div>
+                <div>
+                  <Label>ملاحظات إضافية</Label>
+                  <Input value={serviceNotes} onChange={e => setServiceNotes(e.target.value)} placeholder="أي تفاصيل إضافية..." />
+                </div>
+                
+                <div className="flex gap-2 pt-4">
+                  <Button onClick={() => { setShowServiceModal(false); setSelectedServiceItem(null); }} variant="outline" className="flex-1">إلغاء</Button>
+                  <Button onClick={addServiceToCart} className="flex-1 gradient-bg text-primary-foreground border-0">إضافة إلى السلة</Button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
 
         {viewingOrderId && (
           <InvoiceViewer

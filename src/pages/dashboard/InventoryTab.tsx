@@ -164,8 +164,6 @@ export function InventoryTab({ restaurantId, currency, businessType }: Props) {
       expiry_date: form.expiry_date || null,
       secondary_unit: form.secondary_unit || '',
       unit_conversion_factor: Number(form.unit_conversion_factor) || 1,
-      item_type_id: form.item_type_id || null,
-      warehouse_id: form.warehouse_id || null,
     };
     try {
       if (editingProduct) {
