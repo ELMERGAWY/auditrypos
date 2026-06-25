@@ -176,6 +176,7 @@ export function useDashboardData() {
           sku: product.sku || '',
           unit: product.unit || 'قطعة',
           stock_quantity: product.quantity || 0,
+          product_type: (product as any).product_type || 'inventory',
         })) as MenuItem[])
       : ((itemsRes.data || []) as MenuItem[]);
     const loadedAgents = (agentsRes.data || []) as DeliveryAgent[];

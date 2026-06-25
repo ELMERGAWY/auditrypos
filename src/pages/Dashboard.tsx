@@ -383,7 +383,8 @@ export default function Dashboard() {
         // No unit price yet OR it's a service — set value as price, keep qty = 1
         return { ...c, price: value, qty: 1, qtyText: '1' };
       }
-      const newQty = Math.round((value / price) * 1000) / 1000;
+      // Use fixed-point arithmetic to avoid floating-point errors
+      const newQty = Math.round((value * 1000) / price) / 1000;
       if (newQty <= 0) return c; // don't remove — just keep as is
       return { ...c, qty: newQty, qtyText: String(newQty) };
     }));
