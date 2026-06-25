@@ -859,29 +859,61 @@ export default function Dashboard() {
         {/* Service Item Customization Modal */}
         {showServiceModal && selectedServiceItem && (
           <div className="fixed inset-0 z-[100] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
-            <div className="glass-card p-6 max-w-md w-full relative">
-              <button onClick={() => { setShowServiceModal(false); setSelectedServiceItem(null); }} className="absolute left-4 top-4 text-muted-foreground hover:text-foreground">
+            <div className="glass-card p-6 max-w-lg w-full relative shadow-2xl rounded-3xl">
+              <button onClick={() => { setShowServiceModal(false); setSelectedServiceItem(null); }} className="absolute left-4 top-4 text-muted-foreground hover:text-foreground hover:bg-secondary/50 w-9 h-9 rounded-full flex items-center justify-center">
                 <X className="w-5 h-5" />
               </button>
-              <h3 className="text-2xl font-black mb-6">تخصيص الخدمة: {selectedServiceItem.name}</h3>
+              
+              <div className="text-center mb-6">
+                <div className="text-5xl mb-3">{selectedServiceItem.image}</div>
+                <h3 className="text-2xl font-black mb-2">تخصيص الخدمة</h3>
+                <p className="text-xl font-bold text-primary">{selectedServiceItem.name}</p>
+                <p className="text-xs text-muted-foreground mt-1">أضف التفاصيل المطلوبة قبل الإضافة إلى السلة</p>
+              </div>
               
               <div className="space-y-4">
-                <div>
-                  <Label>اللون</Label>
-                  <Input value={serviceColor} onChange={e => setServiceColor(e.target.value)} placeholder="مثال: أحمر، أزرق" />
+                <div className="p-4 bg-primary/5 rounded-2xl border border-primary/10">
+                  <Label className="text-sm font-bold mb-2 block text-primary">🎨 اللون</Label>
+                  <Input 
+                    value={serviceColor} 
+                    onChange={e => setServiceColor(e.target.value)} 
+                    placeholder="مثال: أحمر، أزرق، أبيض، أسود" 
+                    className="h-11 rounded-xl border-primary/20 focus:ring-2 focus:ring-primary/30"
+                  />
                 </div>
-                <div>
-                  <Label>نوع الخدمة</Label>
-                  <Input value={serviceType} onChange={e => setServiceType(e.target.value)} placeholder="مثال: تنظيف، صيانة" />
+                <div className="p-4 bg-secondary/30 rounded-2xl border border-border">
+                  <Label className="text-sm font-bold mb-2 block text-foreground">🛠️ نوع الخدمة</Label>
+                  <Input 
+                    value={serviceType} 
+                    onChange={e => setServiceType(e.target.value)} 
+                    placeholder="مثال: تنظيف، صيانة، تركيب، إصلاح" 
+                    className="h-11 rounded-xl"
+                  />
                 </div>
-                <div>
-                  <Label>ملاحظات إضافية</Label>
-                  <Input value={serviceNotes} onChange={e => setServiceNotes(e.target.value)} placeholder="أي تفاصيل إضافية..." />
+                <div className="p-4 bg-accent/10 rounded-2xl border border-accent/20">
+                  <Label className="text-sm font-bold mb-2 block text-accent-foreground">📝 ملاحظات إضافية</Label>
+                  <textarea 
+                    value={serviceNotes} 
+                    onChange={e => setServiceNotes(e.target.value)} 
+                    placeholder="أي تفاصيل إضافية تريد إضافتها..." 
+                    className="w-full h-24 p-3 rounded-xl border border-accent/20 bg-background focus:ring-2 focus:ring-accent/30 outline-none resize-none text-sm"
+                  />
                 </div>
                 
-                <div className="flex gap-2 pt-4">
-                  <Button onClick={() => { setShowServiceModal(false); setSelectedServiceItem(null); }} variant="outline" className="flex-1">إلغاء</Button>
-                  <Button onClick={addServiceToCart} className="flex-1 gradient-bg text-primary-foreground border-0">إضافة إلى السلة</Button>
+                <div className="flex gap-3 pt-2">
+                  <Button 
+                    onClick={() => { setShowServiceModal(false); setSelectedServiceItem(null); }} 
+                    variant="outline" 
+                    className="flex-1 h-11 rounded-xl text-sm font-bold border-2 border-border hover:border-foreground/20"
+                  >
+                    إلغاء
+                  </Button>
+                  <Button 
+                    onClick={addServiceToCart} 
+                    className="flex-1 h-11 rounded-xl text-sm font-bold gradient-bg text-primary-foreground border-0 shadow-lg shadow-primary/20"
+                  >
+                    ✅ إضافة إلى السلة
+                  </Button>
                 </div>
               </div>
             </div>

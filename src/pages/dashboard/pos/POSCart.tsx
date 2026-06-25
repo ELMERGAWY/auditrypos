@@ -277,39 +277,60 @@ export const POSCart = memo(function POSCart({
               <div className="flex flex-col gap-1 items-end shrink-0">
                 <div className="flex items-center gap-1">
                   {/* PRIMARY: editable total value field — controlled */}
-                  <div className="relative w-20">
+                  <div className="relative w-24">
                     <input
-                      type="number"
+                      type="text"
                       inputMode="decimal"
-                      step="0.01"
-                      value={lineTotal}
+                      value={lineTotal > 0 ? lineTotal : ''}
                       onChange={e => {
-                        const v = parseFloat(e.target.value);
-                        if (!isNaN(v) && v >= 0) updateValue(c.item.id, v);
+                        // Clean input: allow only numbers and single decimal point
+                        let val = e.target.value.replace(/[^0-9.]/g, '');
+                        const decimalPoints = val.split('.');
+                        if (decimalPoints.length > 2) {
+                          val = decimalPoints[0] + '.' + decimalPoints.slice(1).join('');
+                        }
+                        const v = parseFloat(val);
+                        if (val === '' || (!isNaN(v) && v >= 0)) {
+                          updateValue(c.item.id, val === '' ? 0 : v);
+                        }
                       }}
-                      onFocus={e => e.target.select()}
+                      onFocus={e => {
+                        e.target.select();
+                      }}
+                      onClick={e => {
+                        e.target.select();
+                      }}
                       title="القيمة الإجمالية — عدّلها مباشرة"
-                      className="w-full h-7 text-[10px] pr-5 text-center bg-blue-50/50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-md focus:ring-1 focus:ring-primary outline-none"
+                      className="w-full h-8 text-[11px] pr-6 text-center bg-blue-50/50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-md focus:ring-2 focus:ring-primary outline-none font-medium"
                       placeholder="المبلغ"
                     />
-                    <span className="absolute right-1 top-1/2 -translate-y-1/2 text-[8px] text-blue-500 font-bold pointer-events-none">{currency}</span>
+                    <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[9px] text-blue-600 font-bold pointer-events-none">{currency}</span>
                   </div>
 
                   {/* Qty stepper */}
                   <div className="flex items-center gap-0.5 bg-secondary rounded-md p-0.5">
-                    <button onClick={() => updateQty(c.item.id, -1)} className="w-6 h-6 flex items-center justify-center hover:bg-destructive/20 rounded transition-colors">
-                      <Minus className="w-3 h-3" />
+                    <button onClick={() => updateQty(c.item.id, -1)} className="w-7 h-7 flex items-center justify-center hover:bg-destructive/20 rounded transition-colors text-destructive">
+                      <Minus className="w-4 h-4" />
                     </button>
                     <input
-                      type="number"
+                      type="text"
                       inputMode="decimal"
-                      step="0.001"
                       value={c.qtyText}
-                      onChange={e => setCartItemQty(c.item.id, e.target.value)}
-                      className="w-10 text-center text-xs bg-transparent border-0 outline-none"
+                      onChange={e => {
+                        // Clean input: allow only numbers and single decimal point
+                        let val = e.target.value.replace(/[^0-9.]/g, '');
+                        const decimalPoints = val.split('.');
+                        if (decimalPoints.length > 2) {
+                          val = decimalPoints[0] + '.' + decimalPoints.slice(1).join('');
+                        }
+                        setCartItemQty(c.item.id, val);
+                      }}
+                      onFocus={e => e.target.select()}
+                      onClick={e => e.target.select()}
+                      className="w-12 text-center text-sm bg-transparent border-0 outline-none font-medium"
                     />
-                    <button onClick={() => updateQty(c.item.id, 1)} className="w-6 h-6 flex items-center justify-center hover:bg-primary/20 rounded transition-colors">
-                      <Plus className="w-3 h-3" />
+                    <button onClick={() => updateQty(c.item.id, 1)} className="w-7 h-7 flex items-center justify-center hover:bg-primary/20 rounded transition-colors text-primary">
+                      <Plus className="w-4 h-4" />
                     </button>
                   </div>
                 </div>

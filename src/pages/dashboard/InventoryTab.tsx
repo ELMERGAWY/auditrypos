@@ -791,12 +791,46 @@ export function InventoryTab({ restaurantId, currency, businessType }: Props) {
                 <div className="col-span-2 grid grid-cols-2 gap-4">
                   <div>
                     <Label className="text-xs mb-1 block">الأيقونة</Label>
-                    <div className="flex gap-2 p-1 bg-secondary/30 rounded-xl">
-                      {['📦', '🍎', '🧴', '👕', '🛠️'].map(emoji => (
-                        <button key={emoji} onClick={() => setForm(f => ({ ...f, image: emoji }))} className={`w-9 h-9 rounded-lg flex items-center justify-center transition-all ${form.image === emoji ? 'bg-white shadow-sm scale-110 ring-1 ring-primary/20' : 'opacity-50 hover:opacity-100'}`}>
-                          {emoji}
-                        </button>
-                      ))}
+                    <div className="space-y-2">
+                      <div className="flex gap-2 p-1 bg-secondary/30 rounded-xl">
+                        {['📦', '🍎', '🧴', '👕', '🛠️'].map(emoji => (
+                          <button key={emoji} onClick={() => setForm(f => ({ ...f, image: emoji }))} className={`w-9 h-9 rounded-lg flex items-center justify-center transition-all ${form.image === emoji ? 'bg-white shadow-sm scale-110 ring-1 ring-primary/20' : 'opacity-50 hover:opacity-100'}`}>
+                            {emoji}
+                          </button>
+                        ))}
+                        {/* Custom image upload */}
+                        <label className="w-9 h-9 rounded-lg flex items-center justify-center transition-all cursor-pointer bg-white/50 hover:bg-white border border-dashed border-border hover:border-primary/30">
+                          <input
+                            type="file"
+                            accept="image/*"
+                            className="hidden"
+                            onChange={(e) => {
+                              const file = e.target.files?.[0];
+                              if (file) {
+                                const reader = new FileReader();
+                                reader.onload = (event) => {
+                                  setForm(f => ({ ...f, image: event.target?.result as string }));
+                                };
+                                reader.readAsDataURL(file);
+                              }
+                            }}
+                          />
+                          <span className="text-lg">📤</span>
+                        </label>
+                      </div>
+                      {/* Preview selected image */}
+                      {form.image && form.image.length > 4 && (
+                        <div className="p-2 bg-white rounded-lg border border-border flex items-center gap-2">
+                          <img src={form.image} alt="Custom icon" className="w-8 h-8 object-contain rounded" />
+                          <span className="text-xs text-muted-foreground">أيقونة مخصصة</span>
+                          <button
+                            onClick={() => setForm(f => ({ ...f, image: '📦' }))}
+                            className="ml-auto text-xs text-destructive hover:underline"
+                          >
+                            إزالة
+                          </button>
+                        </div>
+                      )}
                     </div>
                   </div>
                   <div>
