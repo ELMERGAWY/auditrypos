@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
-import { Warehouse, FileSpreadsheet, DollarSign, TrendingUp, Filter } from 'lucide-react';
+import { Warehouse, FileSpreadsheet, DollarSign, TrendingUp, Filter, Package } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 
 interface Warehouse {
