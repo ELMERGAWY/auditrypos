@@ -20,6 +20,11 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContaine
 import { hasFeature, type BusinessType } from '@/lib/businessTypes';
 import { WarehouseManager } from '@/components/inventory/WarehouseManager';
 import { ItemWarehouseAssignments } from '@/components/inventory/ItemWarehouseAssignments';
+import { InventoryTransfersManager } from '@/components/inventory/InventoryTransfersManager';
+import { LandedCostsManager } from '@/components/inventory/LandedCostsManager';
+import { SmartReorderTab } from '@/components/inventory/SmartReorderTab';
+import { WACTab } from '@/components/inventory/WACTab';
+import { WarehouseReportTab } from '@/components/inventory/WarehouseReportTab';
 
 interface Warehouse {
   id: string;
@@ -345,6 +350,9 @@ export function InventoryTab({ restaurantId, currency, businessType }: Props) {
           <TabsTrigger value="wac" className="rounded-xl flex items-center gap-2 data-[state=active]:gradient-bg data-[state=active]:text-white">
             <Scale className="w-4 h-4" /> المتوسط المرجح
           </TabsTrigger>
+          <TabsTrigger value="warehouse_report" className="rounded-xl flex items-center gap-2 data-[state=active]:gradient-bg data-[state=active]:text-white">
+            <FileSpreadsheet className="w-4 h-4" /> تقارير المخازن
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="products" className="space-y-4">
@@ -449,7 +457,7 @@ export function InventoryTab({ restaurantId, currency, businessType }: Props) {
         </TabsContent>
 
         <TabsContent value="warehouses" className="space-y-4">
-          <WarehousesManager restaurantId={restaurantId} warehouses={warehouses} onRefresh={load} />
+          <WarehouseManager restaurantId={restaurantId} warehouses={warehouses} onRefresh={load} />
         </TabsContent>
 
         <TabsContent value="transfers" className="space-y-4">
@@ -466,6 +474,10 @@ export function InventoryTab({ restaurantId, currency, businessType }: Props) {
 
         <TabsContent value="wac" className="space-y-4">
           <WACTab products={products} currency={currency} />
+        </TabsContent>
+
+        <TabsContent value="warehouse_report" className="space-y-4">
+          <WarehouseReportTab products={products} warehouses={warehouses} currency={currency} restaurantId={restaurantId} />
         </TabsContent>
       </Tabs>
 

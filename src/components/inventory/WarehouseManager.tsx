@@ -51,9 +51,14 @@ const accountingStandardLabels: Record<AccountingStandard, string> = {
   US_GAAP: 'US GAAP'
 };
 
-export function WarehouseManager() {
-  const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
-  const [loading, setLoading] = useState(true);
+interface WarehouseManagerProps {
+  restaurantId: string;
+  warehouses: Warehouse[];
+  onRefresh: () => void;
+}
+
+export function WarehouseManager({ restaurantId, warehouses: propsWarehouses, onRefresh }: WarehouseManagerProps) {
+  const [loading, setLoading] = useState(false);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [formData, setFormData] = useState({
     code: '',
@@ -77,42 +82,8 @@ export function WarehouseManager() {
   const [mainWarehouses, setMainWarehouses] = useState<Warehouse[]>([]);
 
   useEffect(() => {
-    fetchWarehouses();
-  }, []);
-
-  const fetchWarehouses = async () => {
-    try {
-      setLoading(true);
-      const { data, error } = await supabase
-        .from('warehouses')
-        .select('*')
-        .order('created_at', { ascending: false });
-
-      if (error) throw error;
-      
-      const warehousesWithParents = await Promise.all(
-        (data || []).map(async (warehouse: Warehouse) => {
-          if (warehouse.parent_warehouse_id) {
-            const { data: parent } = await supabase
-              .from('warehouses')
-              .select('*')
-              .eq('id', warehouse.parent_warehouse_id)
-              .single();
-            return { ...warehouse, parent };
-          }
-          return warehouse;
-        })
-      );
-
-      setWarehouses(warehousesWithParents);
-      setMainWarehouses((data || []).filter((w: Warehouse) => w.type === 'main'));
-    } catch (error) {
-      console.error('Error fetching warehouses:', error);
-      toast.error('فشل في تحميل بيانات المخازن');
-    } finally {
-      setLoading(false);
-    }
-  };
+    setMainWarehouses(propsWarehouses.filter((w: Warehouse) => w.type === 'main'));
+  }, [propsWarehouses]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -123,9 +94,11 @@ export function WarehouseManager() {
     }
 
     try {
+      setLoading(true);
       const { error } = await supabase
         .from('warehouses')
         .insert({
+          restaurant_id: restaurantId,
           code: formData.code,
           name: formData.name,
           name_ar: formData.name_ar,
@@ -168,10 +141,12 @@ export function WarehouseManager() {
         cogs_account_code: '',
         notes: ''
       });
-      fetchWarehouses();
+      onRefresh();
     } catch (error) {
       console.error('Error creating warehouse:', error);
       toast.error('فشل في إضافة المخزن');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -179,6 +154,7 @@ export function WarehouseManager() {
     if (!confirm('هل أنت متأكد من حذف هذا المخزن؟')) return;
 
     try {
+      setLoading(true);
       const { error } = await supabase
         .from('warehouses')
         .delete()
@@ -187,16 +163,40 @@ export function WarehouseManager() {
       if (error) throw error;
 
       toast.success('تم حذف المخزن بنجاح');
-      fetchWarehouses();
+      onRefresh();
     } catch (error) {
       console.error('Error deleting warehouse:', error);
       toast.error('فشل في حذف المخزن');
+    } finally {
+      setLoading(false);
     }
   };
 
   const getWarehousesByType = (types: string[]) => {
-    return warehouses.filter(w => types.includes(w.type));
+    return propsWarehouses.filter(w => types.includes(w.type));
   };
+
+  // Fetch parent warehouses for display
+  const [warehousesWithParents, setWarehousesWithParents] = useState<Warehouse[]>([]);
+  useEffect(() => {
+    const fetchParents = async () => {
+      const withParents = await Promise.all(
+        propsWarehouses.map(async (warehouse) => {
+          if (warehouse.parent_warehouse_id) {
+            const { data: parent } = await supabase
+              .from('warehouses')
+              .select('*')
+              .eq('id', warehouse.parent_warehouse_id)
+              .single();
+            return { ...warehouse, parent };
+          }
+          return warehouse;
+        })
+      );
+      setWarehousesWithParents(withParents);
+    };
+    fetchParents();
+  }, [propsWarehouses]);
 
   if (loading) {
     return (
@@ -314,7 +314,7 @@ export function WarehouseManager() {
         </Dialog>
       </div>
 
-      {warehouses.length === 0 ? (
+      {warehousesWithParents.length === 0 ? (
         <Alert>
           <AlertCircle className="h-4 w-4" />
           <AlertDescription>
@@ -324,7 +324,7 @@ export function WarehouseManager() {
       ) : (
         <div className="space-y-6">
           {(['main', 'sub'] as WarehouseType[]).map((type) => {
-            const typeWarehouses = warehouses.filter(w => w.type === type);
+            const typeWarehouses = warehousesWithParents.filter(w => w.type === type);
             if (typeWarehouses.length === 0) return null;
 
             return (
