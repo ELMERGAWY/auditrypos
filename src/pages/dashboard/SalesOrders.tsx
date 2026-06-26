@@ -117,8 +117,6 @@ export function SalesOrders({ restaurantId, currency }: Props) {
       setShowEditModal(false);
       setEditingOrder(null);
       setEditOrderItems([]);
-      // Add small delay to ensure database update completes before reload
-      await new Promise(resolve => setTimeout(resolve, 300));
       loadOrders();
     } catch (e: any) {
       toast.error('فشل تحديث الأمر: ' + e.message);

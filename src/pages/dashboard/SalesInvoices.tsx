@@ -204,8 +204,6 @@ export function SalesInvoices({ restaurantId, currency, restaurant, isSuperAdmin
       setEditingInvoice(null);
       setEditItems([]);
       setForm({ customer_name: '', amount: '', description: '', payment_method: 'cash', customer_ref: '', paid_amount: '', discount: '', notes: '' });
-      // Add small delay to ensure database update completes before reload
-      await new Promise(resolve => setTimeout(resolve, 300));
       await loadInvoices();
     } catch (e: any) {
       console.error('Error updating invoice:', e);
