@@ -265,7 +265,7 @@ export function WarehouseManager({ restaurantId, warehouses: propsWarehouses, on
               إضافة مخزن جديد
             </Button>
           </DialogTrigger>
-          <DialogContent className="sm:max-w-[500px]">
+          <DialogContent className="sm:max-w-[500px] max-h-[90vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle>إضافة مخزن جديد</DialogTitle>
             </DialogHeader>

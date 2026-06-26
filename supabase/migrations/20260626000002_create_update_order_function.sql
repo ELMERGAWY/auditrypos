@@ -22,15 +22,14 @@ AS $$
 BEGIN
   -- Update the order with all fields
   UPDATE public.orders
-  SET 
+  SET
     customer_name = COALESCE(p_customer_name, customer_name),
     customer_ref = p_customer_ref,
     total = COALESCE(p_total, total),
     paid_amount = COALESCE(p_paid_amount, paid_amount),
     discount = COALESCE(p_discount, discount),
     notes = COALESCE(p_notes, notes),
-    payment_method = COALESCE(p_payment_method, payment_method),
-    updated_at = CURRENT_TIMESTAMP
+    payment_method = COALESCE(p_payment_method, payment_method)
   WHERE id = p_order_id
   RETURNING row_to_json(orders.*)::jsonb;
 END;

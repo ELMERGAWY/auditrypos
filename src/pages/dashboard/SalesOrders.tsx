@@ -91,15 +91,16 @@ export function SalesOrders({ restaurantId, currency }: Props) {
     if (!editingOrder) return;
     try {
       const total = parseFloat(editForm.total_amount) || 0;
-      const payload: any = {
-        customer_name: editForm.customer_name,
-        total_amount: total,
-        status: editForm.status,
-        expected_delivery: editForm.expected_delivery || null
-      };
-      if (editForm.customer_id) payload.customer_id = editForm.customer_id;
 
-      const { error } = await supabase.from('sales_orders').update(payload).eq('id', editingOrder.id);
+      // Use RPC function to bypass potential RLS issues
+      const { error } = await supabase.rpc('update_sales_order', {
+        p_order_id: editingOrder.id,
+        p_customer_name: editForm.customer_name,
+        p_customer_id: editForm.customer_id || null,
+        p_total_amount: total,
+        p_status: editForm.status,
+        p_expected_delivery: editForm.expected_delivery || null
+      });
       if (error) throw error;
 
       // Update items

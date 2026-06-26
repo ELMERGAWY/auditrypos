@@ -130,7 +130,7 @@ export function InventoryTab({ restaurantId, currency, businessType }: Props) {
     setProducts((prodData || []) as Product[]);
     
     // Load Warehouses
-    const { data: whData } = await supabase.from('warehouses').select('*').eq('restaurant_id', restaurantId).order('name');
+    const { data: whData } = await supabase.from('warehouses').select('*').eq('restaurant_id', restaurantId).is('deleted_at', null).order('name');
     setWarehouses((whData || []) as Warehouse[]);
 
     // Load Item Types
