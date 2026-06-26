@@ -74,6 +74,7 @@ export function SalesInvoices({ restaurantId, currency, restaurant, isSuperAdmin
         .from('orders')
         .select('*')
         .eq('restaurant_id', restaurantId)
+        .is('deleted_at', null)
         .order('created_at', { ascending: false })
         .limit(500);
 

@@ -79,9 +79,15 @@ export function SalesOrders({ restaurantId, currency }: Props) {
       customer_id: ''
     });
     try {
-      const { data: items } = await supabase.from('sales_order_items').select('*').eq('sales_order_id', order.id);
+      console.log('Loading items for order:', order.id);
+      const { data: items, error } = await supabase.from('sales_order_items').select('*').eq('sales_order_id', order.id);
+      if (error) {
+        console.error('Error loading order items:', error);
+      }
+      console.log('Loaded items:', items);
       setEditOrderItems(items || []);
-    } catch {
+    } catch (err) {
+      console.error('Exception loading order items:', err);
       setEditOrderItems([]);
     }
     setShowEditModal(true);
