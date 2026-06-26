@@ -365,7 +365,7 @@ export function CustomerManager({ restaurantId, currency }: Props) {
       const { data, error } = await supabase
         .from('customers')
         .select(`
-          id, name, phone, email, address, balance, credit_limit, tax_number, created_at,
+          id, name, phone, email, address, balance, credit_limit, tax_number, created_at, customer_ref,
           orders(id, total, created_at, status),
           customer_transactions(id, amount, type, created_at)
         `)
@@ -374,7 +374,7 @@ export function CustomerManager({ restaurantId, currency }: Props) {
 
       if (error) throw error;
 
-      const formattedCustomers: Customer[] = (data || []).map((c: any) => {
+      const formattedCustomers: Customer[] = await Promise.all((data || []).map(async (c: any) => {
         const sales = (c.orders || []).filter((o: any) => o.status !== 'cancelled')
           .reduce((sum: number, o: any) => sum + Number(o.total), 0) || 0;
         
@@ -382,23 +382,81 @@ export function CustomerManager({ restaurantId, currency }: Props) {
           new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
         )[0];
 
+        // Calculate balance from customer transactions (statement) instead of using the cached balance field
+        let calculatedBalance = 0;
+        
+        // Get orders (invoices) for this customer
+        const { data: ordersData } = await supabase
+          .from('orders')
+          .select('id, total, paid_amount, status, created_at')
+          .eq('customer_id', c.id)
+          .eq('restaurant_id', restaurantId);
+        
+        // Get customer transactions (payments, etc.)
+        const { data: txData } = await supabase
+          .from('customer_transactions')
+          .select('id, amount, type, created_at')
+          .eq('customer_id', c.id)
+          .neq('type', 'sale'); // Exclude 'sale' type as it's redundant with orders
+        
+        // Build and sort all transactions by date
+        const allTransactions: any[] = [];
+        
+        // Add orders as debit transactions
+        ordersData?.forEach((order: any) => {
+          if (order.status !== 'cancelled') {
+            allTransactions.push({
+              date: order.created_at,
+              debit: Number(order.total) || 0,
+              credit: 0
+            });
+            // Add immediate payment as credit
+            const paidAtCheckout = Number(order.paid_amount) || 0;
+            if (paidAtCheckout > 0) {
+              allTransactions.push({
+                date: order.created_at,
+                debit: 0,
+                credit: paidAtCheckout
+              });
+            }
+          }
+        });
+        
+        // Add other transactions
+        txData?.forEach((tx: any) => {
+          const amount = Number(tx.amount) || 0;
+          allTransactions.push({
+            date: tx.created_at,
+            debit: tx.type === 'debit' ? Math.abs(amount) : 0,
+            credit: tx.type !== 'debit' ? Math.abs(amount) : 0
+          });
+        });
+        
+        // Sort by date and calculate running balance
+        allTransactions.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+        
+        allTransactions.forEach(tx => {
+          calculatedBalance += (tx.debit || 0) - (tx.credit || 0);
+        });
+        
         return {
           id: c.id,
           name: c.name,
           phone: c.phone,
           email: c.email,
           address: c.address,
-          balance: Number(c.balance) || 0,
+          balance: calculatedBalance, // Use calculated balance from statement
           credit_limit: c.credit_limit,
           tax_number: c.tax_number,
           created_at: c.created_at,
           last_transaction_date: lastTx?.created_at,
           total_sales: sales
         };
-      });
+      }));
 
       setCustomers(formattedCustomers);
     } catch (error: any) {
+      console.error('Failed to load customers:', error);
       toast.error('فشل تحميل العملاء: ' + error.message);
     } finally {
       setLoading(false);
