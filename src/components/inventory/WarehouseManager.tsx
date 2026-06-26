@@ -8,7 +8,7 @@ import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Plus, Trash2, Building2, Package, Factory, Wrench, FolderTree, AlertCircle } from 'lucide-react';
+import { Plus, Trash2, Building2, Package, Factory, Wrench, FolderTree, AlertCircle, MapPin } from 'lucide-react';
 import { toast } from 'sonner';
 
 type WarehouseType = 'main' | 'sub';
@@ -36,6 +36,18 @@ interface Warehouse {
   inventory_account_code?: string;
   cogs_account_code?: string;
   notes?: string;
+  // Advanced location fields
+  location_zone?: string;
+  aisle?: string;
+  bin?: string;
+  floor?: string;
+  building?: string;
+  // Capacity and control fields
+  capacity_quantity?: number;
+  capacity_volume?: number;
+  temperature_control?: boolean;
+  humidity_control?: boolean;
+  security_level?: string;
   created_at: string;
   updated_at: string;
 }
@@ -77,12 +89,24 @@ export function WarehouseManager({ restaurantId, warehouses: propsWarehouses, on
     accounting_account_code: '',
     inventory_account_code: '',
     cogs_account_code: '',
-    notes: ''
+    notes: '',
+    // Advanced location fields
+    location_zone: '',
+    aisle: '',
+    bin: '',
+    floor: '',
+    building: '',
+    // Capacity and control fields
+    capacity_quantity: '',
+    capacity_volume: '',
+    temperature_control: false,
+    humidity_control: false,
+    security_level: 'normal'
   });
   const [mainWarehouses, setMainWarehouses] = useState<Warehouse[]>([]);
 
   useEffect(() => {
-    setMainWarehouses(propsWarehouses.filter((w: Warehouse) => w.type === 'main'));
+    setMainWarehouses((propsWarehouses || []).filter((w: Warehouse) => w.type === 'main'));
   }, [propsWarehouses]);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -115,7 +139,19 @@ export function WarehouseManager({ restaurantId, warehouses: propsWarehouses, on
           accounting_account_code: formData.accounting_account_code || null,
           inventory_account_code: formData.inventory_account_code || null,
           cogs_account_code: formData.cogs_account_code || null,
-          notes: formData.notes || null
+          notes: formData.notes || null,
+          // Advanced location fields
+          location_zone: formData.location_zone || null,
+          aisle: formData.aisle || null,
+          bin: formData.bin || null,
+          floor: formData.floor || null,
+          building: formData.building || null,
+          // Capacity and control fields
+          capacity_quantity: formData.capacity_quantity ? parseFloat(formData.capacity_quantity) : null,
+          capacity_volume: formData.capacity_volume ? parseFloat(formData.capacity_volume) : null,
+          temperature_control: formData.temperature_control,
+          humidity_control: formData.humidity_control,
+          security_level: formData.security_level || 'normal'
         });
 
       if (error) throw error;
@@ -139,7 +175,19 @@ export function WarehouseManager({ restaurantId, warehouses: propsWarehouses, on
         accounting_account_code: '',
         inventory_account_code: '',
         cogs_account_code: '',
-        notes: ''
+        notes: '',
+        // Advanced location fields
+        location_zone: '',
+        aisle: '',
+        bin: '',
+        floor: '',
+        building: '',
+        // Capacity and control fields
+        capacity_quantity: '',
+        capacity_volume: '',
+        temperature_control: false,
+        humidity_control: false,
+        security_level: 'normal'
       });
       onRefresh();
     } catch (error) {
@@ -254,7 +302,7 @@ export function WarehouseManager({ restaurantId, warehouses: propsWarehouses, on
                 <label className="text-sm font-medium">النوع *</label>
                 <Select
                   value={formData.type}
-                  onValueChange={(value: string) => setFormData({ ...formData, type: value })}
+                  onValueChange={(value: WarehouseType) => setFormData({ ...formData, type: value })}
                 >
                   <SelectTrigger>
                     <SelectValue />
@@ -272,7 +320,7 @@ export function WarehouseManager({ restaurantId, warehouses: propsWarehouses, on
                 <label className="text-sm font-medium">المعيار المحاسبي *</label>
                 <Select
                   value={formData.accounting_standard}
-                  onValueChange={(value: string) => setFormData({ ...formData, accounting_standard: value })}
+                  onValueChange={(value: AccountingStandard) => setFormData({ ...formData, accounting_standard: value })}
                 >
                   <SelectTrigger>
                     <SelectValue />
@@ -306,6 +354,119 @@ export function WarehouseManager({ restaurantId, warehouses: propsWarehouses, on
                   </Select>
                 </div>
               )}
+
+              {/* Advanced Location Fields */}
+              <div className="space-y-3 pt-4 border-t border-border">
+                <h4 className="font-bold text-sm flex items-center gap-2 text-primary">
+                  <MapPin className="w-4 h-4" /> تفاصيل الموقع
+                </h4>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="text-sm font-medium">المنطقة</label>
+                    <Input
+                      value={formData.location_zone}
+                      onChange={(e) => setFormData({ ...formData, location_zone: e.target.value })}
+                      placeholder="مثال: المنطقة A"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium">الممر</label>
+                    <Input
+                      value={formData.aisle}
+                      onChange={(e) => setFormData({ ...formData, aisle: e.target.value })}
+                      placeholder="مثال: A1"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium">الخزانة</label>
+                    <Input
+                      value={formData.bin}
+                      onChange={(e) => setFormData({ ...formData, bin: e.target.value })}
+                      placeholder="مثال: BIN-01"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium">الطابق</label>
+                    <Input
+                      value={formData.floor}
+                      onChange={(e) => setFormData({ ...formData, floor: e.target.value })}
+                      placeholder="مثال: الطابق الأول"
+                    />
+                  </div>
+                  <div className="col-span-2">
+                    <label className="text-sm font-medium">المبنى</label>
+                    <Input
+                      value={formData.building}
+                      onChange={(e) => setFormData({ ...formData, building: e.target.value })}
+                      placeholder="مثال: المبنى الرئيسي"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Capacity and Control Fields */}
+              <div className="space-y-3 pt-4 border-t border-border">
+                <h4 className="font-bold text-sm flex items-center gap-2 text-primary">
+                  <Package className="w-4 h-4" /> السعة والتحكم
+                </h4>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="text-sm font-medium">السعة (الكمية)</label>
+                    <Input
+                      type="number"
+                      value={formData.capacity_quantity}
+                      onChange={(e) => setFormData({ ...formData, capacity_quantity: e.target.value })}
+                      placeholder="0"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium">السعة (الحجم م³)</label>
+                    <Input
+                      type="number"
+                      step="0.001"
+                      value={formData.capacity_volume}
+                      onChange={(e) => setFormData({ ...formData, capacity_volume: e.target.value })}
+                      placeholder="0.000"
+                    />
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      id="temp-control"
+                      checked={formData.temperature_control}
+                      onChange={(e) => setFormData({ ...formData, temperature_control: e.target.checked })}
+                      className="rounded"
+                    />
+                    <label htmlFor="temp-control" className="text-sm">تحكم في درجة الحرارة</label>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      id="humidity-control"
+                      checked={formData.humidity_control}
+                      onChange={(e) => setFormData({ ...formData, humidity_control: e.target.checked })}
+                      className="rounded"
+                    />
+                    <label htmlFor="humidity-control" className="text-sm">تحكم في الرطوبة</label>
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium">مستوى الأمان</label>
+                    <Select
+                      value={formData.security_level}
+                      onValueChange={(value) => setFormData({ ...formData, security_level: value })}
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="normal">عادي</SelectItem>
+                        <SelectItem value="high">عالي</SelectItem>
+                        <SelectItem value="restricted">مقيد</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+              </div>
               <DialogFooter>
                 <Button type="submit">حفظ</Button>
               </DialogFooter>

@@ -173,20 +173,17 @@ export function SalesInvoices({ restaurantId, currency, restaurant, isSuperAdmin
         payment_method: form.payment_method
       });
 
-      const { error: orderError, data: updatedData } = await supabase
-        .from('orders')
-        .update({
-          customer_name: form.customer_name,
-          customer_ref: form.customer_ref || null,
-          total: amount,
-          paid_amount: paidAmount,
-          discount,
-          notes: form.notes || '',
-          payment_method: form.payment_method
-        } as any)
-        .eq('id', editingInvoice.id)
-        .select()
-        .single();
+      // Use RPC function to bypass potential RLS issues
+      const { error: orderError, data: updatedData } = await supabase.rpc('update_order', {
+        p_order_id: editingInvoice.id,
+        p_customer_name: form.customer_name,
+        p_customer_ref: form.customer_ref || null,
+        p_total: amount,
+        p_paid_amount: paidAmount,
+        p_discount: discount,
+        p_notes: form.notes || '',
+        p_payment_method: form.payment_method
+      });
 
       if (orderError) throw orderError;
       console.log('Update result:', updatedData);
