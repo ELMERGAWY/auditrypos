@@ -164,9 +164,10 @@ export function SalesInvoices({ restaurantId, currency, restaurant, isSuperAdmin
       const discount = parseFloat(form.discount) || 0;
 
       toast.info('الخطوة 1: جاري تحديث بيانات الفاتورة...');
+      toast.info(`بيانات المرسلة: المبلغ=${amount}, المدفوع=${paidAmount}, الخصم=${discount}`);
 
       // Try direct update first
-      const { error: orderError } = await supabase
+      const { error: orderError, data: orderData } = await supabase
         .from('orders')
         .update({
           customer_name: form.customer_name,
@@ -177,7 +178,9 @@ export function SalesInvoices({ restaurantId, currency, restaurant, isSuperAdmin
           notes: form.notes || '',
           payment_method: form.payment_method
         })
-        .eq('id', editingInvoice.id);
+        .eq('id', editingInvoice.id)
+        .select()
+        .single();
 
       if (orderError) {
         console.error('Direct order update failed:', orderError);
@@ -203,6 +206,9 @@ export function SalesInvoices({ restaurantId, currency, restaurant, isSuperAdmin
         toast.success('تم تحديث بيانات الفاتورة (RPC)');
       } else {
         toast.success('تم تحديث بيانات الفاتورة (Direct)');
+        if (orderData) {
+          toast.info(`بيانات المستلمة: المبلغ=${orderData.total}, المدفوع=${orderData.paid_amount}, الخصم=${orderData.discount}`);
+        }
       }
 
       toast.info(`الخطوة 2: جاري تحديث ${editItems.length} بند...`);
