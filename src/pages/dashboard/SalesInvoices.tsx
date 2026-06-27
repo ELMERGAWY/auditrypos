@@ -82,6 +82,13 @@ export function SalesInvoices({ restaurantId, currency, restaurant, isSuperAdmin
         throw error;
       }
       console.log('Loaded invoices:', data?.length || 0);
+      
+      // Log the first invoice data for debugging
+      if (data && data.length > 0) {
+        console.log('First invoice data:', data[0]);
+        toast.info(`تم تحميل ${data.length} فاتورة، أول فاتورة: المبلغ=${data[0].total}`);
+      }
+      
       setInvoices(data || []);
     } catch (error: any) {
       console.error('Failed to load invoices:', error);
