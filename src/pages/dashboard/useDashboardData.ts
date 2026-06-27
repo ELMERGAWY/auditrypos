@@ -151,7 +151,7 @@ export function useDashboardData() {
     // Parallel fetch all other resources with optimized queries
     const [itemsRes, ordersRes, callsRes, agentsRes, shiftRes, taxesRes, warehousesRes] = await Promise.all([
       usesProductsCatalog
-        ? supabase.from('products').select('id,name,price,category,image,available,restaurant_id,sort_order,barcode,sku,unit,quantity,warehouse_id,warehouses!inner(name_ar,name)').eq('restaurant_id', rest.id).order('sort_order')
+        ? supabase.from('products').select('id,name,price,category,image,available,restaurant_id,sort_order,barcode,sku,unit,quantity,warehouse_id').eq('restaurant_id', rest.id).order('sort_order')
         : supabase.from('menu_items').select('*').eq('restaurant_id', rest.id).order('sort_order'),
       supabase.from('orders').select('*').eq('restaurant_id', rest.id).order('created_at', { ascending: false }).limit(100),
       supabase.from('waiter_calls').select('*').eq('restaurant_id', rest.id).eq('acknowledged', false).order('created_at', { ascending: false }),
