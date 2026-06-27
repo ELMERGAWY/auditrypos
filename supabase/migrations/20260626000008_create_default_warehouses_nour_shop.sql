@@ -2,7 +2,7 @@
 -- CREATE DEFAULT WAREHOUSES FOR NOUR SHOP
 -- ============================================================
 -- This script creates the default warehouses for Nour Shop
--- Restaurant ID: 7eb31553-ac26-43d3-bec8-5b2659410dd9
+-- Restaurant ID: f050ea01-4938-475d-ad3a-711bfc58e451
 -- ============================================================
 
 -- Insert main warehouse "المحل"
@@ -22,7 +22,7 @@ INSERT INTO public.warehouses (
   created_at
 ) VALUES (
   gen_random_uuid(),
-  '7eb31553-ac26-43d3-bec8-5b2659410dd9',
+  'f050ea01-4938-475d-ad3a-711bfc58e451',
   'WH-001',
   'Main Store',
   'المحل',
@@ -45,7 +45,7 @@ BEGIN
   -- Get the main warehouse ID
   SELECT id INTO v_main_wh_id
   FROM warehouses
-  WHERE restaurant_id = '7eb31553-ac26-43d3-bec8-5b2659410dd9' AND code = 'WH-001';
+  WHERE restaurant_id = 'f050ea01-4938-475d-ad3a-711bfc58e451' AND code = 'WH-001';
 
   -- Create sub-warehouse "أرضية المحل" for main store
   INSERT INTO public.sub_warehouses (
@@ -95,5 +95,5 @@ END $$;
 -- Verify creation
 SELECT id, code, name, name_ar, type, is_active, is_default
 FROM warehouses
-WHERE restaurant_id = '7eb31553-ac26-43d3-bec8-5b2659410dd9'
+WHERE restaurant_id = 'f050ea01-4938-475d-ad3a-711bfc58e451'
 ORDER BY code;
