@@ -187,10 +187,35 @@ export function InventoryTab({ restaurantId, currency, businessType }: Props) {
       // If warehouse is selected, create item-warehouse assignment
       if (form.warehouse_id) {
         // Get sub-warehouses for this warehouse
-        const { data: subWarehouses } = await supabase
+        let { data: subWarehouses } = await supabase
           .from('sub_warehouses')
           .select('id')
           .eq('warehouse_id', form.warehouse_id);
+
+        // If no sub-warehouse exists, create one automatically
+        if (!subWarehouses || subWarehouses.length === 0) {
+          const warehouse = warehouses.find(w => w.id === form.warehouse_id);
+          const { data: newSubWarehouse, error: subWhError } = await supabase
+            .from('sub_warehouses')
+            .insert({
+              warehouse_id: form.warehouse_id,
+              name: `${warehouse?.name_ar || 'المخزن'} - فرعي`,
+              name_ar: `${warehouse?.name_ar || 'المخزن'} - فرعي`,
+              code: `${warehouse?.code || 'WH'}-SUB`,
+              location: 'الموقع الافتراضي',
+              is_active: true
+            })
+            .select()
+            .single();
+
+          if (subWhError) {
+            console.error('Failed to create sub-warehouse:', subWhError);
+            toast.warning('تم حفظ المنتج ولكن فشل إنشاء المخزن الفرعي');
+          } else {
+            subWarehouses = [{ id: newSubWarehouse.id }];
+            toast.success('تم إنشاء مخزن فرعي تلقائياً');
+          }
+        }
 
         if (subWarehouses && subWarehouses.length > 0) {
           // Assign to the first sub-warehouse
