@@ -9,25 +9,60 @@
 BEGIN;
 
 -- Disable RLS on order_items
-ALTER TABLE public.order_items DISABLE ROW LEVEL SECURITY;
+DO $$
+BEGIN
+  IF EXISTS (SELECT FROM pg_tables WHERE schemaname = 'public' AND tablename = 'order_items') THEN
+    ALTER TABLE public.order_items DISABLE ROW LEVEL SECURITY;
+  END IF;
+END $$;
 
--- Disable RLS on sales_order_items
-ALTER TABLE public.sales_order_items DISABLE ROW LEVEL SECURITY;
+-- Disable RLS on sales_order_items (if exists)
+DO $$
+BEGIN
+  IF EXISTS (SELECT FROM pg_tables WHERE schemaname = 'public' AND tablename = 'sales_order_items') THEN
+    ALTER TABLE public.sales_order_items DISABLE ROW LEVEL SECURITY;
+  END IF;
+END $$;
 
 -- Disable RLS on item_warehouse_assignments
-ALTER TABLE public.item_warehouse_assignments DISABLE ROW LEVEL SECURITY;
+DO $$
+BEGIN
+  IF EXISTS (SELECT FROM pg_tables WHERE schemaname = 'public' AND tablename = 'item_warehouse_assignments') THEN
+    ALTER TABLE public.item_warehouse_assignments DISABLE ROW LEVEL SECURITY;
+  END IF;
+END $$;
 
 -- Disable RLS on warehouses
-ALTER TABLE public.warehouses DISABLE ROW LEVEL SECURITY;
+DO $$
+BEGIN
+  IF EXISTS (SELECT FROM pg_tables WHERE schemaname = 'public' AND tablename = 'warehouses') THEN
+    ALTER TABLE public.warehouses DISABLE ROW LEVEL SECURITY;
+  END IF;
+END $$;
 
 -- Disable RLS on sub_warehouses
-ALTER TABLE public.sub_warehouses DISABLE ROW LEVEL SECURITY;
+DO $$
+BEGIN
+  IF EXISTS (SELECT FROM pg_tables WHERE schemaname = 'public' AND tablename = 'sub_warehouses') THEN
+    ALTER TABLE public.sub_warehouses DISABLE ROW LEVEL SECURITY;
+  END IF;
+END $$;
 
 -- Disable RLS on orders
-ALTER TABLE public.orders DISABLE ROW LEVEL SECURITY;
+DO $$
+BEGIN
+  IF EXISTS (SELECT FROM pg_tables WHERE schemaname = 'public' AND tablename = 'orders') THEN
+    ALTER TABLE public.orders DISABLE ROW LEVEL SECURITY;
+  END IF;
+END $$;
 
--- Disable RLS on sales_orders
-ALTER TABLE public.sales_orders DISABLE ROW LEVEL SECURITY;
+-- Disable RLS on sales_orders (if exists)
+DO $$
+BEGIN
+  IF EXISTS (SELECT FROM pg_tables WHERE schemaname = 'public' AND tablename = 'sales_orders') THEN
+    ALTER TABLE public.sales_orders DISABLE ROW LEVEL SECURITY;
+  END IF;
+END $$;
 
 COMMIT;
 
