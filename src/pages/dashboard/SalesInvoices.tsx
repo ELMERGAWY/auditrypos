@@ -206,19 +206,23 @@ export function SalesInvoices({ restaurantId, currency, restaurant, isSuperAdmin
         const item = editItems[i];
         try {
           toast.info(`جاري تحديث البند ${i + 1}/${editItems.length}: ${item.menu_item_name || 'صنف بدون اسم'}`);
+          toast.info(`بيانات البند: الكمية=${item.quantity}, السعر=${item.price}`);
           
           // Try direct update first
-          const { error: directError } = await supabase
+          const { error: directError, data: itemData } = await supabase
             .from('order_items')
             .update({
               quantity: item.quantity,
               price: item.price,
               menu_item_name: item.menu_item_name
             })
-            .eq('id', item.id);
+            .eq('id', item.id)
+            .select()
+            .single();
 
           if (directError) {
             console.error('Direct item update failed:', item.id, directError);
+            toast.error(`فشل تحديث البند (Direct): ${directError.message}`);
             // Fallback to RPC
             const { error: rpcError } = await supabase.rpc('update_order_item', {
               p_item_id: item.id,
@@ -233,9 +237,13 @@ export function SalesInvoices({ restaurantId, currency, restaurant, isSuperAdmin
               itemErrorsDetails.push(`${item.menu_item_name || 'صنف بدون اسم'}: ${rpcError.message}`);
             } else {
               itemUpdateSuccess++;
+              toast.success(`تم تحديث البند (RPC): ${item.menu_item_name || 'صنف بدون اسم'}`);
             }
           } else {
             itemUpdateSuccess++;
+            if (itemData) {
+              toast.info(`تم تحديث البند (Direct): السعر=${itemData.price}, الكمية=${itemData.quantity}`);
+            }
           }
         } catch (itemErr: any) {
           console.error('Exception updating item:', item.id, itemErr);
