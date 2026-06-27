@@ -163,55 +163,10 @@ export function SalesInvoices({ restaurantId, currency, restaurant, isSuperAdmin
       const paidAmount = parseFloat(form.paid_amount) || amount;
       const discount = parseFloat(form.discount) || 0;
 
-      toast.info('الخطوة 1: جاري تحديث بيانات الفاتورة...');
       toast.info(`بيانات المرسلة: المبلغ=${amount}, المدفوع=${paidAmount}, الخصم=${discount}`);
 
-      // Try direct update first
-      const { error: orderError, data: orderData } = await supabase
-        .from('orders')
-        .update({
-          customer_name: form.customer_name,
-          customer_ref: form.customer_ref || null,
-          total: amount,
-          paid_amount: paidAmount,
-          discount,
-          notes: form.notes || '',
-          payment_method: form.payment_method
-        })
-        .eq('id', editingInvoice.id)
-        .select()
-        .single();
-
-      if (orderError) {
-        console.error('Direct order update failed:', orderError);
-        toast.error('فشل تحديث الفاتورة (Direct): ' + orderError.message);
-        
-        // Fallback to RPC if direct update fails
-        toast.info('جاري المحاولة بطريقة RPC...');
-        const { error: rpcError } = await supabase.rpc('update_order', {
-          p_order_id: editingInvoice.id,
-          p_customer_name: form.customer_name,
-          p_customer_ref: form.customer_ref || null,
-          p_total: amount,
-          p_paid_amount: paidAmount,
-          p_discount: discount,
-          p_notes: form.notes || '',
-          p_payment_method: form.payment_method
-        });
-
-        if (rpcError) {
-          toast.error('فشل تحديث الفاتورة (RPC): ' + rpcError.message);
-          throw rpcError;
-        }
-        toast.success('تم تحديث بيانات الفاتورة (RPC)');
-      } else {
-        toast.success('تم تحديث بيانات الفاتورة (Direct)');
-        if (orderData) {
-          toast.info(`بيانات المستلمة: المبلغ=${orderData.total}, المدفوع=${orderData.paid_amount}, الخصم=${orderData.discount}`);
-        }
-      }
-
-      toast.info(`الخطوة 2: جاري تحديث ${editItems.length} بند...`);
+      // Update items FIRST to avoid trigger recalculating total from old items
+      toast.info(`الخطوة 1: جاري تحديث ${editItems.length} بند...`);
 
       let itemUpdateErrors = 0;
       let itemUpdateSuccess = 0;
@@ -259,18 +214,57 @@ export function SalesInvoices({ restaurantId, currency, restaurant, isSuperAdmin
         }
       }
 
-      toast.info(`الخطوة 3: ملخص التحديث - نجح ${itemUpdateSuccess}، فشل ${itemUpdateErrors}`);
+      toast.info(`ملخص البنود: نجح ${itemUpdateSuccess}، فشل ${itemUpdateErrors}`);
 
-      if (itemUpdateErrors > 0) {
-        toast.warning(`تم تحديث الفاتورة ولكن فشل ${itemUpdateErrors} من ${editItems.length} بنود`);
-        // Show detailed errors
-        itemErrorsDetails.forEach(err => toast.error(err));
+      // NOW update the order total and other fields
+      toast.info('الخطوة 2: جاري تحديث بيانات الفاتورة...');
+
+      const { error: orderError, data: orderData } = await supabase
+        .from('orders')
+        .update({
+          customer_name: form.customer_name,
+          customer_ref: form.customer_ref || null,
+          total: amount,
+          paid_amount: paidAmount,
+          discount,
+          notes: form.notes || '',
+          payment_method: form.payment_method
+        })
+        .eq('id', editingInvoice.id)
+        .select()
+        .single();
+
+      if (orderError) {
+        console.error('Direct order update failed:', orderError);
+        toast.error('فشل تحديث الفاتورة (Direct): ' + orderError.message);
+        
+        // Fallback to RPC if direct update fails
+        toast.info('جاري المحاولة بطريقة RPC...');
+        const { error: rpcError } = await supabase.rpc('update_order', {
+          p_order_id: editingInvoice.id,
+          p_customer_name: form.customer_name,
+          p_customer_ref: form.customer_ref || null,
+          p_total: amount,
+          p_paid_amount: paidAmount,
+          p_discount: discount,
+          p_notes: form.notes || '',
+          p_payment_method: form.payment_method
+        });
+
+        if (rpcError) {
+          toast.error('فشل تحديث الفاتورة (RPC): ' + rpcError.message);
+          throw rpcError;
+        }
+        toast.success('تم تحديث بيانات الفاتورة (RPC)');
       } else {
-        toast.success(`تم تحديث الفاتورة وجميع ${itemUpdateSuccess} بنود بنجاح ✅`);
+        toast.success('تم تحديث بيانات الفاتورة (Direct)');
+        if (orderData) {
+          toast.info(`بيانات المستلمة: المبلغ=${orderData.total}, المدفوع=${orderData.paid_amount}, الخصم=${orderData.discount}`);
+        }
       }
 
       // Verify the update by fetching the invoice again immediately
-      toast.info('جاري التحقق من التحديث...');
+      toast.info('الخطوة 3: جاري التحقق النهائي...');
       const { data: verifyData } = await supabase
         .from('orders')
         .select('*')
@@ -278,7 +272,15 @@ export function SalesInvoices({ restaurantId, currency, restaurant, isSuperAdmin
         .single();
 
       if (verifyData) {
-        toast.info(`التحقق: المبلغ=${verifyData.total}, المدفوع=${verifyData.paid_amount}, الخصم=${verifyData.discount}`);
+        toast.info(`التحقق النهائي: المبلغ=${verifyData.total}, المدفوع=${verifyData.paid_amount}, الخصم=${verifyData.discount}`);
+      }
+
+      if (itemUpdateErrors > 0) {
+        toast.warning(`تم تحديث الفاتورة ولكن فشل ${itemUpdateErrors} من ${editItems.length} بنود`);
+        // Show detailed errors
+        itemErrorsDetails.forEach(err => toast.error(err));
+      } else {
+        toast.success(`تم تحديث الفاتورة وجميع ${itemUpdateSuccess} بنود بنجاح ✅`);
       }
 
       setShowManualForm(false);
