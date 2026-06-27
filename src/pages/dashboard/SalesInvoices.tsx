@@ -187,16 +187,30 @@ export function SalesInvoices({ restaurantId, currency, restaurant, isSuperAdmin
 
       if (orderError) throw orderError;
 
+      let itemUpdateErrors = 0;
       for (const item of editItems) {
-        await supabase.rpc('update_order_item', {
-          p_item_id: item.id,
-          p_quantity: item.quantity,
-          p_price: item.price,
-          p_menu_item_name: item.menu_item_name
-        });
+        try {
+          const { error: itemError } = await supabase.rpc('update_order_item', {
+            p_item_id: item.id,
+            p_quantity: item.quantity,
+            p_price: item.price,
+            p_menu_item_name: item.menu_item_name
+          });
+          if (itemError) {
+            console.error('Error updating item:', item.id, itemError);
+            itemUpdateErrors++;
+          }
+        } catch (itemErr) {
+          console.error('Exception updating item:', item.id, itemErr);
+          itemUpdateErrors++;
+        }
       }
 
-      toast.success('تم تحديث الفاتورة بنجاح ✅');
+      if (itemUpdateErrors > 0) {
+        toast.warning(`تم تحديث الفاتورة ولكن فشل تحديث ${itemUpdateErrors} من البنود`);
+      } else {
+        toast.success('تم تحديث الفاتورة بنجاح ✅');
+      }
       setShowManualForm(false);
       setEditingInvoice(null);
       setEditItems([]);

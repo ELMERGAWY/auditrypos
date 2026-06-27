@@ -110,19 +110,32 @@ export function SalesOrders({ restaurantId, currency }: Props) {
 
       if (error) throw error;
 
-      // Update items
+      let itemUpdateErrors = 0;
       for (const item of editOrderItems) {
         if (item.id) {
-          await supabase.rpc('update_sales_order_item', {
-            p_item_id: item.id,
-            p_item_name: item.item_name,
-            p_quantity: item.quantity,
-            p_unit_price: item.unit_price
-          });
+          try {
+            const { error: itemError } = await supabase.rpc('update_sales_order_item', {
+              p_item_id: item.id,
+              p_item_name: item.item_name,
+              p_quantity: item.quantity,
+              p_unit_price: item.unit_price
+            });
+            if (itemError) {
+              console.error('Error updating sales order item:', item.id, itemError);
+              itemUpdateErrors++;
+            }
+          } catch (itemErr) {
+            console.error('Exception updating sales order item:', item.id, itemErr);
+            itemUpdateErrors++;
+          }
         }
       }
 
-      toast.success('تم تحديث أمر البيع بنجاح ✅');
+      if (itemUpdateErrors > 0) {
+        toast.warning(`تم تحديث الأمر ولكن فشل تحديث ${itemUpdateErrors} من البنود`);
+      } else {
+        toast.success('تم تحديث أمر البيع بنجاح ✅');
+      }
       setShowEditModal(false);
       setEditingOrder(null);
       setEditOrderItems([]);
