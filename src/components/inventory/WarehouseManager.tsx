@@ -120,39 +120,11 @@ export function WarehouseManager({ restaurantId, warehouses: propsWarehouses, on
     setDetailsDialogOpen(true);
 
     try {
-      // Get sub-warehouses for this warehouse
-      const { data: subWarehouses } = await supabase
-        .from('sub_warehouses')
-        .select('id')
-        .eq('warehouse_id', warehouse.id);
-
-      if (!subWarehouses || subWarehouses.length === 0) {
-        setWarehouseProducts([]);
-        setLoadingProducts(false);
-        return;
-      }
-
-      const subWarehouseIds = subWarehouses.map(sw => sw.id);
-
-      // Get item assignments for these sub-warehouses
-      const { data: assignments } = await supabase
-        .from('item_warehouse_assignments')
-        .select('item_id')
-        .in('sub_warehouse_id', subWarehouseIds);
-
-      if (!assignments || assignments.length === 0) {
-        setWarehouseProducts([]);
-        setLoadingProducts(false);
-        return;
-      }
-
-      const itemIds = assignments.map(a => a.item_id);
-
-      // Get products details
+      // Get products directly assigned to this warehouse
       const { data: products } = await supabase
         .from('products')
         .select('*')
-        .in('id', itemIds);
+        .eq('warehouse_id', warehouse.id);
 
       setWarehouseProducts(products || []);
     } catch (error) {
