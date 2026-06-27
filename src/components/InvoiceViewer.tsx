@@ -432,11 +432,11 @@ export function InvoiceViewer({
                     </span>
                   </div>
                 )}
-                {paidAmount > 0 && paidAmount !== total && (
-                  <>
-                    {printSettings.paidAmount && <Row label="المدفوع" value={paidAmount} currency={currency} className="text-emerald-500" />}
-                    {printSettings.remaining && <Row label="المتبقي" value={remaining} currency={currency} className="text-destructive font-black" />}
-                  </>
+                {printSettings.paidAmount && (
+                  <Row label="المدفوع" value={paidAmount} currency={currency} className="text-emerald-500" />
+                )}
+                {printSettings.remaining && (
+                  <Row label="المتبقي" value={remaining} currency={currency} className={remaining > 0 ? "text-destructive font-black" : "text-emerald-500 font-black"} />
                 )}
               </div>
             </div>
