@@ -17,7 +17,7 @@ LANGUAGE plpgsql
 SECURITY DEFINER
 AS $$
 BEGIN
-  PERFORM public.sales_order_items
+  UPDATE public.sales_order_items
   SET 
     item_name = p_item_name,
     quantity = p_quantity,
