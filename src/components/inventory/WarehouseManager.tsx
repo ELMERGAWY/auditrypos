@@ -218,9 +218,9 @@ export function WarehouseManager({ restaurantId, warehouses: propsWarehouses, on
         security_level: 'normal'
       });
       onRefresh();
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error creating warehouse:', error);
-      toast.error('فشل في إضافة المخزن');
+      toast.error(`فشل في إضافة المخزن: ${error?.message || 'خطأ غير معروف'}`);
     } finally {
       setLoading(false);
     }
