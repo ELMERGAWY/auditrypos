@@ -171,15 +171,50 @@ export function InventoryTab({ restaurantId, currency, businessType }: Props) {
       unit_conversion_factor: Number(form.unit_conversion_factor) || 1,
     };
     try {
+      let productId: string;
       if (editingProduct) {
         const { error } = await supabase.from('products').update(data).eq('id', editingProduct.id);
         if (error) throw error;
+        productId = editingProduct.id;
         toast.success('تم تحديث المنتج');
       } else {
-        const { error } = await supabase.from('products').insert(data);
+        const { data: newProduct, error } = await supabase.from('products').insert(data).select().single();
         if (error) throw error;
+        productId = newProduct.id;
         toast.success('تم إضافة المنتج');
       }
+
+      // If warehouse is selected, create item-warehouse assignment
+      if (form.warehouse_id) {
+        // Get sub-warehouses for this warehouse
+        const { data: subWarehouses } = await supabase
+          .from('sub_warehouses')
+          .select('id')
+          .eq('warehouse_id', form.warehouse_id);
+
+        if (subWarehouses && subWarehouses.length > 0) {
+          // Assign to the first sub-warehouse
+          const { error: assignmentError } = await supabase
+            .from('item_warehouse_assignments')
+            .insert({
+              item_id: productId,
+              sub_warehouse_id: subWarehouses[0].id,
+              costing_method: 'AVERAGE',
+              accounting_standard: 'IFRS',
+              inventory_valuation_rule: 'IAS2_AVERAGE',
+              is_primary: true,
+              min_stock_level: 0,
+              low_stock_alert: true,
+              overstock_alert: false
+            });
+
+          if (assignmentError) {
+            console.error('Failed to create warehouse assignment:', assignmentError);
+            toast.warning('تم حفظ المنتج ولكن فشل ربطه بالمخزن');
+          }
+        }
+      }
+
       resetForm();
       load();
     } catch (e: any) {
