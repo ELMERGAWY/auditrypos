@@ -137,16 +137,39 @@ export function SalesInvoices({ restaurantId, currency, restaurant, isSuperAdmin
 
   const handleEditInvoice = async (invoice: Invoice) => {
     setEditingInvoice(invoice);
-    setForm({
-      customer_name: invoice.customer_name || '',
-      amount: String(invoice.total || ''),
-      description: '',
-      payment_method: invoice.payment_method || 'cash',
-      customer_ref: extractCustomerRef(invoice),
-      paid_amount: String(invoice.paid_amount ?? invoice.total ?? ''),
-      discount: String(invoice.discount || 0),
-      notes: invoice.notes || ''
-    });
+    
+    // Fetch fresh data from database instead of using the old invoice object
+    const { data: freshInvoice } = await supabase
+      .from('orders')
+      .select('*')
+      .eq('id', invoice.id)
+      .single();
+
+    if (freshInvoice) {
+      setForm({
+        customer_name: freshInvoice.customer_name || '',
+        amount: String(freshInvoice.total || ''),
+        description: '',
+        payment_method: freshInvoice.payment_method || 'cash',
+        customer_ref: extractCustomerRef(freshInvoice),
+        paid_amount: String(freshInvoice.paid_amount ?? freshInvoice.total ?? ''),
+        discount: String(freshInvoice.discount || 0),
+        notes: freshInvoice.notes || ''
+      });
+    } else {
+      // Fallback to old invoice object if fetch fails
+      setForm({
+        customer_name: invoice.customer_name || '',
+        amount: String(invoice.total || ''),
+        description: '',
+        payment_method: invoice.payment_method || 'cash',
+        customer_ref: extractCustomerRef(invoice),
+        paid_amount: String(invoice.paid_amount ?? invoice.total ?? ''),
+        discount: String(invoice.discount || 0),
+        notes: invoice.notes || ''
+      });
+    }
+
     const { data: items } = await supabase.from('order_items').select('*').eq('order_id', invoice.id);
     setEditItems(items || []);
     setShowManualForm(true);
@@ -281,6 +304,13 @@ export function SalesInvoices({ restaurantId, currency, restaurant, isSuperAdmin
         itemErrorsDetails.forEach(err => toast.error(err));
       } else {
         toast.success(`تم تحديث الفاتورة وجميع ${itemUpdateSuccess} بنود بنجاح ✅`);
+      }
+
+      // Update the invoice in the local state immediately
+      if (verifyData) {
+        setInvoices(prev => prev.map(inv => 
+          inv.id === editingInvoice.id ? { ...inv, ...verifyData } : inv
+        ));
       }
 
       setShowManualForm(false);
