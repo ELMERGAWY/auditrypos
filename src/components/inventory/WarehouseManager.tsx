@@ -8,7 +8,7 @@ import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Plus, Trash2, Building2, Package, Factory, Wrench, FolderTree, AlertCircle, MapPin } from 'lucide-react';
+import { Plus, Trash2, Building2, Package, Factory, Wrench, FolderTree, AlertCircle, MapPin, Edit } from 'lucide-react';
 import { toast } from 'sonner';
 
 type WarehouseType = 'MAIN' | 'SUB';
@@ -20,6 +20,7 @@ interface Warehouse {
   name: string;
   name_ar: string | null;
   type: string;
+  warehouse_category?: string;
   parent_warehouse_id: string | null;
   parent?: Warehouse;
   address?: string;
@@ -76,6 +77,8 @@ export function WarehouseManager({ restaurantId, warehouses: propsWarehouses, on
   const [selectedWarehouse, setSelectedWarehouse] = useState<Warehouse | null>(null);
   const [warehouseProducts, setWarehouseProducts] = useState<any[]>([]);
   const [loadingProducts, setLoadingProducts] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
+  const [editingWarehouseId, setEditingWarehouseId] = useState<string | null>(null);
   const [formData, setFormData] = useState({
     code: '',
     name: '',
@@ -114,6 +117,44 @@ export function WarehouseManager({ restaurantId, warehouses: propsWarehouses, on
     setMainWarehouses((propsWarehouses || []).filter((w: Warehouse) => w.type === 'MAIN'));
   }, [propsWarehouses]);
 
+  const handleEdit = (warehouse: Warehouse) => {
+    setIsEditing(true);
+    setEditingWarehouseId(warehouse.id);
+    setFormData({
+      code: warehouse.code || '',
+      name: warehouse.name || '',
+      name_ar: warehouse.name_ar || '',
+      type: (warehouse.type as WarehouseType) || 'MAIN',
+      warehouse_category: (warehouse.warehouse_category as 'STANDARD' | 'MANUFACTURING' | 'SERVICE' | 'PROJECT') || 'STANDARD',
+      accounting_standard: (warehouse.accounting_standard as AccountingStandard) || 'IFRS',
+      parent_warehouse_id: warehouse.parent_warehouse_id || '',
+      address: warehouse.address || '',
+      city: warehouse.city || '',
+      country: warehouse.country || 'Egypt',
+      phone: warehouse.phone || '',
+      email: warehouse.email || '',
+      manager_name: warehouse.manager_name || '',
+      currency: warehouse.currency || 'EGP',
+      accounting_account_code: warehouse.accounting_account_code || '',
+      inventory_account_code: warehouse.inventory_account_code || '',
+      cogs_account_code: warehouse.cogs_account_code || '',
+      notes: warehouse.notes || '',
+      // Advanced location fields
+      location_zone: '',
+      aisle: '',
+      bin: '',
+      floor: '',
+      building: '',
+      // Capacity and control fields
+      capacity_quantity: '',
+      capacity_volume: '',
+      temperature_control: false,
+      humidity_control: false,
+      security_level: 'normal'
+    });
+    setDialogOpen(true);
+  };
+
   const handleViewWarehouseDetails = async (warehouse: Warehouse) => {
     setSelectedWarehouse(warehouse);
     setLoadingProducts(true);
@@ -145,34 +186,68 @@ export function WarehouseManager({ restaurantId, warehouses: propsWarehouses, on
 
     try {
       setLoading(true);
-      const { error } = await supabase
-        .from('warehouses')
-        .insert({
-          restaurant_id: restaurantId,
-          code: formData.code,
-          name: formData.name,
-          name_ar: formData.name_ar,
-          type: formData.type,
-          warehouse_category: formData.warehouse_category,
-          accounting_standard: formData.accounting_standard,
-          parent_warehouse_id: formData.parent_warehouse_id || null,
-          address: formData.address || null,
-          city: formData.city || null,
-          country: formData.country || 'Egypt',
-          phone: formData.phone || null,
-          email: formData.email || null,
-          manager_name: formData.manager_name || null,
-          currency: formData.currency || 'EGP',
-          accounting_account_code: formData.accounting_account_code || null,
-          inventory_account_code: formData.inventory_account_code || null,
-          cogs_account_code: formData.cogs_account_code || null,
-          notes: formData.notes || null
-        });
+      
+      if (isEditing && editingWarehouseId) {
+        // Update existing warehouse
+        const { error } = await supabase
+          .from('warehouses')
+          .update({
+            code: formData.code,
+            name: formData.name,
+            name_ar: formData.name_ar,
+            type: formData.type,
+            warehouse_category: formData.warehouse_category,
+            accounting_standard: formData.accounting_standard,
+            parent_warehouse_id: formData.parent_warehouse_id || null,
+            address: formData.address || null,
+            city: formData.city || null,
+            country: formData.country || 'Egypt',
+            phone: formData.phone || null,
+            email: formData.email || null,
+            manager_name: formData.manager_name || null,
+            currency: formData.currency || 'EGP',
+            accounting_account_code: formData.accounting_account_code || null,
+            inventory_account_code: formData.inventory_account_code || null,
+            cogs_account_code: formData.cogs_account_code || null,
+            notes: formData.notes || null
+          })
+          .eq('id', editingWarehouseId);
 
-      if (error) throw error;
+        if (error) throw error;
+        toast.success('تم تحديث المخزن بنجاح');
+      } else {
+        // Create new warehouse
+        const { error } = await supabase
+          .from('warehouses')
+          .insert({
+            restaurant_id: restaurantId,
+            code: formData.code,
+            name: formData.name,
+            name_ar: formData.name_ar,
+            type: formData.type,
+            warehouse_category: formData.warehouse_category,
+            accounting_standard: formData.accounting_standard,
+            parent_warehouse_id: formData.parent_warehouse_id || null,
+            address: formData.address || null,
+            city: formData.city || null,
+            country: formData.country || 'Egypt',
+            phone: formData.phone || null,
+            email: formData.email || null,
+            manager_name: formData.manager_name || null,
+            currency: formData.currency || 'EGP',
+            accounting_account_code: formData.accounting_account_code || null,
+            inventory_account_code: formData.inventory_account_code || null,
+            cogs_account_code: formData.cogs_account_code || null,
+            notes: formData.notes || null
+          });
 
-      toast.success('تم إضافة المخزن بنجاح');
+        if (error) throw error;
+        toast.success('تم إضافة المخزن بنجاح');
+      }
+
       setDialogOpen(false);
+      setIsEditing(false);
+      setEditingWarehouseId(null);
       setFormData({
         code: '',
         name: '',
@@ -557,6 +632,13 @@ export function WarehouseManager({ restaurantId, warehouses: propsWarehouses, on
                                 onClick={() => handleViewWarehouseDetails(warehouse)}
                               >
                                 <Package className="h-4 w-4" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => handleEdit(warehouse)}
+                              >
+                                <Edit className="h-4 w-4" />
                               </Button>
                               <Button
                                 variant="ghost"
