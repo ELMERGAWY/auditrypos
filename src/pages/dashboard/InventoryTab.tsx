@@ -440,6 +440,15 @@ export function InventoryTab({ restaurantId, currency, businessType }: Props) {
                     <div className="flex items-center gap-2 flex-wrap">
                       <p className="font-bold text-sm truncate">{p.name}</p>
                       {p.barcode && <code className="text-[10px] text-muted-foreground bg-secondary/50 px-1.5 py-0.5 rounded">{p.barcode}</code>}
+                      {p.warehouse_id && (() => {
+                        const warehouse = warehouses.find(w => w.id === p.warehouse_id);
+                        return warehouse ? (
+                          <Badge variant="outline" className="text-[10px] border-info/30 text-info bg-info/10">
+                            <Package className="w-3 h-3 mr-1" />
+                            {warehouse.name_ar || warehouse.name}
+                          </Badge>
+                        ) : null;
+                      })()}
                       {isOut && <Badge className="text-[10px] status-suspended">نفد</Badge>}
                       {isLow && !isOut && <Badge className="text-[10px] status-pending">منخفض</Badge>}
                       {isExpired && <Badge className="text-[10px] status-suspended">منتهي الصلاحية</Badge>}

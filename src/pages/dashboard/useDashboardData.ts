@@ -149,16 +149,19 @@ export function useDashboardData() {
     const usesProductsCatalog = isInventoryDrivenBusiness(businessType);
 
     // Parallel fetch all other resources with optimized queries
-    const [itemsRes, ordersRes, callsRes, agentsRes, shiftRes, taxesRes] = await Promise.all([
+    const [itemsRes, ordersRes, callsRes, agentsRes, shiftRes, taxesRes, warehousesRes] = await Promise.all([
       usesProductsCatalog
-        ? supabase.from('products').select('id,name,price,category,image,available,restaurant_id,sort_order,barcode,sku,unit,quantity').eq('restaurant_id', rest.id).order('sort_order')
+        ? supabase.from('products').select('id,name,price,category,image,available,restaurant_id,sort_order,barcode,sku,unit,quantity,warehouse_id,warehouses!inner(name_ar,name)').eq('restaurant_id', rest.id).order('sort_order')
         : supabase.from('menu_items').select('*').eq('restaurant_id', rest.id).order('sort_order'),
       supabase.from('orders').select('*').eq('restaurant_id', rest.id).order('created_at', { ascending: false }).limit(100),
       supabase.from('waiter_calls').select('*').eq('restaurant_id', rest.id).eq('acknowledged', false).order('created_at', { ascending: false }),
       supabase.from('delivery_agents').select('*').eq('restaurant_id', rest.id),
       supabase.from('shifts').select('*').eq('restaurant_id', rest.id).eq('status', 'open').maybeSingle(),
-      supabase.from('tax_rates').select('*').eq('restaurant_id', rest.id).eq('is_active', true)
+      supabase.from('tax_rates').select('*').eq('restaurant_id', rest.id).eq('is_active', true),
+      usesProductsCatalog ? supabase.from('warehouses').select('id,name_ar,name').eq('restaurant_id', rest.id) : Promise.resolve({ data: [] })
     ]);
+
+    const warehousesMap = new Map((warehousesRes.data || []).map((w: any) => [w.id, w.name_ar || w.name]));
 
     const loadedMenuItems = usesProductsCatalog
       ? ((itemsRes.data || []).map((product: any) => ({
@@ -177,6 +180,7 @@ export function useDashboardData() {
           unit: product.unit || 'قطعة',
           stock_quantity: product.quantity || 0,
           product_type: (product as any).product_type || 'inventory',
+          warehouse_name: product.warehouse_id ? warehousesMap.get(product.warehouse_id) || null : null,
         })) as MenuItem[])
       : ((itemsRes.data || []) as MenuItem[]);
     const loadedAgents = (agentsRes.data || []) as DeliveryAgent[];

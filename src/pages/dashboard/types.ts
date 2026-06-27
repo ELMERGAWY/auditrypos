@@ -28,6 +28,7 @@ export interface MenuItem {
   profit_margin_percent?: number;
   calculated_cost_price?: number;
   stock_quantity?: number;
+  warehouse_name?: string | null;
 }
 
 export interface OrderItem {

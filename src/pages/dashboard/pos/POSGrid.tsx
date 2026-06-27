@@ -1,7 +1,8 @@
 // @ts-nocheck
 import React, { memo } from 'react';
-import { TrendingUp, Receipt, DollarSign, Timer, Plus } from 'lucide-react';
+import { TrendingUp, Receipt, DollarSign, Timer, Plus, Package } from 'lucide-react';
 import { Input } from '@/components/ui/input';
+import { Badge } from '@/components/ui/badge';
 import { TableGrid } from '../TableGrid';
 import { getPosSearchPlaceholder, isFoodSector, isInventoryDrivenBusiness } from '@/lib/businessTypes';
 import type { OrderType, MenuItem, Order } from '../types';
@@ -134,6 +135,14 @@ export const POSGrid = memo(function POSGrid({
             {item.product_type === 'service' && (
               <div className="absolute top-2 right-2 z-10 text-[10px] font-bold px-1.5 py-0.5 rounded-md bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300 border border-amber-300 dark:border-amber-700">
                 🎨 خدمة قابلة للتخصيص
+              </div>
+            )}
+            {item.warehouse_name && (
+              <div className="absolute bottom-2 right-2 z-10">
+                <Badge variant="outline" className="text-[9px] border-info/30 text-info bg-info/10 px-1.5 py-0.5">
+                  <Package className="w-2.5 h-2.5 mr-0.5" />
+                  {item.warehouse_name}
+                </Badge>
               </div>
             )}
             <div className="text-4xl mb-3 transform group-hover:scale-110 transition-transform duration-200 drop-shadow-md">
