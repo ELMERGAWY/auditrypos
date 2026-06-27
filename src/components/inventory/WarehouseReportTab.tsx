@@ -42,13 +42,59 @@ export function WarehouseReportTab({
 }: WarehouseReportTabProps) {
   const [selectedWarehouseId, setSelectedWarehouseId] = useState<string>('all');
   const [reportDate, setReportDate] = useState<string>(new Date().toISOString().split('T')[0]);
+  const [filteredProducts, setFilteredProducts] = useState<Product[]>(products);
+
+  // Filter products based on selected warehouse
+  useEffect(() => {
+    const filterProducts = async () => {
+      if (selectedWarehouseId === 'all') {
+        setFilteredProducts(products);
+        return;
+      }
+
+      try {
+        // Get sub-warehouses for the selected warehouse
+        const { data: subWarehouses } = await supabase
+          .from('sub_warehouses')
+          .select('id')
+          .eq('warehouse_id', selectedWarehouseId);
+
+        if (!subWarehouses || subWarehouses.length === 0) {
+          setFilteredProducts([]);
+          return;
+        }
+
+        const subWarehouseIds = subWarehouses.map(sw => sw.id);
+
+        // Get item assignments for these sub-warehouses
+        const { data: assignments } = await supabase
+          .from('item_warehouse_assignments')
+          .select('item_id')
+          .in('sub_warehouse_id', subWarehouseIds);
+
+        if (!assignments || assignments.length === 0) {
+          setFilteredProducts([]);
+          return;
+        }
+
+        const itemIds = assignments.map(a => a.item_id);
+        const filtered = products.filter(p => itemIds.includes(p.id));
+        setFilteredProducts(filtered);
+      } catch (error) {
+        console.error('Error filtering products:', error);
+        setFilteredProducts(products);
+      }
+    };
+
+    filterProducts();
+  }, [selectedWarehouseId, products, restaurantId]);
 
   // For now, we'll show all products in a per-warehouse report (since we don't have per-warehouse quantities yet)
   const chartData = warehouses.map((w) => {
     // For now, just use total quantity/value for each warehouse
-    const totalQuantity = products.reduce((sum, p) => sum + p.quantity, 0);
-    const totalCostValue = products.reduce((sum, p) => sum + (p.quantity * p.cost_price), 0);
-    const totalSaleValue = products.reduce((sum, p) => sum + (p.quantity * p.price), 0);
+    const totalQuantity = filteredProducts.reduce((sum, p) => sum + p.quantity, 0);
+    const totalCostValue = filteredProducts.reduce((sum, p) => sum + (p.quantity * p.cost_price), 0);
+    const totalSaleValue = filteredProducts.reduce((sum, p) => sum + (p.quantity * p.price), 0);
     return {
       name: w.name_ar || w.name,
       quantity: totalQuantity / warehouses.length,
@@ -116,7 +162,7 @@ export function WarehouseReportTab({
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              {products.reduce((sum, p) => sum + p.quantity, 0).toLocaleString('ar-EG')}
+              {filteredProducts.reduce((sum, p) => sum + p.quantity, 0).toLocaleString('ar-EG')}
             </div>
           </CardContent>
         </Card>
@@ -129,7 +175,7 @@ export function WarehouseReportTab({
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-accent">
-              {products.reduce((sum, p) => sum + (p.quantity * p.cost_price), 0).toLocaleString('ar-EG')} {currency}
+              {filteredProducts.reduce((sum, p) => sum + (p.quantity * p.cost_price), 0).toLocaleString('ar-EG')} {currency}
             </div>
           </CardContent>
         </Card>
@@ -142,7 +188,7 @@ export function WarehouseReportTab({
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-success">
-              {products.reduce((sum, p) => sum + (p.quantity * (p.price - p.cost_price)), 0).toLocaleString('ar-EG')} {currency}
+              {filteredProducts.reduce((sum, p) => sum + (p.quantity * (p.price - p.cost_price)), 0).toLocaleString('ar-EG')} {currency}
             </div>
           </CardContent>
         </Card>
@@ -214,7 +260,7 @@ export function WarehouseReportTab({
               </TableRow>
             </TableHeader>
             <TableBody>
-              {products.map((p) => {
+              {filteredProducts.map((p) => {
                 const costValue = p.quantity * p.cost_price;
                 const saleValue = p.quantity * p.price;
                 const profit = saleValue - costValue;

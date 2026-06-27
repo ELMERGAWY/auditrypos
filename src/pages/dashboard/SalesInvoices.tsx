@@ -188,11 +188,12 @@ export function SalesInvoices({ restaurantId, currency, restaurant, isSuperAdmin
       if (orderError) throw orderError;
 
       for (const item of editItems) {
-        await supabase.from('order_items').update({
-          quantity: item.quantity,
-          price: item.price,
-          menu_item_name: item.menu_item_name
-        }).eq('id', item.id);
+        await supabase.rpc('update_order_item', {
+          p_item_id: item.id,
+          p_quantity: item.quantity,
+          p_price: item.price,
+          p_menu_item_name: item.menu_item_name
+        });
       }
 
       toast.success('تم تحديث الفاتورة بنجاح ✅');
