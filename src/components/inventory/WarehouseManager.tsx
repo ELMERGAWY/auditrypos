@@ -11,7 +11,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Plus, Trash2, Building2, Package, Factory, Wrench, FolderTree, AlertCircle, MapPin } from 'lucide-react';
 import { toast } from 'sonner';
 
-type WarehouseType = 'main' | 'sub';
+type WarehouseType = 'MAIN' | 'SUB';
 type AccountingStandard = 'EAS' | 'IFRS' | 'US_GAAP';
 
 interface Warehouse {
@@ -53,8 +53,8 @@ interface Warehouse {
 }
 
 const warehouseTypeLabels: Record<WarehouseType, string> = {
-  main: 'رئيسي',
-  sub: 'فرعي'
+  MAIN: 'رئيسي',
+  SUB: 'فرعي'
 };
 
 const accountingStandardLabels: Record<AccountingStandard, string> = {
@@ -76,7 +76,8 @@ export function WarehouseManager({ restaurantId, warehouses: propsWarehouses, on
     code: '',
     name: '',
     name_ar: '',
-    type: 'main' as WarehouseType,
+    type: 'MAIN' as WarehouseType,
+    warehouse_category: 'STANDARD' as 'STANDARD' | 'MANUFACTURING' | 'SERVICE' | 'PROJECT',
     accounting_standard: 'IFRS' as AccountingStandard,
     parent_warehouse_id: '' as string,
     address: '',
@@ -106,7 +107,7 @@ export function WarehouseManager({ restaurantId, warehouses: propsWarehouses, on
   const [mainWarehouses, setMainWarehouses] = useState<Warehouse[]>([]);
 
   useEffect(() => {
-    setMainWarehouses((propsWarehouses || []).filter((w: Warehouse) => w.type === 'main'));
+    setMainWarehouses((propsWarehouses || []).filter((w: Warehouse) => w.type === 'MAIN'));
   }, [propsWarehouses]);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -127,6 +128,7 @@ export function WarehouseManager({ restaurantId, warehouses: propsWarehouses, on
           name: formData.name,
           name_ar: formData.name_ar,
           type: formData.type,
+          warehouse_category: formData.warehouse_category,
           accounting_standard: formData.accounting_standard,
           parent_warehouse_id: formData.parent_warehouse_id || null,
           address: formData.address || null,
@@ -162,7 +164,8 @@ export function WarehouseManager({ restaurantId, warehouses: propsWarehouses, on
         code: '',
         name: '',
         name_ar: '',
-        type: 'main',
+        type: 'MAIN',
+        warehouse_category: 'STANDARD',
         accounting_standard: 'IFRS',
         parent_warehouse_id: '',
         address: '',
@@ -334,7 +337,7 @@ export function WarehouseManager({ restaurantId, warehouses: propsWarehouses, on
                   </SelectContent>
                 </Select>
               </div>
-              {formData.type === 'sub' && (
+              {formData.type === 'SUB' && (
                 <div className="space-y-2">
                   <label className="text-sm font-medium">المخزن الرئيسي</label>
                   <Select
@@ -484,7 +487,7 @@ export function WarehouseManager({ restaurantId, warehouses: propsWarehouses, on
         </Alert>
       ) : (
         <div className="space-y-6">
-          {(['main', 'sub'] as WarehouseType[]).map((type) => {
+          {(['MAIN', 'SUB'] as WarehouseType[]).map((type) => {
             const typeWarehouses = warehousesWithParents.filter(w => w.type === type);
             if (typeWarehouses.length === 0) return null;
 
