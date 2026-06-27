@@ -5,6 +5,8 @@
 -- potential issues with direct updates
 -- ============================================================
 
+DROP FUNCTION IF EXISTS public.update_sales_order(UUID, TEXT, UUID, NUMERIC, TEXT, TIMESTAMP WITH TIME ZONE);
+
 CREATE OR REPLACE FUNCTION public.update_sales_order(
   p_order_id UUID,
   p_customer_name TEXT,

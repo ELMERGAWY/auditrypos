@@ -5,6 +5,8 @@
 -- potential issues with direct updates
 -- ============================================================
 
+DROP FUNCTION IF EXISTS public.update_order(UUID, TEXT, TEXT, NUMERIC, NUMERIC, NUMERIC, TEXT, TEXT);
+
 CREATE OR REPLACE FUNCTION public.update_order(
   p_order_id UUID,
   p_customer_name TEXT,
