@@ -15,7 +15,7 @@ CREATE OR REPLACE FUNCTION public.update_order(
   p_notes TEXT,
   p_payment_method TEXT
 )
-RETURNS JSONB
+RETURNS VOID
 LANGUAGE plpgsql
 SECURITY DEFINER
 AS $$
@@ -30,8 +30,7 @@ BEGIN
     discount = COALESCE(p_discount, discount),
     notes = COALESCE(p_notes, notes),
     payment_method = COALESCE(p_payment_method, payment_method)
-  WHERE id = p_order_id
-  RETURNING row_to_json(orders.*)::jsonb;
+  WHERE id = p_order_id;
 END;
 $$;
 

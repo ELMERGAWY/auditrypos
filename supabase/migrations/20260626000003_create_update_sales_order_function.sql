@@ -13,7 +13,7 @@ CREATE OR REPLACE FUNCTION public.update_sales_order(
   p_status TEXT,
   p_expected_delivery TIMESTAMP WITH TIME ZONE
 )
-RETURNS JSONB
+RETURNS VOID
 LANGUAGE plpgsql
 SECURITY DEFINER
 AS $$
@@ -26,8 +26,7 @@ BEGIN
     total_amount = COALESCE(p_total_amount, total_amount),
     status = COALESCE(p_status, status),
     expected_delivery = p_expected_delivery
-  WHERE id = p_order_id
-  RETURNING row_to_json(sales_orders.*)::jsonb;
+  WHERE id = p_order_id;
 END;
 $$;
 

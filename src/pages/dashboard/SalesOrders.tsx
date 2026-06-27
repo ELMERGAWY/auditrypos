@@ -107,6 +107,7 @@ export function SalesOrders({ restaurantId, currency }: Props) {
         p_status: editForm.status,
         p_expected_delivery: editForm.expected_delivery || null
       });
+
       if (error) throw error;
 
       // Update items

@@ -174,7 +174,7 @@ export function SalesInvoices({ restaurantId, currency, restaurant, isSuperAdmin
       });
 
       // Use RPC function to bypass potential RLS issues
-      const { error: orderError, data: updatedData } = await supabase.rpc('update_order', {
+      const { error: orderError } = await supabase.rpc('update_order', {
         p_order_id: editingInvoice.id,
         p_customer_name: form.customer_name,
         p_customer_ref: form.customer_ref || null,
@@ -186,7 +186,6 @@ export function SalesInvoices({ restaurantId, currency, restaurant, isSuperAdmin
       });
 
       if (orderError) throw orderError;
-      console.log('Update result:', updatedData);
 
       for (const item of editItems) {
         await supabase.from('order_items').update({
