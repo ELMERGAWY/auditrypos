@@ -6,33 +6,26 @@
 -- ============================================================
 
 -- ============================================================
--- STEP 1: Find the restaurant ID
+-- STEP 1: Restore all warehouses for Nour Shop
 -- ============================================================
--- Run this query first to get the restaurant_id:
-SELECT id, name FROM restaurants WHERE name ILIKE '%nour%';
--- Copy the ID from the result (it looks like: 123e4567-e89b-12d3-a456-426614174000)
+-- Restaurant ID for Nour Shop: 7eb31553-ac26-43d3-bec8-5b2659410dd9
+-- Run this query to restore all deleted warehouses:
+SELECT public.restore_restaurant_warehouses('7eb31553-ac26-43d3-bec8-5b2659410dd9');
 
 -- ============================================================
--- STEP 2: Restore all warehouses for the restaurant
+-- STEP 2: Verify restoration
 -- ============================================================
--- Replace 'YOUR_RESTAURANT_ID_HERE' with the actual ID from Step 1
--- Then run this query:
-SELECT public.restore_restaurant_warehouses('YOUR_RESTAURANT_ID_HERE');
-
--- ============================================================
--- STEP 3: Verify restoration
--- ============================================================
--- Replace 'YOUR_RESTAURANT_ID_HERE' with the actual ID
+-- Run this query to verify the warehouses were restored:
 SELECT id, code, name, name_ar, type, deleted_at
 FROM warehouses
-WHERE restaurant_id = 'YOUR_RESTAURANT_ID_HERE'
+WHERE restaurant_id = '7eb31553-ac26-43d3-bec8-5b2659410dd9'
 ORDER BY created_at DESC;
 
 -- ============================================================
 -- ALTERNATIVE: List deleted warehouses first
 -- ============================================================
--- Replace 'YOUR_RESTAURANT_ID_HERE' with the actual ID
-SELECT public.list_deleted_warehouses('YOUR_RESTAURANT_ID_HERE');
+-- Run this to see which warehouses are deleted:
+SELECT public.list_deleted_warehouses('7eb31553-ac26-43d3-bec8-5b2659410dd9');
 
 -- ============================================================
 -- ALTERNATIVE: Restore specific warehouse by ID
