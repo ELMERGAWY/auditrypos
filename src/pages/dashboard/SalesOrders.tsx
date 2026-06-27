@@ -98,15 +98,7 @@ export function SalesOrders({ restaurantId, currency }: Props) {
     try {
       const total = parseFloat(editForm.total_amount) || 0;
 
-      console.log('=== Starting Sales Order Update ===');
-      console.log('Order ID:', editingOrder.id);
-      console.log('Update data:', {
-        customer_name: editForm.customer_name,
-        customer_id: editForm.customer_id,
-        total_amount: total,
-        status: editForm.status,
-        expected_delivery: editForm.expected_delivery
-      });
+      toast.info('جاري تحديث أمر البيع...');
 
       // Try direct update first
       const { error } = await supabase
@@ -133,23 +125,17 @@ export function SalesOrders({ restaurantId, currency }: Props) {
         });
 
         if (rpcError) throw rpcError;
-        console.log('RPC order update succeeded');
+        toast.success('تم تحديث بيانات الأمر (RPC)');
       } else {
-        console.log('Direct order update succeeded');
+        toast.success('تم تحديث بيانات الأمر (Direct)');
       }
 
-      console.log('Items to update:', editOrderItems.length);
       let itemUpdateErrors = 0;
       let itemUpdateSuccess = 0;
+      let itemErrorsDetails: string[] = [];
 
       for (const item of editOrderItems) {
         if (item.id) {
-          console.log('Updating item:', item.id, 'with data:', {
-            item_name: item.item_name,
-            quantity: item.quantity,
-            unit_price: item.unit_price
-          });
-
           try {
             // Try direct update first
             const { error: directError } = await supabase
@@ -174,37 +160,34 @@ export function SalesOrders({ restaurantId, currency }: Props) {
               if (rpcError) {
                 console.error('RPC item update also failed:', item.id, rpcError);
                 itemUpdateErrors++;
+                itemErrorsDetails.push(`${item.item_name || 'صنف بدون اسم'}: ${rpcError.message}`);
               } else {
-                console.log('RPC item update succeeded:', item.id);
                 itemUpdateSuccess++;
               }
             } else {
-              console.log('Direct item update succeeded:', item.id);
               itemUpdateSuccess++;
             }
-          } catch (itemErr) {
+          } catch (itemErr: any) {
             console.error('Exception updating item:', item.id, itemErr);
             itemUpdateErrors++;
+            itemErrorsDetails.push(`${item.item_name || 'صنف بدون اسم'}: ${itemErr.message}`);
           }
         }
       }
 
-      console.log('=== Update Summary ===');
-      console.log('Items updated successfully:', itemUpdateSuccess);
-      console.log('Items failed to update:', itemUpdateErrors);
-
       if (itemUpdateErrors > 0) {
-        toast.warning(`تم تحديث الأمر ولكن فشل تحديث ${itemUpdateErrors} من البنود`);
+        toast.warning(`تم تحديث الأمر ولكن فشل ${itemUpdateErrors} من ${editOrderItems.length} بنود`);
+        // Show detailed errors
+        itemErrorsDetails.forEach(err => toast.error(err));
       } else {
-        toast.success('تم تحديث أمر البيع بنجاح ✅');
+        toast.success(`تم تحديث الأمر وجميع ${itemUpdateSuccess} بنود بنجاح ✅`);
       }
       setShowEditModal(false);
       setEditingOrder(null);
       setEditOrderItems([]);
       loadOrders();
     } catch (e: any) {
-      console.error('=== Sales Order Update Failed ===');
-      console.error('Error:', e);
+      console.error('Error updating order:', e);
       toast.error('فشل تحديث الأمر: ' + e.message);
     }
   };

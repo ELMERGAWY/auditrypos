@@ -163,17 +163,7 @@ export function SalesInvoices({ restaurantId, currency, restaurant, isSuperAdmin
       const paidAmount = parseFloat(form.paid_amount) || amount;
       const discount = parseFloat(form.discount) || 0;
 
-      console.log('=== Starting Invoice Update ===');
-      console.log('Invoice ID:', editingInvoice.id);
-      console.log('Update data:', {
-        customer_name: form.customer_name,
-        customer_ref: form.customer_ref,
-        total: amount,
-        paid_amount: paidAmount,
-        discount,
-        notes: form.notes,
-        payment_method: form.payment_method
-      });
+      toast.info('جاري تحديث الفاتورة...');
 
       // Try direct update first
       const { error: orderError } = await supabase
@@ -204,22 +194,16 @@ export function SalesInvoices({ restaurantId, currency, restaurant, isSuperAdmin
         });
 
         if (rpcError) throw rpcError;
-        console.log('RPC order update succeeded');
+        toast.success('تم تحديث بيانات الفاتورة (RPC)');
       } else {
-        console.log('Direct order update succeeded');
+        toast.success('تم تحديث بيانات الفاتورة (Direct)');
       }
 
-      console.log('Items to update:', editItems.length);
       let itemUpdateErrors = 0;
       let itemUpdateSuccess = 0;
+      let itemErrorsDetails: string[] = [];
 
       for (const item of editItems) {
-        console.log('Updating item:', item.id, 'with data:', {
-          quantity: item.quantity,
-          price: item.price,
-          menu_item_name: item.menu_item_name
-        });
-
         try {
           // Try direct update first
           const { error: directError } = await supabase
@@ -244,28 +228,26 @@ export function SalesInvoices({ restaurantId, currency, restaurant, isSuperAdmin
             if (rpcError) {
               console.error('RPC item update also failed:', item.id, rpcError);
               itemUpdateErrors++;
+              itemErrorsDetails.push(`${item.menu_item_name || 'صنف بدون اسم'}: ${rpcError.message}`);
             } else {
-              console.log('RPC item update succeeded:', item.id);
               itemUpdateSuccess++;
             }
           } else {
-            console.log('Direct item update succeeded:', item.id);
             itemUpdateSuccess++;
           }
-        } catch (itemErr) {
+        } catch (itemErr: any) {
           console.error('Exception updating item:', item.id, itemErr);
           itemUpdateErrors++;
+          itemErrorsDetails.push(`${item.menu_item_name || 'صنف بدون اسم'}: ${itemErr.message}`);
         }
       }
 
-      console.log('=== Update Summary ===');
-      console.log('Items updated successfully:', itemUpdateSuccess);
-      console.log('Items failed to update:', itemUpdateErrors);
-
       if (itemUpdateErrors > 0) {
-        toast.warning(`تم تحديث الفاتورة ولكن فشل تحديث ${itemUpdateErrors} من البنود`);
+        toast.warning(`تم تحديث الفاتورة ولكن فشل ${itemUpdateErrors} من ${editItems.length} بنود`);
+        // Show detailed errors
+        itemErrorsDetails.forEach(err => toast.error(err));
       } else {
-        toast.success('تم تحديث الفاتورة بنجاح ✅');
+        toast.success(`تم تحديث الفاتورة وجميع ${itemUpdateSuccess} بنود بنجاح ✅`);
       }
       setShowManualForm(false);
       setEditingInvoice(null);
@@ -273,8 +255,7 @@ export function SalesInvoices({ restaurantId, currency, restaurant, isSuperAdmin
       setForm({ customer_name: '', amount: '', description: '', payment_method: 'cash', customer_ref: '', paid_amount: '', discount: '', notes: '' });
       await loadInvoices();
     } catch (e: any) {
-      console.error('=== Invoice Update Failed ===');
-      console.error('Error:', e);
+      console.error('Error updating invoice:', e);
       toast.error('فشل تحديث الفاتورة: ' + e.message);
     }
   };
