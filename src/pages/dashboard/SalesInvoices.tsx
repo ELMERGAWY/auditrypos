@@ -262,6 +262,19 @@ export function SalesInvoices({ restaurantId, currency, restaurant, isSuperAdmin
       } else {
         toast.success(`تم تحديث الفاتورة وجميع ${itemUpdateSuccess} بنود بنجاح ✅`);
       }
+
+      // Verify the update by fetching the invoice again immediately
+      toast.info('جاري التحقق من التحديث...');
+      const { data: verifyData } = await supabase
+        .from('orders')
+        .select('*')
+        .eq('id', editingInvoice.id)
+        .single();
+
+      if (verifyData) {
+        toast.info(`التحقق: المبلغ=${verifyData.total}, المدفوع=${verifyData.paid_amount}, الخصم=${verifyData.discount}`);
+      }
+
       setShowManualForm(false);
       setEditingInvoice(null);
       setEditItems([]);
