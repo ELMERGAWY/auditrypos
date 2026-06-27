@@ -26,7 +26,7 @@ INSERT INTO public.warehouses (
   'WH-001',
   'Main Store',
   'المحل',
-  'main',
+  'retail',
   'retail',
   'Egypt',
   'EGP',
