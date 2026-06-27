@@ -72,6 +72,10 @@ interface WarehouseManagerProps {
 export function WarehouseManager({ restaurantId, warehouses: propsWarehouses, onRefresh }: WarehouseManagerProps) {
   const [loading, setLoading] = useState(false);
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [detailsDialogOpen, setDetailsDialogOpen] = useState(false);
+  const [selectedWarehouse, setSelectedWarehouse] = useState<Warehouse | null>(null);
+  const [warehouseProducts, setWarehouseProducts] = useState<any[]>([]);
+  const [loadingProducts, setLoadingProducts] = useState(false);
   const [formData, setFormData] = useState({
     code: '',
     name: '',
@@ -109,6 +113,55 @@ export function WarehouseManager({ restaurantId, warehouses: propsWarehouses, on
   useEffect(() => {
     setMainWarehouses((propsWarehouses || []).filter((w: Warehouse) => w.type === 'MAIN'));
   }, [propsWarehouses]);
+
+  const handleViewWarehouseDetails = async (warehouse: Warehouse) => {
+    setSelectedWarehouse(warehouse);
+    setLoadingProducts(true);
+    setDetailsDialogOpen(true);
+
+    try {
+      // Get sub-warehouses for this warehouse
+      const { data: subWarehouses } = await supabase
+        .from('sub_warehouses')
+        .select('id')
+        .eq('warehouse_id', warehouse.id);
+
+      if (!subWarehouses || subWarehouses.length === 0) {
+        setWarehouseProducts([]);
+        setLoadingProducts(false);
+        return;
+      }
+
+      const subWarehouseIds = subWarehouses.map(sw => sw.id);
+
+      // Get item assignments for these sub-warehouses
+      const { data: assignments } = await supabase
+        .from('item_warehouse_assignments')
+        .select('item_id')
+        .in('sub_warehouse_id', subWarehouseIds);
+
+      if (!assignments || assignments.length === 0) {
+        setWarehouseProducts([]);
+        setLoadingProducts(false);
+        return;
+      }
+
+      const itemIds = assignments.map(a => a.item_id);
+
+      // Get products details
+      const { data: products } = await supabase
+        .from('products')
+        .select('*')
+        .in('id', itemIds);
+
+      setWarehouseProducts(products || []);
+    } catch (error) {
+      console.error('Error fetching warehouse products:', error);
+      toast.error('فشل في تحميل المنتجات');
+    } finally {
+      setLoadingProducts(false);
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -537,14 +590,23 @@ export function WarehouseManager({ restaurantId, warehouses: propsWarehouses, on
                             )}
                           </TableCell>
                           <TableCell>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              onClick={() => handleDelete(warehouse.id)}
-                              className="text-destructive hover:text-destructive"
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
+                            <div className="flex items-center gap-2">
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => handleViewWarehouseDetails(warehouse)}
+                              >
+                                <Package className="h-4 w-4" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => handleDelete(warehouse.id)}
+                                className="text-destructive hover:text-destructive"
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </div>
                           </TableCell>
                         </TableRow>
                       ))}
@@ -556,6 +618,55 @@ export function WarehouseManager({ restaurantId, warehouses: propsWarehouses, on
           })}
         </div>
       )}
+
+      {/* Warehouse Details Dialog */}
+      <Dialog open={detailsDialogOpen} onOpenChange={setDetailsDialogOpen}>
+        <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Package className="h-5 w-5" />
+              المنتجات في المخزن: {selectedWarehouse?.name_ar}
+            </DialogTitle>
+          </DialogHeader>
+          {loadingProducts ? (
+            <div className="flex items-center justify-center py-8">
+              <div className="text-muted-foreground">جاري التحميل...</div>
+            </div>
+          ) : warehouseProducts.length === 0 ? (
+            <Alert>
+              <AlertCircle className="h-4 w-4" />
+              <AlertDescription>
+                لا توجد منتجات مرتبطة بهذا المخزن
+              </AlertDescription>
+            </Alert>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>الصنف</TableHead>
+                  <TableHead>الباركود</TableHead>
+                  <TableHead>التصنيف</TableHead>
+                  <TableHead>الكمية</TableHead>
+                  <TableHead>سعر التكلفة</TableHead>
+                  <TableHead>سعر البيع</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {warehouseProducts.map((product) => (
+                  <TableRow key={product.id}>
+                    <TableCell className="font-medium">{product.name}</TableCell>
+                    <TableCell>{product.barcode}</TableCell>
+                    <TableCell><Badge variant="outline">{product.category}</Badge></TableCell>
+                    <TableCell>{product.quantity?.toLocaleString('ar-EG') || 0}</TableCell>
+                    <TableCell>{Number(product.cost_price).toLocaleString('ar-EG')} ج.م</TableCell>
+                    <TableCell>{Number(product.price).toLocaleString('ar-EG')} ج.م</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
