@@ -163,7 +163,7 @@ export function SalesInvoices({ restaurantId, currency, restaurant, isSuperAdmin
       const paidAmount = parseFloat(form.paid_amount) || amount;
       const discount = parseFloat(form.discount) || 0;
 
-      toast.info('جاري تحديث الفاتورة...');
+      toast.info('الخطوة 1: جاري تحديث بيانات الفاتورة...');
 
       // Try direct update first
       const { error: orderError } = await supabase
@@ -180,8 +180,11 @@ export function SalesInvoices({ restaurantId, currency, restaurant, isSuperAdmin
         .eq('id', editingInvoice.id);
 
       if (orderError) {
-        console.error('Direct order update failed, trying RPC:', orderError);
+        console.error('Direct order update failed:', orderError);
+        toast.error('فشل تحديث الفاتورة (Direct): ' + orderError.message);
+        
         // Fallback to RPC if direct update fails
+        toast.info('جاري المحاولة بطريقة RPC...');
         const { error: rpcError } = await supabase.rpc('update_order', {
           p_order_id: editingInvoice.id,
           p_customer_name: form.customer_name,
@@ -193,18 +196,26 @@ export function SalesInvoices({ restaurantId, currency, restaurant, isSuperAdmin
           p_payment_method: form.payment_method
         });
 
-        if (rpcError) throw rpcError;
+        if (rpcError) {
+          toast.error('فشل تحديث الفاتورة (RPC): ' + rpcError.message);
+          throw rpcError;
+        }
         toast.success('تم تحديث بيانات الفاتورة (RPC)');
       } else {
         toast.success('تم تحديث بيانات الفاتورة (Direct)');
       }
 
+      toast.info(`الخطوة 2: جاري تحديث ${editItems.length} بند...`);
+
       let itemUpdateErrors = 0;
       let itemUpdateSuccess = 0;
       let itemErrorsDetails: string[] = [];
 
-      for (const item of editItems) {
+      for (let i = 0; i < editItems.length; i++) {
+        const item = editItems[i];
         try {
+          toast.info(`جاري تحديث البند ${i + 1}/${editItems.length}: ${item.menu_item_name || 'صنف بدون اسم'}`);
+          
           // Try direct update first
           const { error: directError } = await supabase
             .from('order_items')
@@ -216,7 +227,7 @@ export function SalesInvoices({ restaurantId, currency, restaurant, isSuperAdmin
             .eq('id', item.id);
 
           if (directError) {
-            console.error('Direct item update failed, trying RPC:', item.id, directError);
+            console.error('Direct item update failed:', item.id, directError);
             // Fallback to RPC
             const { error: rpcError } = await supabase.rpc('update_order_item', {
               p_item_id: item.id,
@@ -241,6 +252,8 @@ export function SalesInvoices({ restaurantId, currency, restaurant, isSuperAdmin
           itemErrorsDetails.push(`${item.menu_item_name || 'صنف بدون اسم'}: ${itemErr.message}`);
         }
       }
+
+      toast.info(`الخطوة 3: ملخص التحديث - نجح ${itemUpdateSuccess}، فشل ${itemUpdateErrors}`);
 
       if (itemUpdateErrors > 0) {
         toast.warning(`تم تحديث الفاتورة ولكن فشل ${itemUpdateErrors} من ${editItems.length} بنود`);
