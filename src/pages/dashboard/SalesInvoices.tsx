@@ -163,7 +163,9 @@ export function SalesInvoices({ restaurantId, currency, restaurant, isSuperAdmin
       const paidAmount = parseFloat(form.paid_amount) || amount;
       const discount = parseFloat(form.discount) || 0;
 
-      console.log('Updating invoice:', editingInvoice.id, 'with data:', {
+      console.log('=== Starting Invoice Update ===');
+      console.log('Invoice ID:', editingInvoice.id);
+      console.log('Update data:', {
         customer_name: form.customer_name,
         customer_ref: form.customer_ref,
         total: amount,
@@ -173,38 +175,92 @@ export function SalesInvoices({ restaurantId, currency, restaurant, isSuperAdmin
         payment_method: form.payment_method
       });
 
-      // Use RPC function to bypass potential RLS issues
-      const { error: orderError } = await supabase.rpc('update_order', {
-        p_order_id: editingInvoice.id,
-        p_customer_name: form.customer_name,
-        p_customer_ref: form.customer_ref || null,
-        p_total: amount,
-        p_paid_amount: paidAmount,
-        p_discount: discount,
-        p_notes: form.notes || '',
-        p_payment_method: form.payment_method
-      });
+      // Try direct update first
+      const { error: orderError } = await supabase
+        .from('orders')
+        .update({
+          customer_name: form.customer_name,
+          customer_ref: form.customer_ref || null,
+          total: amount,
+          paid_amount: paidAmount,
+          discount,
+          notes: form.notes || '',
+          payment_method: form.payment_method
+        })
+        .eq('id', editingInvoice.id);
 
-      if (orderError) throw orderError;
+      if (orderError) {
+        console.error('Direct order update failed, trying RPC:', orderError);
+        // Fallback to RPC if direct update fails
+        const { error: rpcError } = await supabase.rpc('update_order', {
+          p_order_id: editingInvoice.id,
+          p_customer_name: form.customer_name,
+          p_customer_ref: form.customer_ref || null,
+          p_total: amount,
+          p_paid_amount: paidAmount,
+          p_discount: discount,
+          p_notes: form.notes || '',
+          p_payment_method: form.payment_method
+        });
 
+        if (rpcError) throw rpcError;
+        console.log('RPC order update succeeded');
+      } else {
+        console.log('Direct order update succeeded');
+      }
+
+      console.log('Items to update:', editItems.length);
       let itemUpdateErrors = 0;
+      let itemUpdateSuccess = 0;
+
       for (const item of editItems) {
+        console.log('Updating item:', item.id, 'with data:', {
+          quantity: item.quantity,
+          price: item.price,
+          menu_item_name: item.menu_item_name
+        });
+
         try {
-          const { error: itemError } = await supabase.rpc('update_order_item', {
-            p_item_id: item.id,
-            p_quantity: item.quantity,
-            p_price: item.price,
-            p_menu_item_name: item.menu_item_name
-          });
-          if (itemError) {
-            console.error('Error updating item:', item.id, itemError);
-            itemUpdateErrors++;
+          // Try direct update first
+          const { error: directError } = await supabase
+            .from('order_items')
+            .update({
+              quantity: item.quantity,
+              price: item.price,
+              menu_item_name: item.menu_item_name
+            })
+            .eq('id', item.id);
+
+          if (directError) {
+            console.error('Direct item update failed, trying RPC:', item.id, directError);
+            // Fallback to RPC
+            const { error: rpcError } = await supabase.rpc('update_order_item', {
+              p_item_id: item.id,
+              p_quantity: item.quantity,
+              p_price: item.price,
+              p_menu_item_name: item.menu_item_name
+            });
+
+            if (rpcError) {
+              console.error('RPC item update also failed:', item.id, rpcError);
+              itemUpdateErrors++;
+            } else {
+              console.log('RPC item update succeeded:', item.id);
+              itemUpdateSuccess++;
+            }
+          } else {
+            console.log('Direct item update succeeded:', item.id);
+            itemUpdateSuccess++;
           }
         } catch (itemErr) {
           console.error('Exception updating item:', item.id, itemErr);
           itemUpdateErrors++;
         }
       }
+
+      console.log('=== Update Summary ===');
+      console.log('Items updated successfully:', itemUpdateSuccess);
+      console.log('Items failed to update:', itemUpdateErrors);
 
       if (itemUpdateErrors > 0) {
         toast.warning(`تم تحديث الفاتورة ولكن فشل تحديث ${itemUpdateErrors} من البنود`);
@@ -217,7 +273,8 @@ export function SalesInvoices({ restaurantId, currency, restaurant, isSuperAdmin
       setForm({ customer_name: '', amount: '', description: '', payment_method: 'cash', customer_ref: '', paid_amount: '', discount: '', notes: '' });
       await loadInvoices();
     } catch (e: any) {
-      console.error('Error updating invoice:', e);
+      console.error('=== Invoice Update Failed ===');
+      console.error('Error:', e);
       toast.error('فشل تحديث الفاتورة: ' + e.message);
     }
   };
