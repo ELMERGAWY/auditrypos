@@ -166,19 +166,7 @@ export function WarehouseManager({ restaurantId, warehouses: propsWarehouses, on
           accounting_account_code: formData.accounting_account_code || null,
           inventory_account_code: formData.inventory_account_code || null,
           cogs_account_code: formData.cogs_account_code || null,
-          notes: formData.notes || null,
-          // Advanced location fields
-          location_zone: formData.location_zone || null,
-          aisle: formData.aisle || null,
-          bin: formData.bin || null,
-          floor: formData.floor || null,
-          building: formData.building || null,
-          // Capacity and control fields
-          capacity_quantity: formData.capacity_quantity ? parseFloat(formData.capacity_quantity) : null,
-          capacity_volume: formData.capacity_volume ? parseFloat(formData.capacity_volume) : null,
-          temperature_control: formData.temperature_control,
-          humidity_control: formData.humidity_control,
-          security_level: formData.security_level || 'normal'
+          notes: formData.notes || null
         });
 
       if (error) throw error;
