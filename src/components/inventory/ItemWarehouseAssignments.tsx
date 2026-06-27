@@ -146,26 +146,24 @@ export function ItemWarehouseAssignments({ itemId, itemName }: ItemWarehouseAssi
     }
 
     try {
-      const { error } = await supabase
-        .from('item_warehouse_assignments')
-        .insert({
-          item_id: itemId,
-          sub_warehouse_id: formData.sub_warehouse_id,
-          costing_method: formData.costing_method,
-          accounting_standard: formData.accounting_standard,
-          inventory_valuation_rule: formData.inventory_valuation_rule,
-          is_primary: formData.is_primary,
-          min_stock_level: formData.min_stock_level,
-          max_stock_level: formData.max_stock_level ? parseFloat(formData.max_stock_level) : null,
-          reorder_point: formData.reorder_point ? parseFloat(formData.reorder_point) : null,
-          reorder_quantity: formData.reorder_quantity ? parseFloat(formData.reorder_quantity) : null,
-          stock_unit: formData.stock_unit || null,
-          sales_unit: formData.sales_unit || null,
-          purchase_unit: formData.purchase_unit || null,
-          lead_time_days: formData.lead_time_days,
-          low_stock_alert: formData.low_stock_alert,
-          overstock_alert: formData.overstock_alert
-        });
+      const { error } = await supabase.rpc('insert_item_warehouse_assignment', {
+        p_item_id: itemId,
+        p_sub_warehouse_id: formData.sub_warehouse_id,
+        p_costing_method: formData.costing_method,
+        p_accounting_standard: formData.accounting_standard,
+        p_inventory_valuation_rule: formData.inventory_valuation_rule,
+        p_is_primary: formData.is_primary,
+        p_min_stock_level: formData.min_stock_level,
+        p_max_stock_level: formData.max_stock_level ? parseFloat(formData.max_stock_level) : null,
+        p_reorder_point: formData.reorder_point ? parseFloat(formData.reorder_point) : null,
+        p_reorder_quantity: formData.reorder_quantity ? parseFloat(formData.reorder_quantity) : null,
+        p_stock_unit: formData.stock_unit || null,
+        p_sales_unit: formData.sales_unit || null,
+        p_purchase_unit: formData.purchase_unit || null,
+        p_lead_time_days: formData.lead_time_days,
+        p_low_stock_alert: formData.low_stock_alert,
+        p_overstock_alert: formData.overstock_alert
+      });
 
       if (error) throw error;
 
