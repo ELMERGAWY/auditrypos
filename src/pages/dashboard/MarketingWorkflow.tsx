@@ -82,6 +82,13 @@ export function MarketingWorkflow({ restaurantId, currency }: Props) {
   const [loading, setLoading] = useState(false);
   const [activeTab, setActiveTab] = useState('instances');
 
+  // Safety checks for arrays to prevent React error #306
+  const safeStages = Array.isArray(stages) ? stages : [];
+  const safeInstances = Array.isArray(instances) ? instances : [];
+  const safeTasks = Array.isArray(tasks) ? tasks : [];
+  const safeStaff = Array.isArray(staff) ? staff : [];
+  const safeDepartments = Array.isArray(departments) ? departments : [];
+
   // Modals
   const [showInstanceModal, setShowInstanceModal] = useState(false);
   const [showTaskModal, setShowTaskModal] = useState(false);
@@ -148,7 +155,7 @@ export function MarketingWorkflow({ restaurantId, currency }: Props) {
       const [stagesRes, instancesRes, tasksRes, staffRes, deptRes] = await Promise.all([
         supabase.from('marketing_workflow_stages').select('*').eq('restaurant_id', restaurantId).order('order_index'),
         supabase.from('marketing_workflow_instances').select('*, marketing_workflow_stages(*)').eq('restaurant_id', restaurantId).order('created_at', { ascending: false }),
-        supabase.from('marketing_workflow_tasks').select('*').eq('workflow_instance_id', 'in', (instances.map(i => i.id).join(','))),
+        supabase.from('marketing_workflow_tasks').select('*').eq('workflow_instance_id', 'in', (safeInstances.map(i => i.id).join(','))),
         supabase.from('staff_profiles').select('id, full_name, position').eq('restaurant_id', restaurantId),
         supabase.from('staff_departments').select('id, name').eq('restaurant_id', restaurantId)
       ]);
@@ -428,7 +435,7 @@ export function MarketingWorkflow({ restaurantId, currency }: Props) {
         {/* Workflow Instances */}
         <TabsContent value="instances" className="mt-4">
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {instances.map(instance => (
+            {safeInstances.map(instance => (
               <Card key={instance.id} className="p-5 hover:shadow-lg transition-all border-border/60">
                 <div className="flex justify-between items-start mb-3">
                   <div className="flex-1">
@@ -486,7 +493,7 @@ export function MarketingWorkflow({ restaurantId, currency }: Props) {
                   </Button>
                   <div className="flex-1">
                     <div className="flex gap-1 overflow-x-auto">
-                      {stages.map(stage => (
+                      {safeStages.map(stage => (
                         <div 
                           key={stage.id}
                           className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold ${
@@ -533,7 +540,7 @@ export function MarketingWorkflow({ restaurantId, currency }: Props) {
         {/* Tasks */}
         <TabsContent value="tasks" className="mt-4">
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {tasks.map(task => (
+            {safeTasks.map(task => (
               <Card key={task.id} className="p-5 hover:shadow-lg transition-all border-border/60">
                 <div className="flex justify-between items-start mb-3">
                   <div className="flex-1">
@@ -571,7 +578,7 @@ export function MarketingWorkflow({ restaurantId, currency }: Props) {
         {/* Stages */}
         <TabsContent value="stages" className="mt-4">
           <div className="space-y-3">
-            {stages.map(stage => (
+            {safeStages.map(stage => (
               <Card key={stage.id} className="p-4 hover:shadow-lg transition-all border-border/60">
                 <div className="flex justify-between items-center">
                   <div className="flex items-center gap-3">
@@ -680,7 +687,7 @@ export function MarketingWorkflow({ restaurantId, currency }: Props) {
               <Select value={taskForm.workflow_instance_id} onValueChange={(v) => setTaskForm({ ...taskForm, workflow_instance_id: v })}>
                 <SelectTrigger><SelectValue placeholder="اختر سير العمل" /></SelectTrigger>
                 <SelectContent>
-                  {instances.map(instance => (
+                  {safeInstances.map(instance => (
                     <SelectItem key={instance.id} value={instance.id}>{instance.workflow_name}</SelectItem>
                   ))}
                 </SelectContent>
@@ -708,7 +715,7 @@ export function MarketingWorkflow({ restaurantId, currency }: Props) {
                 <Select value={taskForm.assigned_to} onValueChange={(v) => setTaskForm({ ...taskForm, assigned_to: v })}>
                   <SelectTrigger><SelectValue placeholder="اختر الموظف" /></SelectTrigger>
                   <SelectContent>
-                    {staff.map(member => (
+                    {safeStaff.map(member => (
                       <SelectItem key={member.id} value={member.id}>{member.full_name}</SelectItem>
                     ))}
                   </SelectContent>
@@ -719,7 +726,7 @@ export function MarketingWorkflow({ restaurantId, currency }: Props) {
                 <Select value={taskForm.department_id} onValueChange={(v) => setTaskForm({ ...taskForm, department_id: v })}>
                   <SelectTrigger><SelectValue placeholder="اختر القسم" /></SelectTrigger>
                   <SelectContent>
-                    {departments.map(dept => (
+                    {safeDepartments.map(dept => (
                       <SelectItem key={dept.id} value={dept.id}>{dept.name}</SelectItem>
                     ))}
                   </SelectContent>
