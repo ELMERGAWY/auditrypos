@@ -139,6 +139,7 @@ export function SalesInvoices({ restaurantId, currency, restaurant, isSuperAdmin
 
     try {
       const amount = parseFloat(form.amount);
+      const paidAmount = parseFloat(form.paid_amount) || 0;
       const orderNumber = form.customer_ref ? `INV-${form.customer_ref}-${Date.now().toString().slice(-6)}` : `INV-${Date.now().toString().slice(-6)}`;
       
       // 1. Create the order record
@@ -149,6 +150,7 @@ export function SalesInvoices({ restaurantId, currency, restaurant, isSuperAdmin
           order_number: orderNumber,
           customer_name: form.customer_name,
           total: amount,
+          paid_amount: paidAmount,
           status: 'completed',
           payment_method: form.payment_method,
           delivery_date: form.delivery_date || null,
@@ -175,7 +177,7 @@ export function SalesInvoices({ restaurantId, currency, restaurant, isSuperAdmin
       await journalService.createSaleJournalEntry(restaurantId, {
         ...order,
         items: editItems,
-        paid_amount: amount
+        paid_amount: paidAmount
       }, 'retail');
 
       toast.success('تم إنشاء الفاتورة وترحيلها محاسبياً ✅');
@@ -591,17 +593,19 @@ export function SalesInvoices({ restaurantId, currency, restaurant, isSuperAdmin
                   />
                 </div>
 
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-3 gap-3">
                   <div>
                     <Label>المبلغ الإجمالي</Label>
                     <Input type="number" placeholder="0.00" value={form.amount} onChange={e => setForm({...form, amount: e.target.value})} />
                   </div>
-                  {editingInvoice && (
-                    <div>
-                      <Label>المدفوع</Label>
-                      <Input type="number" value={form.paid_amount} onChange={e => setForm({ ...form, paid_amount: e.target.value })} />
-                    </div>
-                  )}
+                  <div>
+                    <Label>المدفوع</Label>
+                    <Input type="number" placeholder="0.00" value={form.paid_amount} onChange={e => setForm({ ...form, paid_amount: e.target.value })} />
+                  </div>
+                  <div>
+                    <Label>المتبقي</Label>
+                    <Input type="number" placeholder="0.00" value={Math.max(0, Number(form.amount) - Number(form.paid_amount)).toFixed(2)} readOnly className="bg-secondary/50" />
+                  </div>
                 </div>
 
                 {editingInvoice && editItems.length > 0 && (
@@ -627,7 +631,7 @@ export function SalesInvoices({ restaurantId, currency, restaurant, isSuperAdmin
                             next[idx] = { ...item, quantity: newQuantity };
                             setEditItems(next);
                             const newTotal = next.reduce((sum, it) => sum + (Number(it.price || 0) * Number(it.quantity || 0)), 0);
-                            setForm(f => ({ ...f, amount: String(newTotal), paid_amount: String(newTotal) }));
+                            setForm(f => ({ ...f, amount: String(newTotal) }));
                           }} 
                           placeholder="الكمية"
                         />
@@ -640,7 +644,7 @@ export function SalesInvoices({ restaurantId, currency, restaurant, isSuperAdmin
                             next[idx] = { ...item, price: newPrice };
                             setEditItems(next);
                             const newTotal = next.reduce((sum, it) => sum + (Number(it.price || 0) * Number(it.quantity || 0)), 0);
-                            setForm(f => ({ ...f, amount: String(newTotal), paid_amount: String(newTotal) }));
+                            setForm(f => ({ ...f, amount: String(newTotal) }));
                           }} 
                           placeholder="السعر"
                         />
@@ -657,7 +661,7 @@ export function SalesInvoices({ restaurantId, currency, restaurant, isSuperAdmin
                                 next[idx] = { ...item, quantity: calculatedQuantity };
                                 setEditItems(next);
                                 const newFormTotal = next.reduce((sum, it) => sum + (Number(it.price || 0) * Number(it.quantity || 0)), 0);
-                                setForm(f => ({ ...f, amount: String(newFormTotal), paid_amount: String(newFormTotal) }));
+                                setForm(f => ({ ...f, amount: String(newFormTotal) }));
                               }
                             }} 
                             placeholder="الإجمالي"
@@ -670,7 +674,7 @@ export function SalesInvoices({ restaurantId, currency, restaurant, isSuperAdmin
                               const next = editItems.filter((_, i) => i !== idx);
                               setEditItems(next);
                               const newTotal = next.reduce((sum, it) => sum + (Number(it.price || 0) * Number(it.quantity || 0)), 0);
-                              setForm(f => ({ ...f, amount: String(newTotal), paid_amount: String(newTotal) }));
+                              setForm(f => ({ ...f, amount: String(newTotal) }));
                             }}
                           >
                             <X className="w-4 h-4" />
@@ -749,7 +753,7 @@ export function SalesInvoices({ restaurantId, currency, restaurant, isSuperAdmin
                                 };
                                 setEditItems([...editItems, newItem]);
                                 const newTotal = [...editItems, newItem].reduce((sum, it) => sum + (Number(it.price || 0) * Number(it.quantity || 0)), 0);
-                                setForm(f => ({ ...f, amount: String(newTotal), paid_amount: String(newTotal) }));
+                                setForm(f => ({ ...f, amount: String(newTotal) }));
                                 setItemSearch('');
                                 setSelectedItem(null);
                                 setNewItemQty(1);
@@ -777,7 +781,7 @@ export function SalesInvoices({ restaurantId, currency, restaurant, isSuperAdmin
                                   const next = editItems.filter((_, i) => i !== idx);
                                   setEditItems(next);
                                   const newTotal = next.reduce((sum, it) => sum + (Number(it.price || 0) * Number(it.quantity || 0)), 0);
-                                  setForm(f => ({ ...f, amount: String(newTotal), paid_amount: String(newTotal) }));
+                                  setForm(f => ({ ...f, amount: String(newTotal) }));
                                 }}
                               >
                                 <X className="w-3 h-3" />
