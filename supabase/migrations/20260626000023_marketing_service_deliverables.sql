@@ -1,9 +1,11 @@
 -- Marketing Service Deliverables Table
--- This table tracks the delivery status of marketing services from contracts/quotes
+-- This table tracks the delivery status of marketing services from invoices/contracts/quotes
 
 CREATE TABLE IF NOT EXISTS public.marketing_service_deliverables (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
   restaurant_id UUID REFERENCES public.restaurants(id) ON DELETE CASCADE,
+  invoice_id UUID REFERENCES public.sales_invoices(id) ON DELETE CASCADE,
+  invoice_item_id UUID REFERENCES public.sales_invoice_items(id) ON DELETE CASCADE,
   contract_id UUID REFERENCES public.marketing_contracts(id) ON DELETE CASCADE,
   quote_id UUID REFERENCES public.marketing_quotes(id) ON DELETE CASCADE,
   service_id UUID REFERENCES public.marketing_services(id) ON DELETE SET NULL,
@@ -20,6 +22,8 @@ CREATE TABLE IF NOT EXISTS public.marketing_service_deliverables (
 
 -- Create indexes for better performance
 CREATE INDEX IF NOT EXISTS idx_marketing_deliverables_restaurant ON public.marketing_service_deliverables(restaurant_id);
+CREATE INDEX IF NOT EXISTS idx_marketing_deliverables_invoice ON public.marketing_service_deliverables(invoice_id);
+CREATE INDEX IF NOT EXISTS idx_marketing_deliverables_invoice_item ON public.marketing_service_deliverables(invoice_item_id);
 CREATE INDEX IF NOT EXISTS idx_marketing_deliverables_contract ON public.marketing_service_deliverables(contract_id);
 CREATE INDEX IF NOT EXISTS idx_marketing_deliverables_quote ON public.marketing_service_deliverables(quote_id);
 CREATE INDEX IF NOT EXISTS idx_marketing_deliverables_status ON public.marketing_service_deliverables(status);

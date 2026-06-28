@@ -15,6 +15,8 @@ interface ServiceDeliverable {
   id: string;
   contract_id: string | null;
   quote_id: string | null;
+  invoice_id: string | null;
+  invoice_item_id: string | null;
   service_id: string | null;
   service_name: string;
   description: string | null;
@@ -24,6 +26,8 @@ interface ServiceDeliverable {
   priority: string;
   notes: string | null;
   created_at: string;
+  invoice_number?: string;
+  customer_name?: string;
 }
 
 interface Props {
@@ -72,11 +76,22 @@ export function ServiceDeliverables({ restaurantId, currency }: Props) {
     try {
       const { data, error } = await supabase
         .from('marketing_service_deliverables')
-        .select('*')
+        .select(`
+          *,
+          sales_invoices(invoice_number, customer_name)
+        `)
         .eq('restaurant_id', restaurantId)
         .order('expected_delivery_date', { ascending: true });
       if (error) throw error;
-      setDeliverables(data || []);
+      
+      // Map the joined data to include invoice_number and customer_name
+      const deliverablesWithInvoiceInfo = (data || []).map((d: any) => ({
+        ...d,
+        invoice_number: d.sales_invoices?.invoice_number,
+        customer_name: d.sales_invoices?.customer_name
+      }));
+      
+      setDeliverables(deliverablesWithInvoiceInfo);
     } catch (e: any) {
       toast.error('خطأ في تحميل الاستلامات: ' + e.message);
     } finally {
@@ -260,6 +275,12 @@ export function ServiceDeliverables({ restaurantId, currency }: Props) {
               <div className="flex justify-between items-start mb-3">
                 <div className="flex-1">
                   <h3 className="font-bold text-lg">{deliverable.service_name}</h3>
+                  {deliverable.invoice_number && (
+                    <p className="text-xs text-muted-foreground mt-1">فاتورة #{deliverable.invoice_number}</p>
+                  )}
+                  {deliverable.customer_name && (
+                    <p className="text-xs text-muted-foreground">العميل: {deliverable.customer_name}</p>
+                  )}
                   <div className="flex gap-2 mt-1">
                     <Badge className={statusInfo.color}>{statusInfo.label}</Badge>
                     <Badge variant="outline" className={priorityInfo.color}>{priorityInfo.label}</Badge>
