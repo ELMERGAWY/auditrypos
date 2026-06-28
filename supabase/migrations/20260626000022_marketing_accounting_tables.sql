@@ -24,35 +24,35 @@ ALTER TABLE marketing_hourly_rates ENABLE ROW LEVEL SECURITY;
 
 CREATE POLICY "Users can view hourly rates for their restaurant"
     ON marketing_hourly_rates FOR SELECT
-    USING (restaurant_id = (SELECT restaurant_id FROM staff_profiles WHERE user_id = auth.uid()));
+    USING (restaurant_id IN (SELECT id FROM restaurants WHERE owner_id = auth.uid()));
 
 CREATE POLICY "Super admin can view all hourly rates"
     ON marketing_hourly_rates FOR SELECT
-    USING (EXISTS (SELECT 1 FROM staff_profiles WHERE user_id = auth.uid() AND is_super_admin = true));
+    USING (EXISTS (SELECT 1 FROM auth.users WHERE id = auth.uid() AND raw_user_meta_data->>'is_super_admin' = 'true'));
 
 CREATE POLICY "Users can insert hourly rates for their restaurant"
     ON marketing_hourly_rates FOR INSERT
-    WITH CHECK (restaurant_id = (SELECT restaurant_id FROM staff_profiles WHERE user_id = auth.uid()));
+    WITH CHECK (restaurant_id IN (SELECT id FROM restaurants WHERE owner_id = auth.uid()));
 
 CREATE POLICY "Super admin can insert hourly rates"
     ON marketing_hourly_rates FOR INSERT
-    WITH CHECK (EXISTS (SELECT 1 FROM staff_profiles WHERE user_id = auth.uid() AND is_super_admin = true));
+    WITH CHECK (EXISTS (SELECT 1 FROM auth.users WHERE id = auth.uid() AND raw_user_meta_data->>'is_super_admin' = 'true'));
 
 CREATE POLICY "Users can update hourly rates for their restaurant"
     ON marketing_hourly_rates FOR UPDATE
-    USING (restaurant_id = (SELECT restaurant_id FROM staff_profiles WHERE user_id = auth.uid()));
+    USING (restaurant_id IN (SELECT id FROM restaurants WHERE owner_id = auth.uid()));
 
 CREATE POLICY "Super admin can update hourly rates"
     ON marketing_hourly_rates FOR UPDATE
-    USING (EXISTS (SELECT 1 FROM staff_profiles WHERE user_id = auth.uid() AND is_super_admin = true));
+    USING (EXISTS (SELECT 1 FROM auth.users WHERE id = auth.uid() AND raw_user_meta_data->>'is_super_admin' = 'true'));
 
 CREATE POLICY "Users can delete hourly rates for their restaurant"
     ON marketing_hourly_rates FOR DELETE
-    USING (restaurant_id = (SELECT restaurant_id FROM staff_profiles WHERE user_id = auth.uid()));
+    USING (restaurant_id IN (SELECT id FROM restaurants WHERE owner_id = auth.uid()));
 
 CREATE POLICY "Super admin can delete hourly rates"
     ON marketing_hourly_rates FOR DELETE
-    USING (EXISTS (SELECT 1 FROM staff_profiles WHERE user_id = auth.uid() AND is_super_admin = true));
+    USING (EXISTS (SELECT 1 FROM auth.users WHERE id = auth.uid() AND raw_user_meta_data->>'is_super_admin' = 'true'));
 
 -- Indexes
 CREATE INDEX idx_marketing_hourly_rates_restaurant ON marketing_hourly_rates(restaurant_id);
@@ -91,35 +91,35 @@ ALTER TABLE marketing_project_costs ENABLE ROW LEVEL SECURITY;
 
 CREATE POLICY "Users can view project costs for their restaurant"
     ON marketing_project_costs FOR SELECT
-    USING (restaurant_id = (SELECT restaurant_id FROM staff_profiles WHERE user_id = auth.uid()));
+    USING (restaurant_id IN (SELECT id FROM restaurants WHERE owner_id = auth.uid()));
 
 CREATE POLICY "Super admin can view all project costs"
     ON marketing_project_costs FOR SELECT
-    USING (EXISTS (SELECT 1 FROM staff_profiles WHERE user_id = auth.uid() AND is_super_admin = true));
+    USING (EXISTS (SELECT 1 FROM auth.users WHERE id = auth.uid() AND raw_user_meta_data->>'is_super_admin' = 'true'));
 
 CREATE POLICY "Users can insert project costs for their restaurant"
     ON marketing_project_costs FOR INSERT
-    WITH CHECK (restaurant_id = (SELECT restaurant_id FROM staff_profiles WHERE user_id = auth.uid()));
+    WITH CHECK (restaurant_id IN (SELECT id FROM restaurants WHERE owner_id = auth.uid()));
 
 CREATE POLICY "Super admin can insert project costs"
     ON marketing_project_costs FOR INSERT
-    WITH CHECK (EXISTS (SELECT 1 FROM staff_profiles WHERE user_id = auth.uid() AND is_super_admin = true));
+    WITH CHECK (EXISTS (SELECT 1 FROM auth.users WHERE id = auth.uid() AND raw_user_meta_data->>'is_super_admin' = 'true'));
 
 CREATE POLICY "Users can update project costs for their restaurant"
     ON marketing_project_costs FOR UPDATE
-    USING (restaurant_id = (SELECT restaurant_id FROM staff_profiles WHERE user_id = auth.uid()));
+    USING (restaurant_id IN (SELECT id FROM restaurants WHERE owner_id = auth.uid()));
 
 CREATE POLICY "Super admin can update project costs"
     ON marketing_project_costs FOR UPDATE
-    USING (EXISTS (SELECT 1 FROM staff_profiles WHERE user_id = auth.uid() AND is_super_admin = true));
+    USING (EXISTS (SELECT 1 FROM auth.users WHERE id = auth.uid() AND raw_user_meta_data->>'is_super_admin' = 'true'));
 
 CREATE POLICY "Users can delete project costs for their restaurant"
     ON marketing_project_costs FOR DELETE
-    USING (restaurant_id = (SELECT restaurant_id FROM staff_profiles WHERE user_id = auth.uid()));
+    USING (restaurant_id IN (SELECT id FROM restaurants WHERE owner_id = auth.uid()));
 
 CREATE POLICY "Super admin can delete project costs"
     ON marketing_project_costs FOR DELETE
-    USING (EXISTS (SELECT 1 FROM staff_profiles WHERE user_id = auth.uid() AND is_super_admin = true));
+    USING (EXISTS (SELECT 1 FROM auth.users WHERE id = auth.uid() AND raw_user_meta_data->>'is_super_admin' = 'true'));
 
 -- Indexes
 CREATE INDEX idx_marketing_project_costs_restaurant ON marketing_project_costs(restaurant_id);
@@ -160,35 +160,35 @@ ALTER TABLE marketing_project_revenue ENABLE ROW LEVEL SECURITY;
 
 CREATE POLICY "Users can view project revenue for their restaurant"
     ON marketing_project_revenue FOR SELECT
-    USING (restaurant_id = (SELECT restaurant_id FROM staff_profiles WHERE user_id = auth.uid()));
+    USING (restaurant_id IN (SELECT id FROM restaurants WHERE owner_id = auth.uid()));
 
 CREATE POLICY "Super admin can view all project revenue"
     ON marketing_project_revenue FOR SELECT
-    USING (EXISTS (SELECT 1 FROM staff_profiles WHERE user_id = auth.uid() AND is_super_admin = true));
+    USING (EXISTS (SELECT 1 FROM auth.users WHERE id = auth.uid() AND raw_user_meta_data->>'is_super_admin' = 'true'));
 
 CREATE POLICY "Users can insert project revenue for their restaurant"
     ON marketing_project_revenue FOR INSERT
-    WITH CHECK (restaurant_id = (SELECT restaurant_id FROM staff_profiles WHERE user_id = auth.uid()));
+    WITH CHECK (restaurant_id IN (SELECT id FROM restaurants WHERE owner_id = auth.uid()));
 
 CREATE POLICY "Super admin can insert project revenue"
     ON marketing_project_revenue FOR INSERT
-    WITH CHECK (EXISTS (SELECT 1 FROM staff_profiles WHERE user_id = auth.uid() AND is_super_admin = true));
+    WITH CHECK (EXISTS (SELECT 1 FROM auth.users WHERE id = auth.uid() AND raw_user_meta_data->>'is_super_admin' = 'true'));
 
 CREATE POLICY "Users can update project revenue for their restaurant"
     ON marketing_project_revenue FOR UPDATE
-    USING (restaurant_id = (SELECT restaurant_id FROM staff_profiles WHERE user_id = auth.uid()));
+    USING (restaurant_id IN (SELECT id FROM restaurants WHERE owner_id = auth.uid()));
 
 CREATE POLICY "Super admin can update project revenue"
     ON marketing_project_revenue FOR UPDATE
-    USING (EXISTS (SELECT 1 FROM staff_profiles WHERE user_id = auth.uid() AND is_super_admin = true));
+    USING (EXISTS (SELECT 1 FROM auth.users WHERE id = auth.uid() AND raw_user_meta_data->>'is_super_admin' = 'true'));
 
 CREATE POLICY "Users can delete project revenue for their restaurant"
     ON marketing_project_revenue FOR DELETE
-    USING (restaurant_id = (SELECT restaurant_id FROM staff_profiles WHERE user_id = auth.uid()));
+    USING (restaurant_id IN (SELECT id FROM restaurants WHERE owner_id = auth.uid()));
 
 CREATE POLICY "Super admin can delete project revenue"
     ON marketing_project_revenue FOR DELETE
-    USING (EXISTS (SELECT 1 FROM staff_profiles WHERE user_id = auth.uid() AND is_super_admin = true));
+    USING (EXISTS (SELECT 1 FROM auth.users WHERE id = auth.uid() AND raw_user_meta_data->>'is_super_admin' = 'true'));
 
 -- Indexes
 CREATE INDEX idx_marketing_project_revenue_restaurant ON marketing_project_revenue(restaurant_id);
@@ -222,11 +222,11 @@ ALTER TABLE marketing_profitability ENABLE ROW LEVEL SECURITY;
 
 CREATE POLICY "Users can view profitability for their restaurant"
     ON marketing_profitability FOR SELECT
-    USING (restaurant_id = (SELECT restaurant_id FROM staff_profiles WHERE user_id = auth.uid()));
+    USING (restaurant_id IN (SELECT id FROM restaurants WHERE owner_id = auth.uid()));
 
 CREATE POLICY "Super admin can view all profitability"
     ON marketing_profitability FOR SELECT
-    USING (EXISTS (SELECT 1 FROM staff_profiles WHERE user_id = auth.uid() AND is_super_admin = true));
+    USING (EXISTS (SELECT 1 FROM auth.users WHERE id = auth.uid() AND raw_user_meta_data->>'is_super_admin' = 'true'));
 
 -- Indexes
 CREATE INDEX idx_marketing_profitability_restaurant ON marketing_profitability(restaurant_id);
@@ -259,35 +259,35 @@ ALTER TABLE marketing_billing_schedule ENABLE ROW LEVEL SECURITY;
 
 CREATE POLICY "Users can view billing schedule for their restaurant"
     ON marketing_billing_schedule FOR SELECT
-    USING (restaurant_id = (SELECT restaurant_id FROM staff_profiles WHERE user_id = auth.uid()));
+    USING (restaurant_id IN (SELECT id FROM restaurants WHERE owner_id = auth.uid()));
 
 CREATE POLICY "Super admin can view all billing schedule"
     ON marketing_billing_schedule FOR SELECT
-    USING (EXISTS (SELECT 1 FROM staff_profiles WHERE user_id = auth.uid() AND is_super_admin = true));
+    USING (EXISTS (SELECT 1 FROM auth.users WHERE id = auth.uid() AND raw_user_meta_data->>'is_super_admin' = 'true'));
 
 CREATE POLICY "Users can insert billing schedule for their restaurant"
     ON marketing_billing_schedule FOR INSERT
-    WITH CHECK (restaurant_id = (SELECT restaurant_id FROM staff_profiles WHERE user_id = auth.uid()));
+    WITH CHECK (restaurant_id IN (SELECT id FROM restaurants WHERE owner_id = auth.uid()));
 
 CREATE POLICY "Super admin can insert billing schedule"
     ON marketing_billing_schedule FOR INSERT
-    WITH CHECK (EXISTS (SELECT 1 FROM staff_profiles WHERE user_id = auth.uid() AND is_super_admin = true));
+    WITH CHECK (EXISTS (SELECT 1 FROM auth.users WHERE id = auth.uid() AND raw_user_meta_data->>'is_super_admin' = 'true'));
 
 CREATE POLICY "Users can update billing schedule for their restaurant"
     ON marketing_billing_schedule FOR UPDATE
-    USING (restaurant_id = (SELECT restaurant_id FROM staff_profiles WHERE user_id = auth.uid()));
+    USING (restaurant_id IN (SELECT id FROM restaurants WHERE owner_id = auth.uid()));
 
 CREATE POLICY "Super admin can update billing schedule"
     ON marketing_billing_schedule FOR UPDATE
-    USING (EXISTS (SELECT 1 FROM staff_profiles WHERE user_id = auth.uid() AND is_super_admin = true));
+    USING (EXISTS (SELECT 1 FROM auth.users WHERE id = auth.uid() AND raw_user_meta_data->>'is_super_admin' = 'true'));
 
 CREATE POLICY "Users can delete billing schedule for their restaurant"
     ON marketing_billing_schedule FOR DELETE
-    USING (restaurant_id = (SELECT restaurant_id FROM staff_profiles WHERE user_id = auth.uid()));
+    USING (restaurant_id IN (SELECT id FROM restaurants WHERE owner_id = auth.uid()));
 
 CREATE POLICY "Super admin can delete billing schedule"
     ON marketing_billing_schedule FOR DELETE
-    USING (EXISTS (SELECT 1 FROM staff_profiles WHERE user_id = auth.uid() AND is_super_admin = true));
+    USING (EXISTS (SELECT 1 FROM auth.users WHERE id = auth.uid() AND raw_user_meta_data->>'is_super_admin' = 'true'));
 
 -- Indexes
 CREATE INDEX idx_marketing_billing_schedule_restaurant ON marketing_billing_schedule(restaurant_id);
