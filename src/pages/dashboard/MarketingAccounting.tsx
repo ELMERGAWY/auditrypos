@@ -124,7 +124,17 @@ const MarketingAccounting: React.FC<MarketingAccountingProps> = ({
   const [staff, setStaff] = useState<any[]>([]);
   const [departments, setDepartments] = useState<any[]>([]);
   const [workflowInstances, setWorkflowInstances] = useState<any[]>([]);
-  
+
+  // Safety checks for arrays to prevent React error #306
+  const safeStaff = Array.isArray(staff) ? staff : [];
+  const safeDepartments = Array.isArray(departments) ? departments : [];
+  const safeWorkflowInstances = Array.isArray(workflowInstances) ? workflowInstances : [];
+  const safeHourlyRates = Array.isArray(hourlyRates) ? hourlyRates : [];
+  const safeProjectCosts = Array.isArray(projectCosts) ? projectCosts : [];
+  const safeProjectRevenues = Array.isArray(projectRevenues) ? projectRevenues : [];
+  const safeBillingSchedule = Array.isArray(billingSchedule) ? billingSchedule : [];
+  const safeProfitability = Array.isArray(profitability) ? profitability : [];
+
   // Forms
   const [showHourlyRateDialog, setShowHourlyRateDialog] = useState(false);
   const [showCostDialog, setShowCostDialog] = useState(false);
@@ -615,7 +625,7 @@ const MarketingAccounting: React.FC<MarketingAccountingProps> = ({
                         <SelectValue placeholder="اختر الموظف" />
                       </SelectTrigger>
                       <SelectContent>
-                        {staff.map(s => (
+                        {safeStaff.map(s => (
                           <SelectItem key={s.id} value={s.id}>{s.full_name}</SelectItem>
                         ))}
                       </SelectContent>
@@ -631,7 +641,7 @@ const MarketingAccounting: React.FC<MarketingAccountingProps> = ({
                         <SelectValue placeholder="اختر القسم" />
                       </SelectTrigger>
                       <SelectContent>
-                        {departments.map(d => (
+                        {safeDepartments.map(d => (
                           <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>
                         ))}
                       </SelectContent>
@@ -679,7 +689,7 @@ const MarketingAccounting: React.FC<MarketingAccountingProps> = ({
           </div>
 
           <div className="grid gap-4">
-            {hourlyRates.map(rate => (
+            {safeHourlyRates.map(rate => (
               <Card key={rate.id}>
                 <CardContent className="pt-6">
                   <div className="flex justify-between items-start">
@@ -788,7 +798,7 @@ const MarketingAccounting: React.FC<MarketingAccountingProps> = ({
                         <SelectValue placeholder="اختر المشروع" />
                       </SelectTrigger>
                       <SelectContent>
-                        {workflowInstances.map(w => (
+                        {safeWorkflowInstances.map(w => (
                           <SelectItem key={w.id} value={w.id}>{w.title}</SelectItem>
                         ))}
                       </SelectContent>
@@ -859,7 +869,7 @@ const MarketingAccounting: React.FC<MarketingAccountingProps> = ({
                         <SelectValue placeholder="اختر الموظف" />
                       </SelectTrigger>
                       <SelectContent>
-                        {staff.map(s => (
+                        {safeStaff.map(s => (
                           <SelectItem key={s.id} value={s.id}>{s.full_name}</SelectItem>
                         ))}
                       </SelectContent>
@@ -883,7 +893,7 @@ const MarketingAccounting: React.FC<MarketingAccountingProps> = ({
           </div>
 
           <div className="grid gap-4">
-            {projectCosts.map(cost => (
+            {safeProjectCosts.map(cost => (
               <Card key={cost.id}>
                 <CardContent className="pt-6">
                   <div className="flex justify-between items-start">
@@ -989,7 +999,7 @@ const MarketingAccounting: React.FC<MarketingAccountingProps> = ({
                         <SelectValue placeholder="اختر المشروع" />
                       </SelectTrigger>
                       <SelectContent>
-                        {workflowInstances.map(w => (
+                        {safeWorkflowInstances.map(w => (
                           <SelectItem key={w.id} value={w.id}>{w.title}</SelectItem>
                         ))}
                       </SelectContent>
@@ -1085,7 +1095,7 @@ const MarketingAccounting: React.FC<MarketingAccountingProps> = ({
           </div>
 
           <div className="grid gap-4">
-            {projectRevenues.map(revenue => (
+            {safeProjectRevenues.map(revenue => (
               <Card key={revenue.id}>
                 <CardContent className="pt-6">
                   <div className="flex justify-between items-start">
@@ -1184,7 +1194,7 @@ const MarketingAccounting: React.FC<MarketingAccountingProps> = ({
                         <SelectValue placeholder="اختر المشروع" />
                       </SelectTrigger>
                       <SelectContent>
-                        {workflowInstances.map(w => (
+                        {safeWorkflowInstances.map(w => (
                           <SelectItem key={w.id} value={w.id}>{w.title}</SelectItem>
                         ))}
                       </SelectContent>
@@ -1232,7 +1242,7 @@ const MarketingAccounting: React.FC<MarketingAccountingProps> = ({
           </div>
 
           <div className="grid gap-4">
-            {billingSchedule.map(billing => (
+            {safeBillingSchedule.map(billing => (
               <Card key={billing.id}>
                 <CardContent className="pt-6">
                   <div className="flex justify-between items-start">
@@ -1301,7 +1311,7 @@ const MarketingAccounting: React.FC<MarketingAccountingProps> = ({
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
-              {profitability.map(p => (
+              {safeProfitability.map(p => (
                 <div key={p.id} className="border rounded-lg p-4 space-y-2">
                   <div className="flex justify-between items-center">
                     <span className="font-medium">المشروع</span>
