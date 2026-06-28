@@ -1,6 +1,10 @@
 -- Complete Invoice Delivery Integration
 -- This migration adds delivery tracking to invoices and links it with deliverables
 
+-- Step 0: Add delivery_date to orders table
+ALTER TABLE public.orders 
+ADD COLUMN IF NOT EXISTS delivery_date DATE;
+
 -- Step 1: Add delivery date fields to sales_invoice_lines
 ALTER TABLE public.sales_invoice_lines 
 ADD COLUMN IF NOT EXISTS expected_delivery_date DATE,

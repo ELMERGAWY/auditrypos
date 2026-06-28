@@ -142,6 +142,7 @@ export default function Dashboard() {
   const [customerPhone, setCustomerPhone] = useState('');
   const [customerRef, setCustomerRef] = useState('');
   const [deliveryAddress, setDeliveryAddress] = useState('');
+  const [deliveryDate, setDeliveryDate] = useState('');
   const [orderNotes, setOrderNotes] = useState('');
   const [discount, setDiscount] = useState('');
   const [discountType, setDiscountType] = useState<'percent' | 'fixed'>('percent');
@@ -572,7 +573,7 @@ export default function Dashboard() {
             unitFactor: c.unitFactor || 1,
             service_details: c.service_details
           })), 
-          customerName, customerPhone, customerRef, orderType: orderType as any, deliveryAddress, deliveryAgentId: selectedDeliveryAgent, paymentMethod: paymentMethod as any, paidAmount: paidNum, discount: discountAmount, discountType: discountType === 'percent' ? 'percentage' : 'fixed', notes: orderNotes, destinationAccountId: selectedAccountId, customOrderNumber: customOrderNumber || undefined }
+          customerName, customerPhone, customerRef, orderType: orderType as any, deliveryAddress, deliveryDate, deliveryAgentId: selectedDeliveryAgent, paymentMethod: paymentMethod as any, paidAmount: paidNum, discount: discountAmount, discountType: discountType === 'percent' ? 'percentage' : 'fixed', notes: orderNotes, destinationAccountId: selectedAccountId, customOrderNumber: customOrderNumber || undefined }
       );
       if (result.success && result.order) {
         const completeOrder = {
@@ -596,6 +597,7 @@ export default function Dashboard() {
         setTableNumber('');
         setCustomOrderNumber('');
         setOrderNotes('');
+        setDeliveryDate('');
         setDiscount('');
         setDiscountType('percent');
         setSelectedDeliveryAgent('');
@@ -614,13 +616,13 @@ export default function Dashboard() {
     const newTab: HeldInvoice = {
       id: activeInvoiceId || crypto.randomUUID(),
       label: activeInvoiceId ? (invoiceTabs.find(t => t.id === activeInvoiceId)?.label || `فاتورة ${invoiceTabs.length + 1}`) : `فاتورة ${invoiceTabs.length + 1}`,
-      cart, tableNumber, customerName, notes: orderNotes, discount, discountType, orderType, deliveryAddress, customerPhone, deliveryAgentId: selectedDeliveryAgent, timestamp: Date.now(), paymentMethod, selectedAccountId: selectedAccountId || undefined, customOrderNumber
+      cart, tableNumber, customerName, notes: orderNotes, discount, discountType, orderType, deliveryAddress, deliveryDate, customerPhone, deliveryAgentId: selectedDeliveryAgent, timestamp: Date.now(), paymentMethod, selectedAccountId: selectedAccountId || undefined, customOrderNumber
     };
     if (activeInvoiceId) setInvoiceTabs(prev => prev.map(t => t.id === activeInvoiceId ? newTab : t));
     else setInvoiceTabs(prev => [...prev, newTab]);
     clearCart();
     toast.success('تم تعليق الفاتورة');
-  }, [cart, activeInvoiceId, invoiceTabs, tableNumber, customerName, orderNotes, discount, discountType, orderType, deliveryAddress, customerPhone, selectedDeliveryAgent, paymentMethod, selectedAccountId, clearCart, customOrderNumber]);
+  }, [cart, activeInvoiceId, invoiceTabs, tableNumber, customerName, orderNotes, discount, discountType, orderType, deliveryAddress, deliveryDate, customerPhone, selectedDeliveryAgent, paymentMethod, selectedAccountId, clearCart, customOrderNumber]);
 
   // Performance Optimization: Memoize the active tab content
   const activeTabContent = useMemo(() => {
@@ -638,7 +640,7 @@ export default function Dashboard() {
         {activeTab === 'pos' && (
           <div className="flex flex-col lg:flex-row h-full gap-4 overflow-hidden">
             <POSGrid restaurant={restaurant} currency={currency} categories={categories} selectedCategory={selectedCategory} setSelectedCategory={setSelectedCategory} searchQuery={searchQuery} setSearchQuery={setSearchQuery} filteredItems={filteredItems} addToCart={addToCart} servicePackages={servicePackages} addPackageToCart={addPackageToCart} businessType={businessType} todayRevenue={todayRevenue} todayOrders={todayOrdersList} avgOrderValue={avgOrderValue} pendingOrders={pendingOrders} orderType={orderType} orders={orders} tableNumber={tableNumber} setTableNumber={setTableNumber} />
-            <POSCart activeInvoiceId={activeInvoiceId} invoiceTabs={invoiceTabs} cart={cart} holdCurrentInvoice={holdCurrentInvoice} setShowInvoiceTabs={setShowInvoiceTabs} clearCart={clearCart} businessType={businessType} orderType={orderType} setOrderType={setOrderType} tableNumber={tableNumber} setTableNumber={setTableNumber} customOrderNumber={customOrderNumber} setCustomOrderNumber={setCustomOrderNumber} restaurant={restaurant} customerName={customerName} setCustomerName={selectCustomerFromSearch} customerPhone={customerPhone} setCustomerPhone={setCustomerPhone} customerRef={customerRef} setCustomerRef={setCustomerRef} deliveryAddress={deliveryAddress} setDeliveryAddress={setDeliveryAddress} agents={agents} selectedDeliveryAgent={selectedDeliveryAgent} setSelectedDeliveryAgent={setSelectedDeliveryAgent} orderNotes={orderNotes} setOrderNotes={setOrderNotes} discount={discount} setDiscount={setDiscount} discountType={discountType} setDiscountType={setDiscountType} currency={currency} getUnitOptions={getUnitOptions} updateQty={updateQty} setCartItemQty={setCartItemQty} setCartItemUnit={setCartItemUnit} updateValue={updateValue} updatePrice={updatePrice} updateServiceDetails={updateServiceDetails} discountAmount={discountAmount} taxAmount={totalTax} cartSubtotal={cartSubtotal} cartTotal={cartTotal} paymentMethod={paymentMethod} setPaymentMethod={setPaymentMethod} paidAmount={paidAmount} setPaidAmount={setPaidAmount} remaining={remaining} checkout={performCheckout} previewInvoice={() => { setLastReceipt({ total: cartTotal, items: cart.map(c => ({ menu_item_name: c.item.name, quantity: c.qty, price: Number(c.price) })) } as any); setAutoPrint(false); setShowReceipt(true); }} removeFromCart={(id) => setCart(prev => prev.filter(c => c.item.id !== id))} accountingAccounts={accountingAccounts} selectedAccountId={selectedAccountId} setSelectedAccountId={setSelectedAccountId} isProcessing={isProcessingCheckout} />
+            <POSCart activeInvoiceId={activeInvoiceId} invoiceTabs={invoiceTabs} cart={cart} holdCurrentInvoice={holdCurrentInvoice} setShowInvoiceTabs={setShowInvoiceTabs} clearCart={clearCart} businessType={businessType} orderType={orderType} setOrderType={setOrderType} tableNumber={tableNumber} setTableNumber={setTableNumber} customOrderNumber={customOrderNumber} setCustomOrderNumber={setCustomOrderNumber} restaurant={restaurant} customerName={customerName} setCustomerName={selectCustomerFromSearch} customerPhone={customerPhone} setCustomerPhone={setCustomerPhone} customerRef={customerRef} setCustomerRef={setCustomerRef} deliveryAddress={deliveryAddress} setDeliveryAddress={setDeliveryAddress} deliveryDate={deliveryDate} setDeliveryDate={setDeliveryDate} agents={agents} selectedDeliveryAgent={selectedDeliveryAgent} setSelectedDeliveryAgent={setSelectedDeliveryAgent} orderNotes={orderNotes} setOrderNotes={setOrderNotes} discount={discount} setDiscount={setDiscount} discountType={discountType} setDiscountType={setDiscountType} currency={currency} getUnitOptions={getUnitOptions} updateQty={updateQty} setCartItemQty={setCartItemQty} setCartItemUnit={setCartItemUnit} updateValue={updateValue} updatePrice={updatePrice} updateServiceDetails={updateServiceDetails} discountAmount={discountAmount} taxAmount={totalTax} cartSubtotal={cartSubtotal} cartTotal={cartTotal} paymentMethod={paymentMethod} setPaymentMethod={setPaymentMethod} paidAmount={paidAmount} setPaidAmount={setPaidAmount} remaining={remaining} checkout={performCheckout} previewInvoice={() => { setLastReceipt({ total: cartTotal, items: cart.map(c => ({ menu_item_name: c.item.name, quantity: c.qty, price: Number(c.price) })) } as any); setAutoPrint(false); setShowReceipt(true); }} removeFromCart={(id) => setCart(prev => prev.filter(c => c.item.id !== id))} accountingAccounts={accountingAccounts} selectedAccountId={selectedAccountId} setSelectedAccountId={setSelectedAccountId} isProcessing={isProcessingCheckout} />
           </div>
         )}
         {activeTab === 'orders' && (

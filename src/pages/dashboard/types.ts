@@ -98,6 +98,7 @@ export interface Restaurant {
     discountType: 'percent' | 'fixed';
     orderType: OrderType;
     deliveryAddress?: string;
+    deliveryDate?: string;
     customerPhone?: string;
     deliveryAgentId: string;
     timestamp: number;

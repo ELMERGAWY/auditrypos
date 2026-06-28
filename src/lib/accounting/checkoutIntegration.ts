@@ -47,6 +47,7 @@ class CheckoutIntegration {
       tableNumber?: number;
       orderType: 'dine_in' | 'takeaway' | 'delivery' | 'pickup';
       deliveryAddress?: string;
+      deliveryDate?: string;
       deliveryAgentId?: string;
       paymentMethod: 'cash' | 'card' | 'instapay' | 'vodafone_cash';
       paidAmount?: number;
@@ -81,6 +82,7 @@ class CheckoutIntegration {
       customer_phone: orderData.customerPhone || '',
       customer_ref: orderData.customerRef || null,
       delivery_address: orderData.deliveryAddress || '',
+      delivery_date: orderData.deliveryDate || null,
       delivery_agent_id: orderData.deliveryAgentId || null,
       payment_method: orderData.paymentMethod,
       paid_amount: paidAmount,

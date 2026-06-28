@@ -1,7 +1,7 @@
 // @ts-nocheck
 import React, { memo, useState } from 'react';
 import { motion } from 'framer-motion';
-import { ShoppingCart, Pause, Play, Trash2, Hash, Phone, MapPin, StickyNote, DollarSign, Send, Receipt, Minus, Plus, X } from 'lucide-react';
+import { ShoppingCart, Pause, Play, Trash2, Hash, Phone, MapPin, StickyNote, DollarSign, Send, Receipt, Minus, Plus, X, Calendar } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
@@ -31,6 +31,8 @@ interface POSCartProps {
   setCustomerPhone: (val: string) => void;
   deliveryAddress: string;
   setDeliveryAddress: (val: string) => void;
+  deliveryDate: string;
+  setDeliveryDate: (val: string) => void;
   agents: DeliveryAgent[];
   selectedDeliveryAgent: string;
   setSelectedDeliveryAgent: (val: string) => void;
@@ -73,7 +75,8 @@ export const POSCart = memo(function POSCart({
   businessType, orderType, setOrderType, tableNumber, setTableNumber,
   customOrderNumber, setCustomOrderNumber,
   restaurant, customerName, setCustomerName, customerPhone, setCustomerPhone,
-  deliveryAddress, setDeliveryAddress, agents, selectedDeliveryAgent, setSelectedDeliveryAgent,
+  deliveryAddress, setDeliveryAddress, deliveryDate, setDeliveryDate,
+  agents, selectedDeliveryAgent, setSelectedDeliveryAgent,
   orderNotes, setOrderNotes, discount, setDiscount, discountType, setDiscountType,
   currency, getUnitOptions, setCartItemUnit, updateQty, setCartItemQty,
   discountAmount, taxAmount, cartSubtotal, cartTotal, paymentMethod, setPaymentMethod,
@@ -188,6 +191,16 @@ export const POSCart = memo(function POSCart({
             <div className="relative">
               <MapPin className="w-3.5 h-3.5 absolute right-2.5 top-2.5 text-muted-foreground" />
               <Input value={deliveryAddress} onChange={e => setDeliveryAddress(e.target.value)} placeholder={getAddressPlaceholder(businessType)} className="pr-8 h-9 text-xs" />
+            </div>
+            <div className="relative">
+              <Calendar className="w-3.5 h-3.5 absolute right-2.5 top-2.5 text-muted-foreground" />
+              <Input 
+                type="date" 
+                value={deliveryDate} 
+                onChange={e => setDeliveryDate(e.target.value)} 
+                placeholder="تاريخ التسليم" 
+                className="pr-8 h-9 text-xs" 
+              />
             </div>
           </>
         )}
