@@ -203,41 +203,48 @@ const MarketingAccounting: React.FC<MarketingAccountingProps> = ({
     
     setLoading(true);
     try {
-      const [
-        ratesRes,
-        costsRes,
-        revenuesRes,
-        profitRes,
-        billingRes,
-        staffRes,
-        deptRes,
-        instancesRes
-      ] = await Promise.all([
-        supabase.from('marketing_hourly_rates')
-          .select('*, staff_profiles(full_name), staff_departments(name)')
-          .eq('restaurant_id', restaurantId),
-        supabase.from('marketing_project_costs')
-          .select('*, staff_profiles(full_name), marketing_workflow_tasks(title)')
-          .eq('restaurant_id', restaurantId),
-        supabase.from('marketing_project_revenue')
-          .select('*')
-          .eq('restaurant_id', restaurantId),
-        supabase.from('marketing_profitability')
-          .select('*, marketing_workflow_instances(title)')
-          .eq('restaurant_id', restaurantId),
-        supabase.from('marketing_billing_schedule')
-          .select('*')
-          .eq('restaurant_id', restaurantId),
-        supabase.from('staff_profiles')
-          .select('id, full_name, department_id')
-          .eq('restaurant_id', restaurantId),
-        supabase.from('staff_departments')
-          .select('id, name')
-          .eq('restaurant_id', restaurantId),
-        supabase.from('marketing_workflow_instances')
-          .select('id, title, status')
-          .eq('restaurant_id', restaurantId)
-      ]);
+      // Load each table separately with error handling
+      console.log('Loading marketing accounting data for restaurant:', restaurantId);
+      
+      const ratesRes = await supabase.from('marketing_hourly_rates')
+        .select('*, staff_profiles(full_name), staff_departments(name)')
+        .eq('restaurant_id', restaurantId);
+      console.log('ratesRes:', ratesRes);
+      
+      const costsRes = await supabase.from('marketing_project_costs')
+        .select('*, staff_profiles(full_name), marketing_workflow_tasks(title)')
+        .eq('restaurant_id', restaurantId);
+      console.log('costsRes:', costsRes);
+      
+      const revenuesRes = await supabase.from('marketing_project_revenue')
+        .select('*')
+        .eq('restaurant_id', restaurantId);
+      console.log('revenuesRes:', revenuesRes);
+      
+      const profitRes = await supabase.from('marketing_profitability')
+        .select('*, marketing_workflow_instances(title)')
+        .eq('restaurant_id', restaurantId);
+      console.log('profitRes:', profitRes);
+      
+      const billingRes = await supabase.from('marketing_billing_schedule')
+        .select('*')
+        .eq('restaurant_id', restaurantId);
+      console.log('billingRes:', billingRes);
+      
+      const staffRes = await supabase.from('staff_profiles')
+        .select('id, full_name, department_id')
+        .eq('restaurant_id', restaurantId);
+      console.log('staffRes:', staffRes);
+      
+      const deptRes = await supabase.from('staff_departments')
+        .select('id, name')
+        .eq('restaurant_id', restaurantId);
+      console.log('deptRes:', deptRes);
+      
+      const instancesRes = await supabase.from('marketing_workflow_instances')
+        .select('id, title, status')
+        .eq('restaurant_id', restaurantId);
+      console.log('instancesRes:', instancesRes);
 
       setHourlyRates(Array.isArray(ratesRes.data) ? ratesRes.data.map((r: any) => ({
         ...r,
@@ -257,7 +264,10 @@ const MarketingAccounting: React.FC<MarketingAccountingProps> = ({
       setStaff(Array.isArray(staffRes.data) ? staffRes.data : []);
       setDepartments(Array.isArray(deptRes.data) ? deptRes.data : []);
       setWorkflowInstances(Array.isArray(instancesRes.data) ? instancesRes.data : []);
+      
+      console.log('All data loaded successfully');
     } catch (e: any) {
+      console.error('Error loading data:', e);
       toast.error('خطأ في تحميل البيانات: ' + e.message);
     } finally {
       setLoading(false);
