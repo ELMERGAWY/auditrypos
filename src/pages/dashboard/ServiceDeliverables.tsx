@@ -80,14 +80,47 @@ export function ServiceDeliverables({ restaurantId, currency }: Props) {
   const loadDeliverables = async () => {
     setLoading(true);
     try {
-      const { data, error } = await supabase
+      // Load from marketing_service_deliverables
+      const { data: marketingDeliverables, error: marketingError } = await supabase
         .from('marketing_service_deliverables')
         .select('*')
         .eq('restaurant_id', restaurantId)
         .order('expected_delivery_date', { ascending: true });
-      if (error) throw error;
       
-      setDeliverables(data || []);
+      if (marketingError) throw marketingError;
+      
+      // Load from orders with delivery_date
+      const { data: ordersWithDelivery, error: ordersError } = await supabase
+        .from('orders')
+        .select('*, order_items(*)')
+        .eq('restaurant_id', restaurantId)
+        .not('delivery_date', 'is', null)
+        .order('delivery_date', { ascending: true });
+      
+      if (ordersError) throw ordersError;
+      
+      // Convert orders to deliverable format
+      const orderDeliverables = (ordersWithDelivery || []).map((order: any) => ({
+        id: order.id,
+        contract_id: null,
+        quote_id: null,
+        invoice_id: null,
+        invoice_line_id: null,
+        service_id: null,
+        service_name: order.order_items?.[0]?.menu_item_name || 'خدمة من الطلب',
+        description: order.notes,
+        expected_delivery_date: order.delivery_date,
+        actual_delivery_date: null,
+        status: order.status === 'completed' ? 'delivered' : 'pending',
+        priority: 'medium',
+        notes: order.notes,
+        created_at: order.created_at,
+        invoice_number: order.order_number,
+        customer_name: order.customer_name
+      }));
+      
+      // Combine both sources
+      setDeliverables([...(marketingDeliverables || []), ...orderDeliverables]);
     } catch (e: any) {
       toast.error('خطأ في تحميل الاستلامات: ' + e.message);
     } finally {
