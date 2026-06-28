@@ -204,56 +204,121 @@ const MarketingAccounting: React.FC<MarketingAccountingProps> = ({
     setLoading(true);
     try {
       // Load each table separately with error handling
-      const ratesRes = await supabase.from('marketing_hourly_rates')
-        .select('*, staff_profiles(full_name), staff_departments(name)')
-        .eq('restaurant_id', restaurantId);
-      
-      const costsRes = await supabase.from('marketing_project_costs')
-        .select('*, staff_profiles(full_name), marketing_workflow_tasks(title)')
-        .eq('restaurant_id', restaurantId);
-      
-      const revenuesRes = await supabase.from('marketing_project_revenue')
-        .select('*')
-        .eq('restaurant_id', restaurantId);
-      
-      const profitRes = await supabase.from('marketing_profitability')
-        .select('*, marketing_workflow_instances(title)')
-        .eq('restaurant_id', restaurantId);
-      
-      const billingRes = await supabase.from('marketing_billing_schedule')
-        .select('*')
-        .eq('restaurant_id', restaurantId);
-      
-      const staffRes = await supabase.from('staff_profiles')
-        .select('id, full_name, department_id')
-        .eq('restaurant_id', restaurantId);
-      
-      const deptRes = await supabase.from('staff_departments')
-        .select('id, name')
-        .eq('restaurant_id', restaurantId);
-      
-      const instancesRes = await supabase.from('marketing_workflow_instances')
-        .select('id, title, status')
-        .eq('restaurant_id', restaurantId);
+      let ratesData: any[] = [];
+      let costsData: any[] = [];
+      let revenuesData: any[] = [];
+      let profitData: any[] = [];
+      let billingData: any[] = [];
+      let staffData: any[] = [];
+      let deptData: any[] = [];
+      let instancesData: any[] = [];
 
-      setHourlyRates(Array.isArray(ratesRes.data) ? ratesRes.data.map((r: any) => ({
+      try {
+        const ratesRes = await supabase.from('marketing_hourly_rates')
+          .select('*, staff_profiles(full_name), staff_departments(name)')
+          .eq('restaurant_id', restaurantId);
+        if (ratesRes.data && Array.isArray(ratesRes.data)) {
+          ratesData = ratesRes.data;
+        }
+      } catch (e) {
+        console.error('Error loading hourly rates:', e);
+      }
+
+      try {
+        const costsRes = await supabase.from('marketing_project_costs')
+          .select('*, staff_profiles(full_name), marketing_workflow_tasks(title)')
+          .eq('restaurant_id', restaurantId);
+        if (costsRes.data && Array.isArray(costsRes.data)) {
+          costsData = costsRes.data;
+        }
+      } catch (e) {
+        console.error('Error loading project costs:', e);
+      }
+
+      try {
+        const revenuesRes = await supabase.from('marketing_project_revenue')
+          .select('*')
+          .eq('restaurant_id', restaurantId);
+        if (revenuesRes.data && Array.isArray(revenuesRes.data)) {
+          revenuesData = revenuesRes.data;
+        }
+      } catch (e) {
+        console.error('Error loading project revenue:', e);
+      }
+
+      try {
+        const profitRes = await supabase.from('marketing_profitability')
+          .select('*, marketing_workflow_instances(title)')
+          .eq('restaurant_id', restaurantId);
+        if (profitRes.data && Array.isArray(profitRes.data)) {
+          profitData = profitRes.data;
+        }
+      } catch (e) {
+        console.error('Error loading profitability:', e);
+      }
+
+      try {
+        const billingRes = await supabase.from('marketing_billing_schedule')
+          .select('*')
+          .eq('restaurant_id', restaurantId);
+        if (billingRes.data && Array.isArray(billingRes.data)) {
+          billingData = billingRes.data;
+        }
+      } catch (e) {
+        console.error('Error loading billing schedule:', e);
+      }
+
+      try {
+        const staffRes = await supabase.from('staff_profiles')
+          .select('id, full_name, department_id')
+          .eq('restaurant_id', restaurantId);
+        if (staffRes.data && Array.isArray(staffRes.data)) {
+          staffData = staffRes.data;
+        }
+      } catch (e) {
+        console.error('Error loading staff:', e);
+      }
+
+      try {
+        const deptRes = await supabase.from('staff_departments')
+          .select('id, name')
+          .eq('restaurant_id', restaurantId);
+        if (deptRes.data && Array.isArray(deptRes.data)) {
+          deptData = deptRes.data;
+        }
+      } catch (e) {
+        console.error('Error loading departments:', e);
+      }
+
+      try {
+        const instancesRes = await supabase.from('marketing_workflow_instances')
+          .select('id, title, status')
+          .eq('restaurant_id', restaurantId);
+        if (instancesRes.data && Array.isArray(instancesRes.data)) {
+          instancesData = instancesRes.data;
+        }
+      } catch (e) {
+        console.error('Error loading workflow instances:', e);
+      }
+
+      setHourlyRates(ratesData.map((r: any) => ({
         ...r,
-        staff_name: r.staff_profiles?.full_name,
-        department_name: r.staff_departments?.name
-      })) : []);
+        staff_name: r.staff_profiles?.full_name || '',
+        department_name: r.staff_departments?.name || ''
+      })));
       
-      setProjectCosts(Array.isArray(costsRes.data) ? costsRes.data.map((c: any) => ({
+      setProjectCosts(costsData.map((c: any) => ({
         ...c,
-        staff_name: c.staff_profiles?.full_name,
-        task_title: c.marketing_workflow_tasks?.title
-      })) : []);
+        staff_name: c.staff_profiles?.full_name || '',
+        task_title: c.marketing_workflow_tasks?.title || ''
+      })));
       
-      setProjectRevenues(Array.isArray(revenuesRes.data) ? revenuesRes.data : []);
-      setProfitability(Array.isArray(profitRes.data) ? profitRes.data : []);
-      setBillingSchedule(Array.isArray(billingRes.data) ? billingRes.data : []);
-      setStaff(Array.isArray(staffRes.data) ? staffRes.data : []);
-      setDepartments(Array.isArray(deptRes.data) ? deptRes.data : []);
-      setWorkflowInstances(Array.isArray(instancesRes.data) ? instancesRes.data : []);
+      setProjectRevenues(revenuesData);
+      setProfitability(profitData);
+      setBillingSchedule(billingData);
+      setStaff(staffData);
+      setDepartments(deptData);
+      setWorkflowInstances(instancesData);
     } catch (e: any) {
       console.error('Error loading data:', e);
       toast.error('خطأ في تحميل البيانات: ' + e.message);
