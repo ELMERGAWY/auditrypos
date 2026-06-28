@@ -754,9 +754,9 @@ export default function Dashboard() {
         {activeTab === 'marketing_workflow' && <MarketingWorkflow {...commonProps} />}
         {activeTab === 'marketing_accounting' && (
           <ModuleErrorBoundary moduleName="المحاسبة التسويقية">
-            <React.Suspense fallback={<div className="flex items-center justify-center h-64"><div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div></div>}>
+            <Suspense fallback={<div className="flex items-center justify-center h-64"><div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div></div>}>
               <MarketingAccounting {...commonProps} />
-            </React.Suspense>
+            </Suspense>
           </ModuleErrorBoundary>
         )}
         {activeTab === 'service_deliverables' && <ServiceDeliverables {...commonProps} />}
