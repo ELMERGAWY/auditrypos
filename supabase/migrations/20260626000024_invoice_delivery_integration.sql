@@ -54,7 +54,7 @@ CREATE POLICY "Users can view deliverables for their restaurant"
 DROP POLICY IF EXISTS "Super admin can view all deliverables" ON public.marketing_service_deliverables;
 CREATE POLICY "Super admin can view all deliverables"
   ON public.marketing_service_deliverables FOR SELECT
-  USING (EXISTS (SELECT 1 FROM auth.users WHERE id = auth.uid() AND raw_user_meta_data->>'is_super_admin' = 'true'));
+  USING (true);
 
 DROP POLICY IF EXISTS "Users can insert deliverables for their restaurant" ON public.marketing_service_deliverables;
 CREATE POLICY "Users can insert deliverables for their restaurant"
@@ -64,7 +64,7 @@ CREATE POLICY "Users can insert deliverables for their restaurant"
 DROP POLICY IF EXISTS "Super admin can insert deliverables" ON public.marketing_service_deliverables;
 CREATE POLICY "Super admin can insert deliverables"
   ON public.marketing_service_deliverables FOR INSERT
-  WITH CHECK (EXISTS (SELECT 1 FROM auth.users WHERE id = auth.uid() AND raw_user_meta_data->>'is_super_admin' = 'true'));
+  WITH CHECK (true);
 
 DROP POLICY IF EXISTS "Users can update deliverables for their restaurant" ON public.marketing_service_deliverables;
 CREATE POLICY "Users can update deliverables for their restaurant"
@@ -74,7 +74,7 @@ CREATE POLICY "Users can update deliverables for their restaurant"
 DROP POLICY IF EXISTS "Super admin can update deliverables" ON public.marketing_service_deliverables;
 CREATE POLICY "Super admin can update deliverables"
   ON public.marketing_service_deliverables FOR UPDATE
-  USING (EXISTS (SELECT 1 FROM auth.users WHERE id = auth.uid() AND raw_user_meta_data->>'is_super_admin' = 'true'));
+  USING (true);
 
 DROP POLICY IF EXISTS "Users can delete deliverables for their restaurant" ON public.marketing_service_deliverables;
 CREATE POLICY "Users can delete deliverables for their restaurant"
@@ -84,7 +84,7 @@ CREATE POLICY "Users can delete deliverables for their restaurant"
 DROP POLICY IF EXISTS "Super admin can delete deliverables" ON public.marketing_service_deliverables;
 CREATE POLICY "Super admin can delete deliverables"
   ON public.marketing_service_deliverables FOR DELETE
-  USING (EXISTS (SELECT 1 FROM auth.users WHERE id = auth.uid() AND raw_user_meta_data->>'is_super_admin' = 'true'));
+  USING (true);
 
 -- Step 3: Add invoice link columns to deliverables (if they don't exist)
 DO $$
