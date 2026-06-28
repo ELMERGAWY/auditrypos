@@ -1,16 +1,16 @@
 -- Update marketing_service_deliverables to link with invoices
--- This allows automatic creation of deliverables from invoice items
+-- This allows automatic creation of deliverables from invoice lines
 
 ALTER TABLE public.marketing_service_deliverables
 ADD COLUMN IF NOT EXISTS invoice_id UUID REFERENCES public.sales_invoices(id) ON DELETE CASCADE,
-ADD COLUMN IF NOT EXISTS invoice_item_id UUID REFERENCES public.sales_invoice_items(id) ON DELETE CASCADE;
+ADD COLUMN IF NOT EXISTS invoice_line_id UUID REFERENCES public.sales_invoice_lines(id) ON DELETE CASCADE;
 
 -- Create indexes for invoice-related queries
 CREATE INDEX IF NOT EXISTS idx_marketing_deliverables_invoice ON public.marketing_service_deliverables(invoice_id);
-CREATE INDEX IF NOT EXISTS idx_marketing_deliverables_invoice_item ON public.marketing_service_deliverables(invoice_item_id);
+CREATE INDEX IF NOT EXISTS idx_marketing_deliverables_invoice_line ON public.marketing_service_deliverables(invoice_line_id);
 
--- Function to automatically create deliverables from invoice items
-CREATE OR REPLACE FUNCTION create_deliverable_from_invoice_item()
+-- Function to automatically create deliverables from invoice lines
+CREATE OR REPLACE FUNCTION create_deliverable_from_invoice_line()
 RETURNS TRIGGER AS $$
 BEGIN
   -- Only create deliverable if expected_delivery_date is set
@@ -18,7 +18,7 @@ BEGIN
     INSERT INTO public.marketing_service_deliverables (
       restaurant_id,
       invoice_id,
-      invoice_item_id,
+      invoice_line_id,
       service_name,
       description,
       expected_delivery_date,
@@ -40,7 +40,7 @@ BEGIN
       NEW.delivery_notes
     WHERE NOT EXISTS (
       SELECT 1 FROM public.marketing_service_deliverables 
-      WHERE invoice_item_id = NEW.id
+      WHERE invoice_line_id = NEW.id
     );
   END IF;
   
@@ -48,14 +48,14 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
--- Trigger to auto-create deliverables when invoice item is created/updated
-DROP TRIGGER IF EXISTS trigger_create_deliverable_from_invoice_item ON public.sales_invoice_items;
-CREATE TRIGGER trigger_create_deliverable_from_invoice_item
-  AFTER INSERT OR UPDATE OF expected_delivery_date ON public.sales_invoice_items
+-- Trigger to auto-create deliverables when invoice line is created/updated
+DROP TRIGGER IF EXISTS trigger_create_deliverable_from_invoice_line ON public.sales_invoice_lines;
+CREATE TRIGGER trigger_create_deliverable_from_invoice_line
+  AFTER INSERT OR UPDATE OF expected_delivery_date ON public.sales_invoice_lines
   FOR EACH ROW
-  EXECUTE FUNCTION create_deliverable_from_invoice_item();
+  EXECUTE FUNCTION create_deliverable_from_invoice_line();
 
--- Function to sync delivery status from invoice item to deliverable
+-- Function to sync delivery status from invoice line to deliverable
 CREATE OR REPLACE FUNCTION sync_delivery_status_from_invoice()
 RETURNS TRIGGER AS $$
 BEGIN
@@ -66,17 +66,17 @@ BEGIN
     priority = COALESCE(NEW.delivery_priority, priority),
     notes = COALESCE(NEW.delivery_notes, notes),
     updated_at = NOW()
-  WHERE invoice_item_id = NEW.id;
+  WHERE invoice_line_id = NEW.id;
   
   RETURN NEW;
 END;
 $$ LANGUAGE plpgsql;
 
 -- Trigger to sync delivery status
-DROP TRIGGER IF EXISTS trigger_sync_delivery_status ON public.sales_invoice_items;
+DROP TRIGGER IF EXISTS trigger_sync_delivery_status ON public.sales_invoice_lines;
 CREATE TRIGGER trigger_sync_delivery_status
   AFTER UPDATE OF actual_delivery_date, delivery_status, delivery_priority, delivery_notes 
-  ON public.sales_invoice_items
+  ON public.sales_invoice_lines
   FOR EACH ROW
   EXECUTE FUNCTION sync_delivery_status_from_invoice();
 

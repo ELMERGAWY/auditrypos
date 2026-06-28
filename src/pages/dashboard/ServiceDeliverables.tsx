@@ -16,7 +16,7 @@ interface ServiceDeliverable {
   contract_id: string | null;
   quote_id: string | null;
   invoice_id: string | null;
-  invoice_item_id: string | null;
+  invoice_line_id: string | null;
   service_id: string | null;
   service_name: string;
   description: string | null;
@@ -70,6 +70,12 @@ export function ServiceDeliverables({ restaurantId, currency }: Props) {
     priority: 'medium',
     notes: ''
   });
+
+  // Safety checks for arrays to prevent React error #306
+  const safeDeliverables = Array.isArray(deliverables) ? deliverables : [];
+  const safeContracts = Array.isArray(contracts) ? contracts : [];
+  const safeQuotes = Array.isArray(quotes) ? quotes : [];
+  const safeServices = Array.isArray(services) ? services : [];
 
   const loadDeliverables = async () => {
     setLoading(true);
@@ -204,9 +210,9 @@ export function ServiceDeliverables({ restaurantId, currency }: Props) {
     return new Date(expectedDate) < new Date() && status !== 'delivered' && status !== 'cancelled';
   };
 
-  const delayedCount = deliverables.filter(d => d.status === 'delayed').length;
-  const pendingCount = deliverables.filter(d => d.status === 'pending').length;
-  const deliveredCount = deliverables.filter(d => d.status === 'delivered').length;
+  const delayedCount = safeDeliverables.filter(d => d.status === 'delayed').length;
+  const pendingCount = safeDeliverables.filter(d => d.status === 'pending').length;
+  const deliveredCount = safeDeliverables.filter(d => d.status === 'delivered').length;
 
   return (
     <div className="p-4 space-y-6">
@@ -231,7 +237,7 @@ export function ServiceDeliverables({ restaurantId, currency }: Props) {
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         <Card className="p-4 glass-card">
           <p className="text-xs text-muted-foreground">إجمالي الاستلامات</p>
-          <p className="text-2xl font-bold text-primary">{deliverables.length}</p>
+          <p className="text-2xl font-bold text-primary">{safeDeliverables.length}</p>
         </Card>
         <Card className="p-4 glass-card">
           <p className="text-xs text-muted-foreground">قيد الانتظار</p>
@@ -265,7 +271,7 @@ export function ServiceDeliverables({ restaurantId, currency }: Props) {
 
       {/* Deliverables List */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {deliverables.map(deliverable => {
+        {safeDeliverables.map(deliverable => {
           const statusInfo = getStatusInfo(deliverable.status);
           const priorityInfo = getPriorityInfo(deliverable.priority);
           const overdue = isOverdue(deliverable.expected_delivery_date, deliverable.status);
@@ -362,7 +368,7 @@ export function ServiceDeliverables({ restaurantId, currency }: Props) {
                 <Select value={form.contract_id} onValueChange={(v) => setForm({ ...form, contract_id: v })}>
                   <SelectTrigger><SelectValue placeholder="اختر العقد" /></SelectTrigger>
                   <SelectContent>
-                    {contracts.map(c => (
+                    {safeContracts.map(c => (
                       <SelectItem key={c.id} value={c.id}>{c.contract_number} - {c.customer_name}</SelectItem>
                     ))}
                   </SelectContent>
@@ -373,7 +379,7 @@ export function ServiceDeliverables({ restaurantId, currency }: Props) {
                 <Select value={form.quote_id} onValueChange={(v) => setForm({ ...form, quote_id: v })}>
                   <SelectTrigger><SelectValue placeholder="اختر عرض السعر" /></SelectTrigger>
                   <SelectContent>
-                    {quotes.map(q => (
+                    {safeQuotes.map(q => (
                       <SelectItem key={q.id} value={q.id}>{q.quote_number} - {q.customer_name}</SelectItem>
                     ))}
                   </SelectContent>
@@ -383,12 +389,12 @@ export function ServiceDeliverables({ restaurantId, currency }: Props) {
             <div>
               <Label>الخدمة (اختياري)</Label>
               <Select value={form.service_id} onValueChange={(v) => {
-                const service = services.find(s => s.id === v);
+                const service = safeServices.find(s => s.id === v);
                 setForm({ ...form, service_id: v, service_name: service?.name || form.service_name });
               }}>
                 <SelectTrigger><SelectValue placeholder="اختر الخدمة" /></SelectTrigger>
                 <SelectContent>
-                  {services.map(s => (
+                  {safeServices.map(s => (
                     <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
                   ))}
                 </SelectContent>
