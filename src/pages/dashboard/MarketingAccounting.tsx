@@ -537,7 +537,7 @@ const MarketingAccounting: React.FC<MarketingAccountingProps> = ({
           <CardContent>
             <div className="flex items-center gap-2">
               <TrendingDown className="w-4 h-4 text-red-500" />
-              <span className="text-2xl font-bold">{totalCost.toLocaleString()} {currency}</span>
+              <span className="text-2xl font-bold">{typeof totalCost === 'number' ? totalCost.toLocaleString() : '0'} {currency}</span>
             </div>
           </CardContent>
         </Card>
@@ -549,7 +549,7 @@ const MarketingAccounting: React.FC<MarketingAccountingProps> = ({
           <CardContent>
             <div className="flex items-center gap-2">
               <TrendingUp className="w-4 h-4 text-green-500" />
-              <span className="text-2xl font-bold">{totalRevenue.toLocaleString()} {currency}</span>
+              <span className="text-2xl font-bold">{typeof totalRevenue === 'number' ? totalRevenue.toLocaleString() : '0'} {currency}</span>
             </div>
           </CardContent>
         </Card>
@@ -559,9 +559,9 @@ const MarketingAccounting: React.FC<MarketingAccountingProps> = ({
             <CardTitle className="text-sm font-medium text-muted-foreground">صافي الربح</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className={`flex items-center gap-2 ${totalProfit >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+            <div className={`flex items-center gap-2 ${typeof totalProfit === 'number' && totalProfit >= 0 ? 'text-green-600' : 'text-red-600'}`}>
               <DollarSign className="w-4 h-4" />
-              <span className="text-2xl font-bold">{totalProfit.toLocaleString()} {currency}</span>
+              <span className="text-2xl font-bold">{typeof totalProfit === 'number' ? totalProfit.toLocaleString() : '0'} {currency}</span>
             </div>
           </CardContent>
         </Card>
@@ -714,9 +714,9 @@ const MarketingAccounting: React.FC<MarketingAccountingProps> = ({
                       <div className="flex items-center gap-4 text-sm text-muted-foreground">
                         <span className="flex items-center gap-1">
                           <Clock className="w-4 h-4" />
-                          {rate.hourly_rate.toLocaleString()} {currency}/ساعة
+                          {typeof rate.hourly_rate === 'number' ? rate.hourly_rate.toLocaleString() : '0'} {currency}/ساعة
                         </span>
-                        <span>من: {new Date(rate.effective_from).toLocaleDateString('ar-EG')}</span>
+                        <span>من: {rate.effective_from ? new Date(rate.effective_from).toLocaleDateString('ar-EG') : '-'}</span>
                         {rate.effective_to && (
                           <span>إلى: {new Date(rate.effective_to).toLocaleDateString('ar-EG')}</span>
                         )}
@@ -909,7 +909,7 @@ const MarketingAccounting: React.FC<MarketingAccountingProps> = ({
                       </div>
                       <p className="font-medium">{cost.description}</p>
                       <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                        <span>{(cost.amount * cost.quantity).toLocaleString()} {currency}</span>
+                        <span>{typeof cost.amount === 'number' && typeof cost.quantity === 'number' ? (cost.amount * cost.quantity).toLocaleString() : '0'} {currency}</span>
                         {cost.staff_name && (
                           <span className="flex items-center gap-1">
                             <User className="w-3 h-3" />
@@ -1111,7 +1111,7 @@ const MarketingAccounting: React.FC<MarketingAccountingProps> = ({
                       </div>
                       <p className="font-medium">{revenue.description}</p>
                       <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                        <span className="font-bold text-green-600">{revenue.amount.toLocaleString()} {currency}</span>
+                        <span className="font-bold text-green-600">{typeof revenue.amount === 'number' ? revenue.amount.toLocaleString() : '0'} {currency}</span>
                         {revenue.due_date && (
                           <span className="flex items-center gap-1">
                             <Calendar className="w-3 h-3" />
@@ -1260,10 +1260,10 @@ const MarketingAccounting: React.FC<MarketingAccountingProps> = ({
                         <p className="text-sm text-muted-foreground">{billing.milestone_description}</p>
                       )}
                       <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                        <span className="font-bold">{billing.scheduled_amount.toLocaleString()} {currency}</span>
+                        <span className="font-bold">{typeof billing.scheduled_amount === 'number' ? billing.scheduled_amount.toLocaleString() : '0'} {currency}</span>
                         <span className="flex items-center gap-1">
                           <Calendar className="w-3 h-3" />
-                          {new Date(billing.scheduled_date).toLocaleDateString('ar-EG')}
+                          {billing.scheduled_date ? new Date(billing.scheduled_date).toLocaleDateString('ar-EG') : '-'}
                         </span>
                       </div>
                     </div>
@@ -1316,48 +1316,48 @@ const MarketingAccounting: React.FC<MarketingAccountingProps> = ({
                   <div className="flex justify-between items-center">
                     <span className="font-medium">المشروع</span>
                     <span className="text-sm text-muted-foreground">
-                      {p.completion_percentage.toFixed(0)}% مكتمل
+                      {typeof p.completion_percentage === 'number' ? p.completion_percentage.toFixed(0) : '0'}% مكتمل
                     </span>
                   </div>
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
                     <div>
                       <span className="text-muted-foreground">الميزانية:</span>
-                      <span className="block font-bold">{p.total_budget.toLocaleString()} {currency}</span>
+                      <span className="block font-bold">{typeof p.total_budget === 'number' ? p.total_budget.toLocaleString() : '0'} {currency}</span>
                     </div>
                     <div>
                       <span className="text-muted-foreground">التكلفة:</span>
-                      <span className="block font-bold text-red-600">{p.total_cost.toLocaleString()} {currency}</span>
+                      <span className="block font-bold text-red-600">{typeof p.total_cost === 'number' ? p.total_cost.toLocaleString() : '0'} {currency}</span>
                     </div>
                     <div>
                       <span className="text-muted-foreground">الإيراد:</span>
-                      <span className="block font-bold text-green-600">{p.total_revenue.toLocaleString()} {currency}</span>
+                      <span className="block font-bold text-green-600">{typeof p.total_revenue === 'number' ? p.total_revenue.toLocaleString() : '0'} {currency}</span>
                     </div>
                     <div>
                       <span className="text-muted-foreground">صافي الربح:</span>
-                      <span className={`block font-bold ${p.gross_profit >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                        {p.gross_profit.toLocaleString()} {currency}
+                      <span className={`block font-bold ${typeof p.gross_profit === 'number' && p.gross_profit >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                        {typeof p.gross_profit === 'number' ? p.gross_profit.toLocaleString() : '0'} {currency}
                       </span>
                     </div>
                   </div>
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
                     <div>
                       <span className="text-muted-foreground">هامش الربح:</span>
-                      <span className={`block font-bold ${p.profit_margin_percentage >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                        {p.profit_margin_percentage.toFixed(1)}%
+                      <span className={`block font-bold ${typeof p.profit_margin_percentage === 'number' && p.profit_margin_percentage >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                        {typeof p.profit_margin_percentage === 'number' ? p.profit_margin_percentage.toFixed(1) : '0'}%
                       </span>
                     </div>
                     <div>
                       <span className="text-muted-foreground">الساعات المسجلة:</span>
-                      <span className="block font-bold">{p.total_hours_logged.toFixed(1)} ساعة</span>
+                      <span className="block font-bold">{typeof p.total_hours_logged === 'number' ? p.total_hours_logged.toFixed(1) : '0'} ساعة</span>
                     </div>
                     <div>
                       <span className="text-muted-foreground">التكلفة/ساعة:</span>
-                      <span className="block font-bold">{p.cost_per_hour.toFixed(2)} {currency}</span>
+                      <span className="block font-bold">{typeof p.cost_per_hour === 'number' ? p.cost_per_hour.toFixed(2) : '0'} {currency}</span>
                     </div>
                     <div>
                       <span className="text-muted-foreground">استخدام الميزانية:</span>
-                      <span className={`block font-bold ${p.budget_utilization_percentage > 100 ? 'text-red-600' : 'text-green-600'}`}>
-                        {p.budget_utilization_percentage.toFixed(1)}%
+                      <span className={`block font-bold ${typeof p.budget_utilization_percentage === 'number' && p.budget_utilization_percentage > 100 ? 'text-red-600' : 'text-green-600'}`}>
+                        {typeof p.budget_utilization_percentage === 'number' ? p.budget_utilization_percentage.toFixed(1) : '0'}%
                       </span>
                     </div>
                   </div>
