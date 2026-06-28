@@ -732,8 +732,8 @@ const MarketingAccounting: React.FC<MarketingAccountingProps> = ({
                             staff_id: rate.staff_id || '',
                             department_id: rate.department_id || '',
                             role: rate.role,
-                            hourly_rate: rate.hourly_rate.toString(),
-                            effective_from: rate.effective_from.split('T')[0],
+                            hourly_rate: rate.hourly_rate?.toString() || '0',
+                            effective_from: rate.effective_from ? rate.effective_from.split('T')[0] : '',
                             effective_to: rate.effective_to ? rate.effective_to.split('T')[0] : ''
                           });
                           setShowHourlyRateDialog(true);
@@ -931,8 +931,8 @@ const MarketingAccounting: React.FC<MarketingAccountingProps> = ({
                             workflow_instance_id: cost.task_id || '',
                             cost_type: cost.cost_type,
                             description: cost.description,
-                            amount: cost.amount.toString(),
-                            quantity: cost.quantity.toString(),
+                            amount: cost.amount?.toString() || '0',
+                            quantity: cost.quantity?.toString() || '1',
                             unit: cost.unit,
                             task_id: cost.task_id || '',
                             staff_id: cost.staff_id || '',
@@ -1130,7 +1130,7 @@ const MarketingAccounting: React.FC<MarketingAccountingProps> = ({
                             workflow_instance_id: '',
                             revenue_type: revenue.revenue_type,
                             description: revenue.description,
-                            amount: revenue.amount.toString(),
+                            amount: revenue.amount?.toString() || '0',
                             milestone_name: revenue.milestone_name,
                             milestone_status: revenue.milestone_status,
                             milestone_date: revenue.milestone_date || '',
@@ -1277,7 +1277,7 @@ const MarketingAccounting: React.FC<MarketingAccountingProps> = ({
                             workflow_instance_id: '',
                             milestone_name: billing.milestone_name,
                             milestone_description: billing.milestone_description || '',
-                            scheduled_amount: billing.scheduled_amount.toString(),
+                            scheduled_amount: billing.scheduled_amount?.toString() || '0',
                             scheduled_date: billing.scheduled_date
                           });
                           setShowBillingDialog(true);
