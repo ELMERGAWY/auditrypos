@@ -41,7 +41,7 @@ BEGIN
     SET 
       customer_name = NEW.customer_name,
       customer_ref = NEW.customer_ref,
-      total = NEW.total,
+      total_amount = NEW.total,  -- sales_orders uses total_amount
       paid_amount = NEW.paid_amount,
       discount = NEW.discount,
       notes = NEW.notes,
@@ -49,6 +49,8 @@ BEGIN
       status = NEW.status,
       updated_at = NOW()
     WHERE id = NEW.sales_order_id;
+    
+    RAISE NOTICE 'Synced order % to sales_order %', NEW.id, NEW.sales_order_id;
   END IF;
   RETURN NEW;
 END;
@@ -64,7 +66,7 @@ BEGIN
     SET 
       customer_name = NEW.customer_name,
       customer_ref = NEW.customer_ref,
-      total = NEW.total,
+      total = NEW.total_amount,  -- orders uses total
       paid_amount = NEW.paid_amount,
       discount = NEW.discount,
       notes = NEW.notes,
@@ -72,6 +74,8 @@ BEGIN
       status = NEW.status,
       updated_at = NOW()
     WHERE id = NEW.order_id;
+    
+    RAISE NOTICE 'Synced sales_order % to order %', NEW.id, NEW.order_id;
   END IF;
   RETURN NEW;
 END;
