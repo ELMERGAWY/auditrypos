@@ -51,6 +51,9 @@ export function MarketingServices({ restaurantId, currency }: Props) {
     is_active: true
   });
 
+  // Safety checks for arrays to prevent React error #306
+  const safeServices = Array.isArray(services) ? services : [];
+
   const loadServices = async () => {
     setLoading(true);
     try {
@@ -161,30 +164,30 @@ export function MarketingServices({ restaurantId, currency }: Props) {
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         <Card className="p-4 glass-card">
           <p className="text-xs text-muted-foreground">إجمالي الخدمات</p>
-          <p className="text-2xl font-bold text-primary">{services.length}</p>
+          <p className="text-2xl font-bold text-primary">{safeServices.length}</p>
         </Card>
         <Card className="p-4 glass-card">
           <p className="text-xs text-muted-foreground">الخدمات النشطة</p>
           <p className="text-2xl font-bold text-emerald-600">
-            {services.filter(s => s.is_active).length}
+            {safeServices.filter(s => s.is_active).length}
           </p>
         </Card>
         <Card className="p-4 glass-card">
           <p className="text-xs text-muted-foreground">تصميم الهوية التجارية</p>
           <p className="text-2xl font-bold">
-            {services.filter(s => s.category === 'brand_design').length}
+            {safeServices.filter(s => s.category === 'brand_design').length}
           </p>
         </Card>
         <Card className="p-4 glass-card">
           <p className="text-xs text-muted-foreground">إدارة السوشيال ميديا</p>
           <p className="text-2xl font-bold">
-            {services.filter(s => s.category === 'social_media').length}
+            {safeServices.filter(s => s.category === 'social_media').length}
           </p>
         </Card>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {services.map(service => (
+        {safeServices.map(service => (
           <Card key={service.id} className="p-5 hover:shadow-lg transition-all border-border/60">
             <div className="flex justify-between items-start mb-3">
               <div className="flex-1">

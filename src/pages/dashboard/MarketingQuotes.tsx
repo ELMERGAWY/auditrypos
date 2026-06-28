@@ -70,6 +70,12 @@ export function MarketingQuotes({ restaurantId, currency }: Props) {
     { service_name: '', description: '', quantity: 1, unit_price: 0, total_price: 0 }
   ]);
 
+  // Safety checks for arrays to prevent React error #306
+  const safeQuotes = Array.isArray(quotes) ? quotes : [];
+  const safeServices = Array.isArray(services) ? services : [];
+  const safeCustomers = Array.isArray(customers) ? customers : [];
+  const safeItems = Array.isArray(items) ? items : [];
+
   const loadData = async () => {
     setLoading(true);
     try {
@@ -163,7 +169,7 @@ export function MarketingQuotes({ restaurantId, currency }: Props) {
       }
 
       await supabase.from('marketing_quote_items').insert(
-        items.map(item => ({
+        safeItems.map(item => ({
         quote_id: quoteId,
         service_id: item.service_id || null,
         service_name: item.service_name,
@@ -278,24 +284,24 @@ export function MarketingQuotes({ restaurantId, currency }: Props) {
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         <Card className="p-4 glass-card">
           <p className="text-xs text-muted-foreground">إجمالي العروض</p>
-          <p className="text-2xl font-bold text-primary">{quotes.length}</p>
+          <p className="text-2xl font-bold text-primary">{safeQuotes.length}</p>
         </Card>
         <Card className="p-4 glass-card">
           <p className="text-xs text-muted-foreground">الموافق عليها</p>
-          <p className="text-2xl font-bold text-emerald-600">{quotes.filter(q => q.status === 'approved').length}</p>
+          <p className="text-2xl font-bold text-emerald-600">{safeQuotes.filter(q => q.status === 'approved').length}</p>
         </Card>
         <Card className="p-4 glass-card">
           <p className="text-xs text-muted-foreground">المرسلة</p>
-          <p className="text-2xl font-bold text-blue-600">{quotes.filter(q => q.status === 'sent').length}</p>
+          <p className="text-2xl font-bold text-blue-600">{safeQuotes.filter(q => q.status === 'sent').length}</p>
         </Card>
         <Card className="p-4 glass-card">
           <p className="text-xs text-muted-foreground">قيمة العروض</p>
-          <p className="text-2xl font-bold">{quotes.reduce((sum, q) => sum + q.total_amount, 0).toLocaleString()} {currency}</p>
+          <p className="text-2xl font-bold">{safeQuotes.reduce((sum, q) => sum + q.total_amount, 0).toLocaleString()} {currency}</p>
         </Card>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {quotes.map(quote => (
+        {safeQuotes.map(quote => (
           <Card key={quote.id} className="p-5 hover:shadow-lg transition-all border-border/60">
             <div className="flex justify-between items-start mb-3">
               <div className="flex-1">
@@ -378,7 +384,7 @@ export function MarketingQuotes({ restaurantId, currency }: Props) {
                 }}>
                   <SelectTrigger><SelectValue placeholder="اختر العميل" /></SelectTrigger>
                   <SelectContent>
-                    {customers.map(customer => (
+                    {safeCustomers.map(customer => (
                     <SelectItem key={customer.id} value={customer.id}>{customer.name}</SelectItem>
                   ))}
                   </SelectContent>
@@ -413,14 +419,14 @@ export function MarketingQuotes({ restaurantId, currency }: Props) {
                 </Button>
               </div>
               <div className="space-y-3">
-                {items.map((item, index) => (
+                {safeItems.map((item, index) => (
                   <div key={index} className="grid grid-cols-12 gap-2 items-end">
                     <div className="col-span-3">
                       <Label>الخدمة</Label>
                       <Select value={item.service_id} onValueChange={(v) => updateItem(index, 'service_id', v)}>
                         <SelectTrigger><SelectValue placeholder="اختر الخدمة" /></SelectTrigger>
                         <SelectContent>
-                          {services.map(service => (
+                          {safeServices.map(service => (
                           <SelectItem key={service.id} value={service.id}>{service.name} - {service.base_price.toLocaleString()} {currency}</SelectItem>
                         ))}
                         </SelectContent>
@@ -490,7 +496,7 @@ export function MarketingQuotes({ restaurantId, currency }: Props) {
             <div className="border-t border-primary/10 rounded-xl p-4">
               <h4 className="font-bold mb-3">الخدمات:</h4>
               <div className="space-y-2">
-                {viewingQuote?.items.map((item, index) => (
+                {Array.isArray(viewingQuote?.items) && viewingQuote.items.map((item, index) => (
                   <div key={index} className="flex justify-between items-center p-2 bg-secondary/10 rounded-lg">
                     <div>
                       <p className="font-bold">{item.service_name}</p>

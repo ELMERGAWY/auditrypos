@@ -101,6 +101,12 @@ export function MarketingContracts({ restaurantId, currency }: Props) {
   });
   const [contractServices, setContractServices] = useState<ContractService[]>([]);
 
+  // Safety checks for arrays to prevent React error #306
+  const safeContracts = Array.isArray(contracts) ? contracts : [];
+  const safeServices = Array.isArray(services) ? services : [];
+  const safeCustomers = Array.isArray(customers) ? customers : [];
+  const safeContractServices = Array.isArray(contractServices) ? contractServices : [];
+
   const loadData = async () => {
     setLoading(true);
     try {
@@ -211,7 +217,7 @@ export function MarketingContracts({ restaurantId, currency }: Props) {
       }
       
       await supabase.from('marketing_contract_services').insert(
-        contractServices.map(s => ({
+        safeContractServices.map(s => ({
           contract_id: contractId,
           service_id: s.service_id || null,
           service_name: s.service_name,
@@ -315,26 +321,26 @@ export function MarketingContracts({ restaurantId, currency }: Props) {
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         <Card className="p-4 glass-card">
           <p className="text-xs text-muted-foreground">إجمالي العقود</p>
-          <p className="text-2xl font-bold text-primary">{contracts.length}</p>
+          <p className="text-2xl font-bold text-primary">{safeContracts.length}</p>
         </Card>
         <Card className="p-4 glass-card">
           <p className="text-xs text-muted-foreground">العقود النشطة</p>
           <p className="text-2xl font-bold text-emerald-600">
-            {contracts.filter(c => c.status === 'active').length}
+            {safeContracts.filter(c => c.status === 'active').length}
           </p>
         </Card>
         <Card className="p-4 glass-card">
           <p className="text-xs text-muted-foreground">المسودة</p>
-          <p className="text-2xl font-bold">{contracts.filter(c => c.status === 'draft').length}</p>
+          <p className="text-2xl font-bold">{safeContracts.filter(c => c.status === 'draft').length}</p>
         </Card>
         <Card className="p-4 glass-card">
           <p className="text-xs text-muted-foreground">المكتملة</p>
-          <p className="text-2xl font-bold text-blue-600">{contracts.filter(c => c.status === 'completed').length}</p>
+          <p className="text-2xl font-bold text-blue-600">{safeContracts.filter(c => c.status === 'completed').length}</p>
         </Card>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {contracts.map(contract => (
+        {safeContracts.map(contract => (
           <Card key={contract.id} className="p-5 hover:shadow-lg transition-all border-border/60">
             <div className="flex justify-between items-start mb-3">
               <div className="flex-1">
@@ -412,7 +418,7 @@ export function MarketingContracts({ restaurantId, currency }: Props) {
                 }}>
                   <SelectTrigger><SelectValue placeholder="اختر العميل" /></SelectTrigger>
                   <SelectContent>
-                    {customers.map(customer => <SelectItem key={customer.id} value={customer.id}>{customer.name}</SelectItem>)}
+                    {safeCustomers.map(customer => <SelectItem key={customer.id} value={customer.id}>{customer.name}</SelectItem>)}
                   </SelectContent>
                 </Select>
               </div>
@@ -451,14 +457,14 @@ export function MarketingContracts({ restaurantId, currency }: Props) {
                 </Button>
               </div>
               <div className="space-y-3">
-                {contractServices.map((item, index) => (
+                {safeContractServices.map((item, index) => (
                   <div key={index} className="grid grid-cols-12 gap-2 items-end">
                     <div className="col-span-3">
                       <Label>الخدمة</Label>
                       <Select value={item.service_id} onValueChange={(v) => updateService(index, 'service_id', v)}>
                         <SelectTrigger><SelectValue placeholder="اختر الخدمة" /></SelectTrigger>
                         <SelectContent>
-                          {services.map(service => <SelectItem key={service.id} value={service.id}>{service.name} - {service.base_price.toLocaleString()}</SelectItem>)}
+                          {safeServices.map(service => <SelectItem key={service.id} value={service.id}>{service.name} - {service.base_price.toLocaleString()}</SelectItem>)}
                         </SelectContent>
                       </Select>
                     </div>
