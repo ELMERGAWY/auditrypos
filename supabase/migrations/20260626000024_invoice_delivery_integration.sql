@@ -206,7 +206,7 @@ BEGIN
     AND status = 'delayed'
   );
 END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+$$ LANGUAGE plpgsql SECURITY INVOKER;
 
 -- Verification
 DO $$
