@@ -84,7 +84,10 @@ const ALL_TABS_CONFIG = {
   branches: { label: 'الفروع والمنافذ', icon: '🏢' },
   marketing_services: { label: 'خدمات التسويق', icon: '✨' },
   marketing_quotes: { label: 'عروض الأسعار', icon: '📄' },
-  marketing_contracts: { label: 'عقود التسويق', icon: '📄' }
+  marketing_contracts: { label: 'عقود التسويق', icon: '📄' },
+  marketing_workflow: { label: 'سير العمل التسويقي', icon: '🔄' },
+  marketing_accounting: { label: 'المحاسبة التسويقية', icon: '💰' },
+  service_deliverables: { label: 'متابعة الاستلامات', icon: '📦' }
 };
 
 const SuperAdmin = () => {
