@@ -63,10 +63,10 @@ CREATE POLICY "Super admin can delete hourly rates"
     USING (EXISTS (SELECT 1 FROM auth.users WHERE id = auth.uid() AND raw_user_meta_data->>'is_super_admin' = 'true'));
 
 -- Indexes
-CREATE INDEX idx_marketing_hourly_rates_restaurant ON marketing_hourly_rates(restaurant_id);
-CREATE INDEX idx_marketing_hourly_rates_staff ON marketing_hourly_rates(staff_id);
-CREATE INDEX idx_marketing_hourly_rates_department ON marketing_hourly_rates(department_id);
-CREATE INDEX idx_marketing_hourly_rates_active ON marketing_hourly_rates(is_active, effective_from, effective_to);
+CREATE INDEX IF NOT EXISTS idx_marketing_hourly_rates_restaurant ON marketing_hourly_rates(restaurant_id);
+CREATE INDEX IF NOT EXISTS idx_marketing_hourly_rates_staff ON marketing_hourly_rates(staff_id);
+CREATE INDEX IF NOT EXISTS idx_marketing_hourly_rates_department ON marketing_hourly_rates(department_id);
+CREATE INDEX IF NOT EXISTS idx_marketing_hourly_rates_active ON marketing_hourly_rates(is_active, effective_from, effective_to);
 
 -- Table: marketing_project_costs
 -- Tracks all costs associated with a marketing project
@@ -138,12 +138,12 @@ CREATE POLICY "Super admin can delete project costs"
     USING (EXISTS (SELECT 1 FROM auth.users WHERE id = auth.uid() AND raw_user_meta_data->>'is_super_admin' = 'true'));
 
 -- Indexes
-CREATE INDEX idx_marketing_project_costs_restaurant ON marketing_project_costs(restaurant_id);
-CREATE INDEX idx_marketing_project_costs_workflow ON marketing_project_costs(workflow_instance_id);
-CREATE INDEX idx_marketing_project_costs_type ON marketing_project_costs(cost_type);
-CREATE INDEX idx_marketing_project_costs_task ON marketing_project_costs(task_id);
-CREATE INDEX idx_marketing_project_costs_staff ON marketing_project_costs(staff_id);
-CREATE INDEX idx_marketing_project_costs_billed ON marketing_project_costs(billed);
+CREATE INDEX IF NOT EXISTS idx_marketing_project_costs_restaurant ON marketing_project_costs(restaurant_id);
+CREATE INDEX IF NOT EXISTS idx_marketing_project_costs_workflow ON marketing_project_costs(workflow_instance_id);
+CREATE INDEX IF NOT EXISTS idx_marketing_project_costs_type ON marketing_project_costs(cost_type);
+CREATE INDEX IF NOT EXISTS idx_marketing_project_costs_task ON marketing_project_costs(task_id);
+CREATE INDEX IF NOT EXISTS idx_marketing_project_costs_staff ON marketing_project_costs(staff_id);
+CREATE INDEX IF NOT EXISTS idx_marketing_project_costs_billed ON marketing_project_costs(billed);
 
 -- Table: marketing_project_revenue
 -- Tracks revenue and billing for marketing projects
@@ -215,11 +215,11 @@ CREATE POLICY "Super admin can delete project revenue"
     USING (EXISTS (SELECT 1 FROM auth.users WHERE id = auth.uid() AND raw_user_meta_data->>'is_super_admin' = 'true'));
 
 -- Indexes
-CREATE INDEX idx_marketing_project_revenue_restaurant ON marketing_project_revenue(restaurant_id);
-CREATE INDEX idx_marketing_project_revenue_workflow ON marketing_project_revenue(workflow_instance_id);
-CREATE INDEX idx_marketing_project_revenue_type ON marketing_project_revenue(revenue_type);
-CREATE INDEX idx_marketing_project_revenue_invoice ON marketing_project_revenue(sales_invoice_id);
-CREATE INDEX idx_marketing_project_revenue_paid ON marketing_project_revenue(is_paid);
+CREATE INDEX IF NOT EXISTS idx_marketing_project_revenue_restaurant ON marketing_project_revenue(restaurant_id);
+CREATE INDEX IF NOT EXISTS idx_marketing_project_revenue_workflow ON marketing_project_revenue(workflow_instance_id);
+CREATE INDEX IF NOT EXISTS idx_marketing_project_revenue_type ON marketing_project_revenue(revenue_type);
+CREATE INDEX IF NOT EXISTS idx_marketing_project_revenue_invoice ON marketing_project_revenue(sales_invoice_id);
+CREATE INDEX IF NOT EXISTS idx_marketing_project_revenue_paid ON marketing_project_revenue(is_paid);
 
 -- Table: marketing_profitability
 -- Stores calculated profitability metrics for projects
@@ -255,9 +255,9 @@ CREATE POLICY "Super admin can view all profitability"
     USING (EXISTS (SELECT 1 FROM auth.users WHERE id = auth.uid() AND raw_user_meta_data->>'is_super_admin' = 'true'));
 
 -- Indexes
-CREATE INDEX idx_marketing_profitability_restaurant ON marketing_profitability(restaurant_id);
-CREATE INDEX idx_marketing_profitability_workflow ON marketing_profitability(workflow_instance_id);
-CREATE INDEX idx_marketing_profitability_margin ON marketing_profitability(profit_margin_percentage);
+CREATE INDEX IF NOT EXISTS idx_marketing_profitability_restaurant ON marketing_profitability(restaurant_id);
+CREATE INDEX IF NOT EXISTS idx_marketing_profitability_workflow ON marketing_profitability(workflow_instance_id);
+CREATE INDEX IF NOT EXISTS idx_marketing_profitability_margin ON marketing_profitability(profit_margin_percentage);
 
 -- Table: marketing_billing_schedule
 -- Schedules for milestone-based or recurring billing
@@ -324,10 +324,10 @@ CREATE POLICY "Super admin can delete billing schedule"
     USING (EXISTS (SELECT 1 FROM auth.users WHERE id = auth.uid() AND raw_user_meta_data->>'is_super_admin' = 'true'));
 
 -- Indexes
-CREATE INDEX idx_marketing_billing_schedule_restaurant ON marketing_billing_schedule(restaurant_id);
-CREATE INDEX idx_marketing_billing_schedule_workflow ON marketing_billing_schedule(workflow_instance_id);
-CREATE INDEX idx_marketing_billing_schedule_date ON marketing_billing_schedule(scheduled_date);
-CREATE INDEX idx_marketing_billing_schedule_status ON marketing_billing_schedule(status);
+CREATE INDEX IF NOT EXISTS idx_marketing_billing_schedule_restaurant ON marketing_billing_schedule(restaurant_id);
+CREATE INDEX IF NOT EXISTS idx_marketing_billing_schedule_workflow ON marketing_billing_schedule(workflow_instance_id);
+CREATE INDEX IF NOT EXISTS idx_marketing_billing_schedule_date ON marketing_billing_schedule(scheduled_date);
+CREATE INDEX IF NOT EXISTS idx_marketing_billing_schedule_status ON marketing_billing_schedule(status);
 
 -- Function to calculate project profitability
 CREATE OR REPLACE FUNCTION calculate_marketing_profitability(p_workflow_instance_id UUID)
