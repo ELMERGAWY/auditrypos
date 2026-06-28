@@ -315,14 +315,7 @@ CREATE POLICY "Users can insert workflow comments"
     AND restaurant_id IN (SELECT restaurant_id FROM staff_profiles WHERE id = auth.uid())
   ));
 
--- Insert default workflow stages for marketing agencies
-INSERT INTO marketing_workflow_stages (restaurant_id, stage_key, stage_name_ar, stage_name_en, description, order_index, default_duration_hours, requires_approval) VALUES
-  ('00000000-0000-0000-0000-000000000000', 'briefing', 'استلام الطلب', 'Briefing', 'استلام متطلبات العميل وتحديد نطاق المشروع', 1, 24, true),
-  ('00000000-0000-0000-0000-000000000000', 'strategy', 'الاستراتيجية', 'Strategy', 'وضع الاستراتيجية التسويقية وخطة العمل', 2, 48, true),
-  ('00000000-0000-0000-0000-000000000000', 'creative', 'الإبداع والتصميم', 'Creative', 'مرحلة الإبداع والتصميم والإنتاج', 3, 72, true),
-  ('00000000-0000-0000-0000-000000000000', 'review', 'المراجعة', 'Review', 'مراجعة العميل والتعديلات', 4, 24, true),
-  ('00000000-0000-0000-0000-000000000000', 'delivery', 'التسليم', 'Delivery', 'التسليم النهائي للمشروع', '5', 8, false),
-  ('00000000-0000-0000-0000-000000000000', 'followup', 'المتابعة', 'Follow-up', 'متابعة ما بعد التسليم', 6, 24, false)
-ON CONFLICT (stage_key) DO NOTHING;
+-- Note: Default workflow stages will be created by the application when a restaurant is first set up
+-- This avoids foreign key constraint issues with non-existent restaurant IDs
 
 COMMIT;
