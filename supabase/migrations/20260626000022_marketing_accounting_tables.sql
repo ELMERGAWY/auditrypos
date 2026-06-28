@@ -477,14 +477,17 @@ END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
 -- Create triggers
+DROP TRIGGER IF EXISTS trigger_profitability_costs ON marketing_project_costs;
 CREATE TRIGGER trigger_profitability_costs
     AFTER INSERT OR UPDATE OR DELETE ON marketing_project_costs
     FOR EACH ROW EXECUTE FUNCTION trigger_calculate_profitability();
 
+DROP TRIGGER IF EXISTS trigger_profitability_revenue ON marketing_project_revenue;
 CREATE TRIGGER trigger_profitability_revenue
     AFTER INSERT OR UPDATE OR DELETE ON marketing_project_revenue
     FOR EACH ROW EXECUTE FUNCTION trigger_calculate_profitability();
 
+DROP TRIGGER IF EXISTS trigger_profitability_time_logs ON marketing_workflow_time_logs;
 CREATE TRIGGER trigger_profitability_time_logs
     AFTER INSERT OR UPDATE OR DELETE ON marketing_workflow_time_logs
     FOR EACH ROW EXECUTE FUNCTION trigger_calculate_profitability();
@@ -558,6 +561,7 @@ END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
 -- Create trigger for auto labor cost
+DROP TRIGGER IF EXISTS trigger_auto_labor_cost ON marketing_workflow_time_logs;
 CREATE TRIGGER trigger_auto_labor_cost
     AFTER INSERT ON marketing_workflow_time_logs
     FOR EACH ROW EXECUTE FUNCTION create_labor_cost_from_time_log();
