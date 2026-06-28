@@ -1538,7 +1538,7 @@ export const BUSINESS_TYPES: Record<BusinessType, BusinessTypeConfig> = {
       allowCredit: true,
       requireCustomer: true
     },
-    tabs: ['home', 'employees', 'marketing_services', 'marketing_quotes', 'marketing_contracts', 'crm', 'projects', 'customers', 'suppliers', 'sales_orders', 'sales_invoices', 'purchase_orders', 'supplier_contracts', 'purchase_invoices', 'financials', 'treasury', 'chart_of_accounts', 'manual_journal', 'accounting_mapping', 'fixed_assets', 'expenses', 'staff', 'payroll', 'chat', 'users', 'notifications', 'settings']
+    tabs: ['home', 'employees', 'marketing_services', 'marketing_quotes', 'marketing_contracts', 'marketing_workflow', 'crm', 'projects', 'customers', 'suppliers', 'sales_orders', 'sales_invoices', 'purchase_orders', 'supplier_contracts', 'purchase_invoices', 'financials', 'treasury', 'chart_of_accounts', 'manual_journal', 'accounting_mapping', 'fixed_assets', 'expenses', 'staff', 'payroll', 'chat', 'users', 'notifications', 'settings']
   },
   gym: {
     id: 'gym',

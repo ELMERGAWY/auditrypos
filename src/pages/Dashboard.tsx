@@ -80,6 +80,7 @@ const SupplierContracts = lazy(() => import('./dashboard/SupplierContracts').the
 const MarketingServices = lazy(() => import('./dashboard/MarketingServices').then(m => ({ default: m.MarketingServices })));
 const MarketingQuotes = lazy(() => import('./dashboard/MarketingQuotes').then(m => ({ default: m.MarketingQuotes })));
 const MarketingContracts = lazy(() => import('./dashboard/MarketingContracts').then(m => ({ default: m.MarketingContracts })));
+const MarketingWorkflow = lazy(() => import('./dashboard/MarketingWorkflow').then(m => ({ default: m.MarketingWorkflow })));
 const ContractorsTab = lazy(() => import('./dashboard/ContractorsTab').then(m => ({ default: m.ContractorsTab })));
 
 import { BUSINESS_TYPES, BUSINESS_TABS, getBusinessConfig, getDefaultOrderType, isFoodSector, isInventoryDrivenBusiness, type BusinessType } from '@/lib/businessTypes';
@@ -746,6 +747,7 @@ export default function Dashboard() {
         {activeTab === 'marketing_services' && <MarketingServices {...commonProps} />}
         {activeTab === 'marketing_quotes' && <MarketingQuotes {...commonProps} />}
         {activeTab === 'marketing_contracts' && <MarketingContracts {...commonProps} />}
+        {activeTab === 'marketing_workflow' && <MarketingWorkflow {...commonProps} />}
         {activeTab === 'super_admin' && <SuperAdmin />}
         {activeTab === 'contracting' && <ContractingDashboard {...commonProps} />}
         {activeTab === 'contractors' && <ContractorsTab {...commonProps} />}
