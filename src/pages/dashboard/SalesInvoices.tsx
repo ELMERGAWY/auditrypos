@@ -56,9 +56,30 @@ export function SalesInvoices({ restaurantId, currency, restaurant, isSuperAdmin
     customer_ref: '',
     paid_amount: '',
     discount: '',
-    notes: ''
+    notes: '',
+    delivery_date: ''
   });
   const [editItems, setEditItems] = useState<any[]>([]);
+  const [menuItems, setMenuItems] = useState<any[]>([]);
+  const [products, setProducts] = useState<any[]>([]);
+
+  // Load menu items and products for manual invoice
+  useEffect(() => {
+    if (restaurantId) {
+      loadMenuItems();
+      loadProducts();
+    }
+  }, [restaurantId]);
+
+  const loadMenuItems = async () => {
+    const { data } = await supabase.from('menu_items').select('*').eq('restaurant_id', restaurantId);
+    setMenuItems(data || []);
+  };
+
+  const loadProducts = async () => {
+    const { data } = await supabase.from('products').select('*').eq('restaurant_id', restaurantId);
+    setProducts(data || []);
+  };
 
   // Check if invoice editing is allowed - always allow for flexibility
   const canEditInvoices = true;
@@ -118,6 +139,7 @@ export function SalesInvoices({ restaurantId, currency, restaurant, isSuperAdmin
           total: amount,
           status: 'completed',
           payment_method: form.payment_method,
+          delivery_date: form.delivery_date || null,
           is_pos: false // Mark as manual
         })
         .select()
@@ -125,17 +147,29 @@ export function SalesInvoices({ restaurantId, currency, restaurant, isSuperAdmin
 
       if (orderError) throw orderError;
 
-      // 2. Ensure Accounting & Create Journal Entry
+      // 2. Create order items from editItems
+      for (const item of editItems) {
+        await supabase.from('order_items').insert({
+          order_id: order.id,
+          menu_item_id: item.menu_item_id,
+          menu_item_name: item.menu_item_name,
+          quantity: item.quantity,
+          price: item.price
+        });
+      }
+
+      // 3. Ensure Accounting & Create Journal Entry
       await journalService.ensureAccountingSetup(restaurantId, currency);
       await journalService.createSaleJournalEntry(restaurantId, {
         ...order,
-        items: [], // Manual invoice might not have line items in this simplified version
+        items: editItems,
         paid_amount: amount
       }, 'retail');
 
       toast.success('تم إنشاء الفاتورة وترحيلها محاسبياً ✅');
       setShowManualForm(false);
-      setForm({ customer_name: '', amount: '', description: '', payment_method: 'cash', customer_ref: '', paid_amount: '', discount: '', notes: '' });
+      setForm({ customer_name: '', amount: '', description: '', payment_method: 'cash', customer_ref: '', paid_amount: '', discount: '', notes: '', delivery_date: '' });
+      setEditItems([]);
       loadInvoices();
     } catch (e: any) {
       toast.error('فشل إنشاء الفاتورة: ' + e.message);
@@ -161,7 +195,8 @@ export function SalesInvoices({ restaurantId, currency, restaurant, isSuperAdmin
         customer_ref: extractCustomerRef(freshInvoice),
         paid_amount: String(freshInvoice.paid_amount ?? freshInvoice.total ?? ''),
         discount: String(freshInvoice.discount || 0),
-        notes: freshInvoice.notes || ''
+        notes: freshInvoice.notes || '',
+        delivery_date: freshInvoice.delivery_date || ''
       });
     } else {
       // Fallback to old invoice object if fetch fails
@@ -173,7 +208,8 @@ export function SalesInvoices({ restaurantId, currency, restaurant, isSuperAdmin
         customer_ref: extractCustomerRef(invoice),
         paid_amount: String(invoice.paid_amount ?? invoice.total ?? ''),
         discount: String(invoice.discount || 0),
-        notes: invoice.notes || ''
+        notes: invoice.notes || '',
+        delivery_date: invoice.delivery_date || ''
       });
     }
 
@@ -266,7 +302,8 @@ export function SalesInvoices({ restaurantId, currency, restaurant, isSuperAdmin
           paid_amount: paidAmount,
           discount,
           notes: form.notes || '',
-          payment_method: form.payment_method
+          payment_method: form.payment_method,
+          delivery_date: form.delivery_date || null
         })
         .eq('id', editingInvoice.id)
         .select()
@@ -331,7 +368,7 @@ export function SalesInvoices({ restaurantId, currency, restaurant, isSuperAdmin
       setShowManualForm(false);
       setEditingInvoice(null);
       setEditItems([]);
-      setForm({ customer_name: '', amount: '', description: '', payment_method: 'cash', customer_ref: '', paid_amount: '', discount: '', notes: '' });
+      setForm({ customer_name: '', amount: '', description: '', payment_method: 'cash', customer_ref: '', paid_amount: '', discount: '', notes: '', delivery_date: '' });
       await loadInvoices();
     } catch (e: any) {
       console.error('Error updating invoice:', e);
@@ -595,25 +632,119 @@ export function SalesInvoices({ restaurantId, currency, restaurant, isSuperAdmin
                           }} 
                           placeholder="السعر"
                         />
-                        <Input 
-                          type="number" 
-                          value={(Number(item.price || 0) * Number(item.quantity || 0)).toFixed(2)} 
-                          onChange={e => {
-                            const newTotal = Number(e.target.value) || 0;
-                            const currentPrice = Number(item.price) || 0;
-                            if (currentPrice > 0) {
-                              const calculatedQuantity = newTotal / currentPrice;
-                              const next = [...editItems];
-                              next[idx] = { ...item, quantity: calculatedQuantity };
+                        <div className="flex gap-1">
+                          <Input 
+                            type="number" 
+                            value={(Number(item.price || 0) * Number(item.quantity || 0)).toFixed(2)} 
+                            onChange={e => {
+                              const newTotal = Number(e.target.value) || 0;
+                              const currentPrice = Number(item.price) || 0;
+                              if (currentPrice > 0) {
+                                const calculatedQuantity = newTotal / currentPrice;
+                                const next = [...editItems];
+                                next[idx] = { ...item, quantity: calculatedQuantity };
+                                setEditItems(next);
+                                const newFormTotal = next.reduce((sum, it) => sum + (Number(it.price || 0) * Number(it.quantity || 0)), 0);
+                                setForm(f => ({ ...f, amount: String(newFormTotal), paid_amount: String(newFormTotal) }));
+                              }
+                            }} 
+                            placeholder="الإجمالي"
+                          />
+                          <Button 
+                            size="icon" 
+                            variant="ghost" 
+                            className="h-8 w-8 text-destructive" 
+                            onClick={() => {
+                              const next = editItems.filter((_, i) => i !== idx);
                               setEditItems(next);
-                              const newFormTotal = next.reduce((sum, it) => sum + (Number(it.price || 0) * Number(it.quantity || 0)), 0);
-                              setForm(f => ({ ...f, amount: String(newFormTotal), paid_amount: String(newFormTotal) }));
-                            }
-                          }} 
-                          placeholder="الإجمالي (اكتب لحساب الكمية)"
-                        />
+                              const newTotal = next.reduce((sum, it) => sum + (Number(it.price || 0) * Number(it.quantity || 0)), 0);
+                              setForm(f => ({ ...f, amount: String(newTotal), paid_amount: String(newTotal) }));
+                            }}
+                          >
+                            <X className="w-4 h-4" />
+                          </Button>
+                        </div>
                       </div>
                     ))}
+                  </div>
+                )}
+
+                {!editingInvoice && (
+                  <div className="space-y-2">
+                    <Label>إضافة بند للفاتورة</Label>
+                    <div className="grid grid-cols-4 gap-2">
+                      <select 
+                        className="bg-secondary p-2 rounded-lg text-sm"
+                        value={form.description}
+                        onChange={e => setForm({ ...form, description: e.target.value })}
+                      >
+                        <option value="">اختر صنف...</option>
+                        {menuItems.map(item => (
+                          <option key={item.id} value={item.name}>{item.name} - {item.price} {currency}</option>
+                        ))}
+                        {products.map(product => (
+                          <option key={product.id} value={product.name}>{product.name} - {product.cost_price} {currency}</option>
+                        ))}
+                      </select>
+                      <Input 
+                        type="number" 
+                        placeholder="الكمية" 
+                        id="new-item-qty"
+                      />
+                      <Input 
+                        type="number" 
+                        placeholder="السعر" 
+                        id="new-item-price"
+                      />
+                      <Button 
+                        variant="outline"
+                        onClick={() => {
+                          const name = form.description;
+                          const qty = Number((document.getElementById('new-item-qty') as HTMLInputElement)?.value) || 1;
+                          const price = Number((document.getElementById('new-item-price') as HTMLInputElement)?.value) || 0;
+                          
+                          if (name && qty > 0) {
+                            const newItem = {
+                              menu_item_name: name,
+                              quantity: qty,
+                              price: price > 0 ? price : (menuItems.find(m => m.name === name)?.price || products.find(p => p.name === name)?.cost_price || 0)
+                            };
+                            setEditItems([...editItems, newItem]);
+                            const newTotal = [...editItems, newItem].reduce((sum, it) => sum + (Number(it.price || 0) * Number(it.quantity || 0)), 0);
+                            setForm(f => ({ ...f, amount: String(newTotal), paid_amount: String(newTotal), description: '' }));
+                            (document.getElementById('new-item-qty') as HTMLInputElement).value = '';
+                            (document.getElementById('new-item-price') as HTMLInputElement).value = '';
+                          }
+                        }}
+                      >
+                        <Plus className="w-4 h-4" />
+                      </Button>
+                    </div>
+                    {editItems.length > 0 && (
+                      <div className="space-y-1 max-h-32 overflow-y-auto border rounded-lg p-2">
+                        {editItems.map((item, idx) => (
+                          <div key={idx} className="flex justify-between items-center text-sm p-1 bg-secondary/50 rounded">
+                            <span>{item.menu_item_name} × {item.quantity}</span>
+                            <div className="flex items-center gap-2">
+                              <span>{(Number(item.price) * Number(item.quantity)).toFixed(2)} {currency}</span>
+                              <Button 
+                                size="icon" 
+                                variant="ghost" 
+                                className="h-6 w-6 text-destructive" 
+                                onClick={() => {
+                                  const next = editItems.filter((_, i) => i !== idx);
+                                  setEditItems(next);
+                                  const newTotal = next.reduce((sum, it) => sum + (Number(it.price || 0) * Number(it.quantity || 0)), 0);
+                                  setForm(f => ({ ...f, amount: String(newTotal), paid_amount: String(newTotal) }));
+                                }}
+                              >
+                                <X className="w-3 h-3" />
+                              </Button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 )}
 
@@ -623,6 +754,15 @@ export function SalesInvoices({ restaurantId, currency, restaurant, isSuperAdmin
                     <Input value={form.notes} onChange={e => setForm({ ...form, notes: e.target.value })} />
                   </div>
                 )}
+
+                <div>
+                  <Label>تاريخ التسليم</Label>
+                  <Input 
+                    type="date" 
+                    value={form.delivery_date} 
+                    onChange={e => setForm({ ...form, delivery_date: e.target.value })} 
+                  />
+                </div>
 
                 <div>
                   <Label>طريقة الدفع</Label>
