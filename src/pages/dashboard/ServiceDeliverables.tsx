@@ -84,17 +84,16 @@ export function ServiceDeliverables({ restaurantId, currency }: Props) {
         .from('marketing_service_deliverables')
         .select(`
           *,
-          sales_invoices(invoice_number, customer_name)
+          sales_invoices(invoice_number)
         `)
         .eq('restaurant_id', restaurantId)
         .order('expected_delivery_date', { ascending: true });
       if (error) throw error;
       
-      // Map the joined data to include invoice_number and customer_name
+      // Map the joined data to include invoice_number
       const deliverablesWithInvoiceInfo = (data || []).map((d: any) => ({
         ...d,
-        invoice_number: d.sales_invoices?.invoice_number,
-        customer_name: d.sales_invoices?.customer_name
+        invoice_number: d.sales_invoices?.invoice_number
       }));
       
       setDeliverables(deliverablesWithInvoiceInfo);
@@ -283,9 +282,6 @@ export function ServiceDeliverables({ restaurantId, currency }: Props) {
                   <h3 className="font-bold text-lg">{deliverable.service_name}</h3>
                   {deliverable.invoice_number && (
                     <p className="text-xs text-muted-foreground mt-1">فاتورة #{deliverable.invoice_number}</p>
-                  )}
-                  {deliverable.customer_name && (
-                    <p className="text-xs text-muted-foreground">العميل: {deliverable.customer_name}</p>
                   )}
                   <div className="flex gap-2 mt-1">
                     <Badge className={statusInfo.color}>{statusInfo.label}</Badge>
