@@ -81,7 +81,7 @@ const MarketingServices = lazy(() => import('./dashboard/MarketingServices').the
 const MarketingQuotes = lazy(() => import('./dashboard/MarketingQuotes').then(m => ({ default: m.MarketingQuotes })));
 const MarketingContracts = lazy(() => import('./dashboard/MarketingContracts').then(m => ({ default: m.MarketingContracts })));
 const MarketingWorkflow = lazy(() => import('./dashboard/MarketingWorkflow').then(m => ({ default: m.MarketingWorkflow })));
-const MarketingAccounting = lazy(() => import('./dashboard/MarketingAccounting').then(m => ({ default: m.MarketingAccounting })));
+const MarketingAccounting = lazy(() => import('./dashboard/MarketingAccounting'));
 const ServiceDeliverables = lazy(() => import('./dashboard/ServiceDeliverables').then(m => ({ default: m.ServiceDeliverables })));
 const ContractorsTab = lazy(() => import('./dashboard/ContractorsTab').then(m => ({ default: m.ContractorsTab })));
 
@@ -754,7 +754,9 @@ export default function Dashboard() {
         {activeTab === 'marketing_workflow' && <MarketingWorkflow {...commonProps} />}
         {activeTab === 'marketing_accounting' && (
           <ModuleErrorBoundary moduleName="المحاسبة التسويقية">
-            <MarketingAccounting {...commonProps} />
+            <Suspense fallback={<div className="flex items-center justify-center h-64"><div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div></div>}>
+              <MarketingAccounting {...commonProps} />
+            </Suspense>
           </ModuleErrorBoundary>
         )}
         {activeTab === 'service_deliverables' && <ServiceDeliverables {...commonProps} />}
