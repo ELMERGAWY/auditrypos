@@ -115,6 +115,15 @@ const MarketingAccounting: React.FC<MarketingAccountingProps> = ({
   const { user } = useAuth();
   const [loading, setLoading] = useState(true);
   
+  // Early return if no restaurantId
+  if (!restaurantId) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <p className="text-muted-foreground">يرجى اختيار مطعم أولاً</p>
+      </div>
+    );
+  }
+  
   // Data
   const [hourlyRates, setHourlyRates] = useState<HourlyRate[]>([]);
   const [projectCosts, setProjectCosts] = useState<ProjectCost[]>([]);
@@ -187,6 +196,11 @@ const MarketingAccounting: React.FC<MarketingAccountingProps> = ({
   });
 
   const loadData = async () => {
+    if (!restaurantId) {
+      setLoading(false);
+      return;
+    }
+    
     setLoading(true);
     try {
       const [
