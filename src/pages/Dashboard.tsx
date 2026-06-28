@@ -750,7 +750,11 @@ export default function Dashboard() {
         {activeTab === 'marketing_quotes' && <MarketingQuotes {...commonProps} />}
         {activeTab === 'marketing_contracts' && <MarketingContracts {...commonProps} />}
         {activeTab === 'marketing_workflow' && <MarketingWorkflow {...commonProps} />}
-        {activeTab === 'marketing_accounting' && <MarketingAccounting {...commonProps} />}
+        {activeTab === 'marketing_accounting' && (
+          <ModuleErrorBoundary moduleName="المحاسبة التسويقية">
+            <MarketingAccounting {...commonProps} />
+          </ModuleErrorBoundary>
+        )}
         {activeTab === 'service_deliverables' && <ServiceDeliverables {...commonProps} />}
         {activeTab === 'super_admin' && <SuperAdmin />}
         {activeTab === 'contracting' && <ContractingDashboard {...commonProps} />}
