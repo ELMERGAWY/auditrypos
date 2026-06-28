@@ -597,9 +597,27 @@ const MarketingAccounting: React.FC<MarketingAccountingProps> = ({
     );
   }
 
-  // Calculate totals
-  const totalCost = safeProjectCosts.reduce((sum, c) => sum + (c.amount * c.quantity), 0);
-  const totalRevenue = safeProjectRevenues.reduce((sum, r) => sum + r.amount, 0);
+  // Additional safety check - don't render if critical data is not ready
+  if (!Array.isArray(hourlyRates) || !Array.isArray(projectCosts) || !Array.isArray(projectRevenues) || 
+      !Array.isArray(profitability) || !Array.isArray(billingSchedule) || !Array.isArray(staff) || 
+      !Array.isArray(departments) || !Array.isArray(workflowInstances)) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <p className="text-muted-foreground">جاري تحميل البيانات...</p>
+      </div>
+    );
+  }
+
+  // Calculate totals - with additional safety checks
+  const totalCost = Array.isArray(safeProjectCosts) ? safeProjectCosts.reduce((sum, c) => {
+    const amount = typeof c.amount === 'number' ? c.amount : 0;
+    const quantity = typeof c.quantity === 'number' ? c.quantity : 0;
+    return sum + (amount * quantity);
+  }, 0) : 0;
+  const totalRevenue = Array.isArray(safeProjectRevenues) ? safeProjectRevenues.reduce((sum, r) => {
+    const amount = typeof r.amount === 'number' ? r.amount : 0;
+    return sum + amount;
+  }, 0) : 0;
   const totalProfit = totalRevenue - totalCost;
   const totalMargin = totalRevenue > 0 ? ((totalProfit / totalRevenue) * 100).toFixed(1) : 0;
 
@@ -793,9 +811,9 @@ const MarketingAccounting: React.FC<MarketingAccountingProps> = ({
                           <Clock className="w-4 h-4" />
                           {typeof rate.hourly_rate === 'number' ? rate.hourly_rate.toLocaleString() : '0'} {currency}/ساعة
                         </span>
-                        <span>من: {rate.effective_from ? new Date(rate.effective_from).toLocaleDateString('ar-EG') : '-'}</span>
+                        <span>من: {rate.effective_from ? (function() { try { return new Date(rate.effective_from).toLocaleDateString('ar-EG'); } catch { return '-'; } })() : '-'}</span>
                         {rate.effective_to && (
-                          <span>إلى: {new Date(rate.effective_to).toLocaleDateString('ar-EG')}</span>
+                          <span>إلى: {(function() { try { return new Date(rate.effective_to).toLocaleDateString('ar-EG'); } catch { return '-'; } })()}</span>
                         )}
                       </div>
                     </div>
@@ -1192,7 +1210,7 @@ const MarketingAccounting: React.FC<MarketingAccountingProps> = ({
                         {revenue.due_date && (
                           <span className="flex items-center gap-1">
                             <Calendar className="w-3 h-3" />
-                            الاستحقاق: {new Date(revenue.due_date).toLocaleDateString('ar-EG')}
+                            الاستحقاق: {(function() { try { return new Date(revenue.due_date).toLocaleDateString('ar-EG'); } catch { return '-'; } })()}
                           </span>
                         )}
                       </div>
@@ -1340,7 +1358,7 @@ const MarketingAccounting: React.FC<MarketingAccountingProps> = ({
                         <span className="font-bold">{typeof billing.scheduled_amount === 'number' ? billing.scheduled_amount.toLocaleString() : '0'} {currency}</span>
                         <span className="flex items-center gap-1">
                           <Calendar className="w-3 h-3" />
-                          {billing.scheduled_date ? new Date(billing.scheduled_date).toLocaleDateString('ar-EG') : '-'}
+                          {billing.scheduled_date ? (function() { try { return new Date(billing.scheduled_date).toLocaleDateString('ar-EG'); } catch { return '-'; } })() : '-'}
                         </span>
                       </div>
                     </div>
