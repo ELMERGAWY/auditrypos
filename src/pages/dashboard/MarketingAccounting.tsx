@@ -521,8 +521,8 @@ const MarketingAccounting: React.FC<MarketingAccountingProps> = ({
   }
 
   // Calculate totals
-  const totalCost = projectCosts.reduce((sum, c) => sum + (c.amount * c.quantity), 0);
-  const totalRevenue = projectRevenues.reduce((sum, r) => sum + r.amount, 0);
+  const totalCost = safeProjectCosts.reduce((sum, c) => sum + (c.amount * c.quantity), 0);
+  const totalRevenue = safeProjectRevenues.reduce((sum, r) => sum + r.amount, 0);
   const totalProfit = totalRevenue - totalCost;
   const totalMargin = totalRevenue > 0 ? ((totalProfit / totalRevenue) * 100).toFixed(1) : 0;
 
@@ -1303,7 +1303,7 @@ const MarketingAccounting: React.FC<MarketingAccountingProps> = ({
       </Tabs>
 
       {/* Profitability Summary */}
-      {profitability.length > 0 && (
+      {safeProfitability.length > 0 && (
         <Card>
           <CardHeader>
             <CardTitle>ملخص الربحية للمشاريع</CardTitle>
