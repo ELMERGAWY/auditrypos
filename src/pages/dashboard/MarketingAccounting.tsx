@@ -225,24 +225,24 @@ const MarketingAccounting: React.FC<MarketingAccountingProps> = ({
           .eq('restaurant_id', restaurantId)
       ]);
 
-      setHourlyRates((ratesRes.data || []).map((r: any) => ({
+      setHourlyRates(Array.isArray(ratesRes.data) ? ratesRes.data.map((r: any) => ({
         ...r,
         staff_name: r.staff_profiles?.full_name,
         department_name: r.staff_departments?.name
-      })));
+      })) : []);
       
-      setProjectCosts((costsRes.data || []).map((c: any) => ({
+      setProjectCosts(Array.isArray(costsRes.data) ? costsRes.data.map((c: any) => ({
         ...c,
         staff_name: c.staff_profiles?.full_name,
         task_title: c.marketing_workflow_tasks?.title
-      })));
+      })) : []);
       
-      setProjectRevenues(revenuesRes.data || []);
-      setProfitability(profitRes.data || []);
-      setBillingSchedule(billingRes.data || []);
-      setStaff(staffRes.data || []);
-      setDepartments(deptRes.data || []);
-      setWorkflowInstances(instancesRes.data || []);
+      setProjectRevenues(Array.isArray(revenuesRes.data) ? revenuesRes.data : []);
+      setProfitability(Array.isArray(profitRes.data) ? profitRes.data : []);
+      setBillingSchedule(Array.isArray(billingRes.data) ? billingRes.data : []);
+      setStaff(Array.isArray(staffRes.data) ? staffRes.data : []);
+      setDepartments(Array.isArray(deptRes.data) ? deptRes.data : []);
+      setWorkflowInstances(Array.isArray(instancesRes.data) ? instancesRes.data : []);
     } catch (e: any) {
       toast.error('خطأ في تحميل البيانات: ' + e.message);
     } finally {
