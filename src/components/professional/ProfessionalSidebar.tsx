@@ -30,7 +30,7 @@ export type SidebarTab =
   | 'sales_orders' | 'purchase_orders' | 'projects' | 'manual_journal'
   | 'chart_of_accounts' | 'accounting_mapping' | 'fixed_assets'
   | 'loyalty' | 'gift_cards' | 'branches' | 'contracting' | 'bom' | 'service_packages' | 'payroll' | 'chat'
-  | 'employees' | 'supplier_contracts' | 'marketing_services' | 'marketing_quotes' | 'marketing_contracts' | 'contractors' | 'warehouses' | 'sub_warehouses' | 'inventory_transfers';
+  | 'employees' | 'supplier_contracts' | 'marketing_services' | 'marketing_quotes' | 'marketing_contracts' | 'marketing_workflow' | 'marketing_accounting' | 'contractors' | 'warehouses' | 'sub_warehouses' | 'inventory_transfers';
 
 interface NavItem {
   id: SidebarTab;
@@ -194,6 +194,8 @@ export const ProfessionalSidebar = memo(function ProfessionalSidebar({
     marketing_services: { label: 'خدمات التسويق', icon: Sparkles, section: 'main' },
     marketing_quotes: { label: 'عروض الأسعار', icon: FileText, section: 'main' },
     marketing_contracts: { label: 'عقود التسويق', icon: FileCheck, section: 'main' },
+    marketing_workflow: { label: 'سير العمل التسويقي', icon: Layers, section: 'main' },
+    marketing_accounting: { label: 'المحاسبة التسويقية', icon: DollarSign, section: 'finance' },
     contractors: { label: 'الصنايعية', icon: UsersRound, section: 'main' },
   };
 
