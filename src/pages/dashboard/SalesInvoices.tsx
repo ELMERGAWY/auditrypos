@@ -62,6 +62,10 @@ export function SalesInvoices({ restaurantId, currency, restaurant, isSuperAdmin
   const [editItems, setEditItems] = useState<any[]>([]);
   const [menuItems, setMenuItems] = useState<any[]>([]);
   const [products, setProducts] = useState<any[]>([]);
+  const [itemSearch, setItemSearch] = useState('');
+  const [selectedItem, setSelectedItem] = useState<any>(null);
+  const [newItemQty, setNewItemQty] = useState(1);
+  const [newItemPrice, setNewItemPrice] = useState(0);
 
   // Load menu items and products for manual invoice
   useEffect(() => {
@@ -70,6 +74,14 @@ export function SalesInvoices({ restaurantId, currency, restaurant, isSuperAdmin
       loadProducts();
     }
   }, [restaurantId]);
+
+  // Auto-update price when item is selected
+  useEffect(() => {
+    if (selectedItem) {
+      const price = selectedItem.price || selectedItem.cost_price || 0;
+      setNewItemPrice(price);
+    }
+  }, [selectedItem]);
 
   const loadMenuItems = async () => {
     const { data } = await supabase.from('menu_items').select('*').eq('restaurant_id', restaurantId);
@@ -672,53 +684,83 @@ export function SalesInvoices({ restaurantId, currency, restaurant, isSuperAdmin
                 {!editingInvoice && (
                   <div className="space-y-2">
                     <Label>إضافة بند للفاتورة</Label>
-                    <div className="grid grid-cols-4 gap-2">
-                      <select 
-                        className="bg-secondary p-2 rounded-lg text-sm"
-                        value={form.description}
-                        onChange={e => setForm({ ...form, description: e.target.value })}
-                      >
-                        <option value="">اختر صنف...</option>
-                        {menuItems.map(item => (
-                          <option key={item.id} value={item.name}>{item.name} - {item.price} {currency}</option>
-                        ))}
-                        {products.map(product => (
-                          <option key={product.id} value={product.name}>{product.name} - {product.cost_price} {currency}</option>
-                        ))}
-                      </select>
+                    <div className="space-y-2">
                       <Input 
-                        type="number" 
-                        placeholder="الكمية" 
-                        id="new-item-qty"
+                        placeholder="ابحث عن صنف..." 
+                        value={itemSearch}
+                        onChange={e => setItemSearch(e.target.value)}
                       />
-                      <Input 
-                        type="number" 
-                        placeholder="السعر" 
-                        id="new-item-price"
-                      />
-                      <Button 
-                        variant="outline"
-                        onClick={() => {
-                          const name = form.description;
-                          const qty = Number((document.getElementById('new-item-qty') as HTMLInputElement)?.value) || 1;
-                          const price = Number((document.getElementById('new-item-price') as HTMLInputElement)?.value) || 0;
-                          
-                          if (name && qty > 0) {
-                            const newItem = {
-                              menu_item_name: name,
-                              quantity: qty,
-                              price: price > 0 ? price : (menuItems.find(m => m.name === name)?.price || products.find(p => p.name === name)?.cost_price || 0)
-                            };
-                            setEditItems([...editItems, newItem]);
-                            const newTotal = [...editItems, newItem].reduce((sum, it) => sum + (Number(it.price || 0) * Number(it.quantity || 0)), 0);
-                            setForm(f => ({ ...f, amount: String(newTotal), paid_amount: String(newTotal), description: '' }));
-                            (document.getElementById('new-item-qty') as HTMLInputElement).value = '';
-                            (document.getElementById('new-item-price') as HTMLInputElement).value = '';
-                          }
-                        }}
-                      >
-                        <Plus className="w-4 h-4" />
-                      </Button>
+                      {itemSearch && (
+                        <div className="max-h-40 overflow-y-auto border rounded-lg bg-secondary/50">
+                          {menuItems.filter(item => item.name.toLowerCase().includes(itemSearch.toLowerCase())).map(item => (
+                            <div 
+                              key={item.id}
+                              className="p-2 hover:bg-secondary cursor-pointer text-sm"
+                              onClick={() => {
+                                setSelectedItem(item);
+                                setItemSearch(item.name);
+                              }}
+                            >
+                              {item.name} - {item.price} {currency}
+                            </div>
+                          ))}
+                          {products.filter(p => p.name.toLowerCase().includes(itemSearch.toLowerCase())).map(product => (
+                            <div 
+                              key={product.id}
+                              className="p-2 hover:bg-secondary cursor-pointer text-sm"
+                              onClick={() => {
+                                setSelectedItem(product);
+                                setItemSearch(product.name);
+                              }}
+                            >
+                              {product.name} - {product.cost_price} {currency}
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                      <div className="grid grid-cols-3 gap-2">
+                        <div>
+                          <Label className="text-xs">الكمية</Label>
+                          <Input 
+                            type="number" 
+                            value={newItemQty}
+                            onChange={e => setNewItemQty(Number(e.target.value) || 1)}
+                            min="1"
+                          />
+                        </div>
+                        <div>
+                          <Label className="text-xs">السعر</Label>
+                          <Input 
+                            type="number" 
+                            value={newItemPrice}
+                            onChange={e => setNewItemPrice(Number(e.target.value) || 0)}
+                            min="0"
+                          />
+                        </div>
+                        <div className="flex flex-col justify-end">
+                          <Button 
+                            variant="outline"
+                            onClick={() => {
+                              if (selectedItem && newItemQty > 0) {
+                                const newItem = {
+                                  menu_item_name: selectedItem.name,
+                                  quantity: newItemQty,
+                                  price: newItemPrice
+                                };
+                                setEditItems([...editItems, newItem]);
+                                const newTotal = [...editItems, newItem].reduce((sum, it) => sum + (Number(it.price || 0) * Number(it.quantity || 0)), 0);
+                                setForm(f => ({ ...f, amount: String(newTotal), paid_amount: String(newTotal) }));
+                                setItemSearch('');
+                                setSelectedItem(null);
+                                setNewItemQty(1);
+                                setNewItemPrice(0);
+                              }
+                            }}
+                          >
+                            <Plus className="w-4 h-4" />
+                          </Button>
+                        </div>
+                      </div>
                     </div>
                     {editItems.length > 0 && (
                       <div className="space-y-1 max-h-32 overflow-y-auto border rounded-lg p-2">

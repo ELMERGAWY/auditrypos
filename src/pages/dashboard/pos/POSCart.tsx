@@ -186,24 +186,20 @@ export const POSCart = memo(function POSCart({
           <Hash className="w-3.5 h-3.5 absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
           <Input value={customerRef} onChange={e => setCustomerRef(e.target.value)} placeholder="الرقم المرجعي (تلقائي/يدوي)" className="pr-8 h-9 text-xs" />
         </div>
-        {orderType === 'delivery' && (
-          <>
-            <div className="relative">
-              <MapPin className="w-3.5 h-3.5 absolute right-2.5 top-2.5 text-muted-foreground" />
-              <Input value={deliveryAddress} onChange={e => setDeliveryAddress(e.target.value)} placeholder={getAddressPlaceholder(businessType)} className="pr-8 h-9 text-xs" />
-            </div>
-            <div className="relative">
-              <Calendar className="w-3.5 h-3.5 absolute right-2.5 top-2.5 text-muted-foreground" />
-              <Input 
-                type="date" 
-                value={deliveryDate} 
-                onChange={e => setDeliveryDate(e.target.value)} 
-                placeholder="تاريخ التسليم" 
-                className="pr-8 h-9 text-xs" 
-              />
-            </div>
-          </>
-        )}
+        <div className="relative">
+          <MapPin className="w-3.5 h-3.5 absolute right-2.5 top-2.5 text-muted-foreground" />
+          <Input value={deliveryAddress} onChange={e => setDeliveryAddress(e.target.value)} placeholder="عنوان التوصيل (اختياري)" className="pr-8 h-9 text-xs" />
+        </div>
+        <div className="relative">
+          <Calendar className="w-3.5 h-3.5 absolute right-2.5 top-2.5 text-muted-foreground" />
+          <Input 
+            type="date" 
+            value={deliveryDate} 
+            onChange={e => setDeliveryDate(e.target.value)} 
+            placeholder="تاريخ التسليم (اختياري)" 
+            className="pr-8 h-9 text-xs" 
+          />
+        </div>
         <div className="relative">
           <StickyNote className="w-3.5 h-3.5 absolute right-2.5 top-2.5 text-muted-foreground" />
           <Input value={orderNotes} onChange={e => setOrderNotes(e.target.value)} placeholder={getNotesPlaceholder(businessType)} className="pr-8 h-9 text-xs" />
