@@ -36,22 +36,20 @@ export function CustomerSearch({ restaurantId, value, onChange, placeholder }: P
 
   useEffect(() => {
     const query = value.trim();
-    if (query.length < 1) {
-      setSuggestions([]);
-      setShowSuggestions(false);
-      return;
-    }
-
     const timer = window.setTimeout(async () => {
       const safeQuery = query.replace(/[%,]/g, '');
-      const { data } = await supabase.from('customers')
+      let queryBuilder = supabase.from('customers')
         .select('id, name, phone, address, balance, customer_type')
         .eq('restaurant_id', restaurantId)
-        .or(`name.ilike.%${safeQuery}%,phone.ilike.%${safeQuery}%`)
         .limit(8);
-      
+
+      if (query.length >= 1) {
+        queryBuilder = queryBuilder.or(`name.ilike.%${safeQuery}%,phone.ilike.%${safeQuery}%`);
+      }
+
+      const { data } = await queryBuilder;
+
       setSuggestions((data || []) as Customer[]);
-      setShowSuggestions(true);
     }, 250);
 
     return () => window.clearTimeout(timer);
@@ -68,7 +66,7 @@ export function CustomerSearch({ restaurantId, value, onChange, placeholder }: P
       <Input
         value={value}
         onChange={e => onChange(e.target.value)}
-        onFocus={() => value.length >= 1 && suggestions.length > 0 && setShowSuggestions(true)}
+        onFocus={() => setShowSuggestions(true)}
         placeholder={placeholder || 'بحث عن عميل...'}
         className="pr-8 h-9 text-xs"
       />

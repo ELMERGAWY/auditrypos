@@ -100,24 +100,39 @@ export function ServiceDeliverables({ restaurantId, currency }: Props) {
       if (ordersError) throw ordersError;
       
       // Convert orders to deliverable format
-      const orderDeliverables = (ordersWithDelivery || []).map((order: any) => ({
-        id: order.id,
-        contract_id: null,
-        quote_id: null,
-        invoice_id: null,
-        invoice_line_id: null,
-        service_id: null,
-        service_name: order.order_items?.[0]?.menu_item_name || 'خدمة من الطلب',
-        description: order.notes,
-        expected_delivery_date: order.delivery_date,
-        actual_delivery_date: null,
-        status: order.status === 'completed' ? 'delivered' : 'pending',
-        priority: 'medium',
-        notes: order.notes,
-        created_at: order.created_at,
-        invoice_number: order.order_number,
-        customer_name: order.customer_name
-      }));
+      const orderDeliverables = (ordersWithDelivery || []).map((order: any) => {
+        const expectedDate = new Date(order.delivery_date);
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        expectedDate.setHours(0, 0, 0, 0);
+
+        // Determine status based on delivery date, not order status
+        let status = 'pending';
+        if (order.actual_delivery_date) {
+          status = 'delivered';
+        } else if (expectedDate < today) {
+          status = 'delayed';
+        }
+
+        return {
+          id: order.id,
+          contract_id: null,
+          quote_id: null,
+          invoice_id: null,
+          invoice_line_id: null,
+          service_id: null,
+          service_name: order.order_items?.[0]?.menu_item_name || 'خدمة من الطلب',
+          description: order.notes,
+          expected_delivery_date: order.delivery_date,
+          actual_delivery_date: order.actual_delivery_date || null,
+          status: status,
+          priority: 'medium',
+          notes: order.notes,
+          created_at: order.created_at,
+          invoice_number: order.order_number,
+          customer_name: order.customer_name
+        };
+      });
       
       // Combine both sources
       setDeliverables([...(marketingDeliverables || []), ...orderDeliverables]);
@@ -382,7 +397,25 @@ export function ServiceDeliverables({ restaurantId, currency }: Props) {
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <Label>العقد (اختياري)</Label>
-                <Select value={form.contract_id} onValueChange={(v) => setForm({ ...form, contract_id: v })}>
+                <Select value={form.contract_id} onValueChange={async (v) => {
+                  setForm({ ...form, contract_id: v });
+                  if (v) {
+                    // Load services from the contract
+                    const { data: contractServices } = await supabase
+                      .from('marketing_contract_services')
+                      .select('*, marketing_services(*)')
+                      .eq('contract_id', v);
+                    if (contractServices && contractServices.length > 0) {
+                      const firstService = contractServices[0];
+                      setForm(f => ({
+                        ...f,
+                        service_id: firstService.marketing_services?.id || '',
+                        service_name: firstService.marketing_services?.name || firstService.service_name || '',
+                        description: firstService.marketing_services?.description || firstService.description || ''
+                      }));
+                    }
+                  }
+                }}>
                   <SelectTrigger><SelectValue placeholder="اختر العقد" /></SelectTrigger>
                   <SelectContent>
                     {safeContracts.map(c => (

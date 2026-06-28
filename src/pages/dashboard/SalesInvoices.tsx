@@ -576,12 +576,12 @@ export function SalesInvoices({ restaurantId, currency, restaurant, isSuperAdmin
       <AnimatePresence>
         {showManualForm && (
           <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
-            <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="glass-card p-8 max-w-md w-full relative">
-              <button onClick={() => { setShowManualForm(false); setEditingInvoice(null); }} className="absolute left-4 top-4 text-muted-foreground hover:text-foreground">
+            <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="glass-card p-8 max-w-2xl w-full max-h-[90vh] overflow-y-auto relative">
+              <button onClick={() => { setShowManualForm(false); setEditingInvoice(null); }} className="absolute left-4 top-4 text-muted-foreground hover:text-foreground z-10">
                 <X className="w-5 h-5" />
               </button>
               <h3 className="text-2xl font-black mb-6">{editingInvoice ? 'تعديل الفاتورة' : 'إنشاء فاتورة يدوية'}</h3>
-              
+
               <div className="space-y-4">
                 <div>
                   <Label className="mb-2 block">اسم العميل</Label>
@@ -693,10 +693,11 @@ export function SalesInvoices({ restaurantId, currency, restaurant, isSuperAdmin
                         placeholder="ابحث عن صنف..." 
                         value={itemSearch}
                         onChange={e => setItemSearch(e.target.value)}
+                        onFocus={() => setItemSearch('')}
                       />
-                      {itemSearch && (
+                      {itemSearch !== null && (
                         <div className="max-h-40 overflow-y-auto border rounded-lg bg-secondary/50">
-                          {menuItems.filter(item => item.name.toLowerCase().includes(itemSearch.toLowerCase())).map(item => (
+                          {menuItems.filter(item => !itemSearch || item.name.toLowerCase().includes(itemSearch.toLowerCase())).map(item => (
                             <div 
                               key={item.id}
                               className="p-2 hover:bg-secondary cursor-pointer text-sm"
