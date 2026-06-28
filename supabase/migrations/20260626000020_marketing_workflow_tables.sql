@@ -173,36 +173,44 @@ ALTER TABLE marketing_workflow_assets ENABLE ROW LEVEL SECURITY;
 ALTER TABLE marketing_workflow_comments ENABLE ROW LEVEL SECURITY;
 
 -- RLS Policies
-CREATE OR REPLACE POLICY "Users can view workflow stages for their restaurant"
+DROP POLICY IF EXISTS "Users can view workflow stages for their restaurant" ON marketing_workflow_stages;
+CREATE POLICY "Users can view workflow stages for their restaurant"
   ON marketing_workflow_stages FOR SELECT
   USING (restaurant_id IN (SELECT id FROM restaurants WHERE owner_id = auth.uid()));
 
-CREATE OR REPLACE POLICY "Users can insert workflow stages for their restaurant"
+DROP POLICY IF EXISTS "Users can insert workflow stages for their restaurant" ON marketing_workflow_stages;
+CREATE POLICY "Users can insert workflow stages for their restaurant"
   ON marketing_workflow_stages FOR INSERT
   WITH CHECK (restaurant_id IN (SELECT id FROM restaurants WHERE owner_id = auth.uid()));
 
-CREATE OR REPLACE POLICY "Users can update workflow stages for their restaurant"
+DROP POLICY IF EXISTS "Users can update workflow stages for their restaurant" ON marketing_workflow_stages;
+CREATE POLICY "Users can update workflow stages for their restaurant"
   ON marketing_workflow_stages FOR UPDATE
   USING (restaurant_id IN (SELECT id FROM restaurants WHERE owner_id = auth.uid()));
 
-CREATE OR REPLACE POLICY "Users can view workflow instances for their restaurant"
+DROP POLICY IF EXISTS "Users can view workflow instances for their restaurant" ON marketing_workflow_instances;
+CREATE POLICY "Users can view workflow instances for their restaurant"
   ON marketing_workflow_instances FOR SELECT
   USING (restaurant_id IN (SELECT id FROM restaurants WHERE owner_id = auth.uid()));
 
-CREATE OR REPLACE POLICY "Users can insert workflow instances for their restaurant"
+DROP POLICY IF EXISTS "Users can insert workflow instances for their restaurant" ON marketing_workflow_instances;
+CREATE POLICY "Users can insert workflow instances for their restaurant"
   ON marketing_workflow_instances FOR INSERT
   WITH CHECK (restaurant_id IN (SELECT id FROM restaurants WHERE owner_id = auth.uid()));
 
-CREATE OR REPLACE POLICY "Users can update workflow instances for their restaurant"
+DROP POLICY IF EXISTS "Users can update workflow instances for their restaurant" ON marketing_workflow_instances;
+CREATE POLICY "Users can update workflow instances for their restaurant"
   ON marketing_workflow_instances FOR UPDATE
   USING (restaurant_id IN (SELECT id FROM restaurants WHERE owner_id = auth.uid()));
 
-CREATE OR REPLACE POLICY "Users can delete workflow instances for their restaurant"
+DROP POLICY IF EXISTS "Users can delete workflow instances for their restaurant" ON marketing_workflow_instances;
+CREATE POLICY "Users can delete workflow instances for their restaurant"
   ON marketing_workflow_instances FOR DELETE
   USING (restaurant_id IN (SELECT id FROM restaurants WHERE owner_id = auth.uid()));
 
 -- Similar policies for other tables
-CREATE OR REPLACE POLICY "Users can view workflow history for their restaurant"
+DROP POLICY IF EXISTS "Users can view workflow history for their restaurant" ON marketing_workflow_stage_history;
+CREATE POLICY "Users can view workflow history for their restaurant"
   ON marketing_workflow_stage_history FOR SELECT
   USING (EXISTS (
     SELECT 1 FROM marketing_workflow_instances 
@@ -210,7 +218,8 @@ CREATE OR REPLACE POLICY "Users can view workflow history for their restaurant"
     AND restaurant_id IN (SELECT id FROM restaurants WHERE owner_id = auth.uid())
   ));
 
-CREATE OR REPLACE POLICY "Users can insert workflow history"
+DROP POLICY IF EXISTS "Users can insert workflow history" ON marketing_workflow_stage_history;
+CREATE POLICY "Users can insert workflow history"
   ON marketing_workflow_stage_history FOR INSERT
   WITH CHECK (EXISTS (
     SELECT 1 FROM marketing_workflow_instances 
@@ -218,7 +227,8 @@ CREATE OR REPLACE POLICY "Users can insert workflow history"
     AND restaurant_id IN (SELECT id FROM restaurants WHERE owner_id = auth.uid())
   ));
 
-CREATE OR REPLACE POLICY "Users can view workflow tasks for their restaurant"
+DROP POLICY IF EXISTS "Users can view workflow tasks for their restaurant" ON marketing_workflow_tasks;
+CREATE POLICY "Users can view workflow tasks for their restaurant"
   ON marketing_workflow_tasks FOR SELECT
   USING (EXISTS (
     SELECT 1 FROM marketing_workflow_instances 
@@ -226,7 +236,8 @@ CREATE OR REPLACE POLICY "Users can view workflow tasks for their restaurant"
     AND restaurant_id IN (SELECT id FROM restaurants WHERE owner_id = auth.uid())
   ));
 
-CREATE OR REPLACE POLICY "Users can insert workflow tasks"
+DROP POLICY IF EXISTS "Users can insert workflow tasks" ON marketing_workflow_tasks;
+CREATE POLICY "Users can insert workflow tasks"
   ON marketing_workflow_tasks FOR INSERT
   WITH CHECK (EXISTS (
     SELECT 1 FROM marketing_workflow_instances 
@@ -234,7 +245,8 @@ CREATE OR REPLACE POLICY "Users can insert workflow tasks"
     AND restaurant_id IN (SELECT id FROM restaurants WHERE owner_id = auth.uid())
   ));
 
-CREATE OR REPLACE POLICY "Users can update workflow tasks"
+DROP POLICY IF EXISTS "Users can update workflow tasks" ON marketing_workflow_tasks;
+CREATE POLICY "Users can update workflow tasks"
   ON marketing_workflow_tasks FOR UPDATE
   USING (EXISTS (
     SELECT 1 FROM marketing_workflow_instances 
@@ -242,7 +254,8 @@ CREATE OR REPLACE POLICY "Users can update workflow tasks"
     AND restaurant_id IN (SELECT id FROM restaurants WHERE owner_id = auth.uid())
   ));
 
-CREATE OR REPLACE POLICY "Users can delete workflow tasks"
+DROP POLICY IF EXISTS "Users can delete workflow tasks" ON marketing_workflow_tasks;
+CREATE POLICY "Users can delete workflow tasks"
   ON marketing_workflow_tasks FOR DELETE
   USING (EXISTS (
     SELECT 1 FROM marketing_workflow_instances 
@@ -251,7 +264,8 @@ CREATE OR REPLACE POLICY "Users can delete workflow tasks"
   ));
 
 -- Similar policies for time_logs, revisions, assets, comments
-CREATE OR REPLACE POLICY "Users can view workflow time logs for their restaurant"
+DROP POLICY IF EXISTS "Users can view workflow time logs for their restaurant" ON marketing_workflow_time_logs;
+CREATE POLICY "Users can view workflow time logs for their restaurant"
   ON marketing_workflow_time_logs FOR SELECT
   USING (EXISTS (
     SELECT 1 FROM marketing_workflow_instances 
@@ -259,7 +273,8 @@ CREATE OR REPLACE POLICY "Users can view workflow time logs for their restaurant
     AND restaurant_id IN (SELECT id FROM restaurants WHERE owner_id = auth.uid())
   ));
 
-CREATE OR REPLACE POLICY "Users can insert workflow time logs"
+DROP POLICY IF EXISTS "Users can insert workflow time logs" ON marketing_workflow_time_logs;
+CREATE POLICY "Users can insert workflow time logs"
   ON marketing_workflow_time_logs FOR INSERT
   WITH CHECK (EXISTS (
     SELECT 1 FROM marketing_workflow_instances 
@@ -267,7 +282,8 @@ CREATE OR REPLACE POLICY "Users can insert workflow time logs"
     AND restaurant_id IN (SELECT id FROM restaurants WHERE owner_id = auth.uid())
   ));
 
-CREATE OR REPLACE POLICY "Users can view workflow revisions for their restaurant"
+DROP POLICY IF EXISTS "Users can view workflow revisions for their restaurant" ON marketing_workflow_revisions;
+CREATE POLICY "Users can view workflow revisions for their restaurant"
   ON marketing_workflow_revisions FOR SELECT
   USING (EXISTS (
     SELECT 1 FROM marketing_workflow_instances 
@@ -275,7 +291,8 @@ CREATE OR REPLACE POLICY "Users can view workflow revisions for their restaurant
     AND restaurant_id IN (SELECT id FROM restaurants WHERE owner_id = auth.uid())
   ));
 
-CREATE OR REPLACE POLICY "Users can insert workflow revisions"
+DROP POLICY IF EXISTS "Users can insert workflow revisions" ON marketing_workflow_revisions;
+CREATE POLICY "Users can insert workflow revisions"
   ON marketing_workflow_revisions FOR INSERT
   WITH CHECK (EXISTS (
     SELECT 1 FROM marketing_workflow_instances 
@@ -283,7 +300,8 @@ CREATE OR REPLACE POLICY "Users can insert workflow revisions"
     AND restaurant_id IN (SELECT id FROM restaurants WHERE owner_id = auth.uid())
   ));
 
-CREATE OR REPLACE POLICY "Users can view workflow assets for their restaurant"
+DROP POLICY IF EXISTS "Users can view workflow assets for their restaurant" ON marketing_workflow_assets;
+CREATE POLICY "Users can view workflow assets for their restaurant"
   ON marketing_workflow_assets FOR SELECT
   USING (EXISTS (
     SELECT 1 FROM marketing_workflow_instances 
@@ -291,7 +309,8 @@ CREATE OR REPLACE POLICY "Users can view workflow assets for their restaurant"
     AND restaurant_id IN (SELECT id FROM restaurants WHERE owner_id = auth.uid())
   ));
 
-CREATE OR REPLACE POLICY "Users can insert workflow assets"
+DROP POLICY IF EXISTS "Users can insert workflow assets" ON marketing_workflow_assets;
+CREATE POLICY "Users can insert workflow assets"
   ON marketing_workflow_assets FOR INSERT
   WITH CHECK (EXISTS (
     SELECT 1 FROM marketing_workflow_instances 
@@ -299,7 +318,8 @@ CREATE OR REPLACE POLICY "Users can insert workflow assets"
     AND restaurant_id IN (SELECT id FROM restaurants WHERE owner_id = auth.uid())
   ));
 
-CREATE OR REPLACE POLICY "Users can view workflow comments for their restaurant"
+DROP POLICY IF EXISTS "Users can view workflow comments for their restaurant" ON marketing_workflow_comments;
+CREATE POLICY "Users can view workflow comments for their restaurant"
   ON marketing_workflow_comments FOR SELECT
   USING (EXISTS (
     SELECT 1 FROM marketing_workflow_instances 
@@ -307,7 +327,8 @@ CREATE OR REPLACE POLICY "Users can view workflow comments for their restaurant"
     AND restaurant_id IN (SELECT id FROM restaurants WHERE owner_id = auth.uid())
   ));
 
-CREATE OR REPLACE POLICY "Users can insert workflow comments"
+DROP POLICY IF EXISTS "Users can insert workflow comments" ON marketing_workflow_comments;
+CREATE POLICY "Users can insert workflow comments"
   ON marketing_workflow_comments FOR INSERT
   WITH CHECK (EXISTS (
     SELECT 1 FROM marketing_workflow_instances 
