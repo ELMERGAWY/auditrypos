@@ -112,9 +112,39 @@ export function MarketingWorkflow({ restaurantId, currency }: Props) {
     estimated_hours: ''
   });
 
+  const ensureDefaultStages = async () => {
+    try {
+      // Check if stages already exist
+      const { data: existingStages } = await supabase
+        .from('marketing_workflow_stages')
+        .select('id')
+        .eq('restaurant_id', restaurantId)
+        .limit(1);
+
+      if (!existingStages || existingStages.length === 0) {
+        // Create default stages using the function
+        const { error } = await supabase.rpc('create_default_workflow_stages', {
+          p_restaurant_id: restaurantId
+        });
+        
+        if (error) {
+          console.error('Error creating default stages:', error);
+          toast.error('خطأ في إنشاء المراحل الافتراضية');
+        } else {
+          toast.success('تم إنشاء المراحل الافتراضية بنجاح');
+        }
+      }
+    } catch (e: any) {
+      console.error('Error ensuring default stages:', e);
+    }
+  };
+
   const loadData = async () => {
     setLoading(true);
     try {
+      // Ensure default stages exist first
+      await ensureDefaultStages();
+
       const [stagesRes, instancesRes, tasksRes, staffRes, deptRes] = await Promise.all([
         supabase.from('marketing_workflow_stages').select('*').eq('restaurant_id', restaurantId).order('order_index'),
         supabase.from('marketing_workflow_instances').select('*, marketing_workflow_stages(*)').eq('restaurant_id', restaurantId).order('created_at', { ascending: false }),
