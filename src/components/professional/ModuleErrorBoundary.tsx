@@ -40,7 +40,7 @@ export class ModuleErrorBoundary extends Component<Props, State> {
               حدث خطأ غير متوقع أثناء تحميل البيانات. يرجى محاولة تحديث الصفحة أو العودة للرئيسية.
             </p>
           </div>
-          {process.env.NODE_ENV === 'development' && (
+          {true && (
             <div className="p-4 bg-muted rounded-xl text-left text-xs font-mono max-w-lg overflow-auto border">
               {this.state.error?.toString()}
             </div>
