@@ -112,7 +112,8 @@ CREATE INDEX IF NOT EXISTS idx_warning_history_customer
   ON public.customer_warning_history (customer_id, created_at DESC);
 
 -- 8. Update add_customer_warning to record history
-CREATE OR REPLACE FUNCTION public.add_customer_warning(p_customer_id UUID, p_reason TEXT DEFAULT NULL, p_user_id UUID DEFAULT NULL)
+DROP FUNCTION IF EXISTS public.add_customer_warning(UUID, TEXT, UUID);
+CREATE FUNCTION public.add_customer_warning(p_customer_id UUID, p_reason TEXT DEFAULT NULL, p_user_id UUID DEFAULT NULL)
 RETURNS INTEGER
 LANGUAGE plpgsql
 AS $$
@@ -154,7 +155,8 @@ END;
 $$;
 
 -- 9. Update remove_customer_warning to record history
-CREATE OR REPLACE FUNCTION public.remove_customer_warning(p_customer_id UUID, p_reason TEXT DEFAULT NULL, p_user_id UUID DEFAULT NULL)
+DROP FUNCTION IF EXISTS public.remove_customer_warning(UUID, TEXT, UUID);
+CREATE FUNCTION public.remove_customer_warning(p_customer_id UUID, p_reason TEXT DEFAULT NULL, p_user_id UUID DEFAULT NULL)
 RETURNS INTEGER
 LANGUAGE plpgsql
 AS $$
