@@ -83,7 +83,7 @@ export function CustomersTab({ restaurantId, currency }: Props) {
   const load = async () => {
     const { data } = await supabase
       .from('customers')
-      .select('*, risk_level, warning_flags, vip_status')
+      .select('id, name, phone, email, address, customer_type, credit_limit, balance, notes, risk_level, warning_flags, vip_status, created_at')
       .eq('restaurant_id', restaurantId)
       .order('created_at', { ascending: false });
     setCustomers((data || []) as Customer[]);

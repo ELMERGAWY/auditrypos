@@ -99,7 +99,7 @@ CREATE TABLE IF NOT EXISTS public.customer_warning_history (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
   restaurant_id UUID NOT NULL REFERENCES public.restaurants(id) ON DELETE CASCADE,
   customer_id UUID NOT NULL REFERENCES public.customers(id) ON DELETE CASCADE,
-  user_id UUID REFERENCES public.auth.users(id) ON DELETE SET NULL,
+  user_id UUID,
   action TEXT NOT NULL CHECK (action IN ('add', 'remove')),
   warning_count_before INTEGER,
   warning_count_after INTEGER,
