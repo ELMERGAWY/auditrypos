@@ -86,6 +86,7 @@ export function CustomersTab({ restaurantId, currency }: Props) {
       .select('*')
       .eq('restaurant_id', restaurantId)
       .order('created_at', { ascending: false });
+    console.log('Loaded customers:', data);
     setCustomers((data || []) as Customer[]);
   };
 
