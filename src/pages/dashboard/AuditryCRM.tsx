@@ -84,7 +84,7 @@ export function AuditryCRM({ restaurantId, currency, businessType }: Props) {
       
       const { data: customersData, error: custError } = await supabase
         .from('customers')
-        .select('id, name, phone, email, address, customer_type, credit_limit, balance, notes, risk_level, warning_flags, vip_status, loyalty_tier, loyalty_points, created_at')
+        .select('*')
         .eq('restaurant_id', restaurantId);
 
       if (custError) throw custError;
