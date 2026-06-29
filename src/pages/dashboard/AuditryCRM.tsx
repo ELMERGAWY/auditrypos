@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { Card } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -26,7 +27,7 @@ import { ResponsiveContainer, PieChart, Pie, Cell, Tooltip, AreaChart, Area, XAx
 import { 
   FileText, Wallet, Receipt, CreditCard, 
   ArrowUpRight, ArrowDownRight, Download,
-  Settings, Bell, ShieldCheck
+  Settings, Bell, ShieldCheck, ShieldAlert, AlertTriangle
 } from 'lucide-react';
 
 interface Props {
@@ -68,6 +69,11 @@ export function AuditryCRM({ restaurantId, currency, businessType }: Props) {
   // Social message state
   const [selectedMessage, setSelectedMessage] = useState<any | null>(null);
 
+  // Warning management state
+  const [showWarningModal, setShowWarningModal] = useState(false);
+  const [warningReason, setWarningReason] = useState('');
+  const [warningHistory, setWarningHistory] = useState<any[]>([]);
+
   useEffect(() => {
     loadCRMData();
   }, [restaurantId]);
@@ -80,6 +86,9 @@ export function AuditryCRM({ restaurantId, currency, businessType }: Props) {
         .from('customers')
         .select(`
           *,
+          risk_level,
+          warning_flags,
+          vip_status,
           orders(id, total, created_at, status),
           customer_transactions(id, amount, type, created_at)
         `)
@@ -256,6 +265,73 @@ export function AuditryCRM({ restaurantId, currency, businessType }: Props) {
     setNewLead({ name: '', phone: '', estimated_value: '' });
     setShowAddLead(false);
     loadCRMData();
+  };
+
+  const handleAddWarning = async () => {
+    if (!selectedCustomer || !warningReason.trim()) {
+      toast.error('يرجى إدخال سبب التحذير');
+      return;
+    }
+
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      
+      const { error } = await supabase.rpc('add_customer_warning', {
+        p_customer_id: selectedCustomer.id,
+        p_reason: warningReason,
+        p_user_id: user?.id || null
+      });
+
+      if (error) throw error;
+
+      toast.success('تم إضافة علامة تحذيرية');
+      setWarningReason('');
+      loadCRMData();
+      
+      // Update selected customer
+      if (selectedCustomer) {
+        selectedCustomer.warning_flags = (selectedCustomer.warning_flags || 0) + 1;
+        selectedCustomer.risk_level = selectedCustomer.warning_flags >= 3 ? 'high' : selectedCustomer.warning_flags >= 2 ? 'medium' : 'normal';
+      }
+    } catch (e: any) {
+      toast.error('خطأ: ' + e.message);
+    }
+  };
+
+  const handleRemoveWarning = async () => {
+    if (!selectedCustomer) return;
+
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      
+      const { error } = await supabase.rpc('remove_customer_warning', {
+        p_customer_id: selectedCustomer.id,
+        p_reason: 'إزالة يدوية',
+        p_user_id: user?.id || null
+      });
+
+      if (error) throw error;
+
+      toast.success('تم إزالة علامة تحذيرية');
+      loadCRMData();
+      
+      // Update selected customer
+      if (selectedCustomer) {
+        selectedCustomer.warning_flags = Math.max((selectedCustomer.warning_flags || 0) - 1, 0);
+        selectedCustomer.risk_level = selectedCustomer.warning_flags >= 3 ? 'high' : selectedCustomer.warning_flags >= 2 ? 'medium' : 'normal';
+      }
+    } catch (e: any) {
+      toast.error('خطأ: ' + e.message);
+    }
+  };
+
+  const loadWarningHistory = async (customerId: string) => {
+    const { data } = await supabase
+      .from('customer_warning_history')
+      .select('*')
+      .eq('customer_id', customerId)
+      .order('created_at', { ascending: false });
+    setWarningHistory(data || []);
   };
 
   const updateLeadStage = async (id: string, stage: LeadStage) => {
@@ -1215,6 +1291,15 @@ export function AuditryCRM({ restaurantId, currency, businessType }: Props) {
                     <div className="flex gap-2 mt-2">
                       <Badge className="bg-primary/10 text-primary border-primary/20">{selectedCustomer.loyalty_tier || 'البرونزي'}</Badge>
                       <Badge variant="outline" className="border-emerald-500/30 text-emerald-600">عميل نشط</Badge>
+                      {selectedCustomer.vip_status && <Badge className="bg-yellow-500 text-white">VIP ⭐</Badge>}
+                      {selectedCustomer.warning_flags > 0 && (
+                        <Badge variant="outline" className="bg-red-50 text-red-600 border-red-200">
+                          <AlertTriangle className="w-2 h-2 mr-1" />
+                          {selectedCustomer.warning_flags}
+                        </Badge>
+                      )}
+                      {selectedCustomer.risk_level === 'high' && <Badge className="bg-red-500">خطر</Badge>}
+                      {selectedCustomer.risk_level === 'blocked' && <Badge className="bg-red-700">محظور</Badge>}
                     </div>
                   </div>
                 </div>
@@ -1341,6 +1426,10 @@ export function AuditryCRM({ restaurantId, currency, businessType }: Props) {
             </div>
 
             <div className="p-4 border-t bg-secondary/30 flex justify-end gap-3">
+              <Button variant="outline" onClick={() => { setShowWarningModal(true); loadWarningHistory(selectedCustomer.id); }}>
+                <ShieldAlert className="w-4 h-4 ml-2" />
+                إدارة التحذيرات
+              </Button>
               <Button variant="outline" onClick={() => setShowCustomerDetails(false)}>إغلاق</Button>
               <Button className="gradient-bg text-white border-0 gap-2"><Download className="w-4 h-4" /> تحميل كشف الحساب</Button>
               <Button className="bg-emerald-600 text-white hover:bg-emerald-700 gap-2"><Plus className="w-4 h-4" /> تسجيل سداد</Button>
@@ -1348,6 +1437,92 @@ export function AuditryCRM({ restaurantId, currency, businessType }: Props) {
           </DialogContent>
         </Dialog>
       )}
+
+      {/* Warning Management Modal */}
+      <Dialog open={showWarningModal} onOpenChange={setShowWarningModal}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <ShieldAlert className="w-5 h-5 text-orange-500" />
+              إدارة التحذيرات — {selectedCustomer?.name}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            {/* Current Status */}
+            <div className="p-4 bg-secondary/30 rounded-lg">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-sm font-medium">العلامات التحذيرية الحالية:</span>
+                <Badge className={selectedCustomer?.warning_flags >= 3 ? 'bg-red-500' : selectedCustomer?.warning_flags >= 2 ? 'bg-yellow-500' : 'bg-green-500'}>
+                  {selectedCustomer?.warning_flags || 0} / 4
+                </Badge>
+              </div>
+              <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                <span>مستوى الخطورة:</span>
+                <Badge variant="outline" className={
+                  selectedCustomer?.risk_level === 'blocked' ? 'bg-red-100 text-red-700 border-red-300' :
+                  selectedCustomer?.risk_level === 'high' ? 'bg-orange-100 text-orange-700 border-orange-300' :
+                  selectedCustomer?.risk_level === 'medium' ? 'bg-yellow-100 text-yellow-700 border-yellow-300' :
+                  'bg-green-100 text-green-700 border-green-300'
+                }>
+                  {selectedCustomer?.risk_level === 'blocked' ? 'محظور' :
+                   selectedCustomer?.risk_level === 'high' ? 'عالي' :
+                   selectedCustomer?.risk_level === 'medium' ? 'متوسط' : 'عادي'}
+                </Badge>
+              </div>
+            </div>
+
+            {/* Add Warning */}
+            <div className="space-y-2">
+              <label className="text-sm font-medium">إضافة علامة تحذيرية</label>
+              <Input
+                placeholder="اكتب سبب التحذير..."
+                value={warningReason}
+                onChange={e => setWarningReason(e.target.value)}
+              />
+              <div className="flex gap-2">
+                <Button onClick={handleAddWarning} className="flex-1" disabled={!warningReason.trim()}>
+                  <AlertTriangle className="w-4 h-4 ml-2" />
+                  إضافة علامة
+                </Button>
+                <Button onClick={handleRemoveWarning} variant="outline" disabled={selectedCustomer?.warning_flags === 0}>
+                  <ShieldCheck className="w-4 h-4 ml-2" />
+                  إزالة علامة
+                </Button>
+              </div>
+            </div>
+
+            {/* Warning History */}
+            <div className="space-y-2">
+              <label className="text-sm font-medium">سجل التحذيرات</label>
+              <div className="max-h-40 overflow-auto space-y-2">
+                {warningHistory.length === 0 ? (
+                  <p className="text-xs text-muted-foreground text-center py-4">لا يوجد سجل تحذيرات</p>
+                ) : (
+                  warningHistory.map(h => (
+                    <div key={h.id} className="p-2 bg-secondary/20 rounded text-xs">
+                      <div className="flex items-center justify-between">
+                        <span className={h.action === 'add' ? 'text-red-600' : 'text-green-600'}>
+                          {h.action === 'add' ? 'إضافة' : 'إزالة'}
+                        </span>
+                        <span className="text-muted-foreground">
+                          {new Date(h.created_at).toLocaleDateString('ar-EG')}
+                        </span>
+                      </div>
+                      {h.reason && <p className="mt-1 text-muted-foreground">{h.reason}</p>}
+                      <div className="text-muted-foreground mt-1">
+                        {h.warning_count_before} → {h.warning_count_after}
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowWarningModal(false)}>إغلاق</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

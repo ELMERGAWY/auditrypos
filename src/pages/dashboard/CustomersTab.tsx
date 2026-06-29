@@ -1,9 +1,11 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Users, Plus, Search, Edit2, Trash2, CreditCard, FileText, X, BarChart3, TrendingUp, ShoppingCart } from 'lucide-react';
+import { Users, Plus, Search, Edit2, Trash2, CreditCard, FileText, X, BarChart3, TrendingUp, ShoppingCart, AlertTriangle, Star, ShieldAlert, ShieldCheck } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
+import { Textarea } from '@/components/ui/textarea';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
@@ -19,6 +21,18 @@ interface Customer {
   credit_limit: number;
   balance: number;
   notes: string;
+  risk_level?: string;
+  warning_flags?: number;
+  vip_status?: boolean;
+}
+
+interface WarningHistory {
+  id: string;
+  action: string;
+  warning_count_before: number;
+  warning_count_after: number;
+  reason: string;
+  created_at: string;
 }
 
 interface Transaction {
@@ -58,13 +72,20 @@ export function CustomersTab({ restaurantId, currency }: Props) {
   });
   const [showReports, setShowReports] = useState(false);
   const [allTransactions, setAllTransactions] = useState<(Transaction & { customer_name?: string })[]>([]);
+  const [showWarningModal, setShowWarningModal] = useState<Customer | null>(null);
+  const [warningReason, setWarningReason] = useState('');
+  const [warningHistory, setWarningHistory] = useState<WarningHistory[]>([]);
   const [form, setForm] = useState({
     name: '', phone: '', email: '', address: '', customer_type: 'retail',
-    credit_limit: '', notes: '',
+    credit_limit: '', notes: '', vip_status: false, risk_level: 'normal',
   });
 
   const load = async () => {
-    const { data } = await supabase.from('customers').select('*').eq('restaurant_id', restaurantId).order('created_at', { ascending: false });
+    const { data } = await supabase
+      .from('customers')
+      .select('*, risk_level, warning_flags, vip_status')
+      .eq('restaurant_id', restaurantId)
+      .order('created_at', { ascending: false });
     setCustomers((data || []) as Customer[]);
   };
 
@@ -87,7 +108,7 @@ export function CustomersTab({ restaurantId, currency }: Props) {
       restaurant_id: restaurantId,
       name: form.name, phone: form.phone, email: form.email, address: form.address,
       customer_type: form.customer_type, credit_limit: Number(form.credit_limit) || 0,
-      notes: form.notes,
+      notes: form.notes, vip_status: form.vip_status, risk_level: form.risk_level,
     };
     if (editingCustomer) {
       await supabase.from('customers').update(data).eq('id', editingCustomer.id);
@@ -97,6 +118,63 @@ export function CustomersTab({ restaurantId, currency }: Props) {
       toast.success('تم إضافة العميل');
     }
     resetForm(); load();
+  };
+
+  const handleAddWarning = async () => {
+    if (!showWarningModal || !warningReason.trim()) {
+      toast.error('يرجى إدخال سبب التحذير');
+      return;
+    }
+
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      
+      const { error } = await supabase.rpc('add_customer_warning', {
+        p_customer_id: showWarningModal.id,
+        p_reason: warningReason,
+        p_user_id: user?.id || null
+      });
+
+      if (error) throw error;
+
+      toast.success('تم إضافة علامة تحذيرية');
+      setWarningReason('');
+      setShowWarningModal(null);
+      load();
+    } catch (e: any) {
+      toast.error('خطأ: ' + e.message);
+    }
+  };
+
+  const handleRemoveWarning = async () => {
+    if (!showWarningModal) return;
+
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      
+      const { error } = await supabase.rpc('remove_customer_warning', {
+        p_customer_id: showWarningModal.id,
+        p_reason: 'إزالة يدوية',
+        p_user_id: user?.id || null
+      });
+
+      if (error) throw error;
+
+      toast.success('تم إزالة علامة تحذيرية');
+      setShowWarningModal(null);
+      load();
+    } catch (e: any) {
+      toast.error('خطأ: ' + e.message);
+    }
+  };
+
+  const loadWarningHistory = async (customerId: string) => {
+    const { data } = await supabase
+      .from('customer_warning_history')
+      .select('*')
+      .eq('customer_id', customerId)
+      .order('created_at', { ascending: false });
+    setWarningHistory((data || []) as WarningHistory[]);
   };
 
   const handleDelete = async (id: string) => {
@@ -252,7 +330,7 @@ export function CustomersTab({ restaurantId, currency }: Props) {
 
   const resetForm = () => {
     setShowForm(false); setEditingCustomer(null);
-    setForm({ name: '', phone: '', email: '', address: '', customer_type: 'retail', credit_limit: '', notes: '' });
+    setForm({ name: '', phone: '', email: '', address: '', customer_type: 'retail', credit_limit: '', notes: '', vip_status: false, risk_level: 'normal' });
   };
 
   const startEdit = (c: Customer) => {
@@ -260,6 +338,7 @@ export function CustomersTab({ restaurantId, currency }: Props) {
     setForm({
       name: c.name, phone: c.phone, email: c.email, address: c.address,
       customer_type: c.customer_type, credit_limit: String(c.credit_limit), notes: c.notes,
+      vip_status: c.vip_status || false, risk_level: c.risk_level || 'normal',
     });
     setShowForm(true);
   };
@@ -406,6 +485,19 @@ export function CustomersTab({ restaurantId, currency }: Props) {
                 </select>
                 <Input placeholder="حد الائتمان" type="number" value={form.credit_limit} onChange={e => setForm(f => ({ ...f, credit_limit: e.target.value }))} />
               </div>
+              <div className="grid grid-cols-2 gap-3">
+                <select value={form.risk_level} onChange={e => setForm(f => ({ ...f, risk_level: e.target.value }))}
+                  className="w-full px-3 py-2 rounded-lg bg-secondary text-secondary-foreground border border-border text-sm">
+                  <option value="normal">عادي</option>
+                  <option value="medium">متوسط الخطورة</option>
+                  <option value="high">عالي الخطورة</option>
+                  <option value="blocked">محظور</option>
+                </select>
+                <label className="flex items-center gap-2 cursor-pointer px-3 py-2 rounded-lg bg-secondary border border-border">
+                  <input type="checkbox" checked={form.vip_status} onChange={e => setForm(f => ({ ...f, vip_status: e.target.checked }))} className="w-4 h-4" />
+                  <span className="text-sm">عميل مميز ⭐</span>
+                </label>
+              </div>
               <Input placeholder="ملاحظات" value={form.notes} onChange={e => setForm(f => ({ ...f, notes: e.target.value }))} />
               <div className="flex gap-2">
                 <Button onClick={handleSave} className="flex-1 gradient-bg text-primary-foreground border-0">{editingCustomer ? 'حفظ' : 'إضافة'}</Button>
@@ -550,6 +642,93 @@ export function CustomersTab({ restaurantId, currency }: Props) {
         )}
       </AnimatePresence>
 
+      {/* Warning Management Modal */}
+      <Dialog open={!!showWarningModal} onOpenChange={(open) => !open && setShowWarningModal(null)}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <ShieldAlert className="w-5 h-5 text-orange-500" />
+              إدارة التحذيرات — {showWarningModal?.name}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            {/* Current Status */}
+            <div className="p-4 bg-secondary/30 rounded-lg">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-sm font-medium">العلامات التحذيرية الحالية:</span>
+                <Badge className={showWarningModal?.warning_flags >= 3 ? 'bg-red-500' : showWarningModal?.warning_flags >= 2 ? 'bg-yellow-500' : 'bg-green-500'}>
+                  {showWarningModal?.warning_flags || 0} / 4
+                </Badge>
+              </div>
+              <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                <span>مستوى الخطورة:</span>
+                <Badge variant="outline" className={
+                  showWarningModal?.risk_level === 'blocked' ? 'bg-red-100 text-red-700 border-red-300' :
+                  showWarningModal?.risk_level === 'high' ? 'bg-orange-100 text-orange-700 border-orange-300' :
+                  showWarningModal?.risk_level === 'medium' ? 'bg-yellow-100 text-yellow-700 border-yellow-300' :
+                  'bg-green-100 text-green-700 border-green-300'
+                }>
+                  {showWarningModal?.risk_level === 'blocked' ? 'محظور' :
+                   showWarningModal?.risk_level === 'high' ? 'عالي' :
+                   showWarningModal?.risk_level === 'medium' ? 'متوسط' : 'عادي'}
+                </Badge>
+              </div>
+            </div>
+
+            {/* Add Warning */}
+            <div className="space-y-2">
+              <label className="text-sm font-medium">إضافة علامة تحذيرية</label>
+              <Textarea
+                placeholder="اكتب سبب التحذير..."
+                value={warningReason}
+                onChange={e => setWarningReason(e.target.value)}
+                rows={3}
+              />
+              <div className="flex gap-2">
+                <Button onClick={handleAddWarning} className="flex-1" disabled={!warningReason.trim()}>
+                  <AlertTriangle className="w-4 h-4 ml-2" />
+                  إضافة علامة
+                </Button>
+                <Button onClick={handleRemoveWarning} variant="outline" disabled={showWarningModal?.warning_flags === 0}>
+                  <ShieldCheck className="w-4 h-4 ml-2" />
+                  إزالة علامة
+                </Button>
+              </div>
+            </div>
+
+            {/* Warning History */}
+            <div className="space-y-2">
+              <label className="text-sm font-medium">سجل التحذيرات</label>
+              <div className="max-h-40 overflow-auto space-y-2">
+                {warningHistory.length === 0 ? (
+                  <p className="text-xs text-muted-foreground text-center py-4">لا يوجد سجل تحذيرات</p>
+                ) : (
+                  warningHistory.map(h => (
+                    <div key={h.id} className="p-2 bg-secondary/20 rounded text-xs">
+                      <div className="flex items-center justify-between">
+                        <span className={h.action === 'add' ? 'text-red-600' : 'text-green-600'}>
+                          {h.action === 'add' ? 'إضافة' : 'إزالة'}
+                        </span>
+                        <span className="text-muted-foreground">
+                          {new Date(h.created_at).toLocaleDateString('ar-EG')}
+                        </span>
+                      </div>
+                      {h.reason && <p className="mt-1 text-muted-foreground">{h.reason}</p>}
+                      <div className="text-muted-foreground mt-1">
+                        {h.warning_count_before} → {h.warning_count_after}
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowWarningModal(null)}>إغلاق</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       {/* Customers List */}
       <div className="space-y-2">
         {filtered.map(c => (
@@ -565,9 +744,18 @@ export function CustomersTab({ restaurantId, currency }: Props) {
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2">
                   <p className="font-bold text-sm">{c.name}</p>
+                  {c.vip_status && <Star className="w-3 h-3 text-yellow-500 fill-yellow-500" />}
                   <Badge variant="outline" className="text-[10px]">
                     {c.customer_type === 'wholesale' ? 'جملة' : c.customer_type === 'vip' ? 'VIP' : 'تجزئة'}
                   </Badge>
+                  {c.warning_flags > 0 && (
+                    <Badge variant="outline" className="text-[10px] bg-red-50 text-red-600 border-red-200">
+                      <AlertTriangle className="w-2 h-2 mr-1" />
+                      {c.warning_flags}
+                    </Badge>
+                  )}
+                  {c.risk_level === 'high' && <Badge className="text-[10px] bg-red-500">خطر</Badge>}
+                  {c.risk_level === 'blocked' && <Badge className="text-[10px] bg-red-700">محظور</Badge>}
                 </div>
                 <div className="flex items-center gap-3 text-xs text-muted-foreground mt-1">
                   {c.phone && <span>📱 {c.phone}</span>}
@@ -578,6 +766,9 @@ export function CustomersTab({ restaurantId, currency }: Props) {
                 </div>
               </div>
               <div className="flex gap-1">
+                <Button size="sm" variant="ghost" onClick={() => { setShowWarningModal(c); loadWarningHistory(c.id); }} title="إدارة التحذيرات">
+                  <ShieldAlert className="w-3 h-3" />
+                </Button>
                 <Button size="sm" variant="ghost" onClick={() => setShowPayment(c)} title="سند قبض / تسجيل دفعة"><CreditCard className="w-3 h-3" /></Button>
                 <Button size="sm" variant="ghost" onClick={() => openLedger(c)} title="كشف حساب"><FileText className="w-3 h-3" /></Button>
                 <Button size="sm" variant="ghost" onClick={() => startEdit(c)}><Edit2 className="w-3 h-3" /></Button>
