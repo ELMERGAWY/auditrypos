@@ -55,12 +55,14 @@ export function ServiceDeliverables({ restaurantId, currency }: Props) {
   const [contracts, setContracts] = useState<any[]>([]);
   const [quotes, setQuotes] = useState<any[]>([]);
   const [services, setServices] = useState<any[]>([]);
+  const [invoices, setInvoices] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [showModal, setShowModal] = useState(false);
   const [editingDeliverable, setEditingDeliverable] = useState<ServiceDeliverable | null>(null);
   const [form, setForm] = useState({
     contract_id: '',
     quote_id: '',
+    invoice_id: '',
     service_id: '',
     service_name: '',
     description: '',
@@ -145,14 +147,16 @@ export function ServiceDeliverables({ restaurantId, currency }: Props) {
 
   const loadRelatedData = async () => {
     try {
-      const [contractsRes, quotesRes, servicesRes] = await Promise.all([
+      const [contractsRes, quotesRes, servicesRes, invoicesRes] = await Promise.all([
         supabase.from('marketing_contracts').select('id, contract_number, customer_name').eq('restaurant_id', restaurantId),
         supabase.from('marketing_quotes').select('id, quote_number, customer_name').eq('restaurant_id', restaurantId),
-        supabase.from('marketing_services').select('id, name').eq('restaurant_id', restaurantId)
+        supabase.from('marketing_services').select('id, name').eq('restaurant_id', restaurantId),
+        supabase.from('orders').select('id, order_number, customer_name, order_items(*)').eq('restaurant_id', restaurantId)
       ]);
       setContracts(contractsRes.data || []);
       setQuotes(quotesRes.data || []);
       setServices(servicesRes.data || []);
+      setInvoices(invoicesRes.data || []);
     } catch (e: any) {
       console.error('Error loading related data:', e);
     }
@@ -174,6 +178,7 @@ export function ServiceDeliverables({ restaurantId, currency }: Props) {
         restaurant_id: restaurantId,
         contract_id: form.contract_id || null,
         quote_id: form.quote_id || null,
+        invoice_id: form.invoice_id || null,
         service_id: form.service_id || null,
         service_name: form.service_name,
         description: form.description || null,
@@ -225,6 +230,7 @@ export function ServiceDeliverables({ restaurantId, currency }: Props) {
     setForm({
       contract_id: '',
       quote_id: '',
+      invoice_id: '',
       service_id: '',
       service_name: '',
       description: '',
@@ -330,6 +336,7 @@ export function ServiceDeliverables({ restaurantId, currency }: Props) {
                     setForm({
                       contract_id: deliverable.contract_id || '',
                       quote_id: deliverable.quote_id || '',
+                      invoice_id: deliverable.invoice_id || '',
                       service_id: deliverable.service_id || '',
                       service_name: deliverable.service_name,
                       description: deliverable.description || '',
@@ -431,6 +438,31 @@ export function ServiceDeliverables({ restaurantId, currency }: Props) {
                   <SelectContent>
                     {safeQuotes.map(q => (
                       <SelectItem key={q.id} value={q.id}>{q.quote_number} - {q.customer_name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label>الفاتورة (اختياري)</Label>
+                <Select value={form.invoice_id} onValueChange={async (v) => {
+                  setForm({ ...form, invoice_id: v });
+                  if (v) {
+                    // Load services from the invoice
+                    const invoice = invoices.find((inv: any) => inv.id === v);
+                    if (invoice && invoice.order_items && invoice.order_items.length > 0) {
+                      const firstItem = invoice.order_items[0];
+                      setForm(f => ({
+                        ...f,
+                        service_name: firstItem.menu_item_name || '',
+                        description: invoice.notes || ''
+                      }));
+                    }
+                  }
+                }}>
+                  <SelectTrigger><SelectValue placeholder="اختر الفاتورة" /></SelectTrigger>
+                  <SelectContent>
+                    {invoices.map((inv: any) => (
+                      <SelectItem key={inv.id} value={inv.id}>{inv.order_number} - {inv.customer_name}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
