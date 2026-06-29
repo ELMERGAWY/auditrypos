@@ -1,7 +1,8 @@
 import { useState, useEffect, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { Users } from 'lucide-react';
+import { Users, AlertTriangle, Star, ShieldAlert } from 'lucide-react';
 import { Input } from '@/components/ui/input';
+import { Badge } from '@/components/ui/badge';
 
 interface Customer {
   id: string;
@@ -10,6 +11,9 @@ interface Customer {
   address?: string;
   balance: number;
   customer_type: string;
+  risk_level?: string;
+  warning_flags?: number;
+  vip_status?: boolean;
 }
 
 interface Props {
@@ -39,7 +43,7 @@ export function CustomerSearch({ restaurantId, value, onChange, placeholder }: P
     const timer = window.setTimeout(async () => {
       const safeQuery = query.replace(/[%,]/g, '');
       let queryBuilder = supabase.from('customers')
-        .select('id, name, phone, address, balance, customer_type')
+        .select('id, name, phone, address, balance, customer_type, risk_level, warning_flags, vip_status')
         .eq('restaurant_id', restaurantId)
         .limit(8);
 
@@ -72,18 +76,48 @@ export function CustomerSearch({ restaurantId, value, onChange, placeholder }: P
       />
       {showSuggestions && suggestions.length > 0 && (
         <div className="absolute top-full right-0 left-0 z-50 mt-1 bg-card border border-border rounded-lg shadow-lg max-h-48 overflow-auto">
-          {suggestions.map(c => (
-            <button key={c.id} onClick={() => selectCustomer(c)}
-              className="w-full px-3 py-2 text-right text-xs hover:bg-secondary transition-colors flex items-center gap-2">
-              <span className="font-medium">{c.name}</span>
-              {c.phone && <span className="text-muted-foreground">{c.phone}</span>}
-              {c.balance !== 0 && (
-                <span className={`mr-auto text-[10px] font-bold ${c.balance > 0 ? 'text-destructive' : 'text-success'}`}>
-                  {c.balance > 0 ? 'مدين' : 'دائن'}: {Math.abs(c.balance)}
-                </span>
-              )}
-            </button>
-          ))}
+          {suggestions.map(c => {
+            const isBlocked = c.risk_level === 'blocked';
+            const isHighRisk = c.risk_level === 'high';
+            const isMediumRisk = c.risk_level === 'medium';
+            const isVIP = c.vip_status;
+
+            return (
+              <button
+                key={c.id}
+                onClick={() => selectCustomer(c)}
+                className={`w-full px-3 py-2 text-right text-xs hover:bg-secondary transition-colors flex items-center gap-2 ${
+                  isBlocked ? 'bg-red-50 border-red-200' : ''
+                }`}
+              >
+                <div className="flex items-center gap-2 flex-1">
+                  {isBlocked && <ShieldAlert className="w-3 h-3 text-red-600" />}
+                  {isVIP && <Star className="w-3 h-3 text-yellow-500 fill-yellow-500" />}
+                  <span className={`font-medium ${isBlocked ? 'text-red-700' : ''}`}>{c.name}</span>
+                  {c.phone && <span className="text-muted-foreground">{c.phone}</span>}
+                </div>
+                <div className="flex items-center gap-1">
+                  {c.warning_flags > 0 && (
+                    <Badge variant="outline" className="text-[10px] px-1 py-0 h-4">
+                      <AlertTriangle className="w-2 h-2 mr-1" />
+                      {c.warning_flags}
+                    </Badge>
+                  )}
+                  {isHighRisk && (
+                    <Badge className="text-[10px] px-1 py-0 h-4 bg-red-500">خطر</Badge>
+                  )}
+                  {isMediumRisk && (
+                    <Badge className="text-[10px] px-1 py-0 h-4 bg-yellow-500">متوسط</Badge>
+                  )}
+                  {c.balance !== 0 && (
+                    <span className={`text-[10px] font-bold ${c.balance > 0 ? 'text-destructive' : 'text-success'}`}>
+                      {c.balance > 0 ? 'مدين' : 'دائن'}: {Math.abs(c.balance)}
+                    </span>
+                  )}
+                </div>
+              </button>
+            );
+          })}
         </div>
       )}
     </div>

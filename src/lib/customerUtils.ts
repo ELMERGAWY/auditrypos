@@ -5,6 +5,10 @@ import { supabase } from '@/integrations/supabase/client';
  * Find or create a customer by name and phone
  * This is used in service activities (MarketingQuotes, MarketingContracts, SalesOrders)
  * to ensure customers are registered in the customers table
+ *
+ * IMPORTANT: Prevents duplicate customers by checking BOTH name AND phone
+ * - If phone is provided: checks for exact phone match OR (name match AND no phone)
+ * - If phone is NOT provided: checks for name match only (for cash customers)
  */
 export async function findOrCreateCustomer(
   restaurantId: string,
@@ -17,15 +21,19 @@ export async function findOrCreateCustomer(
     const trimmedName = name.trim();
     const trimmedPhone = phone?.trim();
 
-    // 1. Try to find existing customer
+    // 1. Try to find existing customer with STRICT duplicate prevention
     let query = supabase
       .from('customers')
       .select('id, name, phone')
       .eq('restaurant_id', restaurantId);
-    
+
     if (trimmedPhone) {
-      query = query.or(`phone.eq.${trimmedPhone},name.ilike.${trimmedName}`);
+      // If phone is provided, check for:
+      // 1. Exact phone match (same customer with same phone)
+      // 2. Name match AND no phone (same customer without phone registered)
+      query = query.or(`phone.eq.${trimmedPhone},and(name.ilike.${trimmedName},phone.is.null)`);
     } else {
+      // If no phone, check for name match only (for cash customers)
       query = query.ilike('name', trimmedName);
     }
 
@@ -44,11 +52,12 @@ export async function findOrCreateCustomer(
           .update({ phone: trimmedPhone })
           .eq('id', customer.id);
       }
+      console.log(`[customerUtils] Found existing customer: ${customer.name} (ID: ${customer.id})`);
       return customer.id;
     }
 
     // 2. Create new customer if not found
-    console.log(`[customerUtils] Creating new customer: ${trimmedName}`);
+    console.log(`[customerUtils] Creating new customer: ${trimmedName}${trimmedPhone ? ` (${trimmedPhone})` : ''}`);
     const { data: newCustomer, error: insertError } = await supabase
       .from('customers')
       .insert({
@@ -63,7 +72,7 @@ export async function findOrCreateCustomer(
 
     if (insertError) {
       console.error('[customerUtils] Failed to create customer:', insertError);
-      // If it's a unique constraint error on name+restaurant_id, try one last fetch
+      // If it's a unique constraint error, try one last fetch
       if (insertError.code === '23505') {
          const { data: lastTry } = await supabase
            .from('customers')
