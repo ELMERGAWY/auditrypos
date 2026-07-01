@@ -285,6 +285,27 @@ export const POSCart = memo(function POSCart({
                     className="w-full mt-1 h-6 text-[10px] bg-secondary rounded border border-border px-1 focus:ring-1 focus:ring-primary outline-none"
                   />
                 )}
+                {/* Variables (flexible key/value) — available for any item */}
+                <button
+                  type="button"
+                  onClick={() => setVariableDialogFor(c)}
+                  className={`mt-1 inline-flex items-center gap-1 h-6 px-2 text-[10px] rounded border transition-all ${
+                    (c.variables && c.variables.length) ? 'bg-primary/10 border-primary/30 text-primary font-bold' : 'bg-secondary border-border text-muted-foreground hover:bg-secondary/80'
+                  }`}
+                >
+                  <Tags className="w-3 h-3" />
+                  {(c.variables && c.variables.length) ? `${c.variables.length} متغير` : '+ متغيرات'}
+                </button>
+                {c.variables && c.variables.length > 0 && (
+                  <div className="mt-1 flex flex-wrap gap-1">
+                    {c.variables.slice(0, 3).map((v, i) => (
+                      <span key={i} className="text-[9px] bg-primary/5 border border-primary/20 rounded px-1 py-0.5">
+                        <span className="font-bold">{v.label}:</span> {v.value}
+                      </span>
+                    ))}
+                    {c.variables.length > 3 && <span className="text-[9px] text-muted-foreground">+{c.variables.length - 3}</span>}
+                  </div>
+                )}
               </div>
 
               {/* Qty + Value controls */}
