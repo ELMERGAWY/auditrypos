@@ -1,7 +1,8 @@
 // @ts-nocheck
 import React, { memo, useState } from 'react';
 import { motion } from 'framer-motion';
-import { ShoppingCart, Pause, Play, Trash2, Hash, Phone, MapPin, StickyNote, DollarSign, Send, Receipt, Minus, Plus, X, Calendar } from 'lucide-react';
+import { ShoppingCart, Pause, Play, Trash2, Hash, Phone, MapPin, StickyNote, DollarSign, Send, Receipt, Minus, Plus, X, Calendar, Tags } from 'lucide-react';
+import { ServiceVariablesDialog } from '@/components/ServiceVariablesDialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
@@ -63,6 +64,7 @@ interface POSCartProps {
   updateValue: (id: string, value: number) => void;
   updatePrice: (id: string, price: number) => void;
   updateServiceDetails: (id: string, details: string) => void;
+  updateServiceVariables?: (id: string, vars: { label: string; value: string }[]) => void;
   removeFromCart: (id: string) => void;
   accountingAccounts: any[];
   selectedAccountId: string | null;
@@ -81,9 +83,10 @@ export const POSCart = memo(function POSCart({
   currency, getUnitOptions, setCartItemUnit, updateQty, setCartItemQty,
   discountAmount, taxAmount, cartSubtotal, cartTotal, paymentMethod, setPaymentMethod,
   paidAmount, setPaidAmount, remaining, customerRef, setCustomerRef, checkout, previewInvoice,
-  updateValue, updatePrice, updateServiceDetails, removeFromCart,
+  updateValue, updatePrice, updateServiceDetails, updateServiceVariables, removeFromCart,
   accountingAccounts, selectedAccountId, setSelectedAccountId, isProcessing
 }: POSCartProps) {
+  const [variableDialogFor, setVariableDialogFor] = useState<any>(null);
   const { hasPermission } = usePermissions(restaurant?.id);
   const [editingPriceId, setEditingPriceId] = useState<string | null>(null);
   const [editingQtyId, setEditingQtyId] = useState<string | null>(null);
