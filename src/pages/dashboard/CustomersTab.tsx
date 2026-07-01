@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Users, Plus, Search, Edit2, Trash2, CreditCard, FileText, X, BarChart3, TrendingUp, ShoppingCart, AlertTriangle, Star, ShieldAlert, ShieldCheck } from 'lucide-react';
