@@ -32,6 +32,8 @@ import { updateService } from '@/lib/updateService';
 
 // Lazy loaded components for performance
 const DeliveryTab = lazy(() => import('./dashboard/DeliveryTab').then(m => ({ default: m.DeliveryTab })));
+const DeliveryHub = lazy(() => import('./dashboard/DeliveryHub').then(m => ({ default: m.DeliveryHub })));
+const MarketingHub = lazy(() => import('./dashboard/MarketingHub').then(m => ({ default: m.MarketingHub })));
 const ShiftsTab = lazy(() => import('./dashboard/ShiftsTab').then(m => ({ default: m.ShiftsTab })));
 const MenuTab = lazy(() => import('./dashboard/MenuTab').then(m => ({ default: m.MenuTab })));
 const InventoryTab = lazy(() => import('./dashboard/InventoryTab').then(m => ({ default: m.InventoryTab })));
