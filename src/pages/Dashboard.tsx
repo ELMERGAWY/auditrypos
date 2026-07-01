@@ -411,6 +411,13 @@ export default function Dashboard() {
     }));
   }, []);
 
+  const updateServiceVariables = useCallback((id: string, variables: { label: string; value: string }[]) => {
+    setCart(prev => prev.map(c => {
+      if (c.item.id !== id) return c;
+      return { ...c, variables };
+    }));
+  }, []);
+
   const handleDeleteOrder = useCallback(async (id: string) => {
     if (!confirm('هل أنت متأكد من حذف هذا الطلب؟')) return;
     try {
