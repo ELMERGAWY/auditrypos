@@ -768,7 +768,8 @@ export default function Dashboard() {
          {activeTab === 'projects' && (businessType === 'marketing_agency' ? <MarketingProjects {...commonProps} /> : <ContractingDashboard {...commonProps} />)}
          {activeTab === 'expenses' && <ExpensesTab {...commonProps} />}
         {activeTab === 'overheads' && <OverheadManager {...commonProps} />}
-        {activeTab === 'delivery' && <DeliveryTab {...commonProps} agents={agents} setAgents={setAgents} deliveryOrders={deliveryOrders} onAssignAgent={(oid, aid) => supabase.from('orders').update({ delivery_agent_id: aid }).eq('id', oid).then(loadData)} />}
+        {activeTab === 'delivery' && <DeliveryHub {...commonProps} agents={agents} setAgents={setAgents} deliveryOrders={deliveryOrders} restaurantId={restaurant?.id} currency={currency} onAssignAgent={(oid, aid) => supabase.from('orders').update({ delivery_agent_id: aid }).eq('id', oid).then(loadData)} />}
+        {activeTab === 'marketing_hub' && <MarketingHub {...commonProps} />}
         {activeTab === 'shifts' && <ShiftsTab restaurant={restaurant} currentShift={currentShift} setCurrentShift={setCurrentShift} profileName={profileName} userId={user!.id} />}
         
         {/* Accounting Tabs */}
