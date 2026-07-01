@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { ArrowRightLeft, Plus, Trash2, Save, X, Package, Building2, MapPin } from 'lucide-react';

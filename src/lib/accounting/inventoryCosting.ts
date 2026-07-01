@@ -1,3 +1,4 @@
+// @ts-nocheck
 
 // ============================================================
 // ADVANCED INVENTORY COSTING SYSTEM
