@@ -476,6 +476,20 @@ export const POSCart = memo(function POSCart({
           </Button>
         </div>
       </div>
+
+      {/* Service Variables dialog */}
+      <ServiceVariablesDialog
+        open={!!variableDialogFor}
+        onOpenChange={(o) => { if (!o) setVariableDialogFor(null); }}
+        itemName={variableDialogFor?.item?.name}
+        template={variableDialogFor?.item?.variables || []}
+        value={variableDialogFor?.variables || []}
+        onSave={(vars) => {
+          if (variableDialogFor && updateServiceVariables) {
+            updateServiceVariables(variableDialogFor.item.id, vars);
+          }
+        }}
+      />
     </div>
   );
 });
