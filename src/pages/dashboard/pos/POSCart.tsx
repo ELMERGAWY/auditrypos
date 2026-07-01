@@ -1,7 +1,8 @@
 // @ts-nocheck
 import React, { memo, useState } from 'react';
 import { motion } from 'framer-motion';
-import { ShoppingCart, Pause, Play, Trash2, Hash, Phone, MapPin, StickyNote, DollarSign, Send, Receipt, Minus, Plus, X, Calendar } from 'lucide-react';
+import { ShoppingCart, Pause, Play, Trash2, Hash, Phone, MapPin, StickyNote, DollarSign, Send, Receipt, Minus, Plus, X, Calendar, Tags } from 'lucide-react';
+import { ServiceVariablesDialog } from '@/components/ServiceVariablesDialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
@@ -63,6 +64,7 @@ interface POSCartProps {
   updateValue: (id: string, value: number) => void;
   updatePrice: (id: string, price: number) => void;
   updateServiceDetails: (id: string, details: string) => void;
+  updateServiceVariables?: (id: string, vars: { label: string; value: string }[]) => void;
   removeFromCart: (id: string) => void;
   accountingAccounts: any[];
   selectedAccountId: string | null;
@@ -81,9 +83,10 @@ export const POSCart = memo(function POSCart({
   currency, getUnitOptions, setCartItemUnit, updateQty, setCartItemQty,
   discountAmount, taxAmount, cartSubtotal, cartTotal, paymentMethod, setPaymentMethod,
   paidAmount, setPaidAmount, remaining, customerRef, setCustomerRef, checkout, previewInvoice,
-  updateValue, updatePrice, updateServiceDetails, removeFromCart,
+  updateValue, updatePrice, updateServiceDetails, updateServiceVariables, removeFromCart,
   accountingAccounts, selectedAccountId, setSelectedAccountId, isProcessing
 }: POSCartProps) {
+  const [variableDialogFor, setVariableDialogFor] = useState<any>(null);
   const { hasPermission } = usePermissions(restaurant?.id);
   const [editingPriceId, setEditingPriceId] = useState<string | null>(null);
   const [editingQtyId, setEditingQtyId] = useState<string | null>(null);
@@ -282,6 +285,27 @@ export const POSCart = memo(function POSCart({
                     className="w-full mt-1 h-6 text-[10px] bg-secondary rounded border border-border px-1 focus:ring-1 focus:ring-primary outline-none"
                   />
                 )}
+                {/* Variables (flexible key/value) — available for any item */}
+                <button
+                  type="button"
+                  onClick={() => setVariableDialogFor(c)}
+                  className={`mt-1 inline-flex items-center gap-1 h-6 px-2 text-[10px] rounded border transition-all ${
+                    (c.variables && c.variables.length) ? 'bg-primary/10 border-primary/30 text-primary font-bold' : 'bg-secondary border-border text-muted-foreground hover:bg-secondary/80'
+                  }`}
+                >
+                  <Tags className="w-3 h-3" />
+                  {(c.variables && c.variables.length) ? `${c.variables.length} متغير` : '+ متغيرات'}
+                </button>
+                {c.variables && c.variables.length > 0 && (
+                  <div className="mt-1 flex flex-wrap gap-1">
+                    {c.variables.slice(0, 3).map((v, i) => (
+                      <span key={i} className="text-[9px] bg-primary/5 border border-primary/20 rounded px-1 py-0.5">
+                        <span className="font-bold">{v.label}:</span> {v.value}
+                      </span>
+                    ))}
+                    {c.variables.length > 3 && <span className="text-[9px] text-muted-foreground">+{c.variables.length - 3}</span>}
+                  </div>
+                )}
               </div>
 
               {/* Qty + Value controls */}
@@ -452,6 +476,20 @@ export const POSCart = memo(function POSCart({
           </Button>
         </div>
       </div>
+
+      {/* Service Variables dialog */}
+      <ServiceVariablesDialog
+        open={!!variableDialogFor}
+        onOpenChange={(o) => { if (!o) setVariableDialogFor(null); }}
+        itemName={variableDialogFor?.item?.name}
+        template={variableDialogFor?.item?.variables || []}
+        value={variableDialogFor?.variables || []}
+        onSave={(vars) => {
+          if (variableDialogFor && updateServiceVariables) {
+            updateServiceVariables(variableDialogFor.item.id, vars);
+          }
+        }}
+      />
     </div>
   );
 });

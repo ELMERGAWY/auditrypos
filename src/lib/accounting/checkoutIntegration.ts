@@ -205,6 +205,7 @@ class CheckoutIntegration {
         sold_unit: item.unitMode || 'قطعة',
         unit_factor: item.unitFactor || 1,
         cost_price_snapshot: (item as any).unitCost || 0,
+        variables: (item as any).variables || [],
       }));
 
       const { error: itemsError } = await supabase

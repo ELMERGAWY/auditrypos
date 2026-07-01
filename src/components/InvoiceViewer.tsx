@@ -398,6 +398,15 @@ export function InvoiceViewer({
                                     {it.sold_unit && (
                                       <p className="text-[10px] text-muted-foreground">{it.sold_unit}</p>
                                     )}
+                                    {Array.isArray(it.variables) && it.variables.length > 0 && (
+                                      <div className="mt-1 flex flex-wrap gap-1">
+                                        {it.variables.map((v: any, i: number) => (
+                                          <span key={i} className="text-[10px] bg-primary/5 border border-primary/20 rounded px-1.5 py-0.5">
+                                            <span className="font-bold">{v.label}:</span> {v.value}
+                                          </span>
+                                        ))}
+                                      </div>
+                                    )}
                                   </div>
                                 </div>
                               </td>
