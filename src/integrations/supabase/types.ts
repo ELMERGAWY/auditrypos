@@ -8463,6 +8463,7 @@ export type Database = {
           sold_unit: string | null
           unit_factor: number | null
           unit_price_snapshot: number | null
+          variables: Json
         }
         Insert: {
           company_id?: string | null
@@ -8481,6 +8482,7 @@ export type Database = {
           sold_unit?: string | null
           unit_factor?: number | null
           unit_price_snapshot?: number | null
+          variables?: Json
         }
         Update: {
           company_id?: string | null
@@ -8499,6 +8501,7 @@ export type Database = {
           sold_unit?: string | null
           unit_factor?: number | null
           unit_price_snapshot?: number | null
+          variables?: Json
         }
         Relationships: [
           {
@@ -8653,6 +8656,7 @@ export type Database = {
           delivery_date: string | null
           delivery_lat: number | null
           delivery_lng: number | null
+          delivery_status: string
           discount: number
           id: string
           journal_entry_id: string | null
@@ -8684,6 +8688,7 @@ export type Database = {
           delivery_date?: string | null
           delivery_lat?: number | null
           delivery_lng?: number | null
+          delivery_status?: string
           discount?: number
           id?: string
           journal_entry_id?: string | null
@@ -8715,6 +8720,7 @@ export type Database = {
           delivery_date?: string | null
           delivery_lat?: number | null
           delivery_lng?: number | null
+          delivery_status?: string
           discount?: number
           id?: string
           journal_entry_id?: string | null
@@ -11679,6 +11685,7 @@ export type Database = {
           created_at: string | null
           customer_name: string
           customer_phone: string | null
+          delivery_status: string
           id: string
           invoice_date: string
           invoice_number: string
@@ -11696,6 +11703,7 @@ export type Database = {
           created_at?: string | null
           customer_name: string
           customer_phone?: string | null
+          delivery_status?: string
           id?: string
           invoice_date: string
           invoice_number: string
@@ -11713,6 +11721,7 @@ export type Database = {
           created_at?: string | null
           customer_name?: string
           customer_phone?: string | null
+          delivery_status?: string
           id?: string
           invoice_date?: string
           invoice_number?: string
@@ -11840,6 +11849,7 @@ export type Database = {
           price: number
           restaurant_id: string
           updated_at: string
+          variables: Json
         }
         Insert: {
           active?: boolean
@@ -11852,6 +11862,7 @@ export type Database = {
           price?: number
           restaurant_id: string
           updated_at?: string
+          variables?: Json
         }
         Update: {
           active?: boolean
@@ -11864,6 +11875,7 @@ export type Database = {
           price?: number
           restaurant_id?: string
           updated_at?: string
+          variables?: Json
         }
         Relationships: [
           {
