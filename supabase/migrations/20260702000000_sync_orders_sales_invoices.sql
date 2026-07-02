@@ -21,6 +21,7 @@ CREATE OR REPLACE FUNCTION public.sync_order_paid_amount()
 RETURNS TRIGGER AS $$
 BEGIN
   -- Update sales_invoices when order paid_amount changes
+  -- This ensures bidirectional sync between orders and sales_invoices
   UPDATE public.sales_invoices
   SET paid_amount = NEW.paid_amount,
       updated_at = NOW()
@@ -42,6 +43,7 @@ CREATE OR REPLACE FUNCTION public.sync_invoice_paid_amount()
 RETURNS TRIGGER AS $$
 BEGIN
   -- Update orders when sales_invoice paid_amount changes
+  -- This ensures bidirectional sync between sales_invoices and orders
   UPDATE public.orders
   SET paid_amount = NEW.paid_amount
   WHERE id = NEW.order_id;
