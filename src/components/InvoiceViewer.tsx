@@ -167,7 +167,7 @@ export function InvoiceViewer({
         setRecord(data);
         setItems(data?.order_items || []);
 
-        // Load receipt vouchers for this order to show total payments
+        // Load receipt vouchers for this order to show separately (NOT added to paid_amount)
         if (data?.customer_id && restaurantId) {
           const { data: vouchers } = await supabase
             .from('receipt_vouchers')
@@ -177,15 +177,14 @@ export function InvoiceViewer({
             .gte('voucher_date', data.created_at?.split('T')[0] || new Date().toISOString().split('T')[0])
             .order('voucher_date', { ascending: true });
           
-          // Calculate total from receipt vouchers
+          // Calculate total from receipt vouchers (display only)
           const voucherTotal = vouchers?.reduce((sum, v) => sum + (v.amount || 0), 0) || 0;
           
-          // Update record with total paid including vouchers
+          // Store vouchers separately for display - NOT added to paid_amount
           setRecord(prev => ({
             ...prev,
             receipt_vouchers: vouchers || [],
-            receipt_voucher_total: voucherTotal,
-            total_paid: (prev?.paid_amount || 0) + voucherTotal
+            receipt_voucher_total: voucherTotal
           }));
         }
 
@@ -223,6 +222,9 @@ export function InvoiceViewer({
   const discount = Number(record?.discount_amount || 0);
   const directPaidAmount = Number(record?.paid_amount || 0);
   const receiptVoucherTotal = Number(record?.receipt_voucher_total || 0);
+  // paid_amount represents direct payments only
+  // receipt vouchers are tracked separately in customer_transactions
+  // total paid = direct + vouchers (for display only, not stored)
   const totalPaid = directPaidAmount + receiptVoucherTotal;
   const remaining = total - totalPaid;
 

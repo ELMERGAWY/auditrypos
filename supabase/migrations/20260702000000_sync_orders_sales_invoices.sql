@@ -64,43 +64,10 @@ WHERE source_type = 'pos'
   AND source_reference_id IS NOT NULL
   AND order_id IS NULL;
 
--- Step 7: BACKFILL HISTORICAL DATA - Sync receipt vouchers with orders
--- Update orders paid_amount to include receipt voucher payments
-DO $$
-DECLARE
-  v_order RECORD;
-  v_voucher_total NUMERIC;
-  v_new_paid_amount NUMERIC;
-BEGIN
-  -- Loop through all orders that have receipt vouchers
-  FOR v_order IN 
-    SELECT DISTINCT o.id, o.paid_amount, o.customer_id, o.restaurant_id, o.created_at
-    FROM public.orders o
-    INNER JOIN public.receipt_vouchers rv ON rv.customer_id = o.customer_id 
-      AND rv.restaurant_id = o.restaurant_id
-      AND rv.voucher_date >= o.created_at::date
-    WHERE o.status != 'cancelled'
-  LOOP
-    -- Calculate total receipt vouchers for this order
-    SELECT COALESCE(SUM(rv.amount), 0) INTO v_voucher_total
-    FROM public.receipt_vouchers rv
-    WHERE rv.customer_id = v_order.customer_id
-      AND rv.restaurant_id = v_order.restaurant_id
-      AND rv.voucher_date >= v_order.created_at::date;
-    
-    -- Update order paid_amount to include receipt vouchers
-    v_new_paid_amount := COALESCE(v_order.paid_amount, 0) + v_voucher_total;
-    
-    UPDATE public.orders
-    SET paid_amount = v_new_paid_amount
-    WHERE id = v_order.id;
-    
-    RAISE NOTICE 'Updated order %: paid_amount from % to % (including % from vouchers)', 
-      v_order.id, v_order.paid_amount, v_new_paid_amount, v_voucher_total;
-  END LOOP;
-  
-  RAISE NOTICE '✅ Backfilled historical data: Updated orders with receipt voucher payments';
-END $$;
+-- Step 7: BACKFILL HISTORICAL DATA - Link orders to sales_invoices only
+-- DO NOT add receipt vouchers to paid_amount to avoid duplication
+-- Receipt vouchers are tracked separately in customer_transactions
+-- paid_amount should only represent direct payments at order/invoice creation
 
 -- Step 8: Sync sales_invoices paid_amount with orders
 UPDATE public.sales_invoices
