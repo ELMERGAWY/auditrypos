@@ -98,7 +98,9 @@ export function CustomerManager({ restaurantId, currency }: Props) {
   const [receiptVouchers, setReceiptVouchers] = useState<ReceiptVoucher[]>([]);
   const [receiptVoucherSearch, setReceiptVoucherSearch] = useState('');
   const [showReceiptVoucherModal, setShowReceiptVoucherModal] = useState(false);
+  const [voucherAllocations, setVoucherAllocations] = useState<Allocation[]>([]);
   const [editingReceiptVoucher, setEditingReceiptVoucher] = useState<ReceiptVoucher | null>(null);
+
   const [receiptVoucherForm, setReceiptVoucherForm] = useState({
     customer_id: '',
     customer_name: '',
