@@ -735,10 +735,12 @@ export function CustomerManager({ restaurantId, currency }: Props) {
 
         if (voucherId) {
           for (const a of voucherAllocations) {
-            // Update order paid_amount and add voucher ID to array
+            // Update order: add voucher ID to array only
+            // DO NOT update paid_amount to avoid duplication
+            // paid_amount should only represent direct payments at order creation
             const { data: order } = await supabase
               .from('orders')
-              .select('paid_amount, receipt_voucher_ids')
+              .select('paid_amount, receipt_voucher_ids, total')
               .eq('id', a.order_id)
               .single();
 
@@ -747,11 +749,13 @@ export function CustomerManager({ restaurantId, currency }: Props) {
               ? currentVoucherIds
               : [...currentVoucherIds, voucherId];
 
-            const newPaid = Number(a.previous_paid || 0) + Number(a.amount || 0);
-            const fullyPaid = newPaid >= Number(a.order_total || 0) - 0.01;
+            // Calculate total paid including this allocation
+            const directPaid = Number(order?.paid_amount || 0);
+            const allocatedAmount = Number(a.amount || 0);
+            const totalPaid = directPaid + allocatedAmount;
+            const fullyPaid = totalPaid >= Number(order?.total || 0) - 0.01;
 
             await supabase.from('orders').update({
-              paid_amount: newPaid,
               receipt_voucher_ids: newVoucherIds,
               ...(fullyPaid ? { payment_status: 'paid' } : { payment_status: 'partial' }),
             } as any).eq('id', a.order_id);

@@ -218,11 +218,10 @@ export function InvoiceViewer({
   const total = Number(record?.total || record?.total_amount || subtotal);
   const tax = Number(record?.tax_amount || 0);
   const discount = Number(record?.discount_amount || 0);
+  // paid_amount represents direct payments only (at order creation)
+  // receipt vouchers are tracked separately in receipt_voucher_ids array
   const directPaidAmount = Number(record?.paid_amount || 0);
   const receiptVoucherTotal = Number(record?.receipt_voucher_total || 0);
-  // paid_amount represents direct payments only
-  // receipt vouchers are tracked separately in customer_transactions
-  // total paid = direct + vouchers (for display only, not stored)
   const totalPaid = directPaidAmount + receiptVoucherTotal;
   const remaining = total - totalPaid;
 
