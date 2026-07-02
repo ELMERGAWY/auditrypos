@@ -168,13 +168,25 @@ export function InvoiceViewer({
         setItems(data?.order_items || []);
 
         // Load receipt vouchers for this customer (all vouchers, not date-restricted)
+        console.log('InvoiceViewer: Loading vouchers for order', {
+          customerId: data?.customer_id,
+          restaurantId,
+          hasCustomer: !!data?.customer_id,
+          hasRestaurantId: !!restaurantId
+        });
+        
         if (data?.customer_id && restaurantId) {
-          const { data: vouchers } = await supabase
+          const { data: vouchers, error: voucherError } = await supabase
             .from('receipt_vouchers')
             .select('*')
             .eq('customer_id', data.customer_id)
             .eq('restaurant_id', restaurantId)
             .order('voucher_date', { ascending: true });
+          
+          console.log('InvoiceViewer: Vouchers query result', {
+            vouchers: vouchers?.length || 0,
+            error: voucherError
+          });
           
           // Calculate total from receipt vouchers
           const voucherTotal = vouchers?.reduce((sum, v) => sum + (v.amount || 0), 0) || 0;
