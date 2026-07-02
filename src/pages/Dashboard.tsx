@@ -714,7 +714,7 @@ export default function Dashboard() {
                     <span className="font-black text-primary">{Number(o.total).toLocaleString()} {currency}</span>
                   </div>
                   <div className="flex justify-between text-xs">
-                    <span className="text-muted-foreground">المدفوع:</span>
+                    <span className="text-muted-foreground">إجمالي المدفوع:</span>
                     <span className="text-emerald-600 font-bold">{Number(o.paid_amount || 0).toLocaleString()} {currency}</span>
                   </div>
                   <div className="flex justify-between text-xs">
@@ -985,7 +985,7 @@ export default function Dashboard() {
                   <Input type="number" value={editOrderForm.total} onChange={e => setEditOrderForm({...editOrderForm, total: e.target.value})} />
                 </div>
                 <div>
-                  <Label>المدفوع</Label>
+                  <Label>إجمالي المدفوع</Label>
                   <Input type="number" value={editOrderForm.paid_amount} onChange={e => setEditOrderForm({...editOrderForm, paid_amount: e.target.value})} />
                 </div>
                 <div>

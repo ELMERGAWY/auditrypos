@@ -166,7 +166,7 @@ export function PrintSettingsManager({ restaurantId }: PrintSettingsManagerProps
               { key: 'discount', label: 'الخصم' },
               { key: 'total', label: 'الإجمالي' },
               { key: 'paymentMethod', label: 'طريقة الدفع' },
-              { key: 'paidAmount', label: 'المدفوع' },
+              { key: 'paidAmount', label: 'إجمالي المدفوع' },
               { key: 'remaining', label: 'المتبقي' },
               { key: 'change', label: 'الباقي للعميل' },
               { key: 'notes', label: 'الملاحظات' },

@@ -247,7 +247,7 @@ function ReceiptContent({
           )}
           {receiptVouchers.length > 0 && (
             <tr>
-              <td>سندات القبض</td>
+              <td>مدفوع بتاريخ {new Date(receiptVouchers[receiptVouchers.length - 1].voucher_date).toLocaleDateString('ar-EG')}</td>
               <td className="text-green">{voucherTotal.toFixed(2)}</td>
             </tr>
           )}
@@ -271,21 +271,6 @@ function ReceiptContent({
           )}
         </tbody>
       </table>
-
-      {/* Receipt Vouchers */}
-      {receiptVouchers.length > 0 && (
-        <>
-          <hr className="divider" />
-          <div style={{ fontSize: 10, padding: '3px 0' }}>
-            {receiptVouchers.map((voucher) => (
-              <div key={voucher.id} className="row" style={{ fontSize: 9 }}>
-                <span className="info-label">مدفوع {new Date(voucher.voucher_date).toLocaleDateString('ar-EG')}</span>
-                <span>{voucher.amount.toFixed(2)}</span>
-              </div>
-            ))}
-          </div>
-        </>
-      )}
 
       <hr className="divider" />
 
@@ -532,7 +517,7 @@ export function ReceiptModalWrapper({ order, restaurant, onClose, onComplete, is
         content += `<tr><td>المدفوع مباشرة</td><td>${paidAmount.toFixed(2)} ${currency}</td></tr>`;
       }
       if (receiptVouchers.length > 0) {
-        content += `<tr><td>سندات القبض</td><td>${voucherTotal.toFixed(2)} ${currency}</td></tr>`;
+        content += `<tr><td>مدفوع بتاريخ ${new Date(receiptVouchers[receiptVouchers.length - 1].voucher_date).toLocaleDateString('ar-EG')}</td><td>${voucherTotal.toFixed(2)} ${currency}</td></tr>`;
       }
       if (printSettings.paidAmount) {
         content += `<tr><td class="bold">إجمالي المدفوع</td><td class="bold">${totalPaid.toFixed(2)} ${currency}</td></tr>`;
@@ -544,15 +529,6 @@ export function ReceiptModalWrapper({ order, restaurant, onClose, onComplete, is
         content += `<tr><td>الباقي للعميل</td><td>${change.toFixed(2)} ${currency}</td></tr>`;
       }
       content += '</tbody></table>';
-
-      // Receipt Vouchers
-      if (receiptVouchers.length > 0) {
-        content += '<div style="margin-top: 8px; border-top: 1px dashed #000; padding-top: 4px;">';
-        receiptVouchers.forEach((voucher) => {
-          content += `<div class="row" style="font-size: 9px;"><span class="info-label">مدفوع ${new Date(voucher.voucher_date).toLocaleDateString('ar-EG')}</span><span>${voucher.amount.toFixed(2)} ${currency}</span></div>`;
-        });
-        content += '</div>';
-      }
 
       // Notes
       if (printSettings.notes && order.notes) {
@@ -823,7 +799,7 @@ export function ReceiptModalWrapper({ order, restaurant, onClose, onComplete, is
                     </label>
                     <label className="flex items-center gap-2 cursor-pointer">
                       <input type="checkbox" checked={printSettings.paidAmount} onChange={(e) => setPrintSettings({ ...printSettings, paidAmount: e.target.checked })} className="w-4 h-4" />
-                      <span className="text-sm">المدفوع</span>
+                      <span className="text-sm">إجمالي المدفوع</span>
                     </label>
                     <label className="flex items-center gap-2 cursor-pointer">
                       <input type="checkbox" checked={printSettings.remaining} onChange={(e) => setPrintSettings({ ...printSettings, remaining: e.target.checked })} className="w-4 h-4" />
