@@ -100,11 +100,13 @@ interface PrintElementSettings {
 function ReceiptContent({ 
   order, 
   restaurant, 
-  printSettings 
+  printSettings,
+  receiptVouchers = []
 }: { 
   order: Order; 
   restaurant: Restaurant; 
   printSettings: PrintElementSettings;
+  receiptVouchers?: ReceiptVoucher[];
 }) {
   const currency = restaurant.currency || 'ج.م';
   const orderTypeInfo = ORDER_TYPE_CONFIG[order.order_type as keyof typeof ORDER_TYPE_CONFIG];
@@ -422,6 +424,7 @@ export function ReceiptModalWrapper({ order, restaurant, onClose, onComplete, is
       const paymentMethod = (order as any).payment_method || 'cash';
       const remaining = Math.max(0, Number(order.total) - paidAmount);
       const change = paidAmount > Number(order.total) ? paidAmount - Number(order.total) : 0;
+      const voucherTotal = receiptVouchers.reduce((sum, v) => sum + (v.amount || 0), 0);
 
       let content = '';
       
@@ -688,7 +691,7 @@ export function ReceiptModalWrapper({ order, restaurant, onClose, onComplete, is
                   .summary-table tr:last-child td { border-bottom: 2px solid #000; }
                 `}} />
                 <div ref={ref}>
-                  <ReceiptContent order={order} restaurant={restaurant} printSettings={printSettings} />
+                  <ReceiptContent order={order} restaurant={restaurant} printSettings={printSettings} receiptVouchers={receiptVouchers} />
                 </div>
               </div>
             </div>
