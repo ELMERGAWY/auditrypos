@@ -121,7 +121,7 @@ export function ContractorsTab({ restaurant }: Props) {
   const loadInvoices = async () => {
     const { data, error } = await supabase
       .from('sales_invoices')
-      .select('id, invoice_number, total, customer_name, created_at, sales_invoice_items(id, item_name, quantity, unit_price, total)')
+      .select('id, invoice_number, total, customer_name, created_at, sales_invoice_lines(id, product_name, quantity, unit_price, total)')
       .eq('restaurant_id', restaurant.id)
       .order('created_at', { ascending: false })
       .limit(50);
@@ -137,7 +137,7 @@ export function ContractorsTab({ restaurant }: Props) {
   const loadOrders = async () => {
     const { data, error } = await supabase
       .from('orders')
-      .select('id, order_number, total, customer_name, created_at, order_items(id, item_name, quantity, unit_price, total)')
+      .select('id, order_number, total, customer_name, created_at, order_items(id, menu_item_name, quantity, price)')
       .eq('restaurant_id', restaurant.id)
       .order('created_at', { ascending: false })
       .limit(50);
@@ -176,11 +176,12 @@ export function ContractorsTab({ restaurant }: Props) {
 
   const handleServiceSelect = (service: any) => {
     // Add to selected services array
+    const itemTotal = service.total || (Number(service.quantity) * Number(service.price || service.unit_price));
     const newService = {
       id: service.id,
-      item_name: service.item_name,
-      unit_price: service.unit_price,
-      total: service.total,
+      item_name: service.product_name || service.menu_item_name || service.item_name,
+      unit_price: service.unit_price || service.price,
+      total: itemTotal,
       quantity: service.quantity,
       invoice_id: selectedInvoice,
       order_id: selectedOrder,
@@ -194,7 +195,7 @@ export function ContractorsTab({ restaurant }: Props) {
     const totalServicesAmount = updatedServices.reduce((sum, s) => sum + (s.total || 0), 0);
     setServiceForm({
       ...serviceForm,
-      service_name: service.item_name,
+      service_name: newService.item_name,
       service_amount: totalServicesAmount.toString()
     });
     // Clear selection to allow adding more services
@@ -648,7 +649,7 @@ export function ContractorsTab({ restaurant }: Props) {
                     <div className="max-h-40 overflow-y-auto border rounded-lg p-2 space-y-1">
                       {(() => {
                         const invoice = invoices.find(i => i.id === selectedInvoice);
-                        const items = invoice?.sales_invoice_items;
+                        const items = invoice?.sales_invoice_lines;
                         if (!items || items.length === 0) {
                           return <div className="p-2 text-xs text-muted-foreground">لا توجد أصناف في هذه الفاتورة</div>;
                         }
@@ -660,7 +661,7 @@ export function ContractorsTab({ restaurant }: Props) {
                               selectedService?.id === item.id ? 'bg-primary/20 border border-primary/30' : ''
                             }`}
                           >
-                            <div className="font-medium">{item.item_name}</div>
+                            <div className="font-medium">{item.product_name}</div>
                             <div className="text-muted-foreground">
                               {item.quantity} × {item.unit_price} = {item.total} ج.م
                             </div>
@@ -689,9 +690,9 @@ export function ContractorsTab({ restaurant }: Props) {
                               selectedService?.id === item.id ? 'bg-primary/20 border border-primary/30' : ''
                             }`}
                           >
-                            <div className="font-medium">{item.item_name}</div>
+                            <div className="font-medium">{item.menu_item_name}</div>
                             <div className="text-muted-foreground">
-                              {item.quantity} × {item.unit_price} = {item.total} ج.م
+                              {item.quantity} × {item.price} = {(Number(item.quantity) * Number(item.price)).toFixed(2)} ج.م
                             </div>
                           </div>
                         ));
@@ -855,10 +856,11 @@ export function ContractorsTab({ restaurant }: Props) {
                   // Get services for selected invoices/orders
                   const selectedServicesList: any[] = [];
                   summary.selectedInvoices.forEach((inv: any) => {
-                    if (inv.sales_invoice_items) {
-                      inv.sales_invoice_items.forEach((item: any) => {
+                    if (inv.sales_invoice_lines) {
+                      inv.sales_invoice_lines.forEach((item: any) => {
                         selectedServicesList.push({
                           ...item,
+                          item_name: item.product_name,
                           invoice_id: inv.id,
                           invoice_number: inv.invoice_number,
                           customer_name: inv.customer_name
@@ -871,6 +873,9 @@ export function ContractorsTab({ restaurant }: Props) {
                       ord.order_items.forEach((item: any) => {
                         selectedServicesList.push({
                           ...item,
+                          item_name: item.menu_item_name,
+                          unit_price: item.price,
+                          total: Number(item.quantity) * Number(item.price),
                           order_id: ord.id,
                           order_number: ord.order_number,
                           customer_name: ord.customer_name
