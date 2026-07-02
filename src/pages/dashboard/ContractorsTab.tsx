@@ -119,23 +119,33 @@ export function ContractorsTab({ restaurant }: Props) {
   }, [restaurant.id]);
 
   const loadInvoices = async () => {
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from('sales_invoices')
       .select('id, invoice_number, total, customer_name, created_at, sales_invoice_items(id, item_name, quantity, unit_price, total)')
       .eq('restaurant_id', restaurant.id)
       .order('created_at', { ascending: false })
       .limit(50);
-    setInvoices(data || []);
+    if (error) {
+      console.error('Error loading invoices:', error);
+      toast.error('خطأ في تحميل الفواتير');
+    } else {
+      setInvoices(data || []);
+    }
   };
 
   const loadOrders = async () => {
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from('orders')
       .select('id, order_number, total, customer_name, created_at, order_items(id, item_name, quantity, unit_price, total)')
       .eq('restaurant_id', restaurant.id)
       .order('created_at', { ascending: false })
       .limit(50);
-    setOrders(data || []);
+    if (error) {
+      console.error('Error loading orders:', error);
+      toast.error('خطأ في تحميل الطلبات');
+    } else {
+      setOrders(data || []);
+    }
   };
 
   const filteredInvoices = invoices.filter(inv =>
@@ -591,9 +601,13 @@ export function ContractorsTab({ restaurant }: Props) {
                             <SelectValue placeholder="اختر فاتورة" />
                           </SelectTrigger>
                           <SelectContent>
-                            {filteredInvoices.map(inv => (
-                              <SelectItem key={inv.id} value={inv.id}>{inv.invoice_number} - {inv.customer_name || 'بدون عميل'} ({inv.total} ج.م)</SelectItem>
-                            ))}
+                            {filteredInvoices.length > 0 ? (
+                              filteredInvoices.map(inv => (
+                                <SelectItem key={inv.id} value={inv.id}>{inv.invoice_number} - {inv.customer_name || 'بدون عميل'} ({inv.total} ج.م)</SelectItem>
+                              ))
+                            ) : (
+                              <div className="p-2 text-xs text-muted-foreground">لا توجد فواتير</div>
+                            )}
                           </SelectContent>
                         </Select>
                       </div>
@@ -612,9 +626,13 @@ export function ContractorsTab({ restaurant }: Props) {
                             <SelectValue placeholder="اختر طلب" />
                           </SelectTrigger>
                           <SelectContent>
-                            {filteredOrders.map(ord => (
-                              <SelectItem key={ord.id} value={ord.id}>{ord.order_number} - {ord.customer_name || 'بدون عميل'} ({ord.total} ج.م)</SelectItem>
-                            ))}
+                            {filteredOrders.length > 0 ? (
+                              filteredOrders.map(ord => (
+                                <SelectItem key={ord.id} value={ord.id}>{ord.order_number} - {ord.customer_name || 'بدون عميل'} ({ord.total} ج.م)</SelectItem>
+                              ))
+                            ) : (
+                              <div className="p-2 text-xs text-muted-foreground">لا توجد طلبات</div>
+                            )}
                           </SelectContent>
                         </Select>
                       </div>
@@ -627,20 +645,27 @@ export function ContractorsTab({ restaurant }: Props) {
                   <div>
                     <Label className="text-xs">اختر صنف من الفاتورة (اختياري)</Label>
                     <div className="max-h-40 overflow-y-auto border rounded-lg p-2 space-y-1">
-                      {invoices.find(i => i.id === selectedInvoice)?.sales_invoice_items?.map((item: any) => (
-                        <div
-                          key={item.id}
-                          onClick={() => handleServiceSelect(item)}
-                          className={`p-2 rounded cursor-pointer hover:bg-primary/10 text-xs ${
-                            selectedService?.id === item.id ? 'bg-primary/20 border border-primary/30' : ''
-                          }`}
-                        >
-                          <div className="font-medium">{item.item_name}</div>
-                          <div className="text-muted-foreground">
-                            {item.quantity} × {item.unit_price} = {item.total} ج.م
+                      {(() => {
+                        const invoice = invoices.find(i => i.id === selectedInvoice);
+                        const items = invoice?.sales_invoice_items;
+                        if (!items || items.length === 0) {
+                          return <div className="p-2 text-xs text-muted-foreground">لا توجد أصناف في هذه الفاتورة</div>;
+                        }
+                        return items.map((item: any) => (
+                          <div
+                            key={item.id}
+                            onClick={() => handleServiceSelect(item)}
+                            className={`p-2 rounded cursor-pointer hover:bg-primary/10 text-xs ${
+                              selectedService?.id === item.id ? 'bg-primary/20 border border-primary/30' : ''
+                            }`}
+                          >
+                            <div className="font-medium">{item.item_name}</div>
+                            <div className="text-muted-foreground">
+                              {item.quantity} × {item.unit_price} = {item.total} ج.م
+                            </div>
                           </div>
-                        </div>
-                      ))}
+                        ));
+                      })()}
                     </div>
                   </div>
                 )}
@@ -649,20 +674,27 @@ export function ContractorsTab({ restaurant }: Props) {
                   <div>
                     <Label className="text-xs">اختر صنف من الطلب (اختياري)</Label>
                     <div className="max-h-40 overflow-y-auto border rounded-lg p-2 space-y-1">
-                      {orders.find(o => o.id === selectedOrder)?.order_items?.map((item: any) => (
-                        <div
-                          key={item.id}
-                          onClick={() => handleServiceSelect(item)}
-                          className={`p-2 rounded cursor-pointer hover:bg-primary/10 text-xs ${
-                            selectedService?.id === item.id ? 'bg-primary/20 border border-primary/30' : ''
-                          }`}
-                        >
-                          <div className="font-medium">{item.item_name}</div>
-                          <div className="text-muted-foreground">
-                            {item.quantity} × {item.unit_price} = {item.total} ج.م
+                      {(() => {
+                        const order = orders.find(o => o.id === selectedOrder);
+                        const items = order?.order_items;
+                        if (!items || items.length === 0) {
+                          return <div className="p-2 text-xs text-muted-foreground">لا توجد أصناف في هذا الطلب</div>;
+                        }
+                        return items.map((item: any) => (
+                          <div
+                            key={item.id}
+                            onClick={() => handleServiceSelect(item)}
+                            className={`p-2 rounded cursor-pointer hover:bg-primary/10 text-xs ${
+                              selectedService?.id === item.id ? 'bg-primary/20 border border-primary/30' : ''
+                            }`}
+                          >
+                            <div className="font-medium">{item.item_name}</div>
+                            <div className="text-muted-foreground">
+                              {item.quantity} × {item.unit_price} = {item.total} ج.م
+                            </div>
                           </div>
-                        </div>
-                      ))}
+                        ));
+                      })()}
                     </div>
                   </div>
                 )}
