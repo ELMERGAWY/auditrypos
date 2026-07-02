@@ -121,7 +121,7 @@ export function ContractorsTab({ restaurant }: Props) {
   const loadInvoices = async () => {
     const { data, error } = await supabase
       .from('sales_invoices')
-      .select('id, invoice_number, total, customer_name, created_at, sales_invoice_lines(id, description, quantity, unit_price, line_total)')
+      .select('id, invoice_number, total_amount, customer_name, created_at, sales_invoice_lines(id, description, quantity, unit_price, line_total)')
       .eq('restaurant_id', restaurant.id)
       .order('created_at', { ascending: false })
       .limit(50);
@@ -487,8 +487,8 @@ export function ContractorsTab({ restaurant }: Props) {
     const selectedInvoiceData = invoices.filter(inv => selectedInvoices.includes(inv.id));
     const selectedOrderData = orders.filter(ord => selectedOrders.includes(ord.id));
 
-    const totalServiceAmount = selectedInvoiceData.reduce((sum, inv) => sum + inv.total, 0) + 
-                               selectedOrderData.reduce((sum, ord) => sum + ord.total, 0);
+    const totalServiceAmount = selectedInvoiceData.reduce((sum, inv) => sum + (inv.total_amount || inv.total || 0), 0) +
+                               selectedOrderData.reduce((sum, ord) => sum + (ord.total || 0), 0);
 
     const contractorAmount = contractor.payment_type === 'fixed'
       ? contractor.payment_value * (selectedInvoiceData.length + selectedOrderData.length)
@@ -605,7 +605,7 @@ export function ContractorsTab({ restaurant }: Props) {
                           <SelectContent>
                             {filteredInvoices.length > 0 ? (
                               filteredInvoices.map(inv => (
-                                <SelectItem key={inv.id} value={inv.id}>{inv.invoice_number} - {inv.customer_name || 'بدون عميل'} ({inv.total} ج.م)</SelectItem>
+                                <SelectItem key={inv.id} value={inv.id}>{inv.invoice_number} - {inv.customer_name || 'بدون عميل'} ({inv.total_amount} ج.م)</SelectItem>
                               ))
                             ) : (
                               <div className="p-2 text-xs text-muted-foreground">لا توجد فواتير</div>
@@ -819,7 +819,7 @@ export function ContractorsTab({ restaurant }: Props) {
                           }}
                         />
                         <span className="flex-1">{inv.invoice_number} - {inv.customer_name || 'بدون عميل'}</span>
-                        <span className="font-bold">{inv.total} ج.م</span>
+                        <span className="font-bold">{inv.total_amount || inv.total} ج.م</span>
                       </label>
                     ))}
                   </div>
