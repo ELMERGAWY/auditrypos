@@ -16,6 +16,8 @@ import {
   ArrowRight, Calendar, Eye, FileJson, Trash2, Banknote, Edit, X, Settings, Printer
 } from 'lucide-react';
 import { CustomerSearch } from './CustomerSearch';
+import { PaymentAllocations, type Allocation } from '@/components/PaymentAllocations';
+
 import * as XLSX from 'xlsx';
 import jsPDF from 'jspdf';
 import 'jspdf-autotable';
