@@ -167,6 +167,28 @@ export function InvoiceViewer({
         setRecord(data);
         setItems(data?.order_items || []);
 
+        // Load receipt vouchers for this order to show total payments
+        if (data?.customer_id && restaurantId) {
+          const { data: vouchers } = await supabase
+            .from('receipt_vouchers')
+            .select('*')
+            .eq('customer_id', data.customer_id)
+            .eq('restaurant_id', restaurantId)
+            .gte('voucher_date', data.created_at?.split('T')[0] || new Date().toISOString().split('T')[0])
+            .order('voucher_date', { ascending: true });
+          
+          // Calculate total from receipt vouchers
+          const voucherTotal = vouchers?.reduce((sum, v) => sum + (v.amount || 0), 0) || 0;
+          
+          // Update record with total paid including vouchers
+          setRecord(prev => ({
+            ...prev,
+            receipt_vouchers: vouchers || [],
+            receipt_voucher_total: voucherTotal,
+            total_paid: (prev?.paid_amount || 0) + voucherTotal
+          }));
+        }
+
       } else {
         const { data, error } = await supabase
           .from('sales_orders')
@@ -199,8 +221,10 @@ export function InvoiceViewer({
   const total = Number(record?.total || record?.total_amount || subtotal);
   const tax = Number(record?.tax_amount || 0);
   const discount = Number(record?.discount_amount || 0);
-  const paidAmount = Number(record?.paid_amount || 0);
-  const remaining = total - paidAmount;
+  const directPaidAmount = Number(record?.paid_amount || 0);
+  const receiptVoucherTotal = Number(record?.receipt_voucher_total || 0);
+  const totalPaid = directPaidAmount + receiptVoucherTotal;
+  const remaining = total - totalPaid;
 
   return (
     <AnimatePresence>
@@ -439,7 +463,14 @@ export function InvoiceViewer({
                   </div>
                 )}
                 {printSettings.paidAmount && (
-                  <Row label="المدفوع" value={paidAmount} currency={currency} className="text-emerald-500" />
+                  <>
+                    <Row label="المدفوع مباشرة" value={directPaidAmount} currency={currency} className="text-emerald-500" />
+                    {receiptVoucherTotal > 0 && (
+                      <Row label="سندات القبض" value={receiptVoucherTotal} currency={currency} className="text-emerald-500" />
+                    )}
+                    <div className="h-px bg-border my-2" />
+                    <Row label="إجمالي المدفوع" value={totalPaid} currency={currency} className="text-emerald-600 font-black" />
+                  </>
                 )}
                 {printSettings.remaining && (
                   <Row label="المتبقي" value={remaining} currency={currency} className={remaining > 0 ? "text-destructive font-black" : "text-emerald-500 font-black"} />

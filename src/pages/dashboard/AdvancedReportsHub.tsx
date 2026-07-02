@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { 
   TrendingUp, Users, Store, Boxes, 
   Wallet, Landmark, Clock, RefreshCcw, ArrowRight, Download, Printer,
-  FileText, Briefcase, Calculator, Building2, Truck, ClipboardList, Scale, Percent
+  FileText, Briefcase, Calculator, Building2, Truck, ClipboardList, Scale, Percent, Tags
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -12,7 +12,7 @@ import { createFinancialReporting, ProfitLossReport, BalanceSheetReport, CashFlo
 import { 
   generateTaxSummary, generateReceiptsPayments, generateSalesByItem, 
   generateGLTransactions, generateCustomerStatement, generateSupplierStatement,
-  generateInventoryMargin 
+  generateInventoryMargin, generateVariableReports 
 } from '@/erp/reporting_engine/extendedReports';
 import { toast } from 'sonner';
 
@@ -36,6 +36,9 @@ export function AdvancedReportsHub({ restaurantId, currency }: Props) {
   
   // Basic List Reports
   const [listData, setListData] = useState<any[]>([]);
+
+  // Variable Reports
+  const [variableReport, setVariableReport] = useState<any>(null);
 
   const reportGroups = [
     {
@@ -169,6 +172,15 @@ export function AdvancedReportsHub({ restaurantId, currency }: Props) {
         { id: 'customer_unpaid', label: 'كشف حساب العميل (فواتير غير مدفوعة)', trend: 'ديون' },
         { id: 'customer_statement', label: 'كشف حساب العميل (العمليات)', trend: 'تفصيلي' },
       ]
+    },
+    {
+      title: 'متغيرات الخدمات',
+      icon: Tags,
+      reports: [
+        { id: 'variables_by_label', label: 'تحليل المتغيرات حسب النوع', trend: 'متغيرات' },
+        { id: 'variables_by_item', label: 'تحليل المتغيرات حسب الصنف', trend: 'متغيرات' },
+        { id: 'variables_by_customer', label: 'تحليل المتغيرات حسب العميل', trend: 'متغيرات' },
+      ]
     }
   ];
 
@@ -237,6 +249,9 @@ export function AdvancedReportsHub({ restaurantId, currency }: Props) {
       } else if (activeReport === 'inventory_margin') {
         const data = await generateInventoryMargin(restaurantId, startDate, endDate);
         setListData(data);
+      } else if (activeReport === 'variables_by_label' || activeReport === 'variables_by_item' || activeReport === 'variables_by_customer') {
+        const data = await generateVariableReports(restaurantId, startDate, endDate);
+        setVariableReport(data);
       }
       // For other reports, they will show the placeholder automatically
     } catch (err: any) {
@@ -687,6 +702,123 @@ export function AdvancedReportsHub({ restaurantId, currency }: Props) {
       );
     }
 
+    if (activeReport === 'variables_by_label' && variableReport) {
+      return (
+        <div className="space-y-6">
+          <div className="grid grid-cols-3 gap-4 mb-6">
+            <div className="p-4 rounded-xl bg-primary/10 border border-primary/20 text-center">
+              <p className="text-xs font-bold text-muted-foreground mb-1">إجمالي البنود بمتغيرات</p>
+              <p className="text-2xl font-black text-primary">{variableReport.totalItemsWithVariables}</p>
+            </div>
+            <div className="p-4 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-center">
+              <p className="text-xs font-bold text-muted-foreground mb-1">عدد أنواع المتغيرات</p>
+              <p className="text-2xl font-black text-emerald-600">{variableReport.byLabel.length}</p>
+            </div>
+            <div className="p-4 rounded-xl bg-amber-500/10 border border-amber-500/20 text-center">
+              <p className="text-xs font-bold text-muted-foreground mb-1">إجمالي استخدام المتغيرات</p>
+              <p className="text-2xl font-black text-amber-600">{variableReport.byLabel.reduce((s, l) => s + l.count, 0)}</p>
+            </div>
+          </div>
+          <table className="w-full text-right text-sm border-collapse">
+            <thead>
+              <tr className="bg-muted font-black uppercase text-muted-foreground">
+                <th className="p-3 border">اسم المتغير</th>
+                <th className="p-3 border text-center">عدد الاستخدام</th>
+                <th className="p-3 border">أكثر القيم شيوعاً</th>
+              </tr>
+            </thead>
+            <tbody>
+              {variableReport.byLabel.map((row, i) => (
+                <tr key={i} className="border-b hover:bg-primary/5">
+                  <td className="p-3 border font-bold text-primary">{row.label}</td>
+                  <td className="p-3 border text-center font-black">{row.count}</td>
+                  <td className="p-3 border">
+                    <div className="flex flex-wrap gap-1">
+                      {row.topValues.map((tv, idx) => (
+                        <span key={idx} className="inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold bg-secondary/80 text-secondary-foreground border-border">
+                          {tv.value} ({tv.count})
+                        </span>
+                      ))}
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      );
+    }
+
+    if (activeReport === 'variables_by_item' && variableReport) {
+      return (
+        <table className="w-full text-right text-sm border-collapse">
+          <thead>
+            <tr className="bg-muted font-black uppercase text-muted-foreground">
+              <th className="p-3 border">الصنف</th>
+              <th className="p-3 border text-center">الكمية الكلية</th>
+              <th className="p-3 border text-center">عدد المتغيرات</th>
+              <th className="p-3 border text-center">متوسط المتغيرات/بند</th>
+              <th className="p-3 border">المتغيرات المستخدمة</th>
+            </tr>
+          </thead>
+          <tbody>
+            {variableReport.byItem.map((row, i) => (
+              <tr key={i} className="border-b hover:bg-primary/5">
+                <td className="p-3 border font-bold">{row.itemName}</td>
+                <td className="p-3 border text-center font-black">{row.totalItems}</td>
+                <td className="p-3 border text-center font-black text-primary">{row.variableCount}</td>
+                <td className="p-3 border text-center font-bold">{row.avgVariablesPerItem}</td>
+                <td className="p-3 border">
+                  <div className="flex flex-wrap gap-1">
+                    {Object.entries(row.variables).map(([varName, count], idx) => (
+                      <span key={idx} className="inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold bg-secondary/80 text-secondary-foreground border-border">
+                        {varName} ({count})
+                      </span>
+                    ))}
+                  </div>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      );
+    }
+
+    if (activeReport === 'variables_by_customer' && variableReport) {
+      return (
+        <table className="w-full text-right text-sm border-collapse">
+          <thead>
+            <tr className="bg-muted font-black uppercase text-muted-foreground">
+              <th className="p-3 border">اسم العميل</th>
+              <th className="p-3 border text-center">عدد الطلبات</th>
+              <th className="p-3 border text-center">عدد المتغيرات</th>
+              <th className="p-3 border text-center">متوسط المتغيرات/طلب</th>
+              <th className="p-3 border">المتغيرات المستخدمة</th>
+            </tr>
+          </thead>
+          <tbody>
+            {variableReport.byCustomer.map((row, i) => (
+              <tr key={i} className="border-b hover:bg-primary/5">
+                <td className="p-3 border font-bold">{row.customerName}</td>
+                <td className="p-3 border text-center font-black">{row.totalOrders}</td>
+                <td className="p-3 border text-center font-black text-primary">{row.variableCount}</td>
+                <td className="p-3 border text-center font-bold">{row.avgVariablesPerOrder}</td>
+                <td className="p-3 border">
+                  <div className="flex flex-wrap gap-1">
+                    {Object.entries(row.variables).map(([varName, count], idx) => (
+                      <span key={idx} className="inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold bg-secondary/80 text-secondary-foreground border-border">
+                        {varName} ({count})
+                      </span>
+                    ))}
+                  </div>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      );
+    }
+
     // Placeholder UI for reports not fully implemented yet
     return (
       <div className="flex flex-col items-center justify-center p-20 text-center border-2 border-dashed border-primary/20 rounded-2xl bg-primary/5">
@@ -703,7 +835,8 @@ export function AdvancedReportsHub({ restaurantId, currency }: Props) {
       'pnl', 'balance_sheet', 'cash_flow', 'indicators', 'trial_balance',
       'ar_aging', 'ap_aging', 'customers_summary', 'suppliers_summary',
       'inventory_value', 'inventory_qty', 'fixed_assets_summary', 'employees_summary',
-      'tax_summary', 'receipts_payments', 'sales_by_item', 'gl_transactions', 'inventory_margin'
+      'tax_summary', 'receipts_payments', 'sales_by_item', 'gl_transactions', 'inventory_margin',
+      'variables_by_label', 'variables_by_item', 'variables_by_customer'
     ].includes(activeReport);
 
     return (
