@@ -1,10 +1,11 @@
 // @ts-nocheck
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Plus, Trash2, X, Save, Tags } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
+import { supabase } from '@/integrations/supabase/client';
 
 export type ServiceVariable = { label: string; value: string };
 
@@ -15,6 +16,7 @@ interface Props {
   template?: ServiceVariable[]; // pre-defined variable labels (values may be empty)
   value: ServiceVariable[];
   onSave: (vars: ServiceVariable[]) => void;
+  restaurantId?: string;
 }
 
 const SUGGESTIONS = [
@@ -28,12 +30,21 @@ const SUGGESTIONS = [
   'موعد الاستلام',
 ];
 
-export function ServiceVariablesDialog({ open, onOpenChange, itemName, template, value, onSave }: Props) {
+const LS_KEY = 'service_variables_history_v1';
+
+function loadHistory(): Record<string, string[]> {
+  try { return JSON.parse(localStorage.getItem(LS_KEY) || '{}'); } catch { return {}; }
+}
+function saveHistory(hist: Record<string, string[]>) {
+  try { localStorage.setItem(LS_KEY, JSON.stringify(hist)); } catch {}
+}
+
+export function ServiceVariablesDialog({ open, onOpenChange, itemName, template, value, onSave, restaurantId }: Props) {
   const [rows, setRows] = useState<ServiceVariable[]>([]);
+  const [history, setHistory] = useState<Record<string, string[]>>({});
 
   useEffect(() => {
     if (open) {
-      // Merge template labels with existing values (dedupe by label)
       const merged: ServiceVariable[] = [];
       const seen = new Set<string>();
       (template || []).forEach(t => {
@@ -45,16 +56,57 @@ export function ServiceVariablesDialog({ open, onOpenChange, itemName, template,
         if (!seen.has(v.label)) merged.push({ ...v });
       });
       setRows(merged.length ? merged : [{ label: '', value: '' }]);
+      setHistory(loadHistory());
+
+      // Fetch recent variable values from DB to enrich suggestions
+      if (restaurantId) {
+        (async () => {
+          try {
+            const { data } = await supabase
+              .from('order_items')
+              .select('variables, orders!inner(restaurant_id)')
+              .eq('orders.restaurant_id', restaurantId)
+              .not('variables', 'is', null)
+              .order('created_at', { ascending: false })
+              .limit(300);
+            const local = loadHistory();
+            (data || []).forEach((row: any) => {
+              const vars = Array.isArray(row.variables) ? row.variables : [];
+              vars.forEach((v: any) => {
+                if (!v?.label || !v?.value) return;
+                const list = local[v.label] || [];
+                if (!list.includes(v.value)) list.unshift(v.value);
+                local[v.label] = list.slice(0, 25);
+              });
+            });
+            saveHistory(local);
+            setHistory(local);
+          } catch {}
+        })();
+      }
     }
-  }, [open]);
+  }, [open, restaurantId]);
 
   const addRow = (label = '') => setRows(r => [...r, { label, value: '' }]);
   const removeRow = (i: number) => setRows(r => r.filter((_, idx) => idx !== i));
   const updateRow = (i: number, patch: Partial<ServiceVariable>) =>
     setRows(r => r.map((row, idx) => (idx === i ? { ...row, ...patch } : row)));
 
+  const labelSuggestions = useMemo(() => {
+    const fromHistory = Object.keys(history);
+    return Array.from(new Set([...SUGGESTIONS, ...fromHistory]));
+  }, [history]);
+
   const save = () => {
     const cleaned = rows.filter(r => r.label.trim() && r.value.trim());
+    // Persist to local history for next-time suggestions
+    const hist = { ...history };
+    cleaned.forEach(r => {
+      const list = hist[r.label] || [];
+      if (!list.includes(r.value)) list.unshift(r.value);
+      hist[r.label] = list.slice(0, 25);
+    });
+    saveHistory(hist);
     onSave(cleaned);
     onOpenChange(false);
   };
@@ -70,26 +122,41 @@ export function ServiceVariablesDialog({ open, onOpenChange, itemName, template,
           </DialogTitle>
         </DialogHeader>
 
+        <datalist id="svc-var-labels">
+          {labelSuggestions.map(s => <option key={s} value={s} />)}
+        </datalist>
+
         <div className="space-y-3 max-h-[60vh] overflow-auto pl-1">
-          {rows.map((row, i) => (
-            <div key={i} className="flex items-center gap-2">
-              <Input
-                placeholder="اسم المتغير (مثال: اللون قبل)"
-                value={row.label}
-                onChange={e => updateRow(i, { label: e.target.value })}
-                className="h-9 text-xs flex-1"
-              />
-              <Input
-                placeholder="القيمة (مثال: أبيض)"
-                value={row.value}
-                onChange={e => updateRow(i, { value: e.target.value })}
-                className="h-9 text-xs flex-1"
-              />
-              <Button variant="ghost" size="sm" onClick={() => removeRow(i)} className="text-destructive h-8 w-8 p-0">
-                <Trash2 className="w-4 h-4" />
-              </Button>
-            </div>
-          ))}
+          {rows.map((row, i) => {
+            const valueOptions = history[row.label] || [];
+            const listId = `svc-var-val-${i}`;
+            return (
+              <div key={i} className="flex items-center gap-2">
+                <Input
+                  placeholder="اسم المتغير (مثال: اللون قبل)"
+                  value={row.label}
+                  list="svc-var-labels"
+                  onChange={e => updateRow(i, { label: e.target.value })}
+                  className="h-9 text-xs flex-1"
+                />
+                <Input
+                  placeholder="القيمة (مثال: أبيض)"
+                  value={row.value}
+                  list={listId}
+                  onChange={e => updateRow(i, { value: e.target.value })}
+                  className="h-9 text-xs flex-1"
+                />
+                {valueOptions.length > 0 && (
+                  <datalist id={listId}>
+                    {valueOptions.map(v => <option key={v} value={v} />)}
+                  </datalist>
+                )}
+                <Button variant="ghost" size="sm" onClick={() => removeRow(i)} className="text-destructive h-8 w-8 p-0">
+                  <Trash2 className="w-4 h-4" />
+                </Button>
+              </div>
+            );
+          })}
           <Button variant="outline" size="sm" onClick={() => addRow()} className="w-full">
             <Plus className="w-4 h-4 ml-1" /> إضافة متغير جديد
           </Button>
@@ -97,7 +164,7 @@ export function ServiceVariablesDialog({ open, onOpenChange, itemName, template,
           <div className="pt-2">
             <p className="text-[10px] font-bold text-muted-foreground mb-2">اقتراحات سريعة:</p>
             <div className="flex flex-wrap gap-1">
-              {SUGGESTIONS.map(s => (
+              {labelSuggestions.map(s => (
                 <Badge
                   key={s}
                   variant="outline"
