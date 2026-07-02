@@ -83,39 +83,35 @@ export function InvoiceViewer({
 
   const loadPrintSettings = async () => {
     try {
-      const { data: restaurant } = await supabase
-        .from('restaurants')
-        .select('printer_settings')
-        .eq('id', restaurantId)
-        .single();
-
-      if (restaurant?.printer_settings) {
-        const savedSettings = typeof restaurant.printer_settings === 'string'
-          ? JSON.parse(restaurant.printer_settings)
-          : restaurant.printer_settings;
-
-        setPrintSettings({
-          logo: savedSettings.logo ?? true,
-          restaurantName: savedSettings.restaurantName ?? true,
-          invoiceNumber: savedSettings.invoiceNumber ?? true,
-          dateTime: savedSettings.dateTime ?? true,
-          customerName: savedSettings.customerName ?? true,
-          customerPhone: savedSettings.customerPhone ?? true,
-          deliveryAddress: savedSettings.deliveryAddress ?? true,
-          paymentMethod: savedSettings.paymentMethod ?? true,
-          status: savedSettings.status ?? true,
-          items: savedSettings.items ?? true,
-          subtotal: savedSettings.subtotal ?? true,
-          discount: savedSettings.discount ?? true,
-          tax: savedSettings.tax ?? true,
-          total: savedSettings.total ?? true,
-          paidAmount: savedSettings.paidAmount ?? true,
-          remaining: savedSettings.remaining ?? true,
-          notes: savedSettings.notes ?? true,
-          thankYou: savedSettings.thankYou ?? true,
-          poweredBy: savedSettings.poweredBy ?? true,
-        });
-      }
+      // Source of truth: `print_settings` table (same table used by PrintSettingsManager & ReceiptModal)
+      const { data, error } = await supabase
+        .from('print_settings')
+        .select('settings')
+        .eq('restaurant_id', restaurantId)
+        .maybeSingle();
+      if (error && error.code !== 'PGRST116') throw error;
+      const saved: any = data?.settings || {};
+      setPrintSettings(prev => ({
+        logo: saved.logo ?? prev.logo,
+        restaurantName: saved.restaurantName ?? prev.restaurantName,
+        invoiceNumber: saved.invoiceNumber ?? prev.invoiceNumber,
+        dateTime: saved.dateTime ?? prev.dateTime,
+        customerName: saved.customerName ?? prev.customerName,
+        customerPhone: saved.customerPhone ?? prev.customerPhone,
+        deliveryAddress: saved.deliveryAddress ?? prev.deliveryAddress,
+        paymentMethod: saved.paymentMethod ?? prev.paymentMethod,
+        status: saved.status ?? prev.status,
+        items: saved.items ?? prev.items,
+        subtotal: saved.subtotal ?? prev.subtotal,
+        discount: saved.discount ?? prev.discount,
+        tax: saved.tax ?? prev.tax,
+        total: saved.total ?? prev.total,
+        paidAmount: saved.paidAmount ?? prev.paidAmount,
+        remaining: saved.remaining ?? prev.remaining,
+        notes: saved.notes ?? prev.notes,
+        thankYou: saved.thankYou ?? prev.thankYou,
+        poweredBy: saved.poweredBy ?? prev.poweredBy,
+      }));
     } catch (e) {
       console.error('Failed to load print settings:', e);
     }
@@ -124,11 +120,20 @@ export function InvoiceViewer({
   const savePrintSettings = async (newSettings: PrintElementSettings) => {
     if (!restaurantId) return;
     try {
+      // Merge with any existing (copy) settings to avoid losing them
+      const { data: existing } = await supabase
+        .from('print_settings')
+        .select('settings')
+        .eq('restaurant_id', restaurantId)
+        .maybeSingle();
+      const merged = { ...(existing?.settings as any || {}), ...newSettings };
       const { error } = await supabase
-        .from('restaurants')
-        .update({ printer_settings: newSettings })
-        .eq('id', restaurantId);
-
+        .from('print_settings')
+        .upsert({
+          restaurant_id: restaurantId,
+          settings: merged,
+          updated_at: new Date().toISOString(),
+        }, { onConflict: 'restaurant_id' });
       if (error) throw error;
       toast.success('تم حفظ إعدادات الطباعة');
     } catch (e: any) {
@@ -141,6 +146,7 @@ export function InvoiceViewer({
     setPrintSettings(newSettings);
     savePrintSettings(newSettings);
   };
+
 
   useEffect(() => {
     if (!open || !recordId) return;
@@ -158,18 +164,9 @@ export function InvoiceViewer({
           .maybeSingle();
         if (error) throw error;
         
-        console.log('InvoiceViewer - Order data:', data);
-        console.log('InvoiceViewer - Order items:', data?.order_items);
-        
-        if (data?.order_items && data.order_items.length > 0) {
-          console.log('InvoiceViewer - First item:', data.order_items[0]);
-          toast.info(`أول بند في الفاتورة: السعر=${data.order_items[0].price}, الكمية=${data.order_items[0].quantity}`);
-        }
-        
-        toast.info(`بيانات الفاتورة: المبلغ=${data?.total}, المدفوع=${data?.paid_amount}`);
-        
         setRecord(data);
         setItems(data?.order_items || []);
+
       } else {
         const { data, error } = await supabase
           .from('sales_orders')

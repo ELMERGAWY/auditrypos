@@ -16,6 +16,8 @@ import {
   ArrowRight, Calendar, Eye, FileJson, Trash2, Banknote, Edit, X, Settings, Printer
 } from 'lucide-react';
 import { CustomerSearch } from './CustomerSearch';
+import { PaymentAllocations, type Allocation } from '@/components/PaymentAllocations';
+
 import * as XLSX from 'xlsx';
 import jsPDF from 'jspdf';
 import 'jspdf-autotable';
@@ -96,7 +98,9 @@ export function CustomerManager({ restaurantId, currency }: Props) {
   const [receiptVouchers, setReceiptVouchers] = useState<ReceiptVoucher[]>([]);
   const [receiptVoucherSearch, setReceiptVoucherSearch] = useState('');
   const [showReceiptVoucherModal, setShowReceiptVoucherModal] = useState(false);
+  const [voucherAllocations, setVoucherAllocations] = useState<Allocation[]>([]);
   const [editingReceiptVoucher, setEditingReceiptVoucher] = useState<ReceiptVoucher | null>(null);
+
   const [receiptVoucherForm, setReceiptVoucherForm] = useState({
     customer_id: '',
     customer_name: '',
@@ -578,12 +582,32 @@ export function CustomerManager({ restaurantId, currency }: Props) {
     }
 
     try {
+      const trimmedName = formData.name.trim();
+      const trimmedPhone = formData.phone?.trim();
+
+      // Duplicate prevention: match by phone (primary) or by name if no phone
+      let dupQuery = supabase
+        .from('customers')
+        .select('id, name, phone')
+        .eq('restaurant_id', restaurantId);
+      if (trimmedPhone) {
+        dupQuery = dupQuery.eq('phone', trimmedPhone);
+      } else {
+        dupQuery = dupQuery.ilike('name', trimmedName);
+      }
+      const { data: existing } = await dupQuery.limit(1);
+      if (existing && existing.length > 0) {
+        const dup = existing[0];
+        toast.error(`العميل موجود مسبقاً: ${dup.name}${dup.phone ? ` (${dup.phone})` : ''}`);
+        return;
+      }
+
       const { error } = await supabase
         .from('customers')
         .insert({
           restaurant_id: restaurantId,
-          name: formData.name,
-          phone: formData.phone || null,
+          name: trimmedName,
+          phone: trimmedPhone || null,
           email: formData.email || null,
           address: formData.address || null,
           credit_limit: formData.credit_limit ? Number(formData.credit_limit) : 0,
@@ -604,6 +628,7 @@ export function CustomerManager({ restaurantId, currency }: Props) {
       toast.error('فشل إضافة العميل: ' + error.message);
     }
   };
+
 
   const handleUpdateCustomer = async () => {
     if (!selectedCustomer) return;
@@ -691,7 +716,20 @@ export function CustomerManager({ restaurantId, currency }: Props) {
         if (error) throw error;
       }
 
+      // Apply allocations to unpaid orders (multi-invoice payment)
+      if (voucherAllocations.length > 0) {
+        for (const a of voucherAllocations) {
+          const newPaid = Number(a.previous_paid || 0) + Number(a.amount || 0);
+          const fullyPaid = newPaid >= Number(a.order_total || 0) - 0.01;
+          await supabase.from('orders').update({
+            paid_amount: newPaid,
+            ...(fullyPaid ? { payment_status: 'paid' } : { payment_status: 'partial' }),
+          } as any).eq('id', a.order_id);
+        }
+      }
+
       toast.success(editingReceiptVoucher ? 'تم تحديث سند القبض' : 'تم إضافة سند القبض');
+
 
       setShowReceiptVoucherModal(false);
       setEditingReceiptVoucher(null);
@@ -1676,6 +1714,16 @@ export function CustomerManager({ restaurantId, currency }: Props) {
                 تم ربط حساب العملاء بالعميل المختار أعلاه تلقائياً
               </p>
             )}
+            {receiptVoucherForm.customer_id && (
+              <PaymentAllocations
+                restaurantId={restaurantId}
+                customerId={receiptVoucherForm.customer_id}
+                totalAmount={Number(receiptVoucherForm.amount) || 0}
+                currency={currency}
+                onChange={(allocs) => setVoucherAllocations(allocs)}
+              />
+            )}
+
             <div>
               <Label>ملاحظات</Label>
               <Input
