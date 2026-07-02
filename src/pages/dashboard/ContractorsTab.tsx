@@ -62,6 +62,7 @@ export function ContractorsTab({ restaurant }: Props) {
   const [invoiceSearch, setInvoiceSearch] = useState('');
   const [orderSearch, setOrderSearch] = useState('');
   const [selectedService, setSelectedService] = useState<any>(null);
+  const [selectedServices, setSelectedServices] = useState<any[]>([]);
   const [serviceForm, setServiceForm] = useState({
     contractor_id: '',
     service_name: '',
@@ -120,7 +121,7 @@ export function ContractorsTab({ restaurant }: Props) {
   const loadInvoices = async () => {
     const { data } = await supabase
       .from('sales_invoices')
-      .select('id, invoice_number, total, customer_name, created_at')
+      .select('id, invoice_number, total, customer_name, created_at, sales_invoice_items(*)')
       .eq('restaurant_id', restaurant.id)
       .order('created_at', { ascending: false })
       .limit(50);
@@ -130,7 +131,7 @@ export function ContractorsTab({ restaurant }: Props) {
   const loadOrders = async () => {
     const { data } = await supabase
       .from('orders')
-      .select('id, order_number, total, customer_name, created_at')
+      .select('id, order_number, total, customer_name, created_at, order_items(*)')
       .eq('restaurant_id', restaurant.id)
       .order('created_at', { ascending: false })
       .limit(50);
@@ -163,16 +164,57 @@ export function ContractorsTab({ restaurant }: Props) {
 
   const handleServiceSelect = (service: any) => {
     setSelectedService(service);
+    // Add to selected services array
+    const newService = {
+      id: service.id,
+      item_name: service.item_name,
+      unit_price: service.unit_price,
+      total: service.total,
+      quantity: service.quantity,
+      invoice_id: selectedInvoice,
+      order_id: selectedOrder,
+      invoice_number: invoices.find(i => i.id === selectedInvoice)?.invoice_number,
+      order_number: orders.find(o => o.id === selectedOrder)?.order_number,
+      customer_name: invoices.find(i => i.id === selectedInvoice)?.customer_name || orders.find(o => o.id === selectedOrder)?.customer_name
+    };
+    setSelectedServices([...selectedServices, newService]);
+    // Update service form with total
+    const totalServicesAmount = selectedServices.reduce((sum, s) => sum + (s.total || 0), 0) + (service.total || 0);
     setServiceForm({
       ...serviceForm,
       service_name: service.item_name,
-      service_amount: service.unit_price?.toString() || service.total?.toString() || ''
+      service_amount: totalServicesAmount.toString()
+    });
+    // Clear selection to allow adding more services
+    setSelectedInvoice('');
+    setSelectedOrder('');
+    setSelectedService(null);
+  };
+
+  const handleRemoveService = (serviceId: string) => {
+    const updatedServices = selectedServices.filter(s => s.id !== serviceId);
+    setSelectedServices(updatedServices);
+    // Recalculate total
+    const totalServicesAmount = updatedServices.reduce((sum, s) => sum + (s.total || 0), 0);
+    setServiceForm({
+      ...serviceForm,
+      service_amount: totalServicesAmount.toString()
     });
   };
 
   const openAddServiceDialog = () => {
     loadInvoices();
     loadOrders();
+    setSelectedServices([]);
+    setServiceForm({
+      contractor_id: '',
+      service_name: '',
+      service_amount: '',
+      notes: ''
+    });
+    setSelectedInvoice('');
+    setSelectedOrder('');
+    setSelectedService(null);
     setShowAddServiceDialog(true);
   };
 
@@ -209,13 +251,59 @@ export function ContractorsTab({ restaurant }: Props) {
       payload.order_id = selectedOrder;
     }
 
-    const { error } = await supabase.from('contractor_services').insert(payload);
-    if (error) {
-      toast.error('خطأ في إضافة الخدمة: ' + error.message);
+    // If multiple services selected, save each one individually
+    if (selectedServices.length > 0) {
+      // Collect unique invoice and order IDs
+      const invoiceIds = [...new Set(selectedServices.filter(s => s.invoice_id).map(s => s.invoice_id))];
+      const orderIds = [...new Set(selectedServices.filter(s => s.order_id).map(s => s.order_id))];
+
+      // Save each selected service as a separate contractor service
+      for (const service of selectedServices) {
+        const payload: any = {
+          restaurant_id: restaurant.id,
+          contractor_id: serviceForm.contractor_id,
+          service_name: service.item_name,
+          service_amount: service.total,
+          contractor_amount: contractor.payment_type === 'fixed'
+            ? contractor.payment_value
+            : (service.total * contractor.payment_value / 100),
+          status: 'pending' as const,
+          notes: serviceForm.notes || null
+        };
+
+        if (service.invoice_id) {
+          payload.invoice_id = service.invoice_id;
+        } else if (service.order_id) {
+          payload.order_id = service.order_id;
+        }
+
+        const { error } = await supabase.from('contractor_services').insert(payload);
+        if (error) {
+          toast.error('خطأ في إضافة الخدمة: ' + error.message);
+          return;
+        }
+      }
+
+      toast.success(`تم إضافة ${selectedServices.length} خدمة بنجاح`);
+
+      // Auto-transfer to حصر مستحقات
+      setSelectedInvoices(invoiceIds);
+      setSelectedOrders(orderIds);
+      setServiceForm({ ...serviceForm, contractor_id: serviceForm.contractor_id });
+      setShowAddServiceDialog(false);
+      setShowSummaryDialog(true);
       return;
+    } else {
+      // Single service (manual entry)
+      const { error } = await supabase.from('contractor_services').insert(payload);
+      if (error) {
+        toast.error('خطأ في إضافة الخدمة: ' + error.message);
+        return;
+      }
+
+      toast.success('تم إضافة الخدمة بنجاح');
     }
 
-    toast.success('تم إضافة الخدمة بنجاح');
     setShowAddServiceDialog(false);
     setServiceForm({
       contractor_id: '',
@@ -225,6 +313,8 @@ export function ContractorsTab({ restaurant }: Props) {
     });
     setSelectedInvoice('');
     setSelectedOrder('');
+    setSelectedService(null);
+    setSelectedServices([]);
 
     if (selectedContractor) {
       loadContractorServices(selectedContractor.id);
@@ -585,14 +675,45 @@ export function ContractorsTab({ restaurant }: Props) {
                   />
                 </div>
                 <div>
-                  <Label>قيمة الخدمة (ج.م) *</Label>
+                  <Label>قيمة الخدمات (ج.م) *</Label>
                   <Input
                     type="number"
                     value={serviceForm.service_amount}
                     onChange={e => setServiceForm({ ...serviceForm, service_amount: e.target.value })}
-                    placeholder="قيمة الخدمة الأصلية"
+                    placeholder="إجمالي قيمة الخدمات"
+                    readOnly={selectedServices.length > 0}
                   />
                 </div>
+
+                {/* Selected Services List */}
+                {selectedServices.length > 0 && (
+                  <div>
+                    <Label className="text-xs">الخدمات المختارة</Label>
+                    <div className="max-h-40 overflow-y-auto border rounded-lg p-2 space-y-1">
+                      {selectedServices.map((service, idx) => (
+                        <div key={`${service.id}-${idx}`} className="flex items-center justify-between p-2 bg-secondary/50 rounded text-xs">
+                          <div className="flex-1">
+                            <div className="font-medium">{service.item_name}</div>
+                            <div className="text-muted-foreground">
+                              {service.invoice_number ? `فاتورة ${service.invoice_number}` : `طلب ${service.order_number}`} - {service.customer_name || 'بدون عميل'}
+                            </div>
+                            <div className="text-muted-foreground">
+                              {service.quantity} × {service.unit_price} = {service.total} ج.م
+                            </div>
+                          </div>
+                          <Button
+                            onClick={() => handleRemoveService(service.id)}
+                            variant="ghost"
+                            size="sm"
+                            className="text-destructive hover:text-destructive h-6 w-6 p-0"
+                          >
+                            <Trash2 className="w-3 h-3" />
+                          </Button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
                 {serviceForm.contractor_id && (
                   <div className="p-3 bg-secondary rounded-lg">
                     <p className="text-sm text-muted-foreground">طريقة الدفع: {contractors.find(c => c.id === serviceForm.contractor_id)?.payment_type === 'fixed' ? 'مبلغ مقطوع' : 'نسبة'}</p>
