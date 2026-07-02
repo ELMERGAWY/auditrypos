@@ -167,12 +167,14 @@ export function InvoiceViewer({
         setRecord(data);
         setItems(data?.order_items || []);
 
-        // Load receipt vouchers from the order's receipt_voucher_ids array
-        if (data?.receipt_voucher_ids && data.receipt_voucher_ids.length > 0) {
+        // Load receipt vouchers for this customer after order creation date
+        if (data?.customer_id && restaurantId) {
           const { data: vouchers } = await supabase
             .from('receipt_vouchers')
             .select('*')
-            .in('id', data.receipt_voucher_ids)
+            .eq('customer_id', data.customer_id)
+            .eq('restaurant_id', restaurantId)
+            .gte('voucher_date', data.created_at?.split('T')[0] || new Date().toISOString().split('T')[0])
             .order('voucher_date', { ascending: true });
           
           // Calculate total from receipt vouchers

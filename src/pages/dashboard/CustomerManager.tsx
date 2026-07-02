@@ -717,49 +717,24 @@ export function CustomerManager({ restaurantId, currency }: Props) {
       }
 
       // Apply allocations to unpaid orders (multi-invoice payment)
+      // Receipt vouchers are shown in orders/invoices based on customer and date
+      // No need to save voucher IDs in orders - they are queried dynamically
       if (voucherAllocations.length > 0) {
-        // Get the voucher ID
-        let voucherId = editingReceiptVoucher?.id;
-        if (!voucherId) {
-          const { data: newVoucher } = await supabase
-            .from('receipt_vouchers')
-            .select('id')
-            .eq('restaurant_id', restaurantId)
-            .eq('customer_id', receiptVoucherForm.customer_id)
-            .eq('amount', amount)
-            .order('created_at', { ascending: false })
-            .limit(1)
+        for (const a of voucherAllocations) {
+          // Update order paid_amount to include this allocation
+          const { data: order } = await supabase
+            .from('orders')
+            .select('paid_amount, total')
+            .eq('id', a.order_id)
             .single();
-          voucherId = newVoucher?.id;
-        }
 
-        if (voucherId) {
-          for (const a of voucherAllocations) {
-            // Update order: add voucher ID to array only
-            // DO NOT update paid_amount to avoid duplication
-            // paid_amount should only represent direct payments at order creation
-            const { data: order } = await supabase
-              .from('orders')
-              .select('paid_amount, receipt_voucher_ids, total')
-              .eq('id', a.order_id)
-              .single();
+          const newPaid = Number(order?.paid_amount || 0) + Number(a.amount || 0);
+          const fullyPaid = newPaid >= Number(order?.total || 0) - 0.01;
 
-            const currentVoucherIds = order?.receipt_voucher_ids || [];
-            const newVoucherIds = currentVoucherIds.includes(voucherId)
-              ? currentVoucherIds
-              : [...currentVoucherIds, voucherId];
-
-            // Calculate total paid including this allocation
-            const directPaid = Number(order?.paid_amount || 0);
-            const allocatedAmount = Number(a.amount || 0);
-            const totalPaid = directPaid + allocatedAmount;
-            const fullyPaid = totalPaid >= Number(order?.total || 0) - 0.01;
-
-            await supabase.from('orders').update({
-              receipt_voucher_ids: newVoucherIds,
-              ...(fullyPaid ? { payment_status: 'paid' } : { payment_status: 'partial' }),
-            } as any).eq('id', a.order_id);
-          }
+          await supabase.from('orders').update({
+            paid_amount: newPaid,
+            ...(fullyPaid ? { payment_status: 'paid' } : { payment_status: 'partial' }),
+          } as any).eq('id', a.order_id);
         }
       }
 
