@@ -188,6 +188,52 @@ export function InvoiceViewer({
           }));
         }
 
+      } else if (source === 'sales_invoice') {
+        // Load from sales_invoices table and get linked order data
+        const { data: invoice, error: invoiceError } = await supabase
+          .from('sales_invoices')
+          .select('*, orders(*)')
+          .eq('id', recordId)
+          .maybeSingle();
+        if (invoiceError) throw invoiceError;
+        
+        // Use the linked order data if available
+        const orderData = invoice?.orders || invoice;
+        setRecord(orderData);
+        
+        // Load items from order or sales_invoice_items
+        if (orderData?.order_items) {
+          setItems(orderData.order_items);
+        } else {
+          // Try to load from order_items using the order_id
+          if (invoice?.order_id) {
+            const { data: orderItems } = await supabase
+              .from('order_items')
+              .select('*')
+              .eq('order_id', invoice.order_id);
+            setItems(orderItems || []);
+          }
+        }
+
+        // Load receipt vouchers using the order's customer_id and created_at
+        if (orderData?.customer_id && restaurantId) {
+          const { data: vouchers } = await supabase
+            .from('receipt_vouchers')
+            .select('*')
+            .eq('customer_id', orderData.customer_id)
+            .eq('restaurant_id', restaurantId)
+            .gte('voucher_date', orderData.created_at?.split('T')[0] || new Date().toISOString().split('T')[0])
+            .order('voucher_date', { ascending: true });
+          
+          const voucherTotal = vouchers?.reduce((sum, v) => sum + (v.amount || 0), 0) || 0;
+          
+          setRecord(prev => ({
+            ...prev,
+            receipt_vouchers: vouchers || [],
+            receipt_voucher_total: voucherTotal
+          }));
+        }
+
       } else {
         const { data, error } = await supabase
           .from('sales_orders')
