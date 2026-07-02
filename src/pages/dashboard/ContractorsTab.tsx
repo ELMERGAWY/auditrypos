@@ -122,7 +122,6 @@ export function ContractorsTab({ restaurant }: Props) {
     const { data, error } = await supabase
       .from('sales_invoices')
       .select('id, invoice_number, total_amount, created_at, sales_invoice_lines(id, description, quantity, unit_price, line_total)')
-      .eq('restaurant_id', restaurant.id)
       .order('created_at', { ascending: false })
       .limit(50);
     if (error) {
@@ -138,7 +137,6 @@ export function ContractorsTab({ restaurant }: Props) {
     const { data, error } = await supabase
       .from('orders')
       .select('id, order_number, total, created_at, order_items(id, menu_item_name, quantity, price)')
-      .eq('restaurant_id', restaurant.id)
       .order('created_at', { ascending: false })
       .limit(50);
     if (error) {
