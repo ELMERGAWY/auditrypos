@@ -1714,6 +1714,16 @@ export function CustomerManager({ restaurantId, currency }: Props) {
                 تم ربط حساب العملاء بالعميل المختار أعلاه تلقائياً
               </p>
             )}
+            {receiptVoucherForm.customer_id && (
+              <PaymentAllocations
+                restaurantId={restaurantId}
+                customerId={receiptVoucherForm.customer_id}
+                totalAmount={Number(receiptVoucherForm.amount) || 0}
+                currency={currency}
+                onChange={(allocs) => setVoucherAllocations(allocs)}
+              />
+            )}
+
             <div>
               <Label>ملاحظات</Label>
               <Input
