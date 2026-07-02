@@ -167,20 +167,18 @@ export function InvoiceViewer({
         setRecord(data);
         setItems(data?.order_items || []);
 
-        // Load receipt vouchers for this order to show separately (NOT added to paid_amount)
-        if (data?.customer_id && restaurantId) {
+        // Load receipt vouchers from the order's receipt_voucher_ids array
+        if (data?.receipt_voucher_ids && data.receipt_voucher_ids.length > 0) {
           const { data: vouchers } = await supabase
             .from('receipt_vouchers')
             .select('*')
-            .eq('customer_id', data.customer_id)
-            .eq('restaurant_id', restaurantId)
-            .gte('voucher_date', data.created_at?.split('T')[0] || new Date().toISOString().split('T')[0])
+            .in('id', data.receipt_voucher_ids)
             .order('voucher_date', { ascending: true });
           
-          // Calculate total from receipt vouchers (display only)
+          // Calculate total from receipt vouchers
           const voucherTotal = vouchers?.reduce((sum, v) => sum + (v.amount || 0), 0) || 0;
           
-          // Store vouchers separately for display - NOT added to paid_amount
+          // Store vouchers for display
           setRecord(prev => ({
             ...prev,
             receipt_vouchers: vouchers || [],

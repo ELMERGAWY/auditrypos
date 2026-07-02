@@ -718,13 +718,44 @@ export function CustomerManager({ restaurantId, currency }: Props) {
 
       // Apply allocations to unpaid orders (multi-invoice payment)
       if (voucherAllocations.length > 0) {
-        for (const a of voucherAllocations) {
-          const newPaid = Number(a.previous_paid || 0) + Number(a.amount || 0);
-          const fullyPaid = newPaid >= Number(a.order_total || 0) - 0.01;
-          await supabase.from('orders').update({
-            paid_amount: newPaid,
-            ...(fullyPaid ? { payment_status: 'paid' } : { payment_status: 'partial' }),
-          } as any).eq('id', a.order_id);
+        // Get the voucher ID
+        let voucherId = editingReceiptVoucher?.id;
+        if (!voucherId) {
+          const { data: newVoucher } = await supabase
+            .from('receipt_vouchers')
+            .select('id')
+            .eq('restaurant_id', restaurantId)
+            .eq('customer_id', receiptVoucherForm.customer_id)
+            .eq('amount', amount)
+            .order('created_at', { ascending: false })
+            .limit(1)
+            .single();
+          voucherId = newVoucher?.id;
+        }
+
+        if (voucherId) {
+          for (const a of voucherAllocations) {
+            // Update order paid_amount and add voucher ID to array
+            const { data: order } = await supabase
+              .from('orders')
+              .select('paid_amount, receipt_voucher_ids')
+              .eq('id', a.order_id)
+              .single();
+
+            const currentVoucherIds = order?.receipt_voucher_ids || [];
+            const newVoucherIds = currentVoucherIds.includes(voucherId)
+              ? currentVoucherIds
+              : [...currentVoucherIds, voucherId];
+
+            const newPaid = Number(a.previous_paid || 0) + Number(a.amount || 0);
+            const fullyPaid = newPaid >= Number(a.order_total || 0) - 0.01;
+
+            await supabase.from('orders').update({
+              paid_amount: newPaid,
+              receipt_voucher_ids: newVoucherIds,
+              ...(fullyPaid ? { payment_status: 'paid' } : { payment_status: 'partial' }),
+            } as any).eq('id', a.order_id);
+          }
         }
       }
 
