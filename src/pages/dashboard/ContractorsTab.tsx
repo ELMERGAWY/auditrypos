@@ -127,8 +127,9 @@ export function ContractorsTab({ restaurant }: Props) {
       .limit(50);
     if (error) {
       console.error('Error loading invoices:', error);
-      toast.error('خطأ في تحميل الفواتير');
+      toast.error('خطأ في تحميل الفواتير: ' + error.message);
     } else {
+      console.log('Loaded invoices:', data?.length);
       setInvoices(data || []);
     }
   };
@@ -142,8 +143,9 @@ export function ContractorsTab({ restaurant }: Props) {
       .limit(50);
     if (error) {
       console.error('Error loading orders:', error);
-      toast.error('خطأ في تحميل الطلبات');
+      toast.error('خطأ في تحميل الطلبات: ' + error.message);
     } else {
+      console.log('Loaded orders:', data?.length);
       setOrders(data || []);
     }
   };
@@ -212,9 +214,8 @@ export function ContractorsTab({ restaurant }: Props) {
     });
   };
 
-  const openAddServiceDialog = () => {
-    loadInvoices();
-    loadOrders();
+  const openAddServiceDialog = async () => {
+    await Promise.all([loadInvoices(), loadOrders()]);
     setSelectedServices([]);
     setServiceForm({
       contractor_id: '',
