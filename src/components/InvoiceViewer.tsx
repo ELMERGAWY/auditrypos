@@ -167,14 +167,13 @@ export function InvoiceViewer({
         setRecord(data);
         setItems(data?.order_items || []);
 
-        // Load receipt vouchers for this customer after order creation date
+        // Load receipt vouchers for this customer (all vouchers, not date-restricted)
         if (data?.customer_id && restaurantId) {
           const { data: vouchers } = await supabase
             .from('receipt_vouchers')
             .select('*')
             .eq('customer_id', data.customer_id)
             .eq('restaurant_id', restaurantId)
-            .gte('voucher_date', data.created_at?.split('T')[0] || new Date().toISOString().split('T')[0])
             .order('voucher_date', { ascending: true });
           
           // Calculate total from receipt vouchers
@@ -215,14 +214,13 @@ export function InvoiceViewer({
           }
         }
 
-        // Load receipt vouchers using the order's customer_id and created_at
+        // Load receipt vouchers for this customer (all vouchers, not date-restricted)
         if (orderData?.customer_id && restaurantId) {
           const { data: vouchers } = await supabase
             .from('receipt_vouchers')
             .select('*')
             .eq('customer_id', orderData.customer_id)
             .eq('restaurant_id', restaurantId)
-            .gte('voucher_date', orderData.created_at?.split('T')[0] || new Date().toISOString().split('T')[0])
             .order('voucher_date', { ascending: true });
           
           const voucherTotal = vouchers?.reduce((sum, v) => sum + (v.amount || 0), 0) || 0;
