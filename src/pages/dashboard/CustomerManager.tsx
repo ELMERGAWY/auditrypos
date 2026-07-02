@@ -716,7 +716,20 @@ export function CustomerManager({ restaurantId, currency }: Props) {
         if (error) throw error;
       }
 
+      // Apply allocations to unpaid orders (multi-invoice payment)
+      if (voucherAllocations.length > 0) {
+        for (const a of voucherAllocations) {
+          const newPaid = Number(a.previous_paid || 0) + Number(a.amount || 0);
+          const fullyPaid = newPaid >= Number(a.order_total || 0) - 0.01;
+          await supabase.from('orders').update({
+            paid_amount: newPaid,
+            ...(fullyPaid ? { payment_status: 'paid' } : { payment_status: 'partial' }),
+          } as any).eq('id', a.order_id);
+        }
+      }
+
       toast.success(editingReceiptVoucher ? 'تم تحديث سند القبض' : 'تم إضافة سند القبض');
+
 
       setShowReceiptVoucherModal(false);
       setEditingReceiptVoucher(null);
