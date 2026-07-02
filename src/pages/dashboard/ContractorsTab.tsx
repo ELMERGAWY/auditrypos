@@ -121,7 +121,7 @@ export function ContractorsTab({ restaurant }: Props) {
   const loadInvoices = async () => {
     const { data } = await supabase
       .from('sales_invoices')
-      .select('id, invoice_number, total, customer_name, created_at, sales_invoice_items(*)')
+      .select('id, invoice_number, total, customer_name, created_at, sales_invoice_items(id, item_name, quantity, unit_price, total)')
       .eq('restaurant_id', restaurant.id)
       .order('created_at', { ascending: false })
       .limit(50);
@@ -131,7 +131,7 @@ export function ContractorsTab({ restaurant }: Props) {
   const loadOrders = async () => {
     const { data } = await supabase
       .from('orders')
-      .select('id, order_number, total, customer_name, created_at, order_items(*)')
+      .select('id, order_number, total, customer_name, created_at, order_items(id, item_name, quantity, unit_price, total)')
       .eq('restaurant_id', restaurant.id)
       .order('created_at', { ascending: false })
       .limit(50);
@@ -163,7 +163,6 @@ export function ContractorsTab({ restaurant }: Props) {
   };
 
   const handleServiceSelect = (service: any) => {
-    setSelectedService(service);
     // Add to selected services array
     const newService = {
       id: service.id,
@@ -177,9 +176,10 @@ export function ContractorsTab({ restaurant }: Props) {
       order_number: orders.find(o => o.id === selectedOrder)?.order_number,
       customer_name: invoices.find(i => i.id === selectedInvoice)?.customer_name || orders.find(o => o.id === selectedOrder)?.customer_name
     };
-    setSelectedServices([...selectedServices, newService]);
+    const updatedServices = [...selectedServices, newService];
+    setSelectedServices(updatedServices);
     // Update service form with total
-    const totalServicesAmount = selectedServices.reduce((sum, s) => sum + (s.total || 0), 0) + (service.total || 0);
+    const totalServicesAmount = updatedServices.reduce((sum, s) => sum + (s.total || 0), 0);
     setServiceForm({
       ...serviceForm,
       service_name: service.item_name,
@@ -556,7 +556,7 @@ export function ContractorsTab({ restaurant }: Props) {
                 <Receipt className="w-4 h-4 ml-1" /> إضافة خدمة من فاتورة/طلب
               </Button>
             </DialogTrigger>
-            <DialogContent className="max-w-md">
+            <DialogContent className="max-w-md max-h-[90vh] overflow-auto">
               <DialogHeader>
                 <DialogTitle>إضافة خدمة للصنايعي</DialogTitle>
               </DialogHeader>
@@ -666,14 +666,16 @@ export function ContractorsTab({ restaurant }: Props) {
                     </div>
                   </div>
                 )}
-                <div>
-                  <Label>اسم الخدمة *</Label>
-                  <Input
-                    value={serviceForm.service_name}
-                    onChange={e => setServiceForm({ ...serviceForm, service_name: e.target.value })}
-                    placeholder="مثال: تركيب سباكة، صيانة كهرباء"
-                  />
-                </div>
+                {selectedServices.length === 0 && (
+                  <div>
+                    <Label>اسم الخدمة *</Label>
+                    <Input
+                      value={serviceForm.service_name}
+                      onChange={e => setServiceForm({ ...serviceForm, service_name: e.target.value })}
+                      placeholder="مثال: تركيب سباكة، صيانة كهرباء"
+                    />
+                  </div>
+                )}
                 <div>
                   <Label>قيمة الخدمات (ج.م) *</Label>
                   <Input
@@ -811,6 +813,76 @@ export function ContractorsTab({ restaurant }: Props) {
                     ))}
                   </div>
                 </div>
+
+                {/* Show selected services for removal */}
+                {serviceForm.contractor_id && (selectedInvoices.length > 0 || selectedOrders.length > 0) && (() => {
+                  const summary = calculateContractorSummary(serviceForm.contractor_id);
+                  if (!summary) return null;
+
+                  // Get services for selected invoices/orders
+                  const selectedServicesList: any[] = [];
+                  summary.selectedInvoices.forEach((inv: any) => {
+                    if (inv.sales_invoice_items) {
+                      inv.sales_invoice_items.forEach((item: any) => {
+                        selectedServicesList.push({
+                          ...item,
+                          invoice_id: inv.id,
+                          invoice_number: inv.invoice_number,
+                          customer_name: inv.customer_name
+                        });
+                      });
+                    }
+                  });
+                  summary.selectedOrders.forEach((ord: any) => {
+                    if (ord.order_items) {
+                      ord.order_items.forEach((item: any) => {
+                        selectedServicesList.push({
+                          ...item,
+                          order_id: ord.id,
+                          order_number: ord.order_number,
+                          customer_name: ord.customer_name
+                        });
+                      });
+                    }
+                  });
+
+                  if (selectedServicesList.length === 0) return null;
+
+                  return (
+                    <div>
+                      <Label className="font-bold">الخدمات المختارة (يمكن الحذف)</Label>
+                      <div className="max-h-40 overflow-auto border rounded-lg p-2 space-y-1">
+                        {selectedServicesList.map((service, idx) => (
+                          <div key={`${service.id}-${idx}`} className="flex items-center justify-between p-2 bg-secondary/50 rounded text-xs">
+                            <div className="flex-1">
+                              <div className="font-medium">{service.item_name}</div>
+                              <div className="text-muted-foreground">
+                                {service.invoice_number ? `فاتورة ${service.invoice_number}` : `طلب ${service.order_number}`} - {service.customer_name || 'بدون عميل'}
+                              </div>
+                              <div className="text-muted-foreground">
+                                {service.quantity} × {service.unit_price} = {service.total} ج.م
+                              </div>
+                            </div>
+                            <Button
+                              onClick={() => {
+                                if (service.invoice_id) {
+                                  setSelectedInvoices(selectedInvoices.filter(id => id !== service.invoice_id));
+                                } else if (service.order_id) {
+                                  setSelectedOrders(selectedOrders.filter(id => id !== service.order_id));
+                                }
+                              }}
+                              variant="ghost"
+                              size="sm"
+                              className="text-destructive hover:text-destructive h-6 w-6 p-0"
+                            >
+                              <Trash2 className="w-3 h-3" />
+                            </Button>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })()}
 
                 {serviceForm.contractor_id && (selectedInvoices.length > 0 || selectedOrders.length > 0) && (() => {
                   const summary = calculateContractorSummary(serviceForm.contractor_id);
