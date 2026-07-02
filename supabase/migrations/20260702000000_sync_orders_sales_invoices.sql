@@ -38,6 +38,13 @@ AFTER UPDATE OF paid_amount ON public.orders
 FOR EACH ROW
 EXECUTE FUNCTION public.sync_order_paid_amount();
 
+-- Also sync on INSERT to ensure initial sync
+DROP TRIGGER IF EXISTS trigger_sync_order_paid_amount_insert ON public.orders;
+CREATE TRIGGER trigger_sync_order_paid_amount_insert
+AFTER INSERT ON public.orders
+FOR EACH ROW
+EXECUTE FUNCTION public.sync_order_paid_amount();
+
 -- Step 4: Create function to sync from sales_invoices to orders
 CREATE OR REPLACE FUNCTION public.sync_invoice_paid_amount()
 RETURNS TRIGGER AS $$
