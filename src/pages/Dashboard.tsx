@@ -125,6 +125,7 @@ export default function Dashboard() {
   const [editingOrder, setEditingOrder] = useState<any | null>(null);
   const [showEditOrderModal, setShowEditOrderModal] = useState(false);
   const [editOrderItems, setEditOrderItems] = useState<any[]>([]);
+  const [receiptVouchersByCustomer, setReceiptVouchersByCustomer] = useState<Map<string, number>>(new Map());
   const [editOrderForm, setEditOrderForm] = useState({
     customer_name: '',
     customer_phone: '',
@@ -177,6 +178,24 @@ export default function Dashboard() {
     setShowInvoiceTabs(false);
     setAutoPrint(false);
   }, [activeTab]);
+
+  // Load receipt vouchers for all customers
+  useEffect(() => {
+    if (restaurant?.id) {
+      supabase
+        .from('receipt_vouchers')
+        .select('customer_id, amount')
+        .eq('restaurant_id', restaurant.id)
+        .then(({ data }) => {
+          const voucherMap = new Map<string, number>();
+          (data || []).forEach(v => {
+            const current = voucherMap.get(v.customer_id) || 0;
+            voucherMap.set(v.customer_id, current + (v.amount || 0));
+          });
+          setReceiptVouchersByCustomer(voucherMap);
+        });
+    }
+  }, [restaurant?.id]);
 
   // Derived
   const businessType = (restaurant?.business_type || 'restaurant') as BusinessType;
@@ -715,11 +734,11 @@ export default function Dashboard() {
                   </div>
                   <div className="flex justify-between text-xs">
                     <span className="text-muted-foreground">إجمالي المدفوع:</span>
-                    <span className="text-emerald-600 font-bold">{Number(o.paid_amount || 0).toLocaleString()} {currency}</span>
+                    <span className="text-emerald-600 font-bold">{((Number(o.paid_amount || 0) + (receiptVouchersByCustomer.get(o.customer_id) || 0))).toLocaleString()} {currency}</span>
                   </div>
                   <div className="flex justify-between text-xs">
                     <span className="text-muted-foreground">المتبقي:</span>
-                    <span className="text-destructive font-bold">{Math.max(0, Number(o.total) - Number(o.paid_amount || 0)).toLocaleString()} {currency}</span>
+                    <span className="text-destructive font-bold">{Math.max(0, Number(o.total) - (Number(o.paid_amount || 0) + (receiptVouchersByCustomer.get(o.customer_id) || 0))).toLocaleString()} {currency}</span>
                   </div>
                 </div>
 
