@@ -121,7 +121,7 @@ export function ContractorsTab({ restaurant }: Props) {
   const loadInvoices = async () => {
     const { data, error } = await supabase
       .from('sales_invoices')
-      .select('id, invoice_number, total_amount, customer_name, created_at, sales_invoice_lines(id, description, quantity, unit_price, line_total)')
+      .select('id, invoice_number, total_amount, created_at, sales_invoice_lines(id, description, quantity, unit_price, line_total)')
       .eq('restaurant_id', restaurant.id)
       .order('created_at', { ascending: false })
       .limit(50);
@@ -137,7 +137,7 @@ export function ContractorsTab({ restaurant }: Props) {
   const loadOrders = async () => {
     const { data, error } = await supabase
       .from('orders')
-      .select('id, order_number, total, customer_name, created_at, order_items(id, menu_item_name, quantity, price)')
+      .select('id, order_number, total, created_at, order_items(id, menu_item_name, quantity, price)')
       .eq('restaurant_id', restaurant.id)
       .order('created_at', { ascending: false })
       .limit(50);
@@ -152,14 +152,12 @@ export function ContractorsTab({ restaurant }: Props) {
 
   const filteredInvoices = invoices.filter(inv =>
     !invoiceSearch ||
-    inv.invoice_number?.toLowerCase().includes(invoiceSearch.toLowerCase()) ||
-    inv.customer_name?.toLowerCase().includes(invoiceSearch.toLowerCase())
+    inv.invoice_number?.toLowerCase().includes(invoiceSearch.toLowerCase())
   );
 
   const filteredOrders = orders.filter(ord =>
     !orderSearch ||
-    ord.order_number?.toLowerCase().includes(orderSearch.toLowerCase()) ||
-    ord.customer_name?.toLowerCase().includes(orderSearch.toLowerCase())
+    ord.order_number?.toLowerCase().includes(orderSearch.toLowerCase())
   );
 
   const handleInvoiceSelect = (invoiceId: string) => {
@@ -186,8 +184,7 @@ export function ContractorsTab({ restaurant }: Props) {
       invoice_id: selectedInvoice,
       order_id: selectedOrder,
       invoice_number: invoices.find(i => i.id === selectedInvoice)?.invoice_number,
-      order_number: orders.find(o => o.id === selectedOrder)?.order_number,
-      customer_name: invoices.find(i => i.id === selectedInvoice)?.customer_name || orders.find(o => o.id === selectedOrder)?.customer_name
+      order_number: orders.find(o => o.id === selectedOrder)?.order_number
     };
     const updatedServices = [...selectedServices, newService];
     setSelectedServices(updatedServices);
@@ -605,7 +602,7 @@ export function ContractorsTab({ restaurant }: Props) {
                           <SelectContent>
                             {filteredInvoices.length > 0 ? (
                               filteredInvoices.map(inv => (
-                                <SelectItem key={inv.id} value={inv.id}>{inv.invoice_number} - {inv.customer_name || 'بدون عميل'} ({inv.total_amount} ج.م)</SelectItem>
+                                <SelectItem key={inv.id} value={inv.id}>{inv.invoice_number} ({inv.total_amount} ج.م)</SelectItem>
                               ))
                             ) : (
                               <div className="p-2 text-xs text-muted-foreground">لا توجد فواتير</div>
@@ -630,7 +627,7 @@ export function ContractorsTab({ restaurant }: Props) {
                           <SelectContent>
                             {filteredOrders.length > 0 ? (
                               filteredOrders.map(ord => (
-                                <SelectItem key={ord.id} value={ord.id}>{ord.order_number} - {ord.customer_name || 'بدون عميل'} ({ord.total} ج.م)</SelectItem>
+                                <SelectItem key={ord.id} value={ord.id}>{ord.order_number} ({ord.total} ج.م)</SelectItem>
                               ))
                             ) : (
                               <div className="p-2 text-xs text-muted-foreground">لا توجد طلبات</div>
@@ -818,7 +815,7 @@ export function ContractorsTab({ restaurant }: Props) {
                             }
                           }}
                         />
-                        <span className="flex-1">{inv.invoice_number} - {inv.customer_name || 'بدون عميل'}</span>
+                        <span className="flex-1">{inv.invoice_number}</span>
                         <span className="font-bold">{inv.total_amount || inv.total} ج.م</span>
                       </label>
                     ))}
@@ -841,7 +838,7 @@ export function ContractorsTab({ restaurant }: Props) {
                             }
                           }}
                         />
-                        <span className="flex-1">{ord.order_number} - {ord.customer_name || 'بدون عميل'}</span>
+                        <span className="flex-1">{ord.order_number}</span>
                         <span className="font-bold">{ord.total} ج.م</span>
                       </label>
                     ))}
@@ -864,8 +861,7 @@ export function ContractorsTab({ restaurant }: Props) {
                           unit_price: item.unit_price,
                           total: item.line_total,
                           invoice_id: inv.id,
-                          invoice_number: inv.invoice_number,
-                          customer_name: inv.customer_name
+                          invoice_number: inv.invoice_number
                         });
                       });
                     }
@@ -879,8 +875,7 @@ export function ContractorsTab({ restaurant }: Props) {
                           unit_price: item.price,
                           total: Number(item.quantity) * Number(item.price),
                           order_id: ord.id,
-                          order_number: ord.order_number,
-                          customer_name: ord.customer_name
+                          order_number: ord.order_number
                         });
                       });
                     }
@@ -897,7 +892,7 @@ export function ContractorsTab({ restaurant }: Props) {
                             <div className="flex-1">
                               <div className="font-medium">{service.item_name}</div>
                               <div className="text-muted-foreground">
-                                {service.invoice_number ? `فاتورة ${service.invoice_number}` : `طلب ${service.order_number}`} - {service.customer_name || 'بدون عميل'}
+                                {service.invoice_number ? `فاتورة ${service.invoice_number}` : `طلب ${service.order_number}`}
                               </div>
                               <div className="text-muted-foreground">
                                 {service.quantity} × {service.unit_price} = {service.total} ج.م
