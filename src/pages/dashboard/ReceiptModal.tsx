@@ -8,6 +8,13 @@ import { ORDER_TYPE_CONFIG, extractCustomerRef } from './types';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 
+interface ReceiptVoucher {
+  id: string;
+  amount: number;
+  voucher_date: string;
+  payment_method: string;
+}
+
 interface ReceiptProps {
   order: Order;
   restaurant: Restaurant;
@@ -249,6 +256,25 @@ function ReceiptContent({
         </tbody>
       </table>
 
+      {/* Receipt Vouchers */}
+      {receiptVouchers.length > 0 && (
+        <>
+          <hr className="divider" />
+          <div style={{ fontSize: 10, padding: '3px 0' }}>
+            <div className="row">
+              <span className="info-label">سندات القبض ({receiptVouchers.length})</span>
+              <span className="bold">{receiptVouchers.reduce((sum, v) => sum + (v.amount || 0), 0).toFixed(2)}</span>
+            </div>
+            {receiptVouchers.map((voucher, idx) => (
+              <div key={voucher.id} className="row" style={{ fontSize: 9 }}>
+                <span className="info-label">سند {idx + 1}</span>
+                <span>{voucher.amount.toFixed(2)}</span>
+              </div>
+            ))}
+          </div>
+        </>
+      )}
+
       <hr className="divider" />
 
       {/* Notes */}
@@ -281,6 +307,7 @@ type CombinedPrintSettings = PrintElementSettings & {
 export function ReceiptModalWrapper({ order, restaurant, onClose, onComplete, isOpen = true, autoPrint = false }: ReceiptProps) {
   const ref = useRef<HTMLDivElement>(null);
   const [showPrintSettings, setShowPrintSettings] = useState(false);
+  const [receiptVouchers, setReceiptVouchers] = useState<ReceiptVoucher[]>([]);
   const [printSettings, setPrintSettings] = useState<CombinedPrintSettings>({
     // Element settings
     logo: true,
@@ -309,6 +336,21 @@ export function ReceiptModalWrapper({ order, restaurant, onClose, onComplete, is
     businessCopy: true,
     kitchenCopy: true,
   });
+
+  // Load receipt vouchers for this customer
+  useEffect(() => {
+    if (isOpen && (order as any).customer_id && restaurant.id) {
+      supabase
+        .from('receipt_vouchers')
+        .select('*')
+        .eq('customer_id', (order as any).customer_id)
+        .eq('restaurant_id', restaurant.id)
+        .order('voucher_date', { ascending: true })
+        .then(({ data }) => {
+          setReceiptVouchers(data || []);
+        });
+    }
+  }, [isOpen, order, restaurant.id]);
 
   // Load print settings from database on mount
   useEffect(() => {
@@ -482,6 +524,17 @@ export function ReceiptModalWrapper({ order, restaurant, onClose, onComplete, is
         content += `<tr><td>الباقي للعميل</td><td>${change.toFixed(2)} ${currency}</td></tr>`;
       }
       content += '</tbody></table>';
+
+      // Receipt Vouchers
+      if (receiptVouchers.length > 0) {
+        const voucherTotal = receiptVouchers.reduce((sum, v) => sum + (v.amount || 0), 0);
+        content += '<div style="margin-top: 8px; border-top: 1px dashed #000; padding-top: 4px;">';
+        content += `<div class="row"><span class="info-label">سندات القبض (${receiptVouchers.length})</span><span>${voucherTotal.toFixed(2)} ${currency}</span></div>`;
+        receiptVouchers.forEach((voucher, idx) => {
+          content += `<div class="row" style="font-size: 9px;"><span class="info-label">سند ${idx + 1}</span><span>${voucher.amount.toFixed(2)} ${currency}</span></div>`;
+        });
+        content += '</div>';
+      }
 
       // Notes
       if (printSettings.notes && order.notes) {
