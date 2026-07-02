@@ -121,7 +121,7 @@ export function ContractorsTab({ restaurant }: Props) {
   const loadInvoices = async () => {
     const { data, error } = await supabase
       .from('sales_invoices')
-      .select('id, invoice_number, total, customer_name, created_at, sales_invoice_lines(id, product_name, quantity, unit_price, total)')
+      .select('id, invoice_number, total, customer_name, created_at, sales_invoice_lines(id, description, quantity, unit_price, line_total)')
       .eq('restaurant_id', restaurant.id)
       .order('created_at', { ascending: false })
       .limit(50);
@@ -176,10 +176,10 @@ export function ContractorsTab({ restaurant }: Props) {
 
   const handleServiceSelect = (service: any) => {
     // Add to selected services array
-    const itemTotal = service.total || (Number(service.quantity) * Number(service.price || service.unit_price));
+    const itemTotal = service.line_total || service.total || (Number(service.quantity) * Number(service.price || service.unit_price));
     const newService = {
       id: service.id,
-      item_name: service.product_name || service.menu_item_name || service.item_name,
+      item_name: service.description || service.product_name || service.menu_item_name || service.item_name,
       unit_price: service.unit_price || service.price,
       total: itemTotal,
       quantity: service.quantity,
@@ -661,9 +661,9 @@ export function ContractorsTab({ restaurant }: Props) {
                               selectedService?.id === item.id ? 'bg-primary/20 border border-primary/30' : ''
                             }`}
                           >
-                            <div className="font-medium">{item.product_name}</div>
+                            <div className="font-medium">{item.description}</div>
                             <div className="text-muted-foreground">
-                              {item.quantity} × {item.unit_price} = {item.total} ج.م
+                              {item.quantity} × {item.unit_price} = {item.line_total} ج.م
                             </div>
                           </div>
                         ));
@@ -779,7 +779,7 @@ export function ContractorsTab({ restaurant }: Props) {
           </Dialog>
           <Dialog open={showSummaryDialog} onOpenChange={setShowSummaryDialog}>
             <DialogTrigger asChild>
-              <Button onClick={() => { loadInvoices(); loadOrders(); setShowSummaryDialog(true); }} variant="outline">
+              <Button onClick={async () => { await Promise.all([loadInvoices(), loadOrders()]); setShowSummaryDialog(true); }} variant="outline">
                 <ShoppingCart className="w-4 h-4 ml-1" /> حصر مستحقات من فواتير
               </Button>
             </DialogTrigger>
@@ -860,7 +860,9 @@ export function ContractorsTab({ restaurant }: Props) {
                       inv.sales_invoice_lines.forEach((item: any) => {
                         selectedServicesList.push({
                           ...item,
-                          item_name: item.product_name,
+                          item_name: item.description,
+                          unit_price: item.unit_price,
+                          total: item.line_total,
                           invoice_id: inv.id,
                           invoice_number: inv.invoice_number,
                           customer_name: inv.customer_name
@@ -1207,7 +1209,24 @@ export function ContractorsTab({ restaurant }: Props) {
                 <div key={service.id} className="p-3 rounded-lg bg-secondary/50 space-y-2">
                   <div className="flex items-center justify-between">
                     <p className="font-medium">{service.service_name}</p>
-                    {getStatusBadge(service.status)}
+                    <div className="flex items-center gap-2">
+                      {getStatusBadge(service.status)}
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => {
+                          if (confirm('هل أنت متأكد من حذف هذه الخدمة؟')) {
+                            supabase.from('contractor_services').delete().eq('id', service.id).then(() => {
+                              toast.success('تم حذف الخدمة');
+                              loadContractorServices(selectedContractor!.id);
+                            });
+                          }
+                        }}
+                        className="text-destructive hover:text-destructive h-6 w-6 p-0"
+                      >
+                        <Trash2 className="w-3 h-3" />
+                      </Button>
+                    </div>
                   </div>
                   <div className="flex items-center justify-between text-sm">
                     <span className="text-muted-foreground">قيمة الخدمة: {service.service_amount} ج.م</span>
