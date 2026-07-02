@@ -115,8 +115,10 @@ function ReceiptContent({
   const itemCount = items.reduce((s, i) => s + (Number(i.quantity) || 0), 0);
   const paidAmount = Number((order as any).paid_amount) || 0;
   const paymentMethod = (order as any).payment_method || 'cash';
-  const remaining = Math.max(0, Number(order.total) - paidAmount);
-  const change = paidAmount > Number(order.total) ? paidAmount - Number(order.total) : 0;
+  const voucherTotal = receiptVouchers.reduce((sum, v) => sum + (v.amount || 0), 0);
+  const totalPaid = paidAmount + voucherTotal;
+  const remaining = Math.max(0, Number(order.total) - totalPaid);
+  const change = totalPaid > Number(order.total) ? totalPaid - Number(order.total) : 0;
 
   return (
     <div className="receipt">
@@ -239,8 +241,20 @@ function ReceiptContent({
           )}
           {printSettings.paidAmount && (
             <tr>
-              <td>المدفوع</td>
+              <td>المدفوع مباشرة</td>
               <td className="text-green">{paidAmount.toFixed(2)}</td>
+            </tr>
+          )}
+          {receiptVouchers.length > 0 && (
+            <tr>
+              <td>سندات القبض</td>
+              <td className="text-green">{voucherTotal.toFixed(2)}</td>
+            </tr>
+          )}
+          {printSettings.paidAmount && (
+            <tr>
+              <td className="bold">إجمالي المدفوع</td>
+              <td className="bold text-green">{totalPaid.toFixed(2)}</td>
             </tr>
           )}
           {printSettings.remaining && remaining > 0 && (
@@ -263,13 +277,9 @@ function ReceiptContent({
         <>
           <hr className="divider" />
           <div style={{ fontSize: 10, padding: '3px 0' }}>
-            <div className="row">
-              <span className="info-label">سندات القبض ({receiptVouchers.length})</span>
-              <span className="bold">{receiptVouchers.reduce((sum, v) => sum + (v.amount || 0), 0).toFixed(2)}</span>
-            </div>
-            {receiptVouchers.map((voucher, idx) => (
+            {receiptVouchers.map((voucher) => (
               <div key={voucher.id} className="row" style={{ fontSize: 9 }}>
-                <span className="info-label">سند {idx + 1}</span>
+                <span className="info-label">مدفوع {new Date(voucher.voucher_date).toLocaleDateString('ar-EG')}</span>
                 <span>{voucher.amount.toFixed(2)}</span>
               </div>
             ))}
@@ -422,9 +432,10 @@ export function ReceiptModalWrapper({ order, restaurant, onClose, onComplete, is
       const itemCount = items.reduce((s, i) => s + (Number(i.quantity) || 0), 0);
       const paidAmount = Number((order as any).paid_amount) || 0;
       const paymentMethod = (order as any).payment_method || 'cash';
-      const remaining = Math.max(0, Number(order.total) - paidAmount);
-      const change = paidAmount > Number(order.total) ? paidAmount - Number(order.total) : 0;
       const voucherTotal = receiptVouchers.reduce((sum, v) => sum + (v.amount || 0), 0);
+      const totalPaid = paidAmount + voucherTotal;
+      const remaining = Math.max(0, Number(order.total) - totalPaid);
+      const change = totalPaid > Number(order.total) ? totalPaid - Number(order.total) : 0;
 
       let content = '';
       
@@ -518,7 +529,13 @@ export function ReceiptModalWrapper({ order, restaurant, onClose, onComplete, is
         content += `<tr><td>طريقة الدفع</td><td>${PAYMENT_LABELS[paymentMethod] || paymentMethod}</td></tr>`;
       }
       if (printSettings.paidAmount) {
-        content += `<tr><td>المدفوع</td><td>${paidAmount.toFixed(2)} ${currency}</td></tr>`;
+        content += `<tr><td>المدفوع مباشرة</td><td>${paidAmount.toFixed(2)} ${currency}</td></tr>`;
+      }
+      if (receiptVouchers.length > 0) {
+        content += `<tr><td>سندات القبض</td><td>${voucherTotal.toFixed(2)} ${currency}</td></tr>`;
+      }
+      if (printSettings.paidAmount) {
+        content += `<tr><td class="bold">إجمالي المدفوع</td><td class="bold">${totalPaid.toFixed(2)} ${currency}</td></tr>`;
       }
       if (printSettings.remaining && remaining > 0) {
         content += `<tr><td>المتبقي</td><td>${remaining.toFixed(2)} ${currency}</td></tr>`;
@@ -530,11 +547,9 @@ export function ReceiptModalWrapper({ order, restaurant, onClose, onComplete, is
 
       // Receipt Vouchers
       if (receiptVouchers.length > 0) {
-        const voucherTotal = receiptVouchers.reduce((sum, v) => sum + (v.amount || 0), 0);
         content += '<div style="margin-top: 8px; border-top: 1px dashed #000; padding-top: 4px;">';
-        content += `<div class="row"><span class="info-label">سندات القبض (${receiptVouchers.length})</span><span>${voucherTotal.toFixed(2)} ${currency}</span></div>`;
-        receiptVouchers.forEach((voucher, idx) => {
-          content += `<div class="row" style="font-size: 9px;"><span class="info-label">سند ${idx + 1}</span><span>${voucher.amount.toFixed(2)} ${currency}</span></div>`;
+        receiptVouchers.forEach((voucher) => {
+          content += `<div class="row" style="font-size: 9px;"><span class="info-label">مدفوع ${new Date(voucher.voucher_date).toLocaleDateString('ar-EG')}</span><span>${voucher.amount.toFixed(2)} ${currency}</span></div>`;
         });
         content += '</div>';
       }
