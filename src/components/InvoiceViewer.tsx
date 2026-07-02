@@ -164,18 +164,9 @@ export function InvoiceViewer({
           .maybeSingle();
         if (error) throw error;
         
-        console.log('InvoiceViewer - Order data:', data);
-        console.log('InvoiceViewer - Order items:', data?.order_items);
-        
-        if (data?.order_items && data.order_items.length > 0) {
-          console.log('InvoiceViewer - First item:', data.order_items[0]);
-          toast.info(`أول بند في الفاتورة: السعر=${data.order_items[0].price}, الكمية=${data.order_items[0].quantity}`);
-        }
-        
-        toast.info(`بيانات الفاتورة: المبلغ=${data?.total}, المدفوع=${data?.paid_amount}`);
-        
         setRecord(data);
         setItems(data?.order_items || []);
+
       } else {
         const { data, error } = await supabase
           .from('sales_orders')
