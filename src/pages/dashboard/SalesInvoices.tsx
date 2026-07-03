@@ -168,7 +168,8 @@ export function SalesInvoices({ restaurantId, currency, restaurant, isSuperAdmin
           menu_item_id: item.menu_item_id,
           menu_item_name: item.menu_item_name,
           quantity: item.quantity,
-          price: item.price
+          price: item.price,
+          variables: item.variables || null
         });
       }
 
@@ -437,7 +438,8 @@ export function SalesInvoices({ restaurantId, currency, restaurant, isSuperAdmin
           menu_item_id: item.menu_item_id,
           menu_item_name: item.menu_item_name,
           quantity: item.quantity,
-          price: item.price
+          price: item.price,
+          variables: item.variables || null
         });
       }
 

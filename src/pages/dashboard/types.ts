@@ -91,7 +91,7 @@ export interface Restaurant {
   export interface HeldInvoice {
     id: string;
     label: string;
-    cart: { item: MenuItem; qty: number; qtyText?: string; unitMode?: string; unitFactor?: number; price?: number; service_details?: string }[];
+    cart: { item: MenuItem; qty: number; qtyText?: string; unitMode?: string; unitFactor?: number; price?: number; service_details?: string; variables?: { label: string; value: string }[] }[];
     tableNumber: string;
     customerName: string;
     notes: string;

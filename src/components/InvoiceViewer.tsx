@@ -166,7 +166,7 @@ export function InvoiceViewer({
           .eq('id', recordId)
           .maybeSingle();
         if (error) throw error;
-        
+
         setRecord(data);
         setItems(data?.order_items || []);
 
