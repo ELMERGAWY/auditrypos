@@ -178,7 +178,8 @@ export function SalesOrders({ restaurantId, currency }: Props) {
               .update({
                 item_name: item.item_name,
                 quantity: item.quantity,
-                unit_price: item.unit_price
+                unit_price: item.unit_price,
+                variables: item.variables || null
               })
               .eq('id', item.id);
 
@@ -189,7 +190,8 @@ export function SalesOrders({ restaurantId, currency }: Props) {
                 p_item_id: item.id,
                 p_item_name: item.item_name,
                 p_quantity: item.quantity,
-                p_unit_price: item.unit_price
+                p_unit_price: item.unit_price,
+                p_variables: item.variables || null
               });
 
               if (rpcError) {
@@ -266,7 +268,8 @@ export function SalesOrders({ restaurantId, currency }: Props) {
           menu_item_id: item.menu_item_id,
           item_name: item.item_name,
           quantity: item.quantity,
-          unit_price: item.unit_price
+          unit_price: item.unit_price,
+          variables: item.variables || null
         });
       }
 
@@ -617,6 +620,7 @@ export function SalesOrders({ restaurantId, currency }: Props) {
                           <th className="p-2 text-right">الصنف</th>
                           <th className="p-2 text-center w-20">الكمية</th>
                           <th className="p-2 text-center w-24">السعر</th>
+                          <th className="p-2 text-center w-32">المتغيرات</th>
                           <th className="p-2 text-center w-12">حذف</th>
                         </tr>
                       </thead>
@@ -664,6 +668,28 @@ export function SalesOrders({ restaurantId, currency }: Props) {
                                   setEditForm(f => ({ ...f, total_amount: String(newTotal) }));
                                 }}
                               />
+                            </td>
+                            <td className="p-2">
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => {
+                                  const updated = [...editOrderItems];
+                                  const currentVars = updated[idx].variables || [];
+                                  const newVars = prompt('أدخل المتغيرات بصيغة JSON (مثال: [{"label":"الحجم","value":"كبير"}]):', JSON.stringify(currentVars));
+                                  if (newVars) {
+                                    try {
+                                      updated[idx] = { ...updated[idx], variables: JSON.parse(newVars) };
+                                      setEditOrderItems(updated);
+                                    } catch (e) {
+                                      alert('صيغة JSON غير صحيحة');
+                                    }
+                                  }
+                                }}
+                                className="h-8 w-full"
+                              >
+                                {item.variables && item.variables.length > 0 ? `${item.variables.length} متغير` : 'إضافة'}
+                              </Button>
                             </td>
                             <td className="p-2">
                               <Button

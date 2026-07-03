@@ -10,7 +10,8 @@ CREATE OR REPLACE FUNCTION public.update_order_item(
   p_item_id UUID,
   p_quantity NUMERIC,
   p_price NUMERIC,
-  p_menu_item_name TEXT
+  p_menu_item_name TEXT,
+  p_variables JSONB DEFAULT NULL
 )
 RETURNS VOID
 LANGUAGE plpgsql
@@ -18,12 +19,13 @@ SECURITY DEFINER
 AS $$
 BEGIN
   UPDATE public.order_items
-  SET 
+  SET
     quantity = p_quantity,
     price = p_price,
-    menu_item_name = p_menu_item_name
+    menu_item_name = p_menu_item_name,
+    variables = p_variables
   WHERE id = p_item_id;
-  
+
   RAISE NOTICE 'Order item updated successfully';
 END;
 $$;

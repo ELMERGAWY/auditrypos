@@ -265,7 +265,8 @@ export function SalesInvoices({ restaurantId, currency, restaurant, isSuperAdmin
             .update({
               quantity: item.quantity,
               price: item.price,
-              menu_item_name: item.menu_item_name
+              menu_item_name: item.menu_item_name,
+              variables: item.variables || null
             })
             .eq('id', item.id)
             .select()
@@ -279,7 +280,8 @@ export function SalesInvoices({ restaurantId, currency, restaurant, isSuperAdmin
               p_item_id: item.id,
               p_quantity: item.quantity,
               p_price: item.price,
-              p_menu_item_name: item.menu_item_name
+              p_menu_item_name: item.menu_item_name,
+              p_variables: item.variables || null
             });
 
             if (rpcError) {
@@ -614,7 +616,7 @@ export function SalesInvoices({ restaurantId, currency, restaurant, isSuperAdmin
                   <div className="space-y-2 max-h-40 overflow-y-auto border rounded-lg p-2">
                     <Label>بنود الفاتورة</Label>
                     {editItems.map((item, idx) => (
-                      <div key={item.id || idx} className="grid grid-cols-4 gap-2 text-sm">
+                      <div key={item.id || idx} className="grid grid-cols-5 gap-2 text-sm">
                         <Input 
                           value={item.menu_item_name || ''} 
                           onChange={e => {
@@ -637,9 +639,9 @@ export function SalesInvoices({ restaurantId, currency, restaurant, isSuperAdmin
                           }} 
                           placeholder="الكمية"
                         />
-                        <Input 
-                          type="number" 
-                          value={item.price || 0} 
+                        <Input
+                          type="number"
+                          value={item.price || 0}
                           onChange={e => {
                             const newPrice = Number(e.target.value) || 0;
                             const next = [...editItems];
@@ -647,9 +649,29 @@ export function SalesInvoices({ restaurantId, currency, restaurant, isSuperAdmin
                             setEditItems(next);
                             const newTotal = next.reduce((sum, it) => sum + (Number(it.price || 0) * Number(it.quantity || 0)), 0);
                             setForm(f => ({ ...f, amount: String(newTotal) }));
-                          }} 
+                          }}
                           placeholder="السعر"
                         />
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            const next = [...editItems];
+                            const currentVars = next[idx].variables || [];
+                            const newVars = prompt('أدخل المتغيرات بصيغة JSON (مثال: [{"label":"الحجم","value":"كبير"}]):', JSON.stringify(currentVars));
+                            if (newVars) {
+                              try {
+                                next[idx] = { ...next[idx], variables: JSON.parse(newVars) };
+                                setEditItems(next);
+                              } catch (e) {
+                                alert('صيغة JSON غير صحيحة');
+                              }
+                            }
+                          }}
+                          className="h-8 w-full"
+                        >
+                          {item.variables && item.variables.length > 0 ? `${item.variables.length} متغير` : 'إضافة'}
+                        </Button>
                         <div className="flex gap-1">
                           <Input 
                             type="number" 
