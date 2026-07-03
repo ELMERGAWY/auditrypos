@@ -84,6 +84,7 @@ interface PrintElementSettings {
   customerRef: boolean;
   deliveryAddress: boolean;
   items: boolean;
+  variables: boolean;
   totalQty: boolean;
   subtotal: boolean;
   discount: boolean;
@@ -186,7 +187,7 @@ function ReceiptContent({
                     📝 {(item as any).service_details}
                   </div>
                 )}
-                {Array.isArray((item as any).variables) && (item as any).variables.length > 0 && (
+                {printSettings.variables && Array.isArray((item as any).variables) && (item as any).variables.length > 0 && (
                   <div style={{ fontSize: '9px', padding: '2px 4px', color: '#000', borderBottom: '1px dotted #000' }}>
                     {(item as any).variables.map((v: any, i: number) => (
                       <div key={i} style={{ display: 'flex', justifyContent: 'space-between', gap: 4 }}>
@@ -317,6 +318,7 @@ export function ReceiptModalWrapper({ order, restaurant, onClose, onComplete, is
     customerRef: true,
     deliveryAddress: true,
     items: true,
+    variables: true,
     totalQty: true,
     subtotal: true,
     discount: true,
@@ -481,7 +483,7 @@ export function ReceiptModalWrapper({ order, restaurant, onClose, onComplete, is
             if ((item as any).service_details) {
               content += `<div style="font-size: 9px; padding: 2px 0; color: #555;">📝 ${(item as any).service_details}</div>`;
             }
-            if (Array.isArray((item as any).variables) && (item as any).variables.length > 0) {
+            if (printSettings.variables && Array.isArray((item as any).variables) && (item as any).variables.length > 0) {
               content += `<div style="font-size: 9px; padding: 2px 4px; color: #000; border-bottom: 1px dotted #000;">`;
               (item as any).variables.forEach((v: any) => {
                 content += `<div style="display:flex; justify-content:space-between; gap:4px;"><span style="font-weight:700;">• ${v.label}:</span><span>${v.value}</span></div>`;
@@ -776,6 +778,10 @@ export function ReceiptModalWrapper({ order, restaurant, onClose, onComplete, is
                     <label className="flex items-center gap-2 cursor-pointer">
                       <input type="checkbox" checked={printSettings.items} onChange={(e) => setPrintSettings({ ...printSettings, items: e.target.checked })} className="w-4 h-4" />
                       <span className="text-sm">الأصناف</span>
+                    </label>
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input type="checkbox" checked={printSettings.variables} onChange={(e) => setPrintSettings({ ...printSettings, variables: e.target.checked })} className="w-4 h-4" />
+                      <span className="text-sm">متغيرات الخدمة</span>
                     </label>
                     <label className="flex items-center gap-2 cursor-pointer">
                       <input type="checkbox" checked={printSettings.totalQty} onChange={(e) => setPrintSettings({ ...printSettings, totalQty: e.target.checked })} className="w-4 h-4" />

@@ -2328,6 +2328,7 @@ export type Database = {
           payment_value: number
           phone: string | null
           restaurant_id: string
+          service_variables: Json
           specialty: string | null
           updated_at: string | null
         }
@@ -2343,6 +2344,7 @@ export type Database = {
           payment_value?: number
           phone?: string | null
           restaurant_id: string
+          service_variables?: Json
           specialty?: string | null
           updated_at?: string | null
         }
@@ -2358,6 +2360,7 @@ export type Database = {
           payment_value?: number
           phone?: string | null
           restaurant_id?: string
+          service_variables?: Json
           specialty?: string | null
           updated_at?: string | null
         }
@@ -12088,6 +12091,58 @@ export type Database = {
           },
           {
             foreignKeyName: "service_packages_restaurant_id_fkey"
+            columns: ["restaurant_id"]
+            isOneToOne: false
+            referencedRelation: "restaurants_public"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      service_variable_presets: {
+        Row: {
+          created_at: string
+          id: string
+          label: string
+          restaurant_id: string
+          updated_at: string
+          usage_count: number
+          value: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          label: string
+          restaurant_id: string
+          updated_at?: string
+          usage_count?: number
+          value: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          label?: string
+          restaurant_id?: string
+          updated_at?: string
+          usage_count?: number
+          value?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "service_variable_presets_restaurant_id_fkey"
+            columns: ["restaurant_id"]
+            isOneToOne: false
+            referencedRelation: "public_restaurant_info"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "service_variable_presets_restaurant_id_fkey"
+            columns: ["restaurant_id"]
+            isOneToOne: false
+            referencedRelation: "restaurants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "service_variable_presets_restaurant_id_fkey"
             columns: ["restaurant_id"]
             isOneToOne: false
             referencedRelation: "restaurants_public"

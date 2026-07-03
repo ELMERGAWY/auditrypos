@@ -62,6 +62,23 @@ export function ServiceVariablesDialog({ open, onOpenChange, itemName, template,
       if (restaurantId) {
         (async () => {
           try {
+            const local = loadHistory();
+
+            // 1) Central presets table (shared across devices)
+            const { data: presets } = await supabase
+              .from('service_variable_presets')
+              .select('label, value, usage_count')
+              .eq('restaurant_id', restaurantId)
+              .order('usage_count', { ascending: false })
+              .limit(1000);
+            (presets || []).forEach((p: any) => {
+              if (!p?.label || !p?.value) return;
+              const list = local[p.label] || [];
+              if (!list.includes(p.value)) list.push(p.value);
+              local[p.label] = list.slice(0, 50);
+            });
+
+            // 2) Backfill from existing order_items (in case presets table is fresh)
             const { data } = await supabase
               .from('order_items')
               .select('variables, orders!inner(restaurant_id)')
@@ -69,14 +86,13 @@ export function ServiceVariablesDialog({ open, onOpenChange, itemName, template,
               .not('variables', 'is', null)
               .order('created_at', { ascending: false })
               .limit(300);
-            const local = loadHistory();
             (data || []).forEach((row: any) => {
               const vars = Array.isArray(row.variables) ? row.variables : [];
               vars.forEach((v: any) => {
                 if (!v?.label || !v?.value) return;
                 const list = local[v.label] || [];
                 if (!list.includes(v.value)) list.unshift(v.value);
-                local[v.label] = list.slice(0, 25);
+                local[v.label] = list.slice(0, 50);
               });
             });
             saveHistory(local);
@@ -97,16 +113,42 @@ export function ServiceVariablesDialog({ open, onOpenChange, itemName, template,
     return Array.from(new Set([...SUGGESTIONS, ...fromHistory]));
   }, [history]);
 
-  const save = () => {
+  const save = async () => {
     const cleaned = rows.filter(r => r.label.trim() && r.value.trim());
     // Persist to local history for next-time suggestions
     const hist = { ...history };
     cleaned.forEach(r => {
       const list = hist[r.label] || [];
       if (!list.includes(r.value)) list.unshift(r.value);
-      hist[r.label] = list.slice(0, 25);
+      hist[r.label] = list.slice(0, 50);
     });
     saveHistory(hist);
+    // Persist to shared DB presets (best-effort)
+    if (restaurantId && cleaned.length) {
+      try {
+        for (const r of cleaned) {
+          const label = r.label.trim();
+          const value = r.value.trim();
+          const { data: existing } = await supabase
+            .from('service_variable_presets')
+            .select('id, usage_count')
+            .eq('restaurant_id', restaurantId)
+            .eq('label', label)
+            .eq('value', value)
+            .maybeSingle();
+          if (existing?.id) {
+            await supabase
+              .from('service_variable_presets')
+              .update({ usage_count: (existing.usage_count || 0) + 1, updated_at: new Date().toISOString() })
+              .eq('id', existing.id);
+          } else {
+            await supabase
+              .from('service_variable_presets')
+              .insert({ restaurant_id: restaurantId, label, value, usage_count: 1 });
+          }
+        }
+      } catch {}
+    }
     onSave(cleaned);
     onOpenChange(false);
   };

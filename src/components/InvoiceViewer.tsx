@@ -34,6 +34,7 @@ interface PrintElementSettings {
   paymentMethod: boolean;
   status: boolean;
   items: boolean;
+  variables: boolean;
   subtotal: boolean;
   discount: boolean;
   tax: boolean;
@@ -64,6 +65,7 @@ export function InvoiceViewer({
     paymentMethod: true,
     status: true,
     items: true,
+    variables: true,
     subtotal: true,
     discount: true,
     tax: true,
@@ -102,6 +104,7 @@ export function InvoiceViewer({
         paymentMethod: saved.paymentMethod ?? prev.paymentMethod,
         status: saved.status ?? prev.status,
         items: saved.items ?? prev.items,
+        variables: saved.variables ?? prev.variables,
         subtotal: saved.subtotal ?? prev.subtotal,
         discount: saved.discount ?? prev.discount,
         tax: saved.tax ?? prev.tax,
@@ -470,7 +473,7 @@ export function InvoiceViewer({
                                     {it.sold_unit && (
                                       <p className="text-[10px] text-muted-foreground">{it.sold_unit}</p>
                                     )}
-                                    {Array.isArray(it.variables) && it.variables.length > 0 && (
+                                    {printSettings.variables && Array.isArray(it.variables) && it.variables.length > 0 && (
                                       <div className="mt-1 flex flex-wrap gap-1">
                                         {it.variables.map((v: any, i: number) => (
                                           <span key={i} className="text-[10px] bg-primary/5 border border-primary/20 rounded px-1.5 py-0.5">
@@ -598,6 +601,10 @@ export function InvoiceViewer({
                     <label className="flex items-center gap-2 cursor-pointer">
                       <input type="checkbox" checked={printSettings.items} onChange={(e) => handlePrintSettingChange('items', e.target.checked)} className="w-4 h-4" />
                       <span className="text-sm">الأصناف</span>
+                    </label>
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input type="checkbox" checked={printSettings.variables} onChange={(e) => handlePrintSettingChange('variables', e.target.checked)} className="w-4 h-4" />
+                      <span className="text-sm">متغيرات الخدمة</span>
                     </label>
                     <label className="flex items-center gap-2 cursor-pointer">
                       <input type="checkbox" checked={printSettings.subtotal} onChange={(e) => handlePrintSettingChange('subtotal', e.target.checked)} className="w-4 h-4" />

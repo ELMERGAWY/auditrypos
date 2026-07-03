@@ -23,6 +23,7 @@ interface Contractor {
   balance: number;
   notes?: string;
   is_active: boolean;
+  service_variables?: string[];
 }
 
 interface ContractorService {
@@ -84,7 +85,8 @@ export function ContractorsTab({ restaurant }: Props) {
     specialty: '',
     payment_type: 'fixed' as 'fixed' | 'percentage',
     payment_value: '',
-    notes: ''
+    notes: '',
+    service_variables: '' as string,
   });
 
   const loadContractors = async () => {
@@ -122,7 +124,7 @@ export function ContractorsTab({ restaurant }: Props) {
     const companyId = restaurant.company_id || restaurant.id;
     const { data, error } = await supabase
       .from('sales_invoices')
-      .select('id, invoice_number, total_amount, created_at, sales_invoice_lines(id, description, quantity, unit_price, line_total)')
+      .select('id, invoice_number, total_amount, created_at, orders(order_items(id, menu_item_name, quantity, price, variables)), sales_invoice_lines(id, description, quantity, unit_price, line_total)')
       .eq('company_id', companyId)
       .order('created_at', { ascending: false })
       .limit(50);
@@ -130,7 +132,6 @@ export function ContractorsTab({ restaurant }: Props) {
       console.error('Error loading invoices:', error);
       toast.error('خطأ في تحميل الفواتير: ' + error.message);
     } else {
-      console.log('Loaded invoices:', data?.length);
       setInvoices(data || []);
     }
   };
@@ -138,7 +139,7 @@ export function ContractorsTab({ restaurant }: Props) {
   const loadOrders = async () => {
     const { data, error } = await supabase
       .from('orders')
-      .select('id, order_number, total, created_at, order_items(id, menu_item_name, quantity, price)')
+      .select('id, order_number, total, created_at, order_items(id, menu_item_name, quantity, price, variables)')
       .eq('restaurant_id', restaurant.id)
       .order('created_at', { ascending: false })
       .limit(50);
@@ -146,7 +147,6 @@ export function ContractorsTab({ restaurant }: Props) {
       console.error('Error loading orders:', error);
       toast.error('خطأ في تحميل الطلبات: ' + error.message);
     } else {
-      console.log('Loaded orders:', data?.length);
       setOrders(data || []);
     }
   };
@@ -227,6 +227,72 @@ export function ContractorsTab({ restaurant }: Props) {
     setSelectedService(null);
     setShowAddServiceDialog(true);
   };
+
+  // Auto-match: when contractor is chosen, pre-select items whose variables match its keywords
+  useEffect(() => {
+    if (!showAddServiceDialog || !serviceForm.contractor_id) return;
+    const c = contractors.find(x => x.id === serviceForm.contractor_id);
+    const keywords = (c?.service_variables || []).map(k => k.trim().toLowerCase()).filter(Boolean);
+    if (!keywords.length) return;
+
+    const matchItem = (vars: any[]) =>
+      Array.isArray(vars) && vars.some((v: any) => {
+        const l = String(v?.label || '').toLowerCase();
+        const val = String(v?.value || '').toLowerCase();
+        return keywords.some(k => l.includes(k) || val.includes(k));
+      });
+
+    const auto: any[] = [];
+    invoices.forEach((inv: any) => {
+      const lines = inv?.orders?.order_items || [];
+      lines.forEach((item: any) => {
+        if (matchItem(item.variables)) {
+          auto.push({
+            id: `inv-${item.id}`,
+            item_name: item.menu_item_name,
+            unit_price: item.price,
+            total: Number(item.price || 0) * Number(item.quantity || 0),
+            quantity: item.quantity,
+            invoice_id: inv.id,
+            order_id: null,
+            invoice_number: inv.invoice_number,
+            order_number: null,
+            variables: item.variables,
+          });
+        }
+      });
+    });
+    orders.forEach((ord: any) => {
+      (ord.order_items || []).forEach((item: any) => {
+        if (matchItem(item.variables)) {
+          auto.push({
+            id: `ord-${item.id}`,
+            item_name: item.menu_item_name,
+            unit_price: item.price,
+            total: Number(item.price || 0) * Number(item.quantity || 0),
+            quantity: item.quantity,
+            invoice_id: null,
+            order_id: ord.id,
+            invoice_number: null,
+            order_number: ord.order_number,
+            variables: item.variables,
+          });
+        }
+      });
+    });
+
+    if (auto.length) {
+      setSelectedServices(auto);
+      const totalServicesAmount = auto.reduce((s, x) => s + (x.total || 0), 0);
+      setServiceForm(prev => ({
+        ...prev,
+        service_name: auto[0].item_name,
+        service_amount: totalServicesAmount.toString(),
+      }));
+      toast.success(`تم اختيار ${auto.length} خدمة مطابقة لمتغيرات الصنايعي تلقائياً`);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [serviceForm.contractor_id, showAddServiceDialog]);
 
   const handleSaveService = async () => {
     if (!serviceForm.contractor_id || !serviceForm.service_name || !serviceForm.service_amount) {
@@ -340,7 +406,8 @@ export function ContractorsTab({ restaurant }: Props) {
       specialty: '',
       payment_type: 'fixed',
       payment_value: '',
-      notes: ''
+      notes: '',
+      service_variables: '',
     });
     setShowAddForm(false);
     setEditingContractor(null);
@@ -352,6 +419,11 @@ export function ContractorsTab({ restaurant }: Props) {
       return;
     }
 
+    const svArr = (form.service_variables || '')
+      .split(/[,،\n]/)
+      .map(s => s.trim())
+      .filter(Boolean);
+
     const payload = {
       restaurant_id: restaurant.id,
       name: form.name,
@@ -361,7 +433,8 @@ export function ContractorsTab({ restaurant }: Props) {
       payment_type: form.payment_type,
       payment_value: Number(form.payment_value),
       notes: form.notes || null,
-      is_active: true
+      is_active: true,
+      service_variables: svArr,
     };
 
     if (editingContractor) {
@@ -411,7 +484,10 @@ export function ContractorsTab({ restaurant }: Props) {
       specialty: contractor.specialty || '',
       payment_type: contractor.payment_type,
       payment_value: String(contractor.payment_value),
-      notes: contractor.notes || ''
+      notes: contractor.notes || '',
+      service_variables: Array.isArray(contractor.service_variables)
+        ? contractor.service_variables.join('، ')
+        : '',
     });
     setShowAddForm(true);
   };
@@ -1042,6 +1118,17 @@ export function ContractorsTab({ restaurant }: Props) {
                     placeholder={form.payment_type === 'fixed' ? 'مثال: 100' : 'مثال: 20'}
                   />
                 </div>
+              </div>
+              <div>
+                <Label>متغيرات الخدمة (كلمات دلالية للربط التلقائي)</Label>
+                <Input
+                  value={form.service_variables}
+                  onChange={e => setForm({ ...form, service_variables: e.target.value })}
+                  placeholder="مثال: صبغة، رفا، تنظيف (افصل بينها بفاصلة)"
+                />
+                <p className="text-[10px] text-muted-foreground mt-1">
+                  عند إضافة خدمة من فاتورة أو طلب سيتم اختيار العناصر التي تحتوي متغيراتها على أي من هذه الكلمات تلقائياً.
+                </p>
               </div>
               <div>
                 <Label>ملاحظات</Label>
