@@ -342,7 +342,8 @@ export function ContractorsTab({ restaurant }: Props) {
       specialty: '',
       payment_type: 'fixed',
       payment_value: '',
-      notes: ''
+      notes: '',
+      service_variables: '',
     });
     setShowAddForm(false);
     setEditingContractor(null);
