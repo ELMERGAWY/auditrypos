@@ -93,8 +93,6 @@ export function InvoiceViewer({
         .maybeSingle();
       if (error && error.code !== 'PGRST116') throw error;
       const saved: any = data?.settings || {};
-      console.log('Loaded print settings:', saved);
-      console.log('Variables setting:', saved.variables);
       setPrintSettings(prev => ({
         logo: saved.logo ?? prev.logo,
         restaurantName: saved.restaurantName ?? prev.restaurantName,
@@ -169,8 +167,6 @@ export function InvoiceViewer({
           .maybeSingle();
         if (error) throw error;
 
-        console.log('Loaded order data:', data);
-        console.log('Order items with variables:', data?.order_items?.map((it: any) => ({ name: it.menu_item_name, variables: it.variables })));
         setRecord(data);
         setItems(data?.order_items || []);
 
@@ -477,18 +473,19 @@ export function InvoiceViewer({
                                     {it.sold_unit && (
                                       <p className="text-[10px] text-muted-foreground">{it.sold_unit}</p>
                                     )}
-                                    {(() => {
-                                      console.log('Checking variables for item:', it.menu_item_name, 'variables:', it.variables, 'printSettings.variables:', printSettings.variables);
-                                      return printSettings.variables && Array.isArray(it.variables) && it.variables.length > 0 && (
-                                        <div className="mt-1 flex flex-wrap gap-1">
-                                          {it.variables.map((v: any, i: number) => (
-                                            <span key={i} className="text-[10px] bg-primary/5 border border-primary/20 rounded px-1.5 py-0.5">
-                                              <span className="font-bold">{v.label}:</span> {v.value}
-                                            </span>
-                                          ))}
-                                        </div>
-                                      );
-                                    })()}
+                                    {it.variables && (
+                                      <div className="mt-1 flex flex-wrap gap-1">
+                                        {Array.isArray(it.variables) ? it.variables.map((v: any, i: number) => (
+                                          <span key={i} className="text-[10px] bg-primary/5 border border-primary/20 rounded px-1.5 py-0.5">
+                                            <span className="font-bold">{v.label}:</span> {v.value}
+                                          </span>
+                                        )) : (
+                                          <span className="text-[10px] bg-primary/5 border border-primary/20 rounded px-1.5 py-0.5">
+                                            {String(it.variables)}
+                                          </span>
+                                        )}
+                                      </div>
+                                    )}
                                   </div>
                                 </div>
                               </td>
