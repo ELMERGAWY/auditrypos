@@ -65,6 +65,7 @@ export function InvoiceViewer({
     paymentMethod: true,
     status: true,
     items: true,
+    variables: true,
     subtotal: true,
     discount: true,
     tax: true,
