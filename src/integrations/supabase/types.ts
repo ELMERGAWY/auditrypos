@@ -2275,6 +2275,13 @@ export type Database = {
             foreignKeyName: "contractor_services_order_id_fkey"
             columns: ["order_id"]
             isOneToOne: false
+            referencedRelation: "v_order_payments"
+            referencedColumns: ["order_id"]
+          },
+          {
+            foreignKeyName: "contractor_services_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
             referencedRelation: "v_sales_analytics"
             referencedColumns: ["id"]
           },
@@ -3018,6 +3025,13 @@ export type Database = {
             columns: ["order_id"]
             isOneToOne: false
             referencedRelation: "v_order_financial_api"
+            referencedColumns: ["order_id"]
+          },
+          {
+            foreignKeyName: "customer_transactions_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "v_order_payments"
             referencedColumns: ["order_id"]
           },
           {
@@ -4663,6 +4677,13 @@ export type Database = {
             columns: ["order_id"]
             isOneToOne: false
             referencedRelation: "v_order_financial_api"
+            referencedColumns: ["order_id"]
+          },
+          {
+            foreignKeyName: "inventory_consumption_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "v_order_payments"
             referencedColumns: ["order_id"]
           },
           {
@@ -8543,6 +8564,13 @@ export type Database = {
             foreignKeyName: "order_items_order_id_fkey"
             columns: ["order_id"]
             isOneToOne: false
+            referencedRelation: "v_order_payments"
+            referencedColumns: ["order_id"]
+          },
+          {
+            foreignKeyName: "order_items_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
             referencedRelation: "v_sales_analytics"
             referencedColumns: ["id"]
           },
@@ -8623,6 +8651,13 @@ export type Database = {
             foreignKeyName: "order_taxes_order_id_fkey"
             columns: ["order_id"]
             isOneToOne: false
+            referencedRelation: "v_order_payments"
+            referencedColumns: ["order_id"]
+          },
+          {
+            foreignKeyName: "order_taxes_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
             referencedRelation: "v_sales_analytics"
             referencedColumns: ["id"]
           },
@@ -8657,6 +8692,7 @@ export type Database = {
           delivery_lat: number | null
           delivery_lng: number | null
           delivery_status: string
+          direct_paid_amount: number
           discount: number
           id: string
           journal_entry_id: string | null
@@ -8665,6 +8701,7 @@ export type Database = {
           order_type: string
           paid_amount: number
           payment_method: string
+          receipt_voucher_ids: string[] | null
           restaurant_id: string
           sales_order_id: string | null
           status: string
@@ -8689,6 +8726,7 @@ export type Database = {
           delivery_lat?: number | null
           delivery_lng?: number | null
           delivery_status?: string
+          direct_paid_amount?: number
           discount?: number
           id?: string
           journal_entry_id?: string | null
@@ -8697,6 +8735,7 @@ export type Database = {
           order_type?: string
           paid_amount?: number
           payment_method?: string
+          receipt_voucher_ids?: string[] | null
           restaurant_id: string
           sales_order_id?: string | null
           status?: string
@@ -8721,6 +8760,7 @@ export type Database = {
           delivery_lat?: number | null
           delivery_lng?: number | null
           delivery_status?: string
+          direct_paid_amount?: number
           discount?: number
           id?: string
           journal_entry_id?: string | null
@@ -8729,6 +8769,7 @@ export type Database = {
           order_type?: string
           paid_amount?: number
           payment_method?: string
+          receipt_voucher_ids?: string[] | null
           restaurant_id?: string
           sales_order_id?: string | null
           status?: string
@@ -8863,6 +8904,13 @@ export type Database = {
             columns: ["order_id"]
             isOneToOne: false
             referencedRelation: "v_order_financial_api"
+            referencedColumns: ["order_id"]
+          },
+          {
+            foreignKeyName: "payment_batch_items_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "v_order_payments"
             referencedColumns: ["order_id"]
           },
           {
@@ -10203,6 +10251,100 @@ export type Database = {
           },
         ]
       }
+      receipt_voucher_allocations: {
+        Row: {
+          allocated_amount: number
+          created_at: string
+          id: string
+          order_id: string
+          receipt_voucher_id: string
+          restaurant_id: string
+          updated_at: string
+        }
+        Insert: {
+          allocated_amount?: number
+          created_at?: string
+          id?: string
+          order_id: string
+          receipt_voucher_id: string
+          restaurant_id: string
+          updated_at?: string
+        }
+        Update: {
+          allocated_amount?: number
+          created_at?: string
+          id?: string
+          order_id?: string
+          receipt_voucher_id?: string
+          restaurant_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "receipt_voucher_allocations_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "receipt_voucher_allocations_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "v_order_financial_api"
+            referencedColumns: ["order_id"]
+          },
+          {
+            foreignKeyName: "receipt_voucher_allocations_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "v_order_payments"
+            referencedColumns: ["order_id"]
+          },
+          {
+            foreignKeyName: "receipt_voucher_allocations_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "v_sales_analytics"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "receipt_voucher_allocations_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "v_tax_report"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "receipt_voucher_allocations_receipt_voucher_id_fkey"
+            columns: ["receipt_voucher_id"]
+            isOneToOne: false
+            referencedRelation: "receipt_vouchers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "receipt_voucher_allocations_restaurant_id_fkey"
+            columns: ["restaurant_id"]
+            isOneToOne: false
+            referencedRelation: "public_restaurant_info"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "receipt_voucher_allocations_restaurant_id_fkey"
+            columns: ["restaurant_id"]
+            isOneToOne: false
+            referencedRelation: "restaurants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "receipt_voucher_allocations_restaurant_id_fkey"
+            columns: ["restaurant_id"]
+            isOneToOne: false
+            referencedRelation: "restaurants_public"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       receipt_vouchers: {
         Row: {
           account_id: string | null
@@ -11283,6 +11425,7 @@ export type Database = {
           is_progress_invoice: boolean | null
           journal_entry_id: string | null
           notes: string | null
+          order_id: string | null
           paid_amount: number
           payment_method: string | null
           project_id: string | null
@@ -11308,6 +11451,7 @@ export type Database = {
           is_progress_invoice?: boolean | null
           journal_entry_id?: string | null
           notes?: string | null
+          order_id?: string | null
           paid_amount?: number
           payment_method?: string | null
           project_id?: string | null
@@ -11333,6 +11477,7 @@ export type Database = {
           is_progress_invoice?: boolean | null
           journal_entry_id?: string | null
           notes?: string | null
+          order_id?: string | null
           paid_amount?: number
           payment_method?: string | null
           project_id?: string | null
@@ -11351,6 +11496,41 @@ export type Database = {
             columns: ["block_id"]
             isOneToOne: false
             referencedRelation: "project_blocks"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sales_invoices_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sales_invoices_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "v_order_financial_api"
+            referencedColumns: ["order_id"]
+          },
+          {
+            foreignKeyName: "sales_invoices_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "v_order_payments"
+            referencedColumns: ["order_id"]
+          },
+          {
+            foreignKeyName: "sales_invoices_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "v_sales_analytics"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sales_invoices_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "v_tax_report"
             referencedColumns: ["id"]
           },
           {
@@ -11419,6 +11599,13 @@ export type Database = {
             columns: ["order_id"]
             isOneToOne: false
             referencedRelation: "v_order_financial_api"
+            referencedColumns: ["order_id"]
+          },
+          {
+            foreignKeyName: "sales_orders_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "v_order_payments"
             referencedColumns: ["order_id"]
           },
           {
@@ -11639,6 +11826,13 @@ export type Database = {
             columns: ["original_order_id"]
             isOneToOne: false
             referencedRelation: "v_order_financial_api"
+            referencedColumns: ["order_id"]
+          },
+          {
+            foreignKeyName: "sales_returns_original_order_id_fkey"
+            columns: ["original_order_id"]
+            isOneToOne: false
+            referencedRelation: "v_order_payments"
             referencedColumns: ["order_id"]
           },
           {
@@ -15068,6 +15262,13 @@ export type Database = {
             foreignKeyName: "order_items_order_id_fkey"
             columns: ["order_id"]
             isOneToOne: false
+            referencedRelation: "v_order_payments"
+            referencedColumns: ["order_id"]
+          },
+          {
+            foreignKeyName: "order_items_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
             referencedRelation: "v_sales_analytics"
             referencedColumns: ["id"]
           },
@@ -15175,6 +15376,13 @@ export type Database = {
             columns: ["order_id"]
             isOneToOne: false
             referencedRelation: "v_order_financial_api"
+            referencedColumns: ["order_id"]
+          },
+          {
+            foreignKeyName: "customer_transactions_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "v_order_payments"
             referencedColumns: ["order_id"]
           },
           {
@@ -16035,6 +16243,18 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      v_order_payments: {
+        Row: {
+          direct_paid: number | null
+          order_id: string | null
+          order_number: string | null
+          order_total: number | null
+          receipt_voucher_total: number | null
+          remaining_balance: number | null
+          total_paid: number | null
+        }
+        Relationships: []
       }
       v_period_close_control_status: {
         Row: {
@@ -17293,6 +17513,11 @@ export type Database = {
         Args: { restaurant_id: string }
         Returns: Json
       }
+      get_order_allocated_amount: {
+        Args: { p_order_id: string }
+        Returns: number
+      }
+      get_order_total_paid: { Args: { p_order_id: string }; Returns: number }
       get_profit_and_loss: {
         Args: {
           p_end_date: string
