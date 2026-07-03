@@ -26,6 +26,7 @@ interface PrintElementSettings {
   paidAmount: boolean;
   remaining: boolean;
   change: boolean;
+  directPayment: boolean;
   notes: boolean;
   thankYou: boolean;
   poweredBy: boolean;
@@ -65,6 +66,7 @@ export function PrintSettingsManager({ restaurantId }: PrintSettingsManagerProps
     paidAmount: true,
     remaining: true,
     change: true,
+    directPayment: true,
     notes: true,
     thankYou: true,
     poweredBy: true,
@@ -172,6 +174,7 @@ export function PrintSettingsManager({ restaurantId }: PrintSettingsManagerProps
               { key: 'paidAmount', label: 'إجمالي المدفوع' },
               { key: 'remaining', label: 'المتبقي' },
               { key: 'change', label: 'الباقي للعميل' },
+              { key: 'directPayment', label: 'المدفوع مباشرة' },
               { key: 'notes', label: 'الملاحظات' },
               { key: 'thankYou', label: 'شكراً لزيارتكم' },
               { key: 'poweredBy', label: 'Powered by Auditry' },

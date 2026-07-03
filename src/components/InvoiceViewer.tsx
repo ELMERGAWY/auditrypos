@@ -474,7 +474,7 @@ export function InvoiceViewer({
                                       <p className="text-[10px] text-muted-foreground">{it.sold_unit}</p>
                                     )}
                                     {it.variables && (
-                                      <div className="mt-1 flex flex-wrap gap-1">
+                                      <div className="mt-1 grid grid-cols-2 gap-1">
                                         {Array.isArray(it.variables) ? it.variables.map((v: any, i: number) => (
                                           <span key={i} className="text-[10px] bg-primary/5 border border-primary/20 rounded px-1.5 py-0.5">
                                             <span className="font-bold">{v.label}:</span> {v.value}
@@ -522,7 +522,9 @@ export function InvoiceViewer({
                 )}
                 {printSettings.paidAmount && (
                   <>
-                    <Row label="المدفوع مباشرة" value={directPaidAmount} currency={currency} className="text-emerald-500" />
+                    {printSettings.directPayment && (
+                      <Row label="المدفوع مباشرة" value={directPaidAmount} currency={currency} className="text-emerald-500" />
+                    )}
                     {receiptVoucherTotal > 0 && (
                       <Row label="سندات القبض" value={receiptVoucherTotal} currency={currency} className="text-emerald-500" />
                     )}
