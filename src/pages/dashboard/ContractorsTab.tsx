@@ -420,7 +420,10 @@ export function ContractorsTab({ restaurant }: Props) {
       specialty: contractor.specialty || '',
       payment_type: contractor.payment_type,
       payment_value: String(contractor.payment_value),
-      notes: contractor.notes || ''
+      notes: contractor.notes || '',
+      service_variables: Array.isArray(contractor.service_variables)
+        ? contractor.service_variables.join('، ')
+        : '',
     });
     setShowAddForm(true);
   };
