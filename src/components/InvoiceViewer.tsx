@@ -34,6 +34,7 @@ interface PrintElementSettings {
   paymentMethod: boolean;
   status: boolean;
   items: boolean;
+  variables: boolean;
   subtotal: boolean;
   discount: boolean;
   tax: boolean;
