@@ -7,9 +7,10 @@ import { Input } from '@/components/ui/input';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Label } from '@/components/ui/label';
-import { 
-  FileText, Search, Calendar, Printer, Download, 
-  RotateCcw, Eye, RefreshCcw, DollarSign, Users, Plus, X, Trash2, Edit
+import {
+  FileText, Search, Calendar, Printer, Download,
+  RotateCcw, Eye, RefreshCcw, DollarSign, Users, Plus, X, Trash2, Edit,
+  ChevronUp, ChevronDown
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { journalService } from '@/lib/accounting/journalService';
@@ -48,6 +49,8 @@ export function SalesInvoices({ restaurantId, currency, restaurant, isSuperAdmin
   const [showManualForm, setShowManualForm] = useState(false);
   const [viewingId, setViewingId] = useState<string | null>(null);
   const [editingInvoice, setEditingInvoice] = useState<Invoice | null>(null);
+  const [expandedInvoiceId, setExpandedInvoiceId] = useState<string | null>(null);
+  const [expandedInvoiceItems, setExpandedInvoiceItems] = useState<any[]>([]);
   const [form, setForm] = useState({
     customer_name: '',
     amount: '',
@@ -231,6 +234,28 @@ export function SalesInvoices({ restaurantId, currency, restaurant, isSuperAdmin
     const { data: items } = await supabase.from('order_items').select('*').eq('order_id', invoice.id);
     setEditItems(items || []);
     setShowManualForm(true);
+  };
+
+  const loadInvoiceItems = async (invoiceId: string) => {
+    try {
+      const { data: items, error } = await supabase.from('order_items').select('*').eq('order_id', invoiceId);
+      if (error) throw error;
+      return items || [];
+    } catch (err) {
+      console.error('Error loading invoice items:', err);
+      return [];
+    }
+  };
+
+  const handleExpandInvoice = async (invoiceId: string) => {
+    if (expandedInvoiceId === invoiceId) {
+      setExpandedInvoiceId(null);
+      setExpandedInvoiceItems([]);
+    } else {
+      const items = await loadInvoiceItems(invoiceId);
+      setExpandedInvoiceId(invoiceId);
+      setExpandedInvoiceItems(items);
+    }
   };
 
   const handleUpdateInvoice = async () => {
@@ -534,42 +559,75 @@ export function SalesInvoices({ restaurantId, currency, restaurant, isSuperAdmin
 
       <div className="space-y-3">
         {filteredInvoices.map(inv => (
-          <Card key={inv.id} className="p-4 glass-card hover:border-primary/50 transition-all flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <div className="p-3 rounded-xl bg-primary/10 text-primary">
-                <FileText className="w-5 h-5" />
-              </div>
-              <div>
-                <div className="flex items-center gap-2">
-                  <span className="font-bold">{inv.order_number}</span>
-                  <Badge variant="outline" className="text-[10px]">{inv.payment_method === 'cash' ? 'نقدي' : 'آجل'}</Badge>
+          <div key={inv.id}>
+            <Card className="p-4 glass-card hover:border-primary/50 transition-all flex items-center justify-between">
+              <div className="flex items-center gap-4">
+                <div className="p-3 rounded-xl bg-primary/10 text-primary">
+                  <FileText className="w-5 h-5" />
                 </div>
-                <p className="text-xs text-muted-foreground">{inv.customer_name || 'عميل نقدي'} • {new Date(inv.created_at).toLocaleString('ar-EG')}</p>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="font-bold">{inv.order_number}</span>
+                    <Badge variant="outline" className="text-[10px]">{inv.payment_method === 'cash' ? 'نقدي' : 'آجل'}</Badge>
+                  </div>
+                  <p className="text-xs text-muted-foreground">{inv.customer_name || 'عميل نقدي'} • {new Date(inv.created_at).toLocaleString('ar-EG')}</p>
+                </div>
               </div>
-            </div>
-            <div className="flex items-center gap-6">
-              <div className="text-left">
-                <span className="font-black text-lg text-primary">{inv.total.toLocaleString()}</span>
-                <span className="text-[10px] text-muted-foreground mr-1">{currency}</span>
-              </div>
-              <div className="flex gap-1">
-                <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => setViewingId(inv.id)} title="عرض الفاتورة">
-                  <Eye className="w-4 h-4" />
-                </Button>
-                {canEditInvoices && (
-                  <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => handleEditInvoice(inv)} title="تعديل الفاتورة">
-                    <Edit className="w-4 h-4" />
+              <div className="flex items-center gap-6">
+                <div className="text-left">
+                  <span className="font-black text-lg text-primary">{inv.total.toLocaleString()}</span>
+                  <span className="text-[10px] text-muted-foreground mr-1">{currency}</span>
+                </div>
+                <div className="flex gap-1">
+                  <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => handleExpandInvoice(inv.id)} title="عرض البنود">
+                    {expandedInvoiceId === inv.id ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
                   </Button>
-                )}
-                <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => setViewingId(inv.id)} title="طباعة">
-                  <Printer className="w-4 h-4" />
-                </Button>
-                <Button size="icon" variant="ghost" className="h-8 w-8 text-destructive hover:bg-destructive/10" onClick={() => handleDelete(inv)} title="حذف">
-                  <Trash2 className="w-4 h-4" />
-                </Button>
+                  <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => setViewingId(inv.id)} title="عرض الفاتورة">
+                    <Eye className="w-4 h-4" />
+                  </Button>
+                  {canEditInvoices && (
+                    <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => handleEditInvoice(inv)} title="تعديل الفاتورة">
+                      <Edit className="w-4 h-4" />
+                    </Button>
+                  )}
+                  <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => setViewingId(inv.id)} title="طباعة">
+                    <Printer className="w-4 h-4" />
+                  </Button>
+                  <Button size="icon" variant="ghost" className="h-8 w-8 text-destructive hover:bg-destructive/10" onClick={() => handleDelete(inv)} title="حذف">
+                    <Trash2 className="w-4 h-4" />
+                  </Button>
+                </div>
               </div>
-            </div>
-          </Card>
+            </Card>
+            {expandedInvoiceId === inv.id && (
+              <Card className="p-4 mt-2 bg-primary/5">
+                <div className="space-y-2">
+                  <h4 className="font-bold text-sm mb-2">بنود الفاتورة:</h4>
+                  {expandedInvoiceItems.length === 0 ? (
+                    <p className="text-muted-foreground text-sm">لا توجد بنود</p>
+                  ) : (
+                    expandedInvoiceItems.map((item, idx) => (
+                      <div key={item.id || idx} className="flex flex-col gap-1 text-sm">
+                        <div className="flex justify-between items-center">
+                          <span className="font-bold">{item.menu_item_name || 'صنف'}</span>
+                          <span className="text-muted-foreground">{item.quantity} × {Number(item.price || 0).toFixed(2)} {currency}</span>
+                        </div>
+                        {item.variables && Array.isArray(item.variables) && item.variables.length > 0 && (
+                          <div className="flex flex-wrap gap-1 mr-2">
+                            {item.variables.map((v: any, i: number) => (
+                              <span key={i} className="text-xs bg-primary/10 border border-primary/20 rounded px-1.5 py-0.5">
+                                <span className="font-bold">{v.label}:</span> {v.value}
+                              </span>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    ))
+                  )}
+                </div>
+              </Card>
+            )}
+          </div>
         ))}
         {filteredInvoices.length === 0 && !loading && (
           <div className="text-center py-20 text-muted-foreground italic">لا توجد فواتير مطابقة للبحث</div>

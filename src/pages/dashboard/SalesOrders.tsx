@@ -1,5 +1,6 @@
 // @ts-nocheck
 import { useState, useEffect } from 'react';
+import React from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
@@ -7,9 +8,10 @@ import { Input } from '@/components/ui/input';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { 
-  FileText, Plus, Search, Calendar, Package, DollarSign, 
-  CheckCircle, Clock, Eye, RefreshCcw, ShoppingBag, Users, Trash2, Edit, X
+import {
+  FileText, Plus, Search, Calendar, Package, DollarSign,
+  CheckCircle, Clock, Eye, RefreshCcw, ShoppingBag, Users, Trash2, Edit, X,
+  ChevronUp, ChevronDown
 } from 'lucide-react';
 import { Label } from '@/components/ui/label';
 import { InvoiceViewer } from '@/components/InvoiceViewer';
@@ -36,6 +38,8 @@ export function SalesOrders({ restaurantId, currency }: Props) {
   const [loading, setLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [viewingId, setViewingId] = useState<string | null>(null);
+  const [expandedOrderId, setExpandedOrderId] = useState<string | null>(null);
+  const [expandedOrderItems, setExpandedOrderItems] = useState<any[]>([]);
 
   const [showAddModal, setShowAddModal] = useState(false);
   const [customers, setCustomers] = useState<any[]>([]);
@@ -91,6 +95,28 @@ export function SalesOrders({ restaurantId, currency }: Props) {
       setEditOrderItems([]);
     }
     setShowEditModal(true);
+  };
+
+  const loadOrderItems = async (orderId: string) => {
+    try {
+      const { data: items, error } = await supabase.from('sales_order_items').select('*').eq('sales_order_id', orderId);
+      if (error) throw error;
+      return items || [];
+    } catch (err) {
+      console.error('Error loading order items:', err);
+      return [];
+    }
+  };
+
+  const handleExpandOrder = async (orderId: string) => {
+    if (expandedOrderId === orderId) {
+      setExpandedOrderId(null);
+      setExpandedOrderItems([]);
+    } else {
+      const items = await loadOrderItems(orderId);
+      setExpandedOrderId(orderId);
+      setExpandedOrderItems(items);
+    }
   };
 
   const handleUpdateOrder = async () => {
@@ -446,39 +472,74 @@ export function SalesOrders({ restaurantId, currency }: Props) {
                 <tr><td colSpan={6} className="py-20 text-center text-muted-foreground italic">لا توجد أوامر بيع حالياً</td></tr>
               ) : (
                 filteredOrders.map(order => (
-                  <tr key={order.id} className="border-b border-border/50 hover:bg-primary/5 transition-colors">
-                    <td className="px-6 py-4 font-mono font-bold text-xs">{order.order_number}</td>
-                    <td className="px-6 py-4">{new Date(order.order_date).toLocaleDateString('ar-EG')}</td>
-                    <td className="px-6 py-4 font-bold">{order.customer_name || 'عميل نقدي'}</td>
-                    <td className="px-6 py-4 font-bold text-primary">{(order.total_amount || 0).toLocaleString('ar-EG', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} {currency}</td>
-                    <td className="px-6 py-4">
-                      <Badge variant="secondary" className="font-medium">
-                        {order.status === 'draft' ? 'مسودة' : order.status === 'confirmed' ? 'مؤكد' : order.status === 'delivered' ? 'تم التسليم' : 'ملغي'}
-                      </Badge>
-                    </td>
-                    <td className="px-6 py-4 flex gap-1">
-                      <Button variant="ghost" size="sm" title="عرض التفاصيل" onClick={() => setViewingId(order.id)}>
-                        <Eye className="w-4 h-4" />
-                      </Button>
-                      <Button variant="ghost" size="sm" title="تعديل الأمر" onClick={() => handleEditOrder(order)}>
-                        <Edit className="w-4 h-4" />
-                      </Button>
-                      <Button variant="ghost" size="sm" title="حذف" className="text-destructive hover:bg-destructive/10" onClick={() => handleDelete(order)}>
-                        <Trash2 className="w-4 h-4" />
-                      </Button>
-                      {order.status === 'confirmed' && (
-                        <Button 
-                          variant="ghost" 
-                          size="sm" 
-                          title="تحويل لفاتورة" 
-                          className="text-emerald-500 hover:text-emerald-600 hover:bg-emerald-50"
-                          onClick={() => handleConvertToInvoice(order.id)}
-                        >
-                          <FileText className="w-4 h-4" />
+                  <React.Fragment key={order.id}>
+                    <tr className="border-b border-border/50 hover:bg-primary/5 transition-colors">
+                      <td className="px-6 py-4 font-mono font-bold text-xs">{order.order_number}</td>
+                      <td className="px-6 py-4">{new Date(order.order_date).toLocaleDateString('ar-EG')}</td>
+                      <td className="px-6 py-4 font-bold">{order.customer_name || 'عميل نقدي'}</td>
+                      <td className="px-6 py-4 font-bold text-primary">{(order.total_amount || 0).toLocaleString('ar-EG', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} {currency}</td>
+                      <td className="px-6 py-4">
+                        <Badge variant="secondary" className="font-medium">
+                          {order.status === 'draft' ? 'مسودة' : order.status === 'confirmed' ? 'مؤكد' : order.status === 'delivered' ? 'تم التسليم' : 'ملغي'}
+                        </Badge>
+                      </td>
+                      <td className="px-6 py-4 flex gap-1">
+                        <Button variant="ghost" size="sm" title="عرض البنود" onClick={() => handleExpandOrder(order.id)}>
+                          {expandedOrderId === order.id ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
                         </Button>
-                      )}
-                    </td>
-                  </tr>
+                        <Button variant="ghost" size="sm" title="عرض التفاصيل" onClick={() => setViewingId(order.id)}>
+                          <Eye className="w-4 h-4" />
+                        </Button>
+                        <Button variant="ghost" size="sm" title="تعديل الأمر" onClick={() => handleEditOrder(order)}>
+                          <Edit className="w-4 h-4" />
+                        </Button>
+                        <Button variant="ghost" size="sm" title="حذف" className="text-destructive hover:bg-destructive/10" onClick={() => handleDelete(order)}>
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
+                        {order.status === 'confirmed' && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            title="تحويل لفاتورة"
+                            className="text-emerald-500 hover:text-emerald-600 hover:bg-emerald-50"
+                            onClick={() => handleConvertToInvoice(order.id)}
+                          >
+                            <FileText className="w-4 h-4" />
+                          </Button>
+                        )}
+                      </td>
+                    </tr>
+                    {expandedOrderId === order.id && (
+                      <tr className="bg-primary/5">
+                        <td colSpan={6} className="px-6 py-4">
+                          <div className="space-y-2">
+                            <h4 className="font-bold text-sm mb-2">بنود الأمر:</h4>
+                            {expandedOrderItems.length === 0 ? (
+                              <p className="text-muted-foreground text-sm">لا توجد بنود</p>
+                            ) : (
+                              expandedOrderItems.map((item, idx) => (
+                                <div key={item.id || idx} className="flex flex-col gap-1 text-sm">
+                                  <div className="flex justify-between items-center">
+                                    <span className="font-bold">{item.item_name || item.menu_item_name || 'صنف'}</span>
+                                    <span className="text-muted-foreground">{item.quantity} × {Number(item.unit_price || item.price || 0).toFixed(2)} {currency}</span>
+                                  </div>
+                                  {item.variables && Array.isArray(item.variables) && item.variables.length > 0 && (
+                                    <div className="flex flex-wrap gap-1 mr-2">
+                                      {item.variables.map((v: any, i: number) => (
+                                        <span key={i} className="text-xs bg-primary/10 border border-primary/20 rounded px-1.5 py-0.5">
+                                          <span className="font-bold">{v.label}:</span> {v.value}
+                                        </span>
+                                      ))}
+                                    </div>
+                                  )}
+                                </div>
+                              ))
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    )}
+                  </React.Fragment>
                 ))
               )}
             </tbody>
