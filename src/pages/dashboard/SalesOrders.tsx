@@ -132,8 +132,43 @@ export function SalesOrders({ restaurantId, currency }: Props) {
 
       let itemUpdateErrors = 0;
       let itemUpdateSuccess = 0;
+      let itemDeleteSuccess = 0;
       let itemErrorsDetails: string[] = [];
 
+      // Get original items to detect deletions
+      const { data: originalItems } = await supabase
+        .from('sales_order_items')
+        .select('id')
+        .eq('sales_order_id', editingOrder.id);
+
+      const originalItemIds = new Set(originalItems?.map(i => i.id) || []);
+      const currentItemIds = new Set(editOrderItems.filter(i => i.id).map(i => i.id));
+
+      // Delete items that were removed
+      for (const originalItem of originalItems || []) {
+        if (!currentItemIds.has(originalItem.id)) {
+          try {
+            const { error: deleteError } = await supabase
+              .from('sales_order_items')
+              .delete()
+              .eq('id', originalItem.id);
+
+            if (deleteError) {
+              console.error('Failed to delete item:', originalItem.id, deleteError);
+              itemUpdateErrors++;
+              itemErrorsDetails.push(`حذف صنف: ${deleteError.message}`);
+            } else {
+              itemDeleteSuccess++;
+            }
+          } catch (deleteErr: any) {
+            console.error('Exception deleting item:', originalItem.id, deleteErr);
+            itemUpdateErrors++;
+            itemErrorsDetails.push(`حذف صنف: ${deleteErr.message}`);
+          }
+        }
+      }
+
+      // Update existing items
       for (const item of editOrderItems) {
         if (item.id) {
           try {
@@ -176,11 +211,12 @@ export function SalesOrders({ restaurantId, currency }: Props) {
       }
 
       if (itemUpdateErrors > 0) {
-        toast.warning(`تم تحديث الأمر ولكن فشل ${itemUpdateErrors} من ${editOrderItems.length} بنود`);
+        toast.warning(`تم تحديث الأمر ولكن فشل ${itemUpdateErrors} عمليات`);
         // Show detailed errors
         itemErrorsDetails.forEach(err => toast.error(err));
       } else {
-        toast.success(`تم تحديث الأمر وجميع ${itemUpdateSuccess} بنود بنجاح ✅`);
+        const message = `تم تحديث الأمر (${itemUpdateSuccess} تعديل، ${itemDeleteSuccess} حذف) بنجاح ✅`;
+        toast.success(message);
       }
       setShowEditModal(false);
       setEditingOrder(null);
@@ -581,6 +617,7 @@ export function SalesOrders({ restaurantId, currency }: Props) {
                           <th className="p-2 text-right">الصنف</th>
                           <th className="p-2 text-center w-20">الكمية</th>
                           <th className="p-2 text-center w-24">السعر</th>
+                          <th className="p-2 text-center w-12">حذف</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -627,6 +664,23 @@ export function SalesOrders({ restaurantId, currency }: Props) {
                                   setEditForm(f => ({ ...f, total_amount: String(newTotal) }));
                                 }}
                               />
+                            </td>
+                            <td className="p-2">
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => {
+                                  if (confirm('هل أنت متأكد من حذف هذا الصنف؟')) {
+                                    const updated = editOrderItems.filter((_, i) => i !== idx);
+                                    setEditOrderItems(updated);
+                                    const newTotal = updated.reduce((sum, it) => sum + (Number(it.unit_price || it.price || 0) * Number(it.quantity || 0)), 0);
+                                    setEditForm(f => ({ ...f, total_amount: String(newTotal) }));
+                                  }
+                                }}
+                                className="text-destructive hover:text-destructive h-8 w-8 p-0"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </Button>
                             </td>
                           </tr>
                         ))}
