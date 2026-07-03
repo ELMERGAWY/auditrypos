@@ -1120,6 +1120,17 @@ export function ContractorsTab({ restaurant }: Props) {
                 </div>
               </div>
               <div>
+                <Label>متغيرات الخدمة (كلمات دلالية للربط التلقائي)</Label>
+                <Input
+                  value={form.service_variables}
+                  onChange={e => setForm({ ...form, service_variables: e.target.value })}
+                  placeholder="مثال: صبغة، رفا، تنظيف (افصل بينها بفاصلة)"
+                />
+                <p className="text-[10px] text-muted-foreground mt-1">
+                  عند إضافة خدمة من فاتورة أو طلب سيتم اختيار العناصر التي تحتوي متغيراتها على أي من هذه الكلمات تلقائياً.
+                </p>
+              </div>
+              <div>
                 <Label>ملاحظات</Label>
                 <Input value={form.notes} onChange={e => setForm({ ...form, notes: e.target.value })} placeholder="ملاحظات إضافية" />
               </div>
