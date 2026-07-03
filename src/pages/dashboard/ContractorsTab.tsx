@@ -23,6 +23,7 @@ interface Contractor {
   balance: number;
   notes?: string;
   is_active: boolean;
+  service_variables?: string[];
 }
 
 interface ContractorService {
