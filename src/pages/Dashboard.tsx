@@ -138,7 +138,7 @@ export default function Dashboard() {
   });
 
   // POS State
-  const [cart, setCart] = useState<{ item: MenuItem; qty: number; qtyText: string; unitMode: string; unitFactor: number; price: number; service_details?: string; service_color?: string; service_type?: string }[]>([]);
+  const [cart, setCart] = useState<{ item: MenuItem; qty: number; qtyText: string; unitMode: string; unitFactor: number; price: number; service_details?: string; service_color?: string; service_type?: string; variables?: { label: string; value: string }[] }[]>([]);
   const [tableNumber, setTableNumber] = useState('');
   const [customOrderNumber, setCustomOrderNumber] = useState(''); // New state for manual invoice number
   const [customerName, setCustomerName] = useState('');
@@ -593,14 +593,15 @@ export default function Dashboard() {
     try {
       const result = await checkoutIntegration.processCheckout(
         { restaurantId: restaurant.id, businessType: businessType as any, currency, isOnline, userId: user?.id, skipPreparation: !sendToPrep },
-        { cart: cart.map(c => ({ 
-            ...c.item, 
+        { cart: cart.map(c => ({
+            ...c.item,
             price: Number(c.price),
-            quantity: c.qty, 
-            unitMode: c.unitMode, 
+            quantity: c.qty,
+            unitMode: c.unitMode,
             unitFactor: c.unitFactor || 1,
-            service_details: c.service_details
-          })), 
+            service_details: c.service_details,
+            variables: c.variables || null
+          })),
           customerName, customerPhone, customerRef, orderType: orderType as any, deliveryAddress, deliveryDate, deliveryAgentId: selectedDeliveryAgent, paymentMethod: paymentMethod as any, paidAmount: paidNum, discount: discountAmount, discountType: discountType === 'percent' ? 'percentage' : 'fixed', notes: orderNotes, destinationAccountId: selectedAccountId, customOrderNumber: customOrderNumber || undefined }
       );
       if (result.success && result.order) {

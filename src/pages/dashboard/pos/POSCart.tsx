@@ -14,7 +14,7 @@ import { usePermissions } from '@/hooks/usePermissions';
 interface POSCartProps {
   activeInvoiceId: string | null;
   invoiceTabs: HeldInvoice[];
-  cart: { item: MenuItem; qty: number; qtyText: string; unitMode: string; unitFactor: number; price: number; service_details?: string }[];
+  cart: { item: MenuItem; qty: number; qtyText: string; unitMode: string; unitFactor: number; price: number; service_details?: string; variables?: { label: string; value: string }[] }[];
   holdCurrentInvoice: () => void;
   setShowInvoiceTabs: (show: boolean) => void;
   clearCart: () => void;
