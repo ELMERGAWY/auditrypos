@@ -85,7 +85,8 @@ export function ContractorsTab({ restaurant }: Props) {
     specialty: '',
     payment_type: 'fixed' as 'fixed' | 'percentage',
     payment_value: '',
-    notes: ''
+    notes: '',
+    service_variables: '' as string,
   });
 
   const loadContractors = async () => {
