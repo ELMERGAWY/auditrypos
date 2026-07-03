@@ -113,16 +113,42 @@ export function ServiceVariablesDialog({ open, onOpenChange, itemName, template,
     return Array.from(new Set([...SUGGESTIONS, ...fromHistory]));
   }, [history]);
 
-  const save = () => {
+  const save = async () => {
     const cleaned = rows.filter(r => r.label.trim() && r.value.trim());
     // Persist to local history for next-time suggestions
     const hist = { ...history };
     cleaned.forEach(r => {
       const list = hist[r.label] || [];
       if (!list.includes(r.value)) list.unshift(r.value);
-      hist[r.label] = list.slice(0, 25);
+      hist[r.label] = list.slice(0, 50);
     });
     saveHistory(hist);
+    // Persist to shared DB presets (best-effort)
+    if (restaurantId && cleaned.length) {
+      try {
+        for (const r of cleaned) {
+          const label = r.label.trim();
+          const value = r.value.trim();
+          const { data: existing } = await supabase
+            .from('service_variable_presets')
+            .select('id, usage_count')
+            .eq('restaurant_id', restaurantId)
+            .eq('label', label)
+            .eq('value', value)
+            .maybeSingle();
+          if (existing?.id) {
+            await supabase
+              .from('service_variable_presets')
+              .update({ usage_count: (existing.usage_count || 0) + 1, updated_at: new Date().toISOString() })
+              .eq('id', existing.id);
+          } else {
+            await supabase
+              .from('service_variable_presets')
+              .insert({ restaurant_id: restaurantId, label, value, usage_count: 1 });
+          }
+        }
+      } catch {}
+    }
     onSave(cleaned);
     onOpenChange(false);
   };
