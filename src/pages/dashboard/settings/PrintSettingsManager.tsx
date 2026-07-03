@@ -56,6 +56,7 @@ export function PrintSettingsManager({ restaurantId }: PrintSettingsManagerProps
     customerRef: true,
     deliveryAddress: true,
     items: true,
+    variables: true,
     totalQty: true,
     subtotal: true,
     discount: true,
