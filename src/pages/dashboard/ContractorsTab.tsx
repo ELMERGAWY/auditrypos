@@ -124,7 +124,7 @@ export function ContractorsTab({ restaurant }: Props) {
     const companyId = restaurant.company_id || restaurant.id;
     const { data, error } = await supabase
       .from('sales_invoices')
-      .select('id, invoice_number, total_amount, created_at, sales_invoice_lines(id, description, quantity, unit_price, line_total)')
+      .select('id, invoice_number, total_amount, created_at, orders(order_items(id, menu_item_name, quantity, price, variables)), sales_invoice_lines(id, description, quantity, unit_price, line_total)')
       .eq('company_id', companyId)
       .order('created_at', { ascending: false })
       .limit(50);
@@ -132,7 +132,6 @@ export function ContractorsTab({ restaurant }: Props) {
       console.error('Error loading invoices:', error);
       toast.error('خطأ في تحميل الفواتير: ' + error.message);
     } else {
-      console.log('Loaded invoices:', data?.length);
       setInvoices(data || []);
     }
   };
@@ -140,7 +139,7 @@ export function ContractorsTab({ restaurant }: Props) {
   const loadOrders = async () => {
     const { data, error } = await supabase
       .from('orders')
-      .select('id, order_number, total, created_at, order_items(id, menu_item_name, quantity, price)')
+      .select('id, order_number, total, created_at, order_items(id, menu_item_name, quantity, price, variables)')
       .eq('restaurant_id', restaurant.id)
       .order('created_at', { ascending: false })
       .limit(50);
@@ -148,7 +147,6 @@ export function ContractorsTab({ restaurant }: Props) {
       console.error('Error loading orders:', error);
       toast.error('خطأ في تحميل الطلبات: ' + error.message);
     } else {
-      console.log('Loaded orders:', data?.length);
       setOrders(data || []);
     }
   };
