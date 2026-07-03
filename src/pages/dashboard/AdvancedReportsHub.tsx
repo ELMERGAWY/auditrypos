@@ -772,7 +772,7 @@ export function AdvancedReportsHub({ restaurantId, currency }: Props) {
                   <div className="flex flex-wrap gap-1">
                     {Object.entries(row.variables).map(([varName, count], idx) => (
                       <span key={idx} className="inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold bg-secondary/80 text-secondary-foreground border-border">
-                        {varName} ({count})
+                        {varName} ({String(count)})
                       </span>
                     ))}
                   </div>
