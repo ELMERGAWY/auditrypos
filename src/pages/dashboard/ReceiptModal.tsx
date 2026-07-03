@@ -84,6 +84,7 @@ interface PrintElementSettings {
   customerRef: boolean;
   deliveryAddress: boolean;
   items: boolean;
+  variables: boolean;
   totalQty: boolean;
   subtotal: boolean;
   discount: boolean;
