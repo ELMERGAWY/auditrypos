@@ -228,6 +228,72 @@ export function ContractorsTab({ restaurant }: Props) {
     setShowAddServiceDialog(true);
   };
 
+  // Auto-match: when contractor is chosen, pre-select items whose variables match its keywords
+  useEffect(() => {
+    if (!showAddServiceDialog || !serviceForm.contractor_id) return;
+    const c = contractors.find(x => x.id === serviceForm.contractor_id);
+    const keywords = (c?.service_variables || []).map(k => k.trim().toLowerCase()).filter(Boolean);
+    if (!keywords.length) return;
+
+    const matchItem = (vars: any[]) =>
+      Array.isArray(vars) && vars.some((v: any) => {
+        const l = String(v?.label || '').toLowerCase();
+        const val = String(v?.value || '').toLowerCase();
+        return keywords.some(k => l.includes(k) || val.includes(k));
+      });
+
+    const auto: any[] = [];
+    invoices.forEach((inv: any) => {
+      const lines = inv?.orders?.order_items || [];
+      lines.forEach((item: any) => {
+        if (matchItem(item.variables)) {
+          auto.push({
+            id: `inv-${item.id}`,
+            item_name: item.menu_item_name,
+            unit_price: item.price,
+            total: Number(item.price || 0) * Number(item.quantity || 0),
+            quantity: item.quantity,
+            invoice_id: inv.id,
+            order_id: null,
+            invoice_number: inv.invoice_number,
+            order_number: null,
+            variables: item.variables,
+          });
+        }
+      });
+    });
+    orders.forEach((ord: any) => {
+      (ord.order_items || []).forEach((item: any) => {
+        if (matchItem(item.variables)) {
+          auto.push({
+            id: `ord-${item.id}`,
+            item_name: item.menu_item_name,
+            unit_price: item.price,
+            total: Number(item.price || 0) * Number(item.quantity || 0),
+            quantity: item.quantity,
+            invoice_id: null,
+            order_id: ord.id,
+            invoice_number: null,
+            order_number: ord.order_number,
+            variables: item.variables,
+          });
+        }
+      });
+    });
+
+    if (auto.length) {
+      setSelectedServices(auto);
+      const totalServicesAmount = auto.reduce((s, x) => s + (x.total || 0), 0);
+      setServiceForm(prev => ({
+        ...prev,
+        service_name: auto[0].item_name,
+        service_amount: totalServicesAmount.toString(),
+      }));
+      toast.success(`تم اختيار ${auto.length} خدمة مطابقة لمتغيرات الصنايعي تلقائياً`);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [serviceForm.contractor_id, showAddServiceDialog]);
+
   const handleSaveService = async () => {
     if (!serviceForm.contractor_id || !serviceForm.service_name || !serviceForm.service_amount) {
       toast.error('يرجى ملء جميع الحقول المطلوبة');
