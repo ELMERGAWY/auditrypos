@@ -318,6 +318,7 @@ export function ReceiptModalWrapper({ order, restaurant, onClose, onComplete, is
     customerRef: true,
     deliveryAddress: true,
     items: true,
+    variables: true,
     totalQty: true,
     subtotal: true,
     discount: true,
