@@ -187,7 +187,7 @@ function ReceiptContent({
                     📝 {(item as any).service_details}
                   </div>
                 )}
-                {Array.isArray((item as any).variables) && (item as any).variables.length > 0 && (
+                {printSettings.variables && Array.isArray((item as any).variables) && (item as any).variables.length > 0 && (
                   <div style={{ fontSize: '9px', padding: '2px 4px', color: '#000', borderBottom: '1px dotted #000' }}>
                     {(item as any).variables.map((v: any, i: number) => (
                       <div key={i} style={{ display: 'flex', justifyContent: 'space-between', gap: 4 }}>
