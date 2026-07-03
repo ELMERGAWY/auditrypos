@@ -85,6 +85,7 @@ export interface Restaurant {
   inventory_system?: string;
   enabled_modules?: string[];
   custom_tabs?: string[];
+  company_id?: string;
 }
 
   export interface HeldInvoice {

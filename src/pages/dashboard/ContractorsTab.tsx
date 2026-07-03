@@ -119,10 +119,11 @@ export function ContractorsTab({ restaurant }: Props) {
   }, [restaurant.id]);
 
   const loadInvoices = async () => {
+    const companyId = restaurant.company_id || restaurant.id;
     const { data, error } = await supabase
       .from('sales_invoices')
       .select('id, invoice_number, total_amount, created_at, sales_invoice_lines(id, description, quantity, unit_price, line_total)')
-      .or(`company_id.eq.${restaurant.id},restaurant_id.eq.${restaurant.id}`)
+      .eq('company_id', companyId)
       .order('created_at', { ascending: false })
       .limit(50);
     if (error) {
