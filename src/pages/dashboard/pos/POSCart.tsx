@@ -484,6 +484,7 @@ export const POSCart = memo(function POSCart({
         itemName={variableDialogFor?.item?.name}
         template={variableDialogFor?.item?.variables || []}
         value={variableDialogFor?.variables || []}
+        restaurantId={restaurant?.id}
         onSave={(vars) => {
           if (variableDialogFor && updateServiceVariables) {
             updateServiceVariables(variableDialogFor.item.id, vars);
