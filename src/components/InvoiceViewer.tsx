@@ -603,6 +603,10 @@ export function InvoiceViewer({
                       <span className="text-sm">الأصناف</span>
                     </label>
                     <label className="flex items-center gap-2 cursor-pointer">
+                      <input type="checkbox" checked={printSettings.variables} onChange={(e) => handlePrintSettingChange('variables', e.target.checked)} className="w-4 h-4" />
+                      <span className="text-sm">متغيرات الخدمة</span>
+                    </label>
+                    <label className="flex items-center gap-2 cursor-pointer">
                       <input type="checkbox" checked={printSettings.subtotal} onChange={(e) => handlePrintSettingChange('subtotal', e.target.checked)} className="w-4 h-4" />
                       <span className="text-sm">المجموع الفرعي</span>
                     </label>
