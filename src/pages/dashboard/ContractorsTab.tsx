@@ -355,6 +355,11 @@ export function ContractorsTab({ restaurant }: Props) {
       return;
     }
 
+    const svArr = (form.service_variables || '')
+      .split(/[,،\n]/)
+      .map(s => s.trim())
+      .filter(Boolean);
+
     const payload = {
       restaurant_id: restaurant.id,
       name: form.name,
@@ -364,7 +369,8 @@ export function ContractorsTab({ restaurant }: Props) {
       payment_type: form.payment_type,
       payment_value: Number(form.payment_value),
       notes: form.notes || null,
-      is_active: true
+      is_active: true,
+      service_variables: svArr,
     };
 
     if (editingContractor) {
