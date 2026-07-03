@@ -163,6 +163,7 @@ export function PrintSettingsManager({ restaurantId }: PrintSettingsManagerProps
               { key: 'customerRef', label: 'مرجع العميل' },
               { key: 'deliveryAddress', label: 'العنوان' },
               { key: 'items', label: 'الأصناف' },
+              { key: 'variables', label: 'متغيرات الخدمة' },
               { key: 'totalQty', label: 'إجمالي الكمية' },
               { key: 'subtotal', label: 'المجموع الفرعي' },
               { key: 'discount', label: 'الخصم' },
