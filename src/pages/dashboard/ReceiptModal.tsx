@@ -780,6 +780,10 @@ export function ReceiptModalWrapper({ order, restaurant, onClose, onComplete, is
                       <span className="text-sm">الأصناف</span>
                     </label>
                     <label className="flex items-center gap-2 cursor-pointer">
+                      <input type="checkbox" checked={printSettings.variables} onChange={(e) => setPrintSettings({ ...printSettings, variables: e.target.checked })} className="w-4 h-4" />
+                      <span className="text-sm">متغيرات الخدمة</span>
+                    </label>
+                    <label className="flex items-center gap-2 cursor-pointer">
                       <input type="checkbox" checked={printSettings.totalQty} onChange={(e) => setPrintSettings({ ...printSettings, totalQty: e.target.checked })} className="w-4 h-4" />
                       <span className="text-sm">إجمالي الكمية</span>
                     </label>
