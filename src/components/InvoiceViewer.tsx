@@ -104,6 +104,7 @@ export function InvoiceViewer({
         paymentMethod: saved.paymentMethod ?? prev.paymentMethod,
         status: saved.status ?? prev.status,
         items: saved.items ?? prev.items,
+        variables: saved.variables ?? prev.variables,
         subtotal: saved.subtotal ?? prev.subtotal,
         discount: saved.discount ?? prev.discount,
         tax: saved.tax ?? prev.tax,
