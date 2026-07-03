@@ -12,8 +12,7 @@ BEGIN
     quantity = NEW.quantity,
     unit_price = NEW.price,
     line_total = NEW.quantity * NEW.price,
-    description = NEW.menu_item_name,
-    updated_at = NOW()
+    description = NEW.menu_item_name
   FROM public.sales_invoices si
   WHERE si.order_id = NEW.order_id
     AND sales_invoice_lines.invoice_id = si.id
@@ -83,8 +82,7 @@ SET
   quantity = oi.quantity,
   unit_price = oi.price,
   line_total = oi.quantity * oi.price,
-  description = oi.menu_item_name,
-  updated_at = NOW()
+  description = oi.menu_item_name
 FROM public.order_items oi
 JOIN public.sales_invoices si ON si.order_id = oi.order_id
 WHERE sil.invoice_id = si.id
