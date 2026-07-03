@@ -62,6 +62,23 @@ export function ServiceVariablesDialog({ open, onOpenChange, itemName, template,
       if (restaurantId) {
         (async () => {
           try {
+            const local = loadHistory();
+
+            // 1) Central presets table (shared across devices)
+            const { data: presets } = await supabase
+              .from('service_variable_presets')
+              .select('label, value, usage_count')
+              .eq('restaurant_id', restaurantId)
+              .order('usage_count', { ascending: false })
+              .limit(1000);
+            (presets || []).forEach((p: any) => {
+              if (!p?.label || !p?.value) return;
+              const list = local[p.label] || [];
+              if (!list.includes(p.value)) list.push(p.value);
+              local[p.label] = list.slice(0, 50);
+            });
+
+            // 2) Backfill from existing order_items (in case presets table is fresh)
             const { data } = await supabase
               .from('order_items')
               .select('variables, orders!inner(restaurant_id)')
@@ -69,14 +86,13 @@ export function ServiceVariablesDialog({ open, onOpenChange, itemName, template,
               .not('variables', 'is', null)
               .order('created_at', { ascending: false })
               .limit(300);
-            const local = loadHistory();
             (data || []).forEach((row: any) => {
               const vars = Array.isArray(row.variables) ? row.variables : [];
               vars.forEach((v: any) => {
                 if (!v?.label || !v?.value) return;
                 const list = local[v.label] || [];
                 if (!list.includes(v.value)) list.unshift(v.value);
-                local[v.label] = list.slice(0, 25);
+                local[v.label] = list.slice(0, 50);
               });
             });
             saveHistory(local);
