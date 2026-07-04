@@ -24,6 +24,7 @@ const Warehouses = lazy(() => import("./pages/Warehouses"));
 const SubWarehouses = lazy(() => import("./pages/SubWarehouses"));
 const InventoryTransfers = lazy(() => import("./pages/InventoryTransfers"));
 const NotFound = lazy(() => import("./pages/NotFound"));
+const OAuthConsent = lazy(() => import("./pages/OAuthConsent"));
 
 const queryClient = new QueryClient();
 
@@ -84,7 +85,9 @@ const App = () => (
               <Route path="/driver-login" element={<DriverLogin />} />
               <Route path="/driver" element={<DriverDashboard />} />
               <Route path="/track/:token" element={<TrackOrder />} />
+              <Route path="/.lovable/oauth/consent" element={<OAuthConsent />} />
               <Route path="*" element={<NotFound />} />
+
             </Routes>
           </Suspense>
           <GlobalCommandPalette />
