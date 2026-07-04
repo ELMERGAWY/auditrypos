@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { ChefHat } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -7,8 +7,16 @@ import { Label } from '@/components/ui/label';
 import { useAuth } from '@/lib/AuthContext';
 import { toast } from 'sonner';
 
+function safeNext(raw: string | null): string | null {
+  if (!raw) return null;
+  if (!raw.startsWith('/') || raw.startsWith('//')) return null;
+  return raw;
+}
+
 const Login = () => {
   const navigate = useNavigate();
+  const [params] = useSearchParams();
+  const nextPath = safeNext(params.get('next'));
   const { signIn, user } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -16,9 +24,10 @@ const Login = () => {
 
   useEffect(() => {
     if (user) {
-      navigate('/dashboard');
+      navigate(nextPath ?? '/dashboard');
     }
-  }, [user, navigate]);
+  }, [user, navigate, nextPath]);
+
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
