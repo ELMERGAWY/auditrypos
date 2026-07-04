@@ -11362,6 +11362,7 @@ export type Database = {
           total_cost: number
           unit_cost: number
           unit_price: number
+          variables: Json | null
           warehouse_id: string | null
         }
         Insert: {
@@ -11382,6 +11383,7 @@ export type Database = {
           total_cost?: number
           unit_cost?: number
           unit_price?: number
+          variables?: Json | null
           warehouse_id?: string | null
         }
         Update: {
@@ -11402,6 +11404,7 @@ export type Database = {
           total_cost?: number
           unit_cost?: number
           unit_price?: number
+          variables?: Json | null
           warehouse_id?: string | null
         }
         Relationships: [
@@ -17939,6 +17942,7 @@ export type Database = {
           p_menu_item_name: string
           p_price: number
           p_quantity: number
+          p_variables?: Json
         }
         Returns: undefined
       }
@@ -17963,6 +17967,7 @@ export type Database = {
           p_item_name: string
           p_quantity: number
           p_unit_price: number
+          p_variables?: Json
         }
         Returns: undefined
       }
