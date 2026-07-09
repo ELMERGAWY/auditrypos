@@ -37,6 +37,7 @@ export function MarketingHub(props: any) {
       case 'quotes': return <MarketingQuotes {...props} />;
       case 'contracts': return <MarketingContracts {...props} />;
       case 'projects': return <MarketingProjects {...props} />;
+      case 'media_plans': return <MediaPlans {...props} />;
       case 'workflow': return <MarketingWorkflow {...props} />;
       case 'deliverables': return <ServiceDeliverables {...props} />;
       case 'accounting': return <MarketingAccounting {...props} />;
