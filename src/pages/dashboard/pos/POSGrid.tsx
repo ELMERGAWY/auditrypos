@@ -115,6 +115,23 @@ export const POSGrid = memo(function POSGrid({
         </div>
       </div>
 
+      {warehouses.length > 1 && (
+        <div className="flex gap-2 mb-3 overflow-x-auto pb-1 scrollbar-hide items-center">
+          <span className="text-[11px] text-muted-foreground shrink-0 flex items-center gap-1"><Package className="w-3 h-3" /> المخزن النشط:</span>
+          <button
+            onClick={() => setActiveWarehouse('all')}
+            className={`px-3 py-1.5 rounded-lg text-xs whitespace-nowrap transition-all ${activeWarehouse === 'all' ? 'gradient-bg text-primary-foreground shadow' : 'bg-secondary text-secondary-foreground hover:bg-secondary/80'}`}
+          >كل المخازن</button>
+          {warehouses.map(w => (
+            <button
+              key={w}
+              onClick={() => setActiveWarehouse(w)}
+              className={`px-3 py-1.5 rounded-lg text-xs whitespace-nowrap transition-all ${activeWarehouse === w ? 'gradient-bg text-primary-foreground shadow' : 'bg-secondary text-secondary-foreground hover:bg-secondary/80'}`}
+            >{w}</button>
+          ))}
+        </div>
+      )}
+
       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
         {servicePackages.length > 0 && servicePackages.map(pkg => (
           <button 
