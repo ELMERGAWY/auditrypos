@@ -77,7 +77,8 @@ export function MediaPlans({ restaurant }: any) {
 
   const save = async () => {
     if (!form.client_name || !form.plan_name) { toast.error('اكتب اسم العميل واسم الخطة'); return; }
-    const payload = {
+    const actor = await getActorNameAsync();
+    const payload: any = {
       restaurant_id: restaurant.id,
       client_name: form.client_name,
       plan_name: form.plan_name,
