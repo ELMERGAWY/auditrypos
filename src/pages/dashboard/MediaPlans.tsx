@@ -94,6 +94,7 @@ export function MediaPlans({ restaurant }: any) {
       status: form.status,
       notes: form.notes,
     };
+    if (form.id) payload.updated_by_name = actor; else payload.created_by_name = actor;
     const { error } = form.id
       ? await supabase.from('media_plans').update(payload).eq('id', form.id)
       : await supabase.from('media_plans').insert(payload);
