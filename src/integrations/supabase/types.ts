@@ -3468,6 +3468,7 @@ export type Database = {
           bank_account_id: string | null
           category: string | null
           created_at: string | null
+          created_by_name: string | null
           description: string | null
           expense_account_id: string
           id: string
@@ -3476,6 +3477,7 @@ export type Database = {
           restaurant_id: string
           tax_amount: number | null
           total_amount: number
+          updated_by_name: string | null
           voucher_date: string
           voucher_number: string
         }
@@ -3484,6 +3486,7 @@ export type Database = {
           bank_account_id?: string | null
           category?: string | null
           created_at?: string | null
+          created_by_name?: string | null
           description?: string | null
           expense_account_id: string
           id?: string
@@ -3492,6 +3495,7 @@ export type Database = {
           restaurant_id: string
           tax_amount?: number | null
           total_amount?: number
+          updated_by_name?: string | null
           voucher_date?: string
           voucher_number: string
         }
@@ -3500,6 +3504,7 @@ export type Database = {
           bank_account_id?: string | null
           category?: string | null
           created_at?: string | null
+          created_by_name?: string | null
           description?: string | null
           expense_account_id?: string
           id?: string
@@ -3508,6 +3513,7 @@ export type Database = {
           restaurant_id?: string
           tax_amount?: number | null
           total_amount?: number
+          updated_by_name?: string | null
           voucher_date?: string
           voucher_number?: string
         }
@@ -5257,6 +5263,7 @@ export type Database = {
         Row: {
           created_at: string | null
           created_by: string | null
+          created_by_name: string | null
           discount_amount: number | null
           id: string
           journal_entry_id: string | null
@@ -5271,11 +5278,13 @@ export type Database = {
           tax_amount: number | null
           total_amount: number
           updated_at: string | null
+          updated_by_name: string | null
           warehouse_id: string | null
         }
         Insert: {
           created_at?: string | null
           created_by?: string | null
+          created_by_name?: string | null
           discount_amount?: number | null
           id?: string
           journal_entry_id?: string | null
@@ -5290,11 +5299,13 @@ export type Database = {
           tax_amount?: number | null
           total_amount?: number
           updated_at?: string | null
+          updated_by_name?: string | null
           warehouse_id?: string | null
         }
         Update: {
           created_at?: string | null
           created_by?: string | null
+          created_by_name?: string | null
           discount_amount?: number | null
           id?: string
           journal_entry_id?: string | null
@@ -5309,6 +5320,7 @@ export type Database = {
           tax_amount?: number | null
           total_amount?: number
           updated_at?: string | null
+          updated_by_name?: string | null
           warehouse_id?: string | null
         }
         Relationships: [
@@ -5845,6 +5857,7 @@ export type Database = {
           company_id: string | null
           created_at: string | null
           created_by: string | null
+          created_by_name: string | null
           description: string
           entry_date: string
           entry_number: string
@@ -5867,6 +5880,7 @@ export type Database = {
           submitted_by: string | null
           total_credit: number
           total_debit: number
+          updated_by_name: string | null
           workflow_status: string
           workspace_id: string | null
         }
@@ -5876,6 +5890,7 @@ export type Database = {
           company_id?: string | null
           created_at?: string | null
           created_by?: string | null
+          created_by_name?: string | null
           description: string
           entry_date?: string
           entry_number: string
@@ -5898,6 +5913,7 @@ export type Database = {
           submitted_by?: string | null
           total_credit?: number
           total_debit?: number
+          updated_by_name?: string | null
           workflow_status?: string
           workspace_id?: string | null
         }
@@ -5907,6 +5923,7 @@ export type Database = {
           company_id?: string | null
           created_at?: string | null
           created_by?: string | null
+          created_by_name?: string | null
           description?: string
           entry_date?: string
           entry_number?: string
@@ -5929,6 +5946,7 @@ export type Database = {
           submitted_by?: string | null
           total_credit?: number
           total_debit?: number
+          updated_by_name?: string | null
           workflow_status?: string
           workspace_id?: string | null
         }
@@ -7992,6 +8010,114 @@ export type Database = {
           },
         ]
       }
+      media_plans: {
+        Row: {
+          actual_spend: number
+          campaign_type: string
+          channels: Json
+          client_name: string
+          created_at: string
+          created_by: string | null
+          created_by_name: string | null
+          customer_id: string | null
+          end_date: string | null
+          id: string
+          kpis: Json
+          notes: string | null
+          plan_name: string
+          restaurant_id: string
+          results: Json
+          revenue_generated: number
+          start_date: string | null
+          status: string
+          total_budget: number
+          updated_at: string
+          updated_by_name: string | null
+        }
+        Insert: {
+          actual_spend?: number
+          campaign_type?: string
+          channels?: Json
+          client_name: string
+          created_at?: string
+          created_by?: string | null
+          created_by_name?: string | null
+          customer_id?: string | null
+          end_date?: string | null
+          id?: string
+          kpis?: Json
+          notes?: string | null
+          plan_name: string
+          restaurant_id: string
+          results?: Json
+          revenue_generated?: number
+          start_date?: string | null
+          status?: string
+          total_budget?: number
+          updated_at?: string
+          updated_by_name?: string | null
+        }
+        Update: {
+          actual_spend?: number
+          campaign_type?: string
+          channels?: Json
+          client_name?: string
+          created_at?: string
+          created_by?: string | null
+          created_by_name?: string | null
+          customer_id?: string | null
+          end_date?: string | null
+          id?: string
+          kpis?: Json
+          notes?: string | null
+          plan_name?: string
+          restaurant_id?: string
+          results?: Json
+          revenue_generated?: number
+          start_date?: string | null
+          status?: string
+          total_budget?: number
+          updated_at?: string
+          updated_by_name?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "media_plans_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "media_plans_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "v_ar_aging_detail"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "media_plans_restaurant_id_fkey"
+            columns: ["restaurant_id"]
+            isOneToOne: false
+            referencedRelation: "public_restaurant_info"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "media_plans_restaurant_id_fkey"
+            columns: ["restaurant_id"]
+            isOneToOne: false
+            referencedRelation: "restaurants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "media_plans_restaurant_id_fkey"
+            columns: ["restaurant_id"]
+            isOneToOne: false
+            referencedRelation: "restaurants_public"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       menu_item_components: {
         Row: {
           created_at: string
@@ -8685,6 +8811,7 @@ export type Database = {
           client_order_id: string | null
           company_id: string | null
           created_at: string
+          created_by_name: string | null
           customer_id: string | null
           customer_name: string
           customer_phone: string
@@ -8713,12 +8840,14 @@ export type Database = {
           total: number
           total_cost: number | null
           tracking_token: string | null
+          updated_by_name: string | null
           workspace_id: string | null
         }
         Insert: {
           client_order_id?: string | null
           company_id?: string | null
           created_at?: string
+          created_by_name?: string | null
           customer_id?: string | null
           customer_name?: string
           customer_phone?: string
@@ -8747,12 +8876,14 @@ export type Database = {
           total?: number
           total_cost?: number | null
           tracking_token?: string | null
+          updated_by_name?: string | null
           workspace_id?: string | null
         }
         Update: {
           client_order_id?: string | null
           company_id?: string | null
           created_at?: string
+          created_by_name?: string | null
           customer_id?: string | null
           customer_name?: string
           customer_phone?: string
@@ -8781,6 +8912,7 @@ export type Database = {
           total?: number
           total_cost?: number | null
           tracking_token?: string | null
+          updated_by_name?: string | null
           workspace_id?: string | null
         }
         Relationships: [
@@ -9049,6 +9181,7 @@ export type Database = {
           contractor_id: string | null
           counter_account_id: string | null
           created_at: string | null
+          created_by_name: string | null
           id: string
           journal_entry_id: string | null
           notes: string | null
@@ -9057,6 +9190,7 @@ export type Database = {
           restaurant_id: string
           supplier_id: string
           updated_at: string | null
+          updated_by_name: string | null
           voucher_date: string
           voucher_number: string
         }
@@ -9066,6 +9200,7 @@ export type Database = {
           contractor_id?: string | null
           counter_account_id?: string | null
           created_at?: string | null
+          created_by_name?: string | null
           id?: string
           journal_entry_id?: string | null
           notes?: string | null
@@ -9074,6 +9209,7 @@ export type Database = {
           restaurant_id: string
           supplier_id: string
           updated_at?: string | null
+          updated_by_name?: string | null
           voucher_date?: string
           voucher_number: string
         }
@@ -9083,6 +9219,7 @@ export type Database = {
           contractor_id?: string | null
           counter_account_id?: string | null
           created_at?: string | null
+          created_by_name?: string | null
           id?: string
           journal_entry_id?: string | null
           notes?: string | null
@@ -9091,6 +9228,7 @@ export type Database = {
           restaurant_id?: string
           supplier_id?: string
           updated_at?: string | null
+          updated_by_name?: string | null
           voucher_date?: string
           voucher_number?: string
         }
@@ -9853,6 +9991,7 @@ export type Database = {
       purchase_invoices: {
         Row: {
           created_at: string | null
+          created_by_name: string | null
           goods_received_at: string | null
           id: string
           inventory_receipt_id: string | null
@@ -9872,10 +10011,12 @@ export type Database = {
           tax_amount: number
           total_amount: number
           updated_at: string
+          updated_by_name: string | null
           warehouse_id: string | null
         }
         Insert: {
           created_at?: string | null
+          created_by_name?: string | null
           goods_received_at?: string | null
           id?: string
           inventory_receipt_id?: string | null
@@ -9895,10 +10036,12 @@ export type Database = {
           tax_amount?: number
           total_amount?: number
           updated_at?: string
+          updated_by_name?: string | null
           warehouse_id?: string | null
         }
         Update: {
           created_at?: string | null
+          created_by_name?: string | null
           goods_received_at?: string | null
           id?: string
           inventory_receipt_id?: string | null
@@ -9918,6 +10061,7 @@ export type Database = {
           tax_amount?: number
           total_amount?: number
           updated_at?: string
+          updated_by_name?: string | null
           warehouse_id?: string | null
         }
         Relationships: [
@@ -10354,6 +10498,7 @@ export type Database = {
           amount: number
           counter_account_id: string | null
           created_at: string | null
+          created_by_name: string | null
           customer_id: string
           id: string
           journal_entry_id: string | null
@@ -10361,6 +10506,7 @@ export type Database = {
           payment_method: string
           restaurant_id: string
           updated_at: string | null
+          updated_by_name: string | null
           voucher_date: string
           voucher_number: string
         }
@@ -10369,6 +10515,7 @@ export type Database = {
           amount: number
           counter_account_id?: string | null
           created_at?: string | null
+          created_by_name?: string | null
           customer_id: string
           id?: string
           journal_entry_id?: string | null
@@ -10376,6 +10523,7 @@ export type Database = {
           payment_method?: string
           restaurant_id: string
           updated_at?: string | null
+          updated_by_name?: string | null
           voucher_date?: string
           voucher_number: string
         }
@@ -10384,6 +10532,7 @@ export type Database = {
           amount?: number
           counter_account_id?: string | null
           created_at?: string | null
+          created_by_name?: string | null
           customer_id?: string
           id?: string
           journal_entry_id?: string | null
@@ -10391,6 +10540,7 @@ export type Database = {
           payment_method?: string
           restaurant_id?: string
           updated_at?: string | null
+          updated_by_name?: string | null
           voucher_date?: string
           voucher_number?: string
         }
@@ -11423,6 +11573,7 @@ export type Database = {
           company_id: string
           created_at: string
           created_by: string | null
+          created_by_name: string | null
           customer_id: string | null
           discount_amount: number
           id: string
@@ -11443,12 +11594,14 @@ export type Database = {
           tax_amount: number
           total_amount: number
           updated_at: string
+          updated_by_name: string | null
         }
         Insert: {
           block_id?: string | null
           company_id: string
           created_at?: string
           created_by?: string | null
+          created_by_name?: string | null
           customer_id?: string | null
           discount_amount?: number
           id?: string
@@ -11469,12 +11622,14 @@ export type Database = {
           tax_amount?: number
           total_amount?: number
           updated_at?: string
+          updated_by_name?: string | null
         }
         Update: {
           block_id?: string | null
           company_id?: string
           created_at?: string
           created_by?: string | null
+          created_by_name?: string | null
           customer_id?: string | null
           discount_amount?: number
           id?: string
@@ -11495,6 +11650,7 @@ export type Database = {
           tax_amount?: number
           total_amount?: number
           updated_at?: string
+          updated_by_name?: string | null
         }
         Relationships: [
           {
@@ -17069,6 +17225,7 @@ export type Database = {
           company_id: string | null
           created_at: string | null
           created_by: string | null
+          created_by_name: string | null
           description: string
           entry_date: string
           entry_number: string
@@ -17091,6 +17248,7 @@ export type Database = {
           submitted_by: string | null
           total_credit: number
           total_debit: number
+          updated_by_name: string | null
           workflow_status: string
           workspace_id: string | null
         }
@@ -17676,6 +17834,7 @@ export type Database = {
           company_id: string | null
           created_at: string | null
           created_by: string | null
+          created_by_name: string | null
           description: string
           entry_date: string
           entry_number: string
@@ -17698,6 +17857,7 @@ export type Database = {
           submitted_by: string | null
           total_credit: number
           total_debit: number
+          updated_by_name: string | null
           workflow_status: string
           workspace_id: string | null
         }
@@ -17768,6 +17928,7 @@ export type Database = {
           company_id: string | null
           created_at: string | null
           created_by: string | null
+          created_by_name: string | null
           description: string
           entry_date: string
           entry_number: string
@@ -17790,6 +17951,7 @@ export type Database = {
           submitted_by: string | null
           total_credit: number
           total_debit: number
+          updated_by_name: string | null
           workflow_status: string
           workspace_id: string | null
         }
@@ -17883,6 +18045,7 @@ export type Database = {
           company_id: string | null
           created_at: string | null
           created_by: string | null
+          created_by_name: string | null
           description: string
           entry_date: string
           entry_number: string
@@ -17905,6 +18068,7 @@ export type Database = {
           submitted_by: string | null
           total_credit: number
           total_debit: number
+          updated_by_name: string | null
           workflow_status: string
           workspace_id: string | null
         }
