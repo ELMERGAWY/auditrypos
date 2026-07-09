@@ -36,6 +36,20 @@ export const POSGrid = memo(function POSGrid({
   searchQuery, setSearchQuery, filteredItems, addToCart,
   servicePackages, addPackageToCart
 }: POSGridProps) {
+  // POS active warehouse filter — barcode/search will only match items in this warehouse
+  const warehouses = React.useMemo(() => {
+    const names = new Set<string>();
+    (filteredItems || []).forEach((i: any) => { if (i?.warehouse_name) names.add(i.warehouse_name); });
+    return Array.from(names);
+  }, [filteredItems]);
+  const [activeWarehouse, setActiveWarehouse] = React.useState<string>(() => {
+    try { return localStorage.getItem('pos_active_warehouse') || 'all'; } catch { return 'all'; }
+  });
+  React.useEffect(() => { try { localStorage.setItem('pos_active_warehouse', activeWarehouse); } catch {} }, [activeWarehouse]);
+  const visibleItems = React.useMemo(() => activeWarehouse === 'all'
+    ? filteredItems
+    : (filteredItems || []).filter((i: any) => (i?.warehouse_name || '') === activeWarehouse),
+  [filteredItems, activeWarehouse]);
   return (
     <div className="flex-1 p-4 overflow-auto scrollbar-hide">
       {/* Quick Stats */}
