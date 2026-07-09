@@ -73,6 +73,10 @@ const Login = () => {
           ليس لديك حساب?{' '}
           <button onClick={() => navigate('/register')} className="text-primary hover:underline">سجّل الآن</button>
         </p>
+        <p className="text-center text-xs text-muted-foreground mt-2">
+          موظف؟{' '}
+          <button onClick={() => navigate('/staff-login')} className="text-primary hover:underline">دخول ببريدك وكود تحقق</button>
+        </p>
       </div>
     </div>
   );
