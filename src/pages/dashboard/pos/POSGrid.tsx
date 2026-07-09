@@ -152,7 +152,7 @@ export const POSGrid = memo(function POSGrid({
             </div>
           </button>
         ))}
-        {filteredItems.map(item => (
+        {visibleItems.map(item => (
           <button 
             key={item.id} 
             onClick={() => addToCart(item)} 
