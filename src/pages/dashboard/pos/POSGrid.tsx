@@ -36,6 +36,20 @@ export const POSGrid = memo(function POSGrid({
   searchQuery, setSearchQuery, filteredItems, addToCart,
   servicePackages, addPackageToCart
 }: POSGridProps) {
+  // POS active warehouse filter — barcode/search will only match items in this warehouse
+  const warehouses = React.useMemo(() => {
+    const names = new Set<string>();
+    (filteredItems || []).forEach((i: any) => { if (i?.warehouse_name) names.add(i.warehouse_name); });
+    return Array.from(names);
+  }, [filteredItems]);
+  const [activeWarehouse, setActiveWarehouse] = React.useState<string>(() => {
+    try { return localStorage.getItem('pos_active_warehouse') || 'all'; } catch { return 'all'; }
+  });
+  React.useEffect(() => { try { localStorage.setItem('pos_active_warehouse', activeWarehouse); } catch {} }, [activeWarehouse]);
+  const visibleItems = React.useMemo(() => activeWarehouse === 'all'
+    ? filteredItems
+    : (filteredItems || []).filter((i: any) => (i?.warehouse_name || '') === activeWarehouse),
+  [filteredItems, activeWarehouse]);
   return (
     <div className="flex-1 p-4 overflow-auto scrollbar-hide">
       {/* Quick Stats */}
@@ -101,6 +115,23 @@ export const POSGrid = memo(function POSGrid({
         </div>
       </div>
 
+      {warehouses.length > 1 && (
+        <div className="flex gap-2 mb-3 overflow-x-auto pb-1 scrollbar-hide items-center">
+          <span className="text-[11px] text-muted-foreground shrink-0 flex items-center gap-1"><Package className="w-3 h-3" /> المخزن النشط:</span>
+          <button
+            onClick={() => setActiveWarehouse('all')}
+            className={`px-3 py-1.5 rounded-lg text-xs whitespace-nowrap transition-all ${activeWarehouse === 'all' ? 'gradient-bg text-primary-foreground shadow' : 'bg-secondary text-secondary-foreground hover:bg-secondary/80'}`}
+          >كل المخازن</button>
+          {warehouses.map(w => (
+            <button
+              key={w}
+              onClick={() => setActiveWarehouse(w)}
+              className={`px-3 py-1.5 rounded-lg text-xs whitespace-nowrap transition-all ${activeWarehouse === w ? 'gradient-bg text-primary-foreground shadow' : 'bg-secondary text-secondary-foreground hover:bg-secondary/80'}`}
+            >{w}</button>
+          ))}
+        </div>
+      )}
+
       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
         {servicePackages.length > 0 && servicePackages.map(pkg => (
           <button 
@@ -121,7 +152,7 @@ export const POSGrid = memo(function POSGrid({
             </div>
           </button>
         ))}
-        {filteredItems.map(item => (
+        {visibleItems.map(item => (
           <button 
             key={item.id} 
             onClick={() => addToCart(item)} 

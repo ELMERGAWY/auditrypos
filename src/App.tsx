@@ -25,6 +25,7 @@ const SubWarehouses = lazy(() => import("./pages/SubWarehouses"));
 const InventoryTransfers = lazy(() => import("./pages/InventoryTransfers"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 const OAuthConsent = lazy(() => import("./pages/OAuthConsent"));
+const StaffLogin = lazy(() => import("./pages/StaffLogin"));
 
 const queryClient = new QueryClient();
 
@@ -73,6 +74,7 @@ const App = () => (
             <Routes>
               <Route path="/" element={<Index />} />
               <Route path="/login" element={<Login />} />
+              <Route path="/staff-login" element={<StaffLogin />} />
               <Route path="/register" element={<Register />} />
               <Route path="/dashboard" element={<Dashboard />} />
               <Route path="/warehouses" element={<Warehouses />} />

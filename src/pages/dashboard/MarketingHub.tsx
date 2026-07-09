@@ -13,14 +13,16 @@ const MarketingWorkflow = lazy(() => import('./MarketingWorkflow').then(m => ({ 
 const MarketingAccounting = lazy(() => import('./MarketingAccounting'));
 const MarketingProjects = lazy(() => import('./MarketingProjects').then(m => ({ default: m.MarketingProjects })));
 const ServiceDeliverables = lazy(() => import('./ServiceDeliverables').then(m => ({ default: m.ServiceDeliverables })));
+const MediaPlans = lazy(() => import('./MediaPlans').then(m => ({ default: m.MediaPlans })));
 
-type SubTab = 'services' | 'quotes' | 'contracts' | 'projects' | 'workflow' | 'deliverables' | 'accounting';
+type SubTab = 'services' | 'quotes' | 'contracts' | 'projects' | 'media_plans' | 'workflow' | 'deliverables' | 'accounting';
 
 const TABS: { id: SubTab; label: string; icon: any; color: string }[] = [
   { id: 'services', label: 'الخدمات والأسعار', icon: Layers, color: 'text-blue-500' },
   { id: 'quotes', label: 'عروض الأسعار', icon: FileText, color: 'text-cyan-500' },
   { id: 'contracts', label: 'العقود', icon: FileCheck, color: 'text-emerald-500' },
   { id: 'projects', label: 'المشاريع', icon: Briefcase, color: 'text-indigo-500' },
+  { id: 'media_plans', label: 'خطط الإعلام', icon: Megaphone, color: 'text-pink-500' },
   { id: 'workflow', label: 'سير العمل', icon: Workflow, color: 'text-purple-500' },
   { id: 'deliverables', label: 'المخرجات', icon: Package, color: 'text-orange-500' },
   { id: 'accounting', label: 'المحاسبة والربحية', icon: DollarSign, color: 'text-green-600' },
@@ -35,6 +37,7 @@ export function MarketingHub(props: any) {
       case 'quotes': return <MarketingQuotes {...props} />;
       case 'contracts': return <MarketingContracts {...props} />;
       case 'projects': return <MarketingProjects {...props} />;
+      case 'media_plans': return <MediaPlans {...props} />;
       case 'workflow': return <MarketingWorkflow {...props} />;
       case 'deliverables': return <ServiceDeliverables {...props} />;
       case 'accounting': return <MarketingAccounting {...props} />;
