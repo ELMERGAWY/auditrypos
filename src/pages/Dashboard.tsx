@@ -1055,16 +1055,30 @@ export default function Dashboard() {
                 </div>
 
                 {/* Editable Order Items */}
-                {editOrderItems.length > 0 && (
-                  <div>
-                    <Label className="text-base font-bold mb-2 block">بنود الطلب</Label>
+                <div>
+                  <div className="flex items-center justify-between mb-2">
+                    <Label className="text-base font-bold block">بنود الطلب</Label>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      onClick={() => setEditOrderItems(prev => [...prev, { menu_item_name: '', quantity: 1, price: 0, sold_unit: 'قطعة', unit_factor: 1 }])}
+                    >
+                      + إضافة صنف
+                    </Button>
+                  </div>
+                  {editOrderItems.length === 0 ? (
+                    <div className="text-sm text-muted-foreground p-4 text-center border border-dashed border-border rounded-xl">لا توجد بنود — أضف صنفاً</div>
+                  ) : (
                     <div className="rounded-xl overflow-hidden border border-border">
                       <table className="w-full text-sm">
                         <thead className="bg-secondary">
                           <tr>
                             <th className="p-2 text-right">الصنف</th>
                             <th className="p-2 text-center w-20">الكمية</th>
+                            <th className="p-2 text-center w-20">الوحدة</th>
                             <th className="p-2 text-center w-24">السعر</th>
+                            <th className="p-2 w-10"></th>
                           </tr>
                         </thead>
                         <tbody>
@@ -1080,16 +1094,33 @@ export default function Dashboard() {
                                     setEditOrderItems(updated);
                                   }}
                                 />
+                                {(item.variables && Array.isArray(item.variables) && item.variables.length > 0) && (
+                                  <div className="text-[10px] text-muted-foreground mt-1 truncate">
+                                    {item.variables.map((v: any) => `${v.label}: ${v.value}`).join(' • ')}
+                                  </div>
+                                )}
                               </td>
                               <td className="p-2">
                                 <Input
                                   className="h-8 text-sm text-center"
                                   type="number"
-                                  min="1"
-                                  value={item.quantity || 1}
+                                  min="0"
+                                  step="0.01"
+                                  value={item.quantity ?? 1}
                                   onChange={e => {
                                     const updated = [...editOrderItems];
-                                    updated[idx] = { ...updated[idx], quantity: Number(e.target.value) };
+                                    updated[idx] = { ...updated[idx], quantity: parseFloat(e.target.value) || 0 };
+                                    setEditOrderItems(updated);
+                                  }}
+                                />
+                              </td>
+                              <td className="p-2">
+                                <Input
+                                  className="h-8 text-sm text-center"
+                                  value={item.sold_unit || 'قطعة'}
+                                  onChange={e => {
+                                    const updated = [...editOrderItems];
+                                    updated[idx] = { ...updated[idx], sold_unit: e.target.value };
                                     setEditOrderItems(updated);
                                   }}
                                 />
@@ -1100,7 +1131,7 @@ export default function Dashboard() {
                                   type="number"
                                   min="0"
                                   step="0.01"
-                                  value={item.price || 0}
+                                  value={item.price ?? 0}
                                   onChange={e => {
                                     const updated = [...editOrderItems];
                                     updated[idx] = { ...updated[idx], price: parseFloat(e.target.value) || 0 };
@@ -1108,13 +1139,24 @@ export default function Dashboard() {
                                   }}
                                 />
                               </td>
+                              <td className="p-2 text-center">
+                                <button
+                                  type="button"
+                                  onClick={() => setEditOrderItems(prev => prev.filter((_, i) => i !== idx))}
+                                  className="text-destructive hover:bg-destructive/10 rounded p-1"
+                                  title="حذف"
+                                >
+                                  <X className="w-4 h-4" />
+                                </button>
+                              </td>
                             </tr>
                           ))}
                         </tbody>
                       </table>
                     </div>
-                  </div>
-                )}
+                  )}
+                </div>
+
 
                 <div className="flex gap-2">
                   <Button className="flex-1 h-12 gradient-bg border-0 text-white font-bold text-lg mt-4" onClick={handleUpdateOrder}>
