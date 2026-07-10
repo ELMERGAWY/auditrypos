@@ -313,6 +313,7 @@ export default function Dashboard() {
         serviceNotes ? `ملاحظات: ${serviceNotes}` : ''
       ].filter(Boolean).join(' | ');
       return [...prev, {
+        lineId: crypto.randomUUID(),
         item: selectedServiceItem,
         qty: 1,
         qtyText: '1',
@@ -323,6 +324,7 @@ export default function Dashboard() {
         service_color: serviceColor,
         service_type: serviceType
       }];
+
     });
     setShowServiceModal(false);
     setSelectedServiceItem(null);
