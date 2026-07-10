@@ -2,7 +2,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Mail, Shield, ArrowRight, KeyRound } from 'lucide-react';
+import { Mail, Shield, ArrowRight, KeyRound, User, Building2 } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -10,43 +10,71 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 
 /**
- * Staff email OTP login (free — no SMS provider required).
- * Uses Supabase magic OTP: sends 6-digit code to email, verifies it in-app.
- * SMS/phone OTP requires configuring an SMS provider (Twilio) at the project level.
+ * Staff auth: email + password.
+ * - Register: creates an account marked pending; admin must approve & assign to a company.
+ * - Login: email + password; if not approved, shows a friendly wait screen.
+ * Staff name is recorded locally so it appears next to every action they perform.
  */
 export default function StaffLogin() {
   const navigate = useNavigate();
-  const [step, setStep] = useState<'email' | 'code'>('email');
+  const [mode, setMode] = useState<'login' | 'register'>('login');
   const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [staffName, setStaffName] = useState('');
-  const [code, setCode] = useState('');
+  const [companyCode, setCompanyCode] = useState('');
   const [loading, setLoading] = useState(false);
 
-  const sendCode = async () => {
-    if (!email.trim() || !staffName.trim()) { toast.error('اكتب اسمك وبريدك'); return; }
+  const persistActor = (name: string, mail: string) => {
+    try {
+      localStorage.setItem('active_staff_name', name.trim());
+      localStorage.setItem('active_staff_email', mail.trim());
+    } catch {}
+  };
+
+  const register = async () => {
+    if (!email.trim() || !password.trim() || !staffName.trim()) {
+      toast.error('اكتب الاسم والبريد وكلمة المرور');
+      return;
+    }
+    if (password.length < 6) { toast.error('كلمة المرور 6 أحرف على الأقل'); return; }
     setLoading(true);
-    const { error } = await supabase.auth.signInWithOtp({
+    const { error } = await supabase.auth.signUp({
       email: email.trim(),
-      options: { shouldCreateUser: true, data: { full_name: staffName.trim() } },
+      password: password.trim(),
+      options: {
+        emailRedirectTo: window.location.origin,
+        data: {
+          full_name: staffName.trim(),
+          role: 'staff',
+          company_code: companyCode.trim() || null,
+          pending_approval: true,
+        },
+      },
     });
     setLoading(false);
     if (error) { toast.error(error.message); return; }
-    toast.success('تم إرسال كود التحقق إلى بريدك');
-    setStep('code');
+    toast.success('تم إنشاء الحساب. بانتظار موافقة الأدمن.');
+    setMode('login');
   };
 
-  const verify = async () => {
-    if (!code.trim()) { toast.error('اكتب كود التحقق'); return; }
+  const login = async () => {
+    if (!email.trim() || !password.trim()) { toast.error('اكتب البريد وكلمة المرور'); return; }
     setLoading(true);
-    const { data, error } = await supabase.auth.verifyOtp({ email: email.trim(), token: code.trim(), type: 'email' });
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email: email.trim(),
+      password: password.trim(),
+    });
     setLoading(false);
     if (error) { toast.error(error.message); return; }
-    // Record actor for audit trail
-    try {
-      localStorage.setItem('active_staff_name', staffName.trim());
-      localStorage.setItem('active_staff_email', email.trim());
-    } catch {}
-    toast.success(`أهلاً ${staffName}`);
+    const meta: any = data.user?.user_metadata || {};
+    const displayName = meta.full_name || staffName.trim() || email.trim();
+    persistActor(displayName, email.trim());
+    const approved = meta.pending_approval === false || meta.approved_company_id;
+    if (!approved) {
+      toast.info('حسابك لم يُفعّل بعد — بانتظار موافقة الأدمن.');
+      return;
+    }
+    toast.success(`أهلاً ${displayName}`);
     navigate('/dashboard');
   };
 
@@ -58,40 +86,63 @@ export default function StaffLogin() {
             <div className="w-16 h-16 rounded-2xl gradient-bg mx-auto flex items-center justify-center shadow-lg">
               <Shield className="w-8 h-8 text-white" />
             </div>
-            <h1 className="text-2xl font-black">تسجيل دخول الموظف</h1>
-            <p className="text-xs text-muted-foreground">تحقق بكود يُرسل إلى بريدك الإلكتروني</p>
+            <h1 className="text-2xl font-black">
+              {mode === 'login' ? 'دخول الموظف' : 'تسجيل حساب موظف'}
+            </h1>
+            <p className="text-xs text-muted-foreground">
+              {mode === 'login'
+                ? 'ادخل ببريدك وكلمة المرور — يجب أن يوافق الأدمن على حسابك أولاً'
+                : 'أنشئ حساباً، وسيقوم الأدمن بتفعيله وربطه بالشركة'}
+            </p>
           </div>
 
-          {step === 'email' ? (
-            <div className="space-y-3">
+          <div className="space-y-3">
+            {mode === 'register' && (
               <div>
-                <label className="text-xs font-bold flex items-center gap-1 mb-1"><Shield className="w-3 h-3" /> اسمك الكامل</label>
+                <label className="text-xs font-bold flex items-center gap-1 mb-1"><User className="w-3 h-3" /> الاسم الكامل</label>
                 <Input placeholder="مثلاً: محمد أحمد" value={staffName} onChange={e => setStaffName(e.target.value)} />
               </div>
-              <div>
-                <label className="text-xs font-bold flex items-center gap-1 mb-1"><Mail className="w-3 h-3" /> البريد الإلكتروني</label>
-                <Input type="email" dir="ltr" placeholder="you@example.com" value={email} onChange={e => setEmail(e.target.value)} />
-              </div>
-              <Button className="w-full gap-2" onClick={sendCode} disabled={loading}>
-                {loading ? 'جاري الإرسال...' : <>إرسال كود التحقق <ArrowRight className="w-4 h-4" /></>}
-              </Button>
-              <p className="text-[10px] text-muted-foreground text-center">
-                اسمك سيظهر بجانب كل عملية تنشئها أو تعدّلها (فواتير، سندات، طلبات).
-              </p>
+            )}
+            <div>
+              <label className="text-xs font-bold flex items-center gap-1 mb-1"><Mail className="w-3 h-3" /> البريد الإلكتروني</label>
+              <Input type="email" dir="ltr" placeholder="you@example.com" value={email} onChange={e => setEmail(e.target.value)} />
             </div>
-          ) : (
-            <div className="space-y-3">
-              <div className="text-xs text-center text-muted-foreground">تم إرسال كود إلى <span className="font-bold text-foreground" dir="ltr">{email}</span></div>
-              <div>
-                <label className="text-xs font-bold flex items-center gap-1 mb-1"><KeyRound className="w-3 h-3" /> كود التحقق (6 أرقام)</label>
-                <Input dir="ltr" placeholder="000000" maxLength={6} className="text-center text-2xl tracking-widest font-mono" value={code} onChange={e => setCode(e.target.value.replace(/\D/g, ''))} />
-              </div>
-              <Button className="w-full gap-2" onClick={verify} disabled={loading || code.length < 6}>
-                {loading ? 'جاري التحقق...' : 'دخول'}
-              </Button>
-              <Button variant="ghost" className="w-full text-xs" onClick={() => setStep('email')}>تغيير البريد</Button>
+            <div>
+              <label className="text-xs font-bold flex items-center gap-1 mb-1"><KeyRound className="w-3 h-3" /> كلمة المرور</label>
+              <Input type="password" dir="ltr" placeholder="••••••" value={password} onChange={e => setPassword(e.target.value)} />
             </div>
-          )}
+            {mode === 'register' && (
+              <div>
+                <label className="text-xs font-bold flex items-center gap-1 mb-1"><Building2 className="w-3 h-3" /> كود/اسم الشركة (اختياري)</label>
+                <Input placeholder="اسم أو كود الشركة التي ستنضم إليها" value={companyCode} onChange={e => setCompanyCode(e.target.value)} />
+                <p className="text-[10px] text-muted-foreground mt-1">سيستخدمه الأدمن لربطك بالشركة الصحيحة.</p>
+              </div>
+            )}
+
+            <Button
+              className="w-full gap-2"
+              onClick={mode === 'login' ? login : register}
+              disabled={loading}
+            >
+              {loading
+                ? 'جاري المعالجة...'
+                : mode === 'login'
+                  ? <>دخول <ArrowRight className="w-4 h-4" /></>
+                  : <>إنشاء الحساب <ArrowRight className="w-4 h-4" /></>}
+            </Button>
+
+            <Button
+              variant="ghost"
+              className="w-full text-xs"
+              onClick={() => setMode(mode === 'login' ? 'register' : 'login')}
+            >
+              {mode === 'login' ? 'ليس لديك حساب؟ سجّل الآن' : 'لديك حساب بالفعل؟ تسجيل الدخول'}
+            </Button>
+
+            <p className="text-[10px] text-muted-foreground text-center">
+              اسمك سيظهر بجانب كل عملية تنشئها أو تعدّلها (فواتير، سندات، طلبات).
+            </p>
+          </div>
         </Card>
       </motion.div>
     </div>
