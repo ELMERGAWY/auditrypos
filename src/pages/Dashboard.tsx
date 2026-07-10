@@ -333,26 +333,23 @@ export default function Dashboard() {
   const addPackageToCart = useCallback((pkg: any) => {
     setCart(prev => {
       let newCart = [...prev];
-      // Add each item in the package
+      // Always add each package item as a new line (no merging)
       for (const pkgItem of pkg.items) {
         const menuItem = menuItems.find(i => i.id === pkgItem.id);
         if (menuItem) {
-          const existing = newCart.find(c => c.item.id === menuItem.id);
-          if (existing) {
-            newCart = newCart.map(c => c.item.id === menuItem.id ? { ...c, qty: c.qty + pkgItem.quantity, qtyText: String(c.qty + pkgItem.quantity) } : c);
-          } else {
-            const defaultUnit = getUnitOptions(menuItem)[0] || { label: 'قطعة', factor: 1 };
-            newCart.push({ 
-              item: menuItem, 
-              qty: pkgItem.quantity, 
-              qtyText: String(pkgItem.quantity), 
-              unitMode: defaultUnit.label,
-              unitFactor: defaultUnit.factor,
-              price: (Number(menuItem.price) || 0) * defaultUnit.factor
-            });
-          }
+          const defaultUnit = getUnitOptions(menuItem)[0] || { label: 'قطعة', factor: 1 };
+          newCart.push({
+            lineId: crypto.randomUUID(),
+            item: menuItem,
+            qty: pkgItem.quantity,
+            qtyText: String(pkgItem.quantity),
+            unitMode: defaultUnit.label,
+            unitFactor: defaultUnit.factor,
+            price: (Number(menuItem.price) || 0) * defaultUnit.factor
+          });
         }
       }
+
       // Now adjust the total price to match the package price
       // Calculate the current total of the package items
       const packageItemsTotal = pkg.items.reduce((sum: number, pkgItem: any) => {
