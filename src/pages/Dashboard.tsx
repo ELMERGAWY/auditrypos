@@ -287,10 +287,9 @@ export default function Dashboard() {
       return;
     }
     setCart(prev => {
-      const existing = prev.find(c => c.item.id === item.id);
-      if (existing) return prev.map(c => c.item.id === item.id ? { ...c, qty: c.qty + 1, qtyText: String(c.qty + 1) } : c);
       const defaultUnit = getUnitOptions(item)[0] || { label: 'قطعة', factor: 1 };
       return [...prev, {
+        lineId: crypto.randomUUID(),
         item,
         qty: 1,
         qtyText: '1',
@@ -299,6 +298,7 @@ export default function Dashboard() {
         price: (Number(item.price) || 0) * defaultUnit.factor
       }];
     });
+
   }, [getUnitOptions]);
 
   // Function to add service item with customization
