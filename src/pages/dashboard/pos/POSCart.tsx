@@ -218,10 +218,10 @@ export const POSCart = memo(function POSCart({
     const unitOptions = getUnitOptions(c.item);
 
     return (
-            <motion.div key={c.item.id} initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }}
+            <motion.div key={c.lineId} initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }}
               className="flex items-center gap-2 bg-secondary/50 rounded-lg p-3 relative group">
               <button
-                onClick={() => removeFromCart(c.item.id)}
+                onClick={() => removeFromCart(c.lineId)}
                 className="absolute -top-2 -left-2 w-5 h-5 rounded-full bg-destructive text-white items-center justify-center hidden group-hover:flex shadow-lg z-10"
               >
                 <X className="w-3 h-3" />
@@ -230,16 +230,16 @@ export const POSCart = memo(function POSCart({
 
               {/* Item name + price editor */}
               <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-1 cursor-pointer" onClick={() => setEditingPriceId(editingPriceId === c.item.id ? null : c.item.id)}>
+                <div className="flex items-center gap-1 cursor-pointer" onClick={() => setEditingPriceId(editingPriceId === c.lineId ? null : c.lineId)}>
                   <p className="text-sm font-medium truncate">{c.item.name}</p>
-                  <div className={`p-0.5 rounded transition-colors ${editingPriceId === c.item.id ? 'bg-primary text-white' : 'text-muted-foreground hover:bg-secondary'}`}>
+                  <div className={`p-0.5 rounded transition-colors ${editingPriceId === c.lineId ? 'bg-primary text-white' : 'text-muted-foreground hover:bg-secondary'}`}>
                     <DollarSign className="w-3 h-3" />
                   </div>
                 </div>
 
                 {/* Unit price — always visible */}
                 <div className="flex items-center gap-1 mt-0.5">
-                  {editingPriceId === c.item.id ? (
+                  {editingPriceId === c.lineId ? (
                     <>
                       <span className="text-[10px] text-muted-foreground">سعر الوحدة:</span>
                       <input
@@ -249,13 +249,13 @@ export const POSCart = memo(function POSCart({
                         placeholder="0"
                         onBlur={e => {
                           const val = parseFloat(e.target.value);
-                          if (!isNaN(val)) updatePrice(c.item.id, val);
+                          if (!isNaN(val)) updatePrice(c.lineId, val);
                           setEditingPriceId(null);
                         }}
                         onKeyDown={e => {
                           if (e.key === 'Enter') {
                             const val = parseFloat(e.target.value);
-                            if (!isNaN(val)) updatePrice(c.item.id, val);
+                            if (!isNaN(val)) updatePrice(c.lineId, val);
                             setEditingPriceId(null);
                           }
                           if (e.key === 'Escape') setEditingPriceId(null);
@@ -272,7 +272,7 @@ export const POSCart = memo(function POSCart({
                 </div>
 
                 {/* Modified price badge */}
-                {Math.abs(Number(c.price) - defaultUnitPrice) > 0.001 && Number(c.price) > 0 && editingPriceId !== c.item.id && (
+                {Math.abs(Number(c.price) - defaultUnitPrice) > 0.001 && Number(c.price) > 0 && editingPriceId !== c.lineId && (
                   <p className="text-[9px] text-amber-500 font-bold">✎ سعر معدل</p>
                 )}
                 {/* Service details input (only for service items) */}
@@ -280,7 +280,7 @@ export const POSCart = memo(function POSCart({
                   <input
                     type="text"
                     value={c.service_details || ''}
-                    onChange={(e) => updateServiceDetails(c.item.id, e.target.value)}
+                    onChange={(e) => updateServiceDetails(c.lineId, e.target.value)}
                     placeholder="تفاصيل الخدمة (مثل: اللون، الحجم، الخ)"
                     className="w-full mt-1 h-6 text-[10px] bg-secondary rounded border border-border px-1 focus:ring-1 focus:ring-primary outline-none"
                   />
@@ -312,7 +312,7 @@ export const POSCart = memo(function POSCart({
               <div className="flex flex-col gap-1 items-end shrink-0">
                 <div className="flex items-center gap-1">
                   {/* PRIMARY: editable total value field — click-to-edit */}
-                  {editingValueId === c.item.id ? (
+                  {editingValueId === c.lineId ? (
                     <div className="relative w-24">
                       <input
                         type="number"
@@ -323,13 +323,13 @@ export const POSCart = memo(function POSCart({
                         placeholder="0"
                         onBlur={e => {
                           const val = parseFloat(e.target.value);
-                          if (!isNaN(val)) updateValue(c.item.id, val);
+                          if (!isNaN(val)) updateValue(c.lineId, val);
                           setEditingValueId(null);
                         }}
                         onKeyDown={e => {
                           if (e.key === 'Enter') {
                             const val = parseFloat(e.target.value);
-                            if (!isNaN(val)) updateValue(c.item.id, val);
+                            if (!isNaN(val)) updateValue(c.lineId, val);
                             setEditingValueId(null);
                           }
                           if (e.key === 'Escape') setEditingValueId(null);
@@ -340,7 +340,7 @@ export const POSCart = memo(function POSCart({
                     </div>
                   ) : (
                     <button
-                      onClick={() => setEditingValueId(c.item.id)}
+                      onClick={() => setEditingValueId(c.lineId)}
                       className="w-24 h-8 text-[11px] pr-6 text-center bg-blue-50/50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-md hover:bg-blue-100 dark:hover:bg-blue-900/40 transition-all font-medium flex items-center justify-center relative"
                       title="القيمة الإجمالية — اضغط للتعديل"
                     >
@@ -351,10 +351,10 @@ export const POSCart = memo(function POSCart({
 
                   {/* Qty stepper with click-to-edit */}
                   <div className="flex items-center gap-0.5 bg-secondary rounded-md p-0.5">
-                    <button onClick={() => updateQty(c.item.id, -1)} className="w-7 h-7 flex items-center justify-center hover:bg-destructive/20 rounded transition-colors text-destructive">
+                    <button onClick={() => updateQty(c.lineId, -1)} className="w-7 h-7 flex items-center justify-center hover:bg-destructive/20 rounded transition-colors text-destructive">
                       <Minus className="w-4 h-4" />
                     </button>
-                    {editingQtyId === c.item.id ? (
+                    {editingQtyId === c.lineId ? (
                       <input
                         type="number"
                         autoFocus
@@ -363,12 +363,12 @@ export const POSCart = memo(function POSCart({
                         defaultValue={c.qtyText}
                         placeholder="0"
                         onBlur={e => {
-                          setCartItemQty(c.item.id, e.target.value);
+                          setCartItemQty(c.lineId, e.target.value);
                           setEditingQtyId(null);
                         }}
                         onKeyDown={e => {
                           if (e.key === 'Enter') {
-                            setCartItemQty(c.item.id, e.target.value);
+                            setCartItemQty(c.lineId, e.target.value);
                             setEditingQtyId(null);
                           }
                           if (e.key === 'Escape') setEditingQtyId(null);
@@ -377,13 +377,13 @@ export const POSCart = memo(function POSCart({
                       />
                     ) : (
                       <button
-                        onClick={() => setEditingQtyId(c.item.id)}
+                        onClick={() => setEditingQtyId(c.lineId)}
                         className="w-12 text-center text-sm bg-transparent border-0 rounded font-medium hover:bg-white/50 dark:hover:bg-gray-700/50 transition-all"
                       >
                         {c.qtyText}
                       </button>
                     )}
-                    <button onClick={() => updateQty(c.item.id, 1)} className="w-7 h-7 flex items-center justify-center hover:bg-primary/20 rounded transition-colors text-primary">
+                    <button onClick={() => updateQty(c.lineId, 1)} className="w-7 h-7 flex items-center justify-center hover:bg-primary/20 rounded transition-colors text-primary">
                       <Plus className="w-4 h-4" />
                     </button>
                   </div>
@@ -391,7 +391,7 @@ export const POSCart = memo(function POSCart({
 
                 {/* Unit selector */}
                 {unitOptions.length > 1 && (
-                  <select value={c.unitMode} onChange={e => setCartItemUnit(c.item.id, e.target.value)}
+                  <select value={c.unitMode} onChange={e => setCartItemUnit(c.lineId, e.target.value)}
                     className="h-6 text-[10px] bg-secondary border-0 rounded px-1 w-full">
                     {unitOptions.map(u => <option key={u.label} value={u.label}>{u.label}</option>)}
                   </select>
@@ -487,7 +487,7 @@ export const POSCart = memo(function POSCart({
         restaurantId={restaurant?.id}
         onSave={(vars) => {
           if (variableDialogFor && updateServiceVariables) {
-            updateServiceVariables(variableDialogFor.item.id, vars);
+            updateServiceVariables(variableDialogFor.lineId, vars);
           }
         }}
       />
