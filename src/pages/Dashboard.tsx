@@ -499,16 +499,35 @@ export default function Dashboard() {
       }
       if (error) throw error;
 
-      // Update order items
-      for (const item of editOrderItems) {
-        if (item.id) {
-          await supabase.from('order_items').update({
-            menu_item_name: item.menu_item_name,
-            quantity: item.quantity,
-            price: item.price
-          }).eq('id', item.id);
+      // Update / insert / delete order items
+      const originalIds = new Set((editingOrder as any).__originalItemIds || []);
+      const currentIds = new Set(editOrderItems.filter(i => i.id).map(i => i.id));
+      // Delete removed
+      for (const oid of originalIds) {
+        if (!currentIds.has(oid)) {
+          await supabase.from('order_items').delete().eq('id', oid);
         }
       }
+      for (const item of editOrderItems) {
+        const payloadItem: any = {
+          menu_item_name: item.menu_item_name,
+          quantity: Number(item.quantity) || 0,
+          price: Number(item.price) || 0,
+          sold_unit: item.sold_unit || 'قطعة',
+          unit_factor: Number(item.unit_factor) || 1,
+        };
+        if (item.id) {
+          await supabase.from('order_items').update(payloadItem).eq('id', item.id);
+        } else {
+          await supabase.from('order_items').insert({
+            ...payloadItem,
+            order_id: editingOrder.id,
+            menu_item_id: item.menu_item_id || null,
+            product_id: item.product_id || null,
+          });
+        }
+      }
+
 
       setOrders(prev => (prev || []).map(o => o.id === editingOrder.id ? { ...o, ...payload } as Order : o));
       toast.success('تم تحديث الطلب بنجاح ✅');
