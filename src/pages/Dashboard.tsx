@@ -287,10 +287,9 @@ export default function Dashboard() {
       return;
     }
     setCart(prev => {
-      const existing = prev.find(c => c.item.id === item.id);
-      if (existing) return prev.map(c => c.item.id === item.id ? { ...c, qty: c.qty + 1, qtyText: String(c.qty + 1) } : c);
       const defaultUnit = getUnitOptions(item)[0] || { label: 'قطعة', factor: 1 };
       return [...prev, {
+        lineId: crypto.randomUUID(),
         item,
         qty: 1,
         qtyText: '1',
@@ -299,6 +298,7 @@ export default function Dashboard() {
         price: (Number(item.price) || 0) * defaultUnit.factor
       }];
     });
+
   }, [getUnitOptions]);
 
   // Function to add service item with customization
@@ -313,6 +313,7 @@ export default function Dashboard() {
         serviceNotes ? `ملاحظات: ${serviceNotes}` : ''
       ].filter(Boolean).join(' | ');
       return [...prev, {
+        lineId: crypto.randomUUID(),
         item: selectedServiceItem,
         qty: 1,
         qtyText: '1',
@@ -323,6 +324,7 @@ export default function Dashboard() {
         service_color: serviceColor,
         service_type: serviceType
       }];
+
     });
     setShowServiceModal(false);
     setSelectedServiceItem(null);
@@ -331,26 +333,23 @@ export default function Dashboard() {
   const addPackageToCart = useCallback((pkg: any) => {
     setCart(prev => {
       let newCart = [...prev];
-      // Add each item in the package
+      // Always add each package item as a new line (no merging)
       for (const pkgItem of pkg.items) {
         const menuItem = menuItems.find(i => i.id === pkgItem.id);
         if (menuItem) {
-          const existing = newCart.find(c => c.item.id === menuItem.id);
-          if (existing) {
-            newCart = newCart.map(c => c.item.id === menuItem.id ? { ...c, qty: c.qty + pkgItem.quantity, qtyText: String(c.qty + pkgItem.quantity) } : c);
-          } else {
-            const defaultUnit = getUnitOptions(menuItem)[0] || { label: 'قطعة', factor: 1 };
-            newCart.push({ 
-              item: menuItem, 
-              qty: pkgItem.quantity, 
-              qtyText: String(pkgItem.quantity), 
-              unitMode: defaultUnit.label,
-              unitFactor: defaultUnit.factor,
-              price: (Number(menuItem.price) || 0) * defaultUnit.factor
-            });
-          }
+          const defaultUnit = getUnitOptions(menuItem)[0] || { label: 'قطعة', factor: 1 };
+          newCart.push({
+            lineId: crypto.randomUUID(),
+            item: menuItem,
+            qty: pkgItem.quantity,
+            qtyText: String(pkgItem.quantity),
+            unitMode: defaultUnit.label,
+            unitFactor: defaultUnit.factor,
+            price: (Number(menuItem.price) || 0) * defaultUnit.factor
+          });
         }
       }
+
       // Now adjust the total price to match the package price
       // Calculate the current total of the package items
       const packageItemsTotal = pkg.items.reduce((sum: number, pkgItem: any) => {
@@ -367,11 +366,11 @@ export default function Dashboard() {
     });
   }, [menuItems, getUnitOptions]);
 
-  const updateQty = useCallback((id: string, d: number) => setCart(prev => prev.map(c => c.item.id === id ? { ...c, qty: Math.max(0, Math.round((c.qty + d) * 100) / 100), qtyText: String(Math.max(0, Math.round((c.qty + d) * 100) / 100)) } : c).filter(c => c.qty > 0)), []);
+  const updateQty = useCallback((id: string, d: number) => setCart(prev => prev.map(c => c.lineId === id ? { ...c, qty: Math.max(0, Math.round((c.qty + d) * 100) / 100), qtyText: String(Math.max(0, Math.round((c.qty + d) * 100) / 100)) } : c).filter(c => c.qty > 0)), []);
 
   const setCartItemQty = useCallback((id: string, text: string) => {
     setCart(prev => prev.map(c => {
-      if (c.item.id !== id) return c;
+      if (c.lineId !== id) return c;
       // Allow only one decimal point
       let cleaned = text.replace(/[^0-9.]/g, '');
       const decimalPoints = cleaned.split('.');
@@ -385,7 +384,7 @@ export default function Dashboard() {
 
   const setCartItemUnit = useCallback((id: string, label: string) => {
     setCart(prev => prev.map(c => {
-      if (c.item.id !== id) return c;
+      if (c.lineId !== id) return c;
       const nextUnit = getUnitOptions(c.item).find(u => u.label === label) || { label, factor: 1 };
       return {
         ...c,
@@ -401,7 +400,7 @@ export default function Dashboard() {
   const updateValue = useCallback((id: string, value: number) => {
     if (isNaN(value) || value < 0) return;
     setCart(prev => prev.map(c => {
-      if (c.item.id !== id) return c;
+      if (c.lineId !== id) return c;
       const price = Number(c.price) || 0;
       const isService = c.item.product_type === 'service';
       if (price <= 0 || isService) {
@@ -418,21 +417,21 @@ export default function Dashboard() {
   const updatePrice = useCallback((id: string, newPrice: number) => {
     if (isNaN(newPrice) || newPrice < 0) return;
     setCart(prev => prev.map(c => {
-      if (c.item.id !== id) return c;
+      if (c.lineId !== id) return c;
       return { ...c, price: newPrice };
     }));
   }, []);
 
   const updateServiceDetails = useCallback((id: string, details: string) => {
     setCart(prev => prev.map(c => {
-      if (c.item.id !== id) return c;
+      if (c.lineId !== id) return c;
       return { ...c, service_details: details };
     }));
   }, []);
 
   const updateServiceVariables = useCallback((id: string, variables: { label: string; value: string }[]) => {
     setCart(prev => prev.map(c => {
-      if (c.item.id !== id) return c;
+      if (c.lineId !== id) return c;
       return { ...c, variables };
     }));
   }, []);
@@ -464,10 +463,13 @@ export default function Dashboard() {
     // Fetch order items for editing
     try {
       const { data: items } = await supabase.from('order_items').select('*').eq('order_id', order.id);
-      setEditOrderItems(items || []);
+      const list = items || [];
+      setEditOrderItems(list);
+      (order as any).__originalItemIds = list.map((i: any) => i.id);
     } catch {
       setEditOrderItems([]);
     }
+
     setShowEditOrderModal(true);
   }, []);
 
@@ -500,16 +502,35 @@ export default function Dashboard() {
       }
       if (error) throw error;
 
-      // Update order items
-      for (const item of editOrderItems) {
-        if (item.id) {
-          await supabase.from('order_items').update({
-            menu_item_name: item.menu_item_name,
-            quantity: item.quantity,
-            price: item.price
-          }).eq('id', item.id);
+      // Update / insert / delete order items
+      const originalIds = new Set((editingOrder as any).__originalItemIds || []);
+      const currentIds = new Set(editOrderItems.filter(i => i.id).map(i => i.id));
+      // Delete removed
+      for (const oid of originalIds) {
+        if (!currentIds.has(oid)) {
+          await supabase.from('order_items').delete().eq('id', oid);
         }
       }
+      for (const item of editOrderItems) {
+        const payloadItem: any = {
+          menu_item_name: item.menu_item_name,
+          quantity: Number(item.quantity) || 0,
+          price: Number(item.price) || 0,
+          sold_unit: item.sold_unit || 'قطعة',
+          unit_factor: Number(item.unit_factor) || 1,
+        };
+        if (item.id) {
+          await supabase.from('order_items').update(payloadItem).eq('id', item.id);
+        } else {
+          await supabase.from('order_items').insert({
+            ...payloadItem,
+            order_id: editingOrder.id,
+            menu_item_id: item.menu_item_id || null,
+            product_id: item.product_id || null,
+          });
+        }
+      }
+
 
       setOrders(prev => (prev || []).map(o => o.id === editingOrder.id ? { ...o, ...payload } as Order : o));
       toast.success('تم تحديث الطلب بنجاح ✅');
@@ -669,7 +690,7 @@ export default function Dashboard() {
         {activeTab === 'pos' && (
           <div className="flex flex-col lg:flex-row h-full gap-4 overflow-hidden">
             <POSGrid restaurant={restaurant} currency={currency} categories={categories} selectedCategory={selectedCategory} setSelectedCategory={setSelectedCategory} searchQuery={searchQuery} setSearchQuery={setSearchQuery} filteredItems={filteredItems} addToCart={addToCart} servicePackages={servicePackages} addPackageToCart={addPackageToCart} businessType={businessType} todayRevenue={todayRevenue} todayOrders={todayOrdersList} avgOrderValue={avgOrderValue} pendingOrders={pendingOrders} orderType={orderType} orders={orders} tableNumber={tableNumber} setTableNumber={setTableNumber} />
-            <POSCart activeInvoiceId={activeInvoiceId} invoiceTabs={invoiceTabs} cart={cart} holdCurrentInvoice={holdCurrentInvoice} setShowInvoiceTabs={setShowInvoiceTabs} clearCart={clearCart} businessType={businessType} orderType={orderType} setOrderType={setOrderType} tableNumber={tableNumber} setTableNumber={setTableNumber} customOrderNumber={customOrderNumber} setCustomOrderNumber={setCustomOrderNumber} restaurant={restaurant} customerName={customerName} setCustomerName={selectCustomerFromSearch} customerPhone={customerPhone} setCustomerPhone={setCustomerPhone} customerRef={customerRef} setCustomerRef={setCustomerRef} deliveryAddress={deliveryAddress} setDeliveryAddress={setDeliveryAddress} deliveryDate={deliveryDate} setDeliveryDate={setDeliveryDate} agents={agents} selectedDeliveryAgent={selectedDeliveryAgent} setSelectedDeliveryAgent={setSelectedDeliveryAgent} orderNotes={orderNotes} setOrderNotes={setOrderNotes} discount={discount} setDiscount={setDiscount} discountType={discountType} setDiscountType={setDiscountType} currency={currency} getUnitOptions={getUnitOptions} updateQty={updateQty} setCartItemQty={setCartItemQty} setCartItemUnit={setCartItemUnit} updateValue={updateValue} updatePrice={updatePrice} updateServiceDetails={updateServiceDetails} updateServiceVariables={updateServiceVariables} discountAmount={discountAmount} taxAmount={totalTax} cartSubtotal={cartSubtotal} cartTotal={cartTotal} paymentMethod={paymentMethod} setPaymentMethod={setPaymentMethod} paidAmount={paidAmount} setPaidAmount={setPaidAmount} remaining={remaining} checkout={performCheckout} previewInvoice={() => { setLastReceipt({ total: cartTotal, items: cart.map(c => ({ menu_item_name: c.item.name, quantity: c.qty, price: Number(c.price) })) } as any); setAutoPrint(false); setShowReceipt(true); }} removeFromCart={(id) => setCart(prev => prev.filter(c => c.item.id !== id))} accountingAccounts={accountingAccounts} selectedAccountId={selectedAccountId} setSelectedAccountId={setSelectedAccountId} isProcessing={isProcessingCheckout} />
+            <POSCart activeInvoiceId={activeInvoiceId} invoiceTabs={invoiceTabs} cart={cart} holdCurrentInvoice={holdCurrentInvoice} setShowInvoiceTabs={setShowInvoiceTabs} clearCart={clearCart} businessType={businessType} orderType={orderType} setOrderType={setOrderType} tableNumber={tableNumber} setTableNumber={setTableNumber} customOrderNumber={customOrderNumber} setCustomOrderNumber={setCustomOrderNumber} restaurant={restaurant} customerName={customerName} setCustomerName={selectCustomerFromSearch} customerPhone={customerPhone} setCustomerPhone={setCustomerPhone} customerRef={customerRef} setCustomerRef={setCustomerRef} deliveryAddress={deliveryAddress} setDeliveryAddress={setDeliveryAddress} deliveryDate={deliveryDate} setDeliveryDate={setDeliveryDate} agents={agents} selectedDeliveryAgent={selectedDeliveryAgent} setSelectedDeliveryAgent={setSelectedDeliveryAgent} orderNotes={orderNotes} setOrderNotes={setOrderNotes} discount={discount} setDiscount={setDiscount} discountType={discountType} setDiscountType={setDiscountType} currency={currency} getUnitOptions={getUnitOptions} updateQty={updateQty} setCartItemQty={setCartItemQty} setCartItemUnit={setCartItemUnit} updateValue={updateValue} updatePrice={updatePrice} updateServiceDetails={updateServiceDetails} updateServiceVariables={updateServiceVariables} discountAmount={discountAmount} taxAmount={totalTax} cartSubtotal={cartSubtotal} cartTotal={cartTotal} paymentMethod={paymentMethod} setPaymentMethod={setPaymentMethod} paidAmount={paidAmount} setPaidAmount={setPaidAmount} remaining={remaining} checkout={performCheckout} previewInvoice={() => { setLastReceipt({ total: cartTotal, items: cart.map(c => ({ menu_item_name: c.item.name, quantity: c.qty, price: Number(c.price) })) } as any); setAutoPrint(false); setShowReceipt(true); }} removeFromCart={(id) => setCart(prev => prev.filter(c => c.lineId !== id))} accountingAccounts={accountingAccounts} selectedAccountId={selectedAccountId} setSelectedAccountId={setSelectedAccountId} isProcessing={isProcessingCheckout} />
           </div>
         )}
         {activeTab === 'orders' && (
@@ -1034,16 +1055,30 @@ export default function Dashboard() {
                 </div>
 
                 {/* Editable Order Items */}
-                {editOrderItems.length > 0 && (
-                  <div>
-                    <Label className="text-base font-bold mb-2 block">بنود الطلب</Label>
+                <div>
+                  <div className="flex items-center justify-between mb-2">
+                    <Label className="text-base font-bold block">بنود الطلب</Label>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      onClick={() => setEditOrderItems(prev => [...prev, { menu_item_name: '', quantity: 1, price: 0, sold_unit: 'قطعة', unit_factor: 1 }])}
+                    >
+                      + إضافة صنف
+                    </Button>
+                  </div>
+                  {editOrderItems.length === 0 ? (
+                    <div className="text-sm text-muted-foreground p-4 text-center border border-dashed border-border rounded-xl">لا توجد بنود — أضف صنفاً</div>
+                  ) : (
                     <div className="rounded-xl overflow-hidden border border-border">
                       <table className="w-full text-sm">
                         <thead className="bg-secondary">
                           <tr>
                             <th className="p-2 text-right">الصنف</th>
                             <th className="p-2 text-center w-20">الكمية</th>
+                            <th className="p-2 text-center w-20">الوحدة</th>
                             <th className="p-2 text-center w-24">السعر</th>
+                            <th className="p-2 w-10"></th>
                           </tr>
                         </thead>
                         <tbody>
@@ -1059,16 +1094,33 @@ export default function Dashboard() {
                                     setEditOrderItems(updated);
                                   }}
                                 />
+                                {(item.variables && Array.isArray(item.variables) && item.variables.length > 0) && (
+                                  <div className="text-[10px] text-muted-foreground mt-1 truncate">
+                                    {item.variables.map((v: any) => `${v.label}: ${v.value}`).join(' • ')}
+                                  </div>
+                                )}
                               </td>
                               <td className="p-2">
                                 <Input
                                   className="h-8 text-sm text-center"
                                   type="number"
-                                  min="1"
-                                  value={item.quantity || 1}
+                                  min="0"
+                                  step="0.01"
+                                  value={item.quantity ?? 1}
                                   onChange={e => {
                                     const updated = [...editOrderItems];
-                                    updated[idx] = { ...updated[idx], quantity: Number(e.target.value) };
+                                    updated[idx] = { ...updated[idx], quantity: parseFloat(e.target.value) || 0 };
+                                    setEditOrderItems(updated);
+                                  }}
+                                />
+                              </td>
+                              <td className="p-2">
+                                <Input
+                                  className="h-8 text-sm text-center"
+                                  value={item.sold_unit || 'قطعة'}
+                                  onChange={e => {
+                                    const updated = [...editOrderItems];
+                                    updated[idx] = { ...updated[idx], sold_unit: e.target.value };
                                     setEditOrderItems(updated);
                                   }}
                                 />
@@ -1079,7 +1131,7 @@ export default function Dashboard() {
                                   type="number"
                                   min="0"
                                   step="0.01"
-                                  value={item.price || 0}
+                                  value={item.price ?? 0}
                                   onChange={e => {
                                     const updated = [...editOrderItems];
                                     updated[idx] = { ...updated[idx], price: parseFloat(e.target.value) || 0 };
@@ -1087,13 +1139,24 @@ export default function Dashboard() {
                                   }}
                                 />
                               </td>
+                              <td className="p-2 text-center">
+                                <button
+                                  type="button"
+                                  onClick={() => setEditOrderItems(prev => prev.filter((_, i) => i !== idx))}
+                                  className="text-destructive hover:bg-destructive/10 rounded p-1"
+                                  title="حذف"
+                                >
+                                  <X className="w-4 h-4" />
+                                </button>
+                              </td>
                             </tr>
                           ))}
                         </tbody>
                       </table>
                     </div>
-                  </div>
-                )}
+                  )}
+                </div>
+
 
                 <div className="flex gap-2">
                   <Button className="flex-1 h-12 gradient-bg border-0 text-white font-bold text-lg mt-4" onClick={handleUpdateOrder}>
