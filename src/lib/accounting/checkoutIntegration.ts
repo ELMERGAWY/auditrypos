@@ -256,7 +256,25 @@ class CheckoutIntegration {
           const remaining = finalTotal - paidAmount;
           await this.updateCustomerBalance(customerId, context.restaurantId, remaining, order.id, orderNum);
         }
+        // 13b. Auto-create Receipt Voucher for the paid portion (so customer ledger reflects it)
+        if (paidAmount > 0) {
+          try {
+            const voucherNumber = `RCV-${orderNum.slice(-6)}-${Date.now().toString().slice(-4)}`;
+            await supabase.from('receipt_vouchers').insert({
+              restaurant_id: context.restaurantId,
+              voucher_number: voucherNumber,
+              voucher_date: new Date().toISOString().slice(0, 10),
+              customer_id: customerId,
+              amount: paidAmount,
+              payment_method: orderData.paymentMethod,
+              notes: `سداد تلقائي عند إنشاء الفاتورة ${orderNum}`,
+            });
+          } catch (rcvErr) {
+            console.warn('[checkout] auto receipt voucher failed:', rcvErr);
+          }
+        }
       }
+
 
       // 14. Update delivery agent status if applicable
       if (isDelivery && orderData.deliveryAgentId) {
