@@ -463,10 +463,13 @@ export default function Dashboard() {
     // Fetch order items for editing
     try {
       const { data: items } = await supabase.from('order_items').select('*').eq('order_id', order.id);
-      setEditOrderItems(items || []);
+      const list = items || [];
+      setEditOrderItems(list);
+      (order as any).__originalItemIds = list.map((i: any) => i.id);
     } catch {
       setEditOrderItems([]);
     }
+
     setShowEditOrderModal(true);
   }, []);
 
