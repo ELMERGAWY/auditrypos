@@ -260,7 +260,7 @@ class CheckoutIntegration {
         if (paidAmount > 0) {
           try {
             const voucherNumber = `RCV-${orderNum.slice(-6)}-${Date.now().toString().slice(-4)}`;
-            await supabase.from('receipt_vouchers').insert({
+            const { data: voucher } = await supabase.from('receipt_vouchers').insert({
               restaurant_id: context.restaurantId,
               voucher_number: voucherNumber,
               voucher_date: new Date().toISOString().slice(0, 10),
@@ -268,7 +268,18 @@ class CheckoutIntegration {
               amount: paidAmount,
               payment_method: orderData.paymentMethod,
               notes: `سداد تلقائي عند إنشاء الفاتورة ${orderNum}`,
-            });
+            }).select('id').single();
+
+            if (voucher?.id) {
+              await supabase.from('orders').update({
+                direct_paid_amount: paidAmount,
+                receipt_voucher_ids: [voucher.id],
+                paid_amount: paidAmount,
+              }).eq('id', order.id);
+              (order as any).direct_paid_amount = paidAmount;
+              (order as any).receipt_voucher_ids = [voucher.id];
+              (order as any).paid_amount = paidAmount;
+            }
           } catch (rcvErr) {
             console.warn('[checkout] auto receipt voucher failed:', rcvErr);
           }
@@ -286,7 +297,7 @@ class CheckoutIntegration {
 
       // 15. Record inventory consumption
       if (cogs > 0) {
-        await this.recordInventoryConsumption(order.id, inventoryItemsForCosting);
+        await this.recordInventoryConsumption(order.id, context.restaurantId, inventoryItemsForCosting);
       }
 
       toast.success(`✅ تم إنشاء الطلب #${orderNum.slice(-4)} - ${finalTotal.toFixed(2)} ${context.currency}`);
@@ -339,6 +350,7 @@ class CheckoutIntegration {
             sold_unit: item.unitMode || 'قطعة',
             unit_factor: item.unitFactor || 1,
             cost_price_snapshot: (item as any).unitCost || 0,
+            variables: (item as any).variables || null,
           }));
 
           // Queue the order locally
@@ -593,6 +605,7 @@ class CheckoutIntegration {
 
   private async recordInventoryConsumption(
     orderId: string,
+    restaurantId: string,
     items: OrderItem[]
   ): Promise<void> {
     if (items.length === 0) return;
@@ -600,8 +613,11 @@ class CheckoutIntegration {
     // Bulk insert for better performance
     const records = items.map(item => ({
       order_id: orderId,
-      product_id: (item as any).product_id || item.menu_item_id,
-      quantity: item.quantity,
+      item_id: (item as any).product_id || item.menu_item_id,
+      restaurant_id: restaurantId,
+      consumed_qty: item.quantity,
+      unit_cost: (item as any).unitCost || (item as any).cost_price_snapshot || 0,
+      total_cost: ((item as any).unitCost || (item as any).cost_price_snapshot || 0) * item.quantity,
     }));
 
     await supabase.from('inventory_consumption').insert(records as any);

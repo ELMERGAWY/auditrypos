@@ -514,10 +514,15 @@ export default function Dashboard() {
       for (const item of editOrderItems) {
         const payloadItem: any = {
           menu_item_name: item.menu_item_name,
+          menu_item_image: item.menu_item_image || '📦',
           quantity: Number(item.quantity) || 0,
           price: Number(item.price) || 0,
           sold_unit: item.sold_unit || 'قطعة',
           unit_factor: Number(item.unit_factor) || 1,
+          product_id: item.product_id || null,
+          menu_item_id: item.menu_item_id || null,
+          variables: Array.isArray(item.variables) ? item.variables : null,
+          line_total: (Number(item.quantity) || 0) * (Number(item.price) || 0),
         };
         if (item.id) {
           await supabase.from('order_items').update(payloadItem).eq('id', item.id);
@@ -629,10 +634,20 @@ export default function Dashboard() {
         const completeOrder = {
           ...result.order,
           items: cart.map(c => ({
+            menu_item_id: c.item.product_id ? null : c.item.id,
+            product_id: c.item.product_id || (c.item.product_type === 'inventory' ? c.item.id : null),
             menu_item_name: c.item.name,
+            menu_item_image: c.item.image || '📦',
             quantity: c.qty,
-            price: Number(c.price)
-          }))
+            price: Number(c.price),
+            sold_unit: c.unitMode,
+            unit_factor: c.unitFactor || 1,
+            variables: c.variables || null,
+            service_details: c.service_details,
+          })),
+          paid_amount: paidNum,
+          direct_paid_amount: paidNum,
+          payment_method: paymentMethod,
         };
         setOrders(prev => [completeOrder as Order, ...(Array.isArray(prev) ? prev : [])]);
         setLastReceipt(completeOrder as Order);
@@ -1095,10 +1110,32 @@ export default function Dashboard() {
                                   }}
                                 />
                                 {(item.variables && Array.isArray(item.variables) && item.variables.length > 0) && (
-                                  <div className="text-[10px] text-muted-foreground mt-1 truncate">
-                                    {item.variables.map((v: any) => `${v.label}: ${v.value}`).join(' • ')}
+                                  <div className="mt-2 space-y-1">
+                                    {item.variables.map((v: any, vi: number) => (
+                                      <div key={vi} className="grid grid-cols-2 gap-1">
+                                        <Input className="h-7 text-[11px]" value={v.label || ''} onChange={e => {
+                                          const updated = [...editOrderItems];
+                                          const vars = [...(updated[idx].variables || [])];
+                                          vars[vi] = { ...vars[vi], label: e.target.value };
+                                          updated[idx] = { ...updated[idx], variables: vars };
+                                          setEditOrderItems(updated);
+                                        }} />
+                                        <Input className="h-7 text-[11px]" value={v.value || ''} onChange={e => {
+                                          const updated = [...editOrderItems];
+                                          const vars = [...(updated[idx].variables || [])];
+                                          vars[vi] = { ...vars[vi], value: e.target.value };
+                                          updated[idx] = { ...updated[idx], variables: vars };
+                                          setEditOrderItems(updated);
+                                        }} />
+                                      </div>
+                                    ))}
                                   </div>
                                 )}
+                                <Button type="button" size="sm" variant="ghost" className="h-7 mt-1 text-[11px]" onClick={() => {
+                                  const updated = [...editOrderItems];
+                                  updated[idx] = { ...updated[idx], variables: [...(updated[idx].variables || []), { label: '', value: '' }] };
+                                  setEditOrderItems(updated);
+                                }}>+ متغير</Button>
                               </td>
                               <td className="p-2">
                                 <Input
