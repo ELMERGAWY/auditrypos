@@ -260,7 +260,7 @@ class CheckoutIntegration {
         if (paidAmount > 0) {
           try {
             const voucherNumber = `RCV-${orderNum.slice(-6)}-${Date.now().toString().slice(-4)}`;
-            await supabase.from('receipt_vouchers').insert({
+            const { data: voucher } = await supabase.from('receipt_vouchers').insert({
               restaurant_id: context.restaurantId,
               voucher_number: voucherNumber,
               voucher_date: new Date().toISOString().slice(0, 10),
@@ -268,7 +268,18 @@ class CheckoutIntegration {
               amount: paidAmount,
               payment_method: orderData.paymentMethod,
               notes: `سداد تلقائي عند إنشاء الفاتورة ${orderNum}`,
-            });
+            }).select('id').single();
+
+            if (voucher?.id) {
+              await supabase.from('orders').update({
+                direct_paid_amount: paidAmount,
+                receipt_voucher_ids: [voucher.id],
+                paid_amount: paidAmount,
+              }).eq('id', order.id);
+              (order as any).direct_paid_amount = paidAmount;
+              (order as any).receipt_voucher_ids = [voucher.id];
+              (order as any).paid_amount = paidAmount;
+            }
           } catch (rcvErr) {
             console.warn('[checkout] auto receipt voucher failed:', rcvErr);
           }
@@ -339,6 +350,7 @@ class CheckoutIntegration {
             sold_unit: item.unitMode || 'قطعة',
             unit_factor: item.unitFactor || 1,
             cost_price_snapshot: (item as any).unitCost || 0,
+            variables: (item as any).variables || null,
           }));
 
           // Queue the order locally
@@ -601,7 +613,10 @@ class CheckoutIntegration {
     const records = items.map(item => ({
       order_id: orderId,
       product_id: (item as any).product_id || item.menu_item_id,
+      restaurant_id: (item as any).restaurant_id || null,
+      item_id: (item as any).product_id || item.menu_item_id,
       quantity: item.quantity,
+      consumed_qty: item.quantity,
     }));
 
     await supabase.from('inventory_consumption').insert(records as any);

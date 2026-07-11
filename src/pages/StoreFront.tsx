@@ -10,7 +10,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 
 interface MenuItem {
-  id: string; name: string; price: number; category: string; image: string; icon_url?: string; in_stock?: boolean; quantity?: number;
+  id: string; name: string; price: number; category: string; image: string; icon_url?: string; in_stock?: boolean; quantity?: number; source?: 'menu' | 'product'; variables?: { label: string; value: string }[];
 }
 
 interface CartItem { item: MenuItem; qty: number; }
@@ -66,7 +66,9 @@ const StoreFront = () => {
           image: m.image,
           icon_url: m.icon_url,
           in_stock: m.in_stock,
-          quantity: m.quantity
+          quantity: m.quantity,
+          source: 'menu',
+          variables: m.variables || []
         })) as MenuItem[];
         setItems(menuItems);
         setCategories([...new Set(menuItems.map(i => i.category).filter(Boolean))]);
@@ -81,7 +83,9 @@ const StoreFront = () => {
           image: p.image,
           icon_url: p.icon_url,
           in_stock: p.in_stock,
-          quantity: p.quantity
+          quantity: p.quantity,
+          source: 'product',
+          variables: p.variables || []
         })) as MenuItem[];
         setItems(prods);
         setCategories([...new Set(prods.map(i => i.category).filter(Boolean))]);
@@ -174,7 +178,15 @@ const StoreFront = () => {
     try {
       const { data, error } = await supabase.rpc('create_storefront_order', {
         p_restaurant_id: restaurantId,
-        p_items: cart.map(c => ({ name: c.item.name, image: c.item.image, price: c.item.price, quantity: c.qty })),
+          p_items: cart.map(c => ({
+            menu_item_id: c.item.source === 'menu' ? c.item.id : null,
+            product_id: c.item.source === 'product' ? c.item.id : null,
+            name: c.item.name,
+            image: c.item.image,
+            price: c.item.price,
+            quantity: c.qty,
+            variables: c.item.variables || []
+          })),
         p_customer_name: customerForm.name,
         p_customer_phone: customerForm.phone,
         p_delivery_address: customerForm.address || null,
