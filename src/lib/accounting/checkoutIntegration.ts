@@ -297,7 +297,7 @@ class CheckoutIntegration {
 
       // 15. Record inventory consumption
       if (cogs > 0) {
-        await this.recordInventoryConsumption(order.id, inventoryItemsForCosting);
+        await this.recordInventoryConsumption(order.id, context.restaurantId, inventoryItemsForCosting);
       }
 
       toast.success(`✅ تم إنشاء الطلب #${orderNum.slice(-4)} - ${finalTotal.toFixed(2)} ${context.currency}`);
@@ -605,6 +605,7 @@ class CheckoutIntegration {
 
   private async recordInventoryConsumption(
     orderId: string,
+    restaurantId: string,
     items: OrderItem[]
   ): Promise<void> {
     if (items.length === 0) return;
@@ -612,11 +613,11 @@ class CheckoutIntegration {
     // Bulk insert for better performance
     const records = items.map(item => ({
       order_id: orderId,
-      product_id: (item as any).product_id || item.menu_item_id,
-      restaurant_id: (item as any).restaurant_id || null,
       item_id: (item as any).product_id || item.menu_item_id,
-      quantity: item.quantity,
+      restaurant_id: restaurantId,
       consumed_qty: item.quantity,
+      unit_cost: (item as any).unitCost || (item as any).cost_price_snapshot || 0,
+      total_cost: ((item as any).unitCost || (item as any).cost_price_snapshot || 0) * item.quantity,
     }));
 
     await supabase.from('inventory_consumption').insert(records as any);
