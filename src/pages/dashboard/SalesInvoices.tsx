@@ -490,15 +490,15 @@ export function SalesInvoices({ restaurantId, currency, restaurant, isSuperAdmin
   };
 
   const handleDelete = async (inv: Invoice) => {
-    if (!confirm(`هل أنت متأكد من حذف الفاتورة ${inv.order_number}؟ سيتم حذف الأصناف وقيود اليومية المرتبطة.`)) return;
+    if (!confirm(`هل أنت متأكد من حذف الفاتورة ${inv.order_number}؟ سيتم إرجاع الكميات للمخزن وحذف القيود المرتبطة.`)) return;
     try {
-      // Delete dependents first (order_items, order_taxes, journal_entries)
-      await supabase.from('order_items').delete().eq('order_id', inv.id);
+      // استرجاع المخزون أولاً (idempotent) ثم احذف الطلب فقط — CASCADE يحذف الأصناف
+      await supabase.rpc('restore_inventory_for_order', { p_order_id: inv.id });
       await supabase.from('order_taxes').delete().eq('order_id', inv.id);
       await supabase.from('journal_entries').delete().eq('source_id', inv.id).eq('source', 'sale');
       const { error } = await supabase.from('orders').delete().eq('id', inv.id);
       if (error) throw error;
-      toast.success('تم حذف الفاتورة');
+      toast.success('تم حذف الفاتورة وإرجاع الكمية للمخزن');
       loadInvoices();
     } catch (e: any) {
       toast.error('فشل الحذف: ' + e.message);

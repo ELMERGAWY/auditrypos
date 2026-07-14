@@ -509,13 +509,14 @@ export default function Dashboard() {
   }, []);
 
   const handleDeleteOrder = useCallback(async (id: string) => {
-    if (!confirm('هل أنت متأكد من حذف هذا الطلب؟')) return;
+    if (!confirm('هل أنت متأكد من حذف هذا الطلب؟ سيتم إرجاع الكميات للمخزن.')) return;
     try {
+      // استرجاع المخزون صراحة قبل الحذف (الـ trigger يعمل أيضاً، والنداء idempotent)
+      await supabase.rpc('restore_inventory_for_order', { p_order_id: id });
       const { error } = await supabase.from('orders').delete().eq('id', id);
       if (error) throw error;
       setOrders(prev => (prev || []).filter(o => o.id !== id));
-      toast.success('تم حذف الطلب بنجاح');
-      // Reload data from server to ensure UI is in sync
+      toast.success('تم حذف الطلب وإرجاع الكمية للمخزن');
       await loadData();
     } catch (e: any) {
       toast.error('فشل حذف الطلب: ' + (e?.message || ''));
