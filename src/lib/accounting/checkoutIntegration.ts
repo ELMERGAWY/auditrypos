@@ -406,22 +406,13 @@ class CheckoutIntegration {
           error?.code === 'ECONNRESET' ||
           error?.code === 'ETIMEDOUT' ||
           !navigator.onLine) {
-        errorMsg = '📡 مشكلة في الاتصال بالخادم. جاري المحاولة مرة أخرى...';
+        errorMsg = '📡 مشكلة في الاتصال بالخادم. سيتم الحفظ محلياً.';
         errorCode = 'CONNECTION_ERROR';
         isNetworkError = true;
-        
-        // Auto-retry once for connection errors
-        toast.info('🔄 إعادة المحاولة...');
-        try {
-          await new Promise(resolve => setTimeout(resolve, 1500));
-          return await this.processCheckout(context, orderData);
-        } catch (retryError) {
-          errorMsg = '❌ فشل الاتصال بعد إعادة المحاولة. سيتم الحفظ محلياً.';
-          errorCode = 'CONNECTION_FAILED';
-          isNetworkError = true;
 
-          // Prepare order items for offline storage
-          const offlineOrderItems = orderData.cart.map(item => ({
+        // DISABLED: Auto-retry causes duplicate orders
+        // Instead, directly save to offline queue
+        const offlineOrderItems = orderData.cart.map(item => ({
             menu_item_id: (item as any).product_id ? null : item.menu_item_id,
             product_id: (item as any).product_id || null,
             menu_item_name: item.menu_item_name || (item as any).name || 'صنف',
