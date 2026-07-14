@@ -303,7 +303,13 @@ export async function syncPendingData(): Promise<{ synced: number; errors: numbe
       }
 
       const { data: order, error } = await supabase.from('orders').insert(orderPayload as any).select().single();
-      if (error || !order) { 
+      if (error || !order) {
+        // تعارض unique = الطلب موجود مسبقاً — اعتبرها مزامنة ناجحة ولا تعِد الإدراج
+        if (error?.code === '23505' || String(error?.message || '').includes('duplicate')) {
+          await removePendingOrder(po.id);
+          synced++;
+          continue;
+        }
         await updateSyncMeta(po.id, { 
           id: po.id, 
           retryCount: (meta?.retryCount ?? 0) + 1, 
@@ -503,7 +509,15 @@ export async function forceSyncPendingData(): Promise<{ synced: number; errors: 
       }
 
       const { data: order, error } = await supabase.from('orders').insert(orderPayload as any).select().single();
-      if (error || !order) { errors++; continue; }
+      if (error || !order) {
+        if (error?.code === '23505' || String(error?.message || '').includes('duplicate')) {
+          await removePendingOrder(po.id);
+          synced++;
+          continue;
+        }
+        errors++;
+        continue;
+      }
       
       const itemsWithOrderId = po.items.map(item => ({
         order_id: order.id,

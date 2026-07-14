@@ -63,10 +63,21 @@ class CheckoutIntegration {
   ): Promise<CheckoutResult> {
     // 7. Prepare order data first (so it's available in catch)
     const paidAmount = orderData.paidAmount ?? 0;
-    const orderNum = orderData.customOrderNumber || (orderData.customerRef ? `ORD-${orderData.customerRef}-${Date.now().toString().slice(-6)}` : `ORD-${Date.now().toString().slice(-6)}`);
+    // client_order_id ثابت من الواجهة — أساس منع التكرار عبر المحاولات
     const clientOrderId =
       orderData.clientOrderId ||
       `${context.restaurantId}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    // رقم الطلب يجب أن يكون مشتقاً من clientOrderId (وليس Date.now) حتى لا يتغيّر عند إعادة المحاولة
+    // وإلا UNIQUE(order_number) لن يمنع التكرار لأن كل retry يولّد رقماً جديداً.
+    const stableSuffix = clientOrderId.replace(/[^a-zA-Z0-9]/g, '').slice(-8).toUpperCase();
+    const orderNum =
+      orderData.customOrderNumber ||
+      (orderData.customerRef
+        ? `ORD-${orderData.customerRef}-${stableSuffix}`
+        : `ORD-${stableSuffix}`);
+
+    // نتذكر إذا تم إنشاء الطلب فعلياً حتى لا نضيفه لطابور الأوفلاين مرة أخرى
+    let createdOrder: any = null;
     
     let finalNotes = orderData.notes || '';
     if (orderData.customerRef) {
@@ -188,48 +199,81 @@ class CheckoutIntegration {
         customer_id: customerId,
       };
 
-      // Show debug toast before creating order
-      const debugMsg = `جاري إنشاء الطلب #${orderPayload.order_number} - المبلغ: ${orderPayload.total} - المدفوع: ${orderPayload.paid_amount}`;
-      toast.info(debugMsg);
-
-      // مهم: اجعل إنشاء الطلب Idempotent قدر الإمكان لتقليل التكرار في حالات
-      // النقر المزدوج/تذبذب الاتصال/إعادة المحاولة.
+      // مهم: Idempotent — ابحث أولاً عن طلب موجود لنفس العملية قبل أي INSERT
       let order: any = null;
       let orderError: any = null;
 
-      ({ data: order, error: orderError } = await supabase
+      const { data: existingByClient } = await supabase
         .from('orders')
-        .insert(orderPayload)
-        .select()
-        .single());
+        .select('*')
+        .eq('client_order_id', clientOrderId)
+        .maybeSingle();
 
-      // لو حصل تعارض Unique (غالباً على client_order_id)، اعتبر العملية ناجحة
-      // وجلب نفس الطلب بدلاً من إنشاء طلب جديد أو كسر العملية.
-      if (orderError && (orderError.code === '23505' || String(orderError.message || '').includes('duplicate'))) {
-        const clientOrderId = (orderPayload as any).client_order_id;
-        if (clientOrderId) {
-          const { data: existingOrder, error: fetchErr } = await supabase
+      if (existingByClient) {
+        order = existingByClient;
+        toast.info('ℹ️ تم اكتشاف طلب مُنشأ مسبقاً، جاري إكمال العملية بدون تكرار.');
+        // أكمل/صحّح المدفوع والحالة إذا كانت المحاولة السابقة توقفت في المنتصف
+        const patch: Record<string, unknown> = {};
+        if (paidAmount > Number(existingByClient.paid_amount || 0)) {
+          patch.paid_amount = paidAmount;
+        }
+        if (existingByClient.status !== orderPayload.status) {
+          patch.status = orderPayload.status;
+        }
+        if (Number(existingByClient.total || 0) !== Number(orderPayload.total || 0) && Number(orderPayload.total || 0) > 0) {
+          patch.total = orderPayload.total;
+          patch.discount = orderPayload.discount;
+        }
+        if (Object.keys(patch).length > 0) {
+          const { data: patched } = await supabase
+            .from('orders')
+            .update(patch)
+            .eq('id', existingByClient.id)
+            .select()
+            .single();
+          if (patched) order = patched;
+        }
+      } else {
+        ({ data: order, error: orderError } = await supabase
+          .from('orders')
+          .insert(orderPayload)
+          .select()
+          .single());
+
+        // تعارض Unique على client_order_id أو order_number → استرجع الطلب الموجود ولا تنشئ جديداً
+        if (orderError && (orderError.code === '23505' || String(orderError.message || '').includes('duplicate'))) {
+          const { data: byClient } = await supabase
             .from('orders')
             .select('*')
             .eq('client_order_id', clientOrderId)
             .maybeSingle();
 
-          if (!fetchErr && existingOrder) {
-            order = existingOrder;
+          if (byClient) {
+            order = byClient;
             orderError = null;
             toast.info('ℹ️ تم اكتشاف طلب مُنشأ مسبقاً، جاري إكمال العملية بدون تكرار.');
+          } else {
+            const { data: byNumber } = await supabase
+              .from('orders')
+              .select('*')
+              .eq('order_number', orderNum)
+              .eq('restaurant_id', context.restaurantId)
+              .maybeSingle();
+
+            if (byNumber) {
+              order = byNumber;
+              orderError = null;
+              toast.info('ℹ️ تم اكتشاف طلب بنفس الرقم، جاري إكمال العملية بدون تكرار.');
+            }
           }
         }
-      }
-
-      // Show debug toast after creating order
-      if (order) {
-        toast.success(`تم إنشاء الطلب #${order.order_number} - ID: ${order.id.slice(-4)} - المدفوع: ${order.paid_amount}`);
       }
 
       if (orderError || !order) {
         throw new Error(`فشل إنشاء الطلب: ${orderError?.message}`);
       }
+
+      createdOrder = order;
 
       // 10. Create order items
       const orderItems = orderData.cart.map(item => ({
@@ -266,34 +310,55 @@ class CheckoutIntegration {
         throw new Error(`فشل حفظ أصناف الفاتورة: ${itemsError.message}`);
       }
 
-      // 11. Create tax records
+      // 11. Create tax records (once)
       if (taxCalculation.taxLines.length > 0) {
-        const taxRecords = taxCalculation.taxLines.map(line => ({
-          order_id: order.id,
-          tax_rate_id: line.tax_config_id,
-          taxable_amount: line.taxable_amount,
-          tax_amount: line.tax_amount,
-          tax_type: 'vat',
-        }));
+        const { data: existingTaxes } = await supabase
+          .from('order_taxes')
+          .select('id')
+          .eq('order_id', order.id)
+          .limit(1);
 
-        await supabase.from('order_taxes').insert(taxRecords);
+        if (!existingTaxes || existingTaxes.length === 0) {
+          const taxRecords = taxCalculation.taxLines.map(line => ({
+            order_id: order.id,
+            tax_rate_id: line.tax_config_id,
+            taxable_amount: line.taxable_amount,
+            tax_amount: line.tax_amount,
+            tax_type: 'vat',
+          }));
+
+          await supabase.from('order_taxes').insert(taxRecords);
+        }
       }
 
-      // 12. Create journal entries (Double Entry)
+      // 12. Create journal entries (Double Entry) — once per order
       let journalEntryId: string | undefined;
 
       if (context.isOnline) {
-        const journalEntry = await journalService.createSaleJournalEntry(
-          context.restaurantId,
-          { ...order, items: orderItems } as Order,
-          context.businessType,
-          cogs,
-          taxCalculation.taxAmount,
-          orderData.destinationAccountId
-        );
+        const { data: existingJournal } = await supabase
+          .from('journal_entries')
+          .select('id')
+          .eq('restaurant_id', context.restaurantId)
+          .eq('reference_type', 'order')
+          .eq('reference_id', order.id)
+          .limit(1)
+          .maybeSingle();
 
-        if (journalEntry) {
-          journalEntryId = journalEntry.id;
+        if (existingJournal?.id) {
+          journalEntryId = existingJournal.id;
+        } else {
+          const journalEntry = await journalService.createSaleJournalEntry(
+            context.restaurantId,
+            { ...order, items: orderItems } as Order,
+            context.businessType,
+            cogs,
+            taxCalculation.taxAmount,
+            orderData.destinationAccountId
+          );
+
+          if (journalEntry) {
+            journalEntryId = journalEntry.id;
+          }
         }
       }
 
@@ -302,7 +367,11 @@ class CheckoutIntegration {
         // 13a. Auto-create Receipt Voucher for the paid portion using the new RPC function
         // This will automatically create: receipt_voucher, customer_transaction, journal_entry
         // and update customer balance via triggers
-        if (paidAmount > 0) {
+        const alreadyHasVoucher =
+          Array.isArray((order as any).receipt_voucher_ids) &&
+          (order as any).receipt_voucher_ids.length > 0;
+
+        if (paidAmount > 0 && !alreadyHasVoucher) {
           try {
             // Get account IDs for the receipt voucher
             const { data: cashAcc } = await supabase
@@ -396,21 +465,29 @@ class CheckoutIntegration {
           }
         }
 
-        // 13b. Record remaining balance as credit (if any)
-        // The triggers will handle balance updates automatically
+        // 13b. Record remaining balance as credit (if any) — once
         if (paidAmount < finalTotal) {
           const remaining = finalTotal - paidAmount;
-          await supabase.from('customer_transactions').insert({
-            customer_id: customerId,
-            restaurant_id: context.restaurantId,
-            type: 'sale',
-            amount: remaining,
-            description: `فاتورة #${orderNum.slice(-4)} - متبقي`,
-            order_id: order.id,
-            payment_method: 'credit',
-            reference_type: 'order',
-            reference_id: order.id
-          });
+          const { data: existingSaleTx } = await supabase
+            .from('customer_transactions')
+            .select('id')
+            .eq('order_id', order.id)
+            .eq('type', 'sale')
+            .limit(1);
+
+          if (!existingSaleTx || existingSaleTx.length === 0) {
+            await supabase.from('customer_transactions').insert({
+              customer_id: customerId,
+              restaurant_id: context.restaurantId,
+              type: 'sale',
+              amount: remaining,
+              description: `فاتورة #${orderNum.slice(-4)} - متبقي`,
+              order_id: order.id,
+              payment_method: 'credit',
+              reference_type: 'order',
+              reference_id: order.id
+            });
+          }
         }
       }
 
@@ -457,8 +534,18 @@ class CheckoutIntegration {
         errorCode = 'CONNECTION_ERROR';
         isNetworkError = true;
 
-        // DISABLED: Auto-retry causes duplicate orders
-        // Instead, directly save to offline queue
+        // لو الطلب اتخلق فعلاً على السيرفر — لا تضفه لطابور الأوفلاين (ده سبب التكرار!)
+        // أرجِع النجاح الجزئي حتى لا يعيد المستخدم المحاولة ويُنشئ طلباً ثانياً.
+        if (createdOrder) {
+          toast.warning('تم حفظ الطلب على السيرفر، لكن بعض الخطوات المحاسبية تأخرت. لن يتم إنشاء طلب مكرر.');
+          return {
+            success: true,
+            order: createdOrder as unknown as Order,
+            error: undefined,
+            errorCode: 'PARTIAL_NETWORK',
+          };
+        }
+
         const offlineOrderItems = orderData.cart.map(item => ({
             menu_item_id: (item as any).product_id ? null : item.menu_item_id,
             product_id: (item as any).product_id || null,
@@ -472,11 +559,11 @@ class CheckoutIntegration {
             variables: (item as any).variables || null,
           }));
 
-          // Queue the order locally
+          // استخدم client_order_id كـ id للطابور حتى لا تتكرر نفس العملية في IndexedDB
           await queueOfflineOrder({
-            id: `${context.restaurantId}-${Date.now()}-${Math.random().toString(36).slice(2,8)}`,
+            id: clientOrderId,
             restaurantId: context.restaurantId,
-            orderData: orderPayload,
+            orderData: { ...orderPayload, client_order_id: clientOrderId },
             items: offlineOrderItems,
             timestamp: Date.now()
           });

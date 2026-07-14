@@ -631,17 +631,17 @@ export default function Dashboard() {
 
   const performCheckout = async (sendToPrep: boolean = false) => {
     if (cart.length === 0) return;
-    // منع الازدواجية حتى لو حدثت نقرتين قبل تحديث state
-    if (checkoutLockRef.current) return;
+    // منع الازدواجية — افحص القفل قبل وضعه، ولا تترك القفل عالقاً عند الخروج المبكر
+    if (checkoutLockRef.current || isProcessingCheckout) return;
     checkoutLockRef.current = true;
-    if (isProcessingCheckout) return; // Prevent double-click (UI-level)
     if (!restaurant?.id) {
       toast.error('خطأ: بيانات المطعم غير متاحة');
-      setIsProcessingCheckout(false);
       checkoutLockRef.current = false;
       return;
     }
     setIsProcessingCheckout(true);
+    // ثبّت معرف العملية قبل أي await حتى تشارك إعادة المحاولة نفس client_order_id
+    const checkoutClientOrderId = getClientOrderIdForCheckout();
     try {
       const result = await checkoutIntegration.processCheckout(
         { restaurantId: restaurant.id, businessType: businessType as any, currency, isOnline, userId: user?.id, skipPreparation: !sendToPrep },
@@ -655,7 +655,7 @@ export default function Dashboard() {
             variables: c.variables || null
           })),
           customerName, customerPhone, customerRef, orderType: orderType as any, deliveryAddress, deliveryDate, deliveryAgentId: selectedDeliveryAgent, paymentMethod: paymentMethod as any, paidAmount: paidNum, discount: discountAmount, discountType: discountType === 'percent' ? 'percentage' : 'fixed', notes: orderNotes, destinationAccountId: selectedAccountId, customOrderNumber: customOrderNumber || undefined,
-          clientOrderId: getClientOrderIdForCheckout()
+          clientOrderId: checkoutClientOrderId
         }
       );
       if (result.success && result.order) {
