@@ -196,7 +196,7 @@ export const ProfessionalSidebar = memo(function ProfessionalSidebar({
     marketing_contracts: { label: 'عقود التسويق', icon: FileCheck, section: 'main' },
     marketing_workflow: { label: 'سير العمل التسويقي', icon: Layers, section: 'main' },
     marketing_accounting: { label: 'المحاسبة التسويقية', icon: DollarSign, section: 'finance' },
-    service_deliverables: { label: 'متابعة الاستلامات', icon: Package, section: 'main' },
+    service_deliverables: { label: 'متابعة التسليمات', icon: Package, section: 'main' },
     contractors: { label: 'الصنايعية', icon: UsersRound, section: 'main' },
   };
 

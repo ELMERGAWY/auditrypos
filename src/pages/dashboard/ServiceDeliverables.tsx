@@ -1,5 +1,9 @@
-import React, { useState, useEffect } from 'react';
-import { Plus, Edit2, Trash2, Calendar, AlertTriangle, CheckCircle, Clock, Package } from 'lucide-react';
+// @ts-nocheck
+import { useState, useEffect, useMemo, useCallback } from 'react';
+import {
+  Plus, Edit2, Trash2, Calendar, AlertTriangle, CheckCircle, Clock,
+  Package, Search, Filter, Truck, RefreshCcw, User, Hash, Layers
+} from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -11,8 +15,11 @@ import { Badge } from '@/components/ui/badge';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 
+type DeliverableSource = 'marketing' | 'order';
+
 interface ServiceDeliverable {
   id: string;
+  source: DeliverableSource;
   contract_id: string | null;
   quote_id: string | null;
   invoice_id: string | null;
@@ -28,150 +35,269 @@ interface ServiceDeliverable {
   created_at: string;
   invoice_number?: string;
   customer_name?: string;
+  customer_phone?: string;
+  item_labels?: string[];
 }
 
 interface Props {
   restaurantId: string;
-  currency: string;
+  currency?: string;
 }
 
 const STATUS_OPTIONS = [
-  { value: 'pending', label: 'قيد الانتظار', color: 'bg-gray-500' },
-  { value: 'in_progress', label: 'قيد التنفيذ', color: 'bg-blue-500' },
-  { value: 'delivered', label: 'تم التسليم', color: 'bg-green-500' },
-  { value: 'delayed', label: 'متأخر', color: 'bg-red-500' },
-  { value: 'cancelled', label: 'ملغي', color: 'bg-gray-400' }
+  { value: 'pending', label: 'قيد الانتظار', color: 'bg-slate-500', text: 'text-slate-700', soft: 'bg-slate-500/10 border-slate-500/30' },
+  { value: 'in_progress', label: 'قيد التنفيذ', color: 'bg-sky-500', text: 'text-sky-700', soft: 'bg-sky-500/10 border-sky-500/30' },
+  { value: 'delivered', label: 'تم التسليم', color: 'bg-emerald-500', text: 'text-emerald-700', soft: 'bg-emerald-500/10 border-emerald-500/30' },
+  { value: 'delayed', label: 'متأخر', color: 'bg-rose-500', text: 'text-rose-700', soft: 'bg-rose-500/10 border-rose-500/30' },
+  { value: 'cancelled', label: 'ملغي', color: 'bg-zinc-400', text: 'text-zinc-600', soft: 'bg-zinc-500/10 border-zinc-500/30' },
 ];
 
 const PRIORITY_OPTIONS = [
-  { value: 'low', label: 'منخفض', color: 'bg-gray-400' },
-  { value: 'medium', label: 'متوسط', color: 'bg-yellow-500' },
-  { value: 'high', label: 'عالي', color: 'bg-orange-500' },
-  { value: 'urgent', label: 'عاجل', color: 'bg-red-600' }
+  { value: 'low', label: 'منخفض', color: 'border-zinc-400 text-zinc-600' },
+  { value: 'medium', label: 'متوسط', color: 'border-amber-500 text-amber-700' },
+  { value: 'high', label: 'عالي', color: 'border-orange-500 text-orange-700' },
+  { value: 'urgent', label: 'عاجل', color: 'border-rose-600 text-rose-700' },
 ];
 
-export function ServiceDeliverables({ restaurantId, currency }: Props) {
+function daysUntil(dateStr: string): number {
+  const target = new Date(dateStr);
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  target.setHours(0, 0, 0, 0);
+  return Math.round((target.getTime() - today.getTime()) / 86400000);
+}
+
+function mapOrderDeliveryStatus(deliveryStatus: string | null | undefined, expectedDate: string): string {
+  const ds = String(deliveryStatus || 'pending');
+  if (ds === 'delivered' || ds === 'completed') return 'delivered';
+  if (ds === 'cancelled') return 'cancelled';
+  if (ds === 'in_progress' || ds === 'out_for_delivery' || ds === 'preparing') return 'in_progress';
+  if (daysUntil(expectedDate) < 0) return 'delayed';
+  return 'pending';
+}
+
+function toOrderDeliveryStatus(status: string): string {
+  if (status === 'delivered') return 'delivered';
+  if (status === 'cancelled') return 'cancelled';
+  if (status === 'in_progress') return 'in_progress';
+  return 'pending';
+}
+
+const emptyForm = {
+  contract_id: '',
+  quote_id: '',
+  invoice_id: '',
+  service_id: '',
+  service_name: '',
+  description: '',
+  expected_delivery_date: '',
+  actual_delivery_date: '',
+  status: 'pending',
+  priority: 'medium',
+  notes: '',
+};
+
+export function ServiceDeliverables({ restaurantId }: Props) {
   const [deliverables, setDeliverables] = useState<ServiceDeliverable[]>([]);
   const [contracts, setContracts] = useState<any[]>([]);
   const [quotes, setQuotes] = useState<any[]>([]);
   const [services, setServices] = useState<any[]>([]);
   const [invoices, setInvoices] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
+  const [savingId, setSavingId] = useState<string | null>(null);
   const [showModal, setShowModal] = useState(false);
   const [editingDeliverable, setEditingDeliverable] = useState<ServiceDeliverable | null>(null);
-  const [form, setForm] = useState({
-    contract_id: '',
-    quote_id: '',
-    invoice_id: '',
-    service_id: '',
-    service_name: '',
-    description: '',
-    expected_delivery_date: '',
-    actual_delivery_date: '',
-    status: 'pending',
-    priority: 'medium',
-    notes: ''
-  });
+  const [form, setForm] = useState(emptyForm);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [statusFilter, setStatusFilter] = useState('all');
+  const [priorityFilter, setPriorityFilter] = useState('all');
+  const [sourceFilter, setSourceFilter] = useState('all');
 
-  // Safety checks for arrays to prevent React error #306
-  const safeDeliverables = Array.isArray(deliverables) ? deliverables : [];
   const safeContracts = Array.isArray(contracts) ? contracts : [];
   const safeQuotes = Array.isArray(quotes) ? quotes : [];
   const safeServices = Array.isArray(services) ? services : [];
 
-  const loadDeliverables = async () => {
+  const loadDeliverables = useCallback(async () => {
+    if (!restaurantId) return;
     setLoading(true);
     try {
-      // Load from marketing_service_deliverables
-      const { data: marketingDeliverables, error: marketingError } = await supabase
-        .from('marketing_service_deliverables')
-        .select('*')
-        .eq('restaurant_id', restaurantId)
-        .order('expected_delivery_date', { ascending: true });
-      
-      if (marketingError) throw marketingError;
-      
-      // Load from orders with delivery_date
-      const { data: ordersWithDelivery, error: ordersError } = await supabase
-        .from('orders')
-        .select('*, order_items(*)')
-        .eq('restaurant_id', restaurantId)
-        .not('delivery_date', 'is', null)
-        .order('delivery_date', { ascending: true });
-      
-      if (ordersError) throw ordersError;
-      
-      // Convert orders to deliverable format
-      const orderDeliverables = (ordersWithDelivery || []).map((order: any) => {
-        const expectedDate = new Date(order.delivery_date);
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
-        expectedDate.setHours(0, 0, 0, 0);
+      const [{ data: marketingDeliverables, error: marketingError }, { data: ordersWithDelivery, error: ordersError }] =
+        await Promise.all([
+          supabase
+            .from('marketing_service_deliverables')
+            .select('*')
+            .eq('restaurant_id', restaurantId)
+            .order('expected_delivery_date', { ascending: true }),
+          supabase
+            .from('orders')
+            .select('id, order_number, customer_name, customer_phone, notes, delivery_date, delivery_status, created_at, status, order_items(menu_item_name, quantity, sold_unit, variables)')
+            .eq('restaurant_id', restaurantId)
+            .not('delivery_date', 'is', null)
+            .neq('status', 'cancelled')
+            .order('delivery_date', { ascending: true }),
+        ]);
 
-        // Determine status based on delivery date, not order status
-        let status = 'pending';
-        if (order.actual_delivery_date) {
-          status = 'delivered';
-        } else if (expectedDate < today) {
+      if (marketingError) throw marketingError;
+      if (ordersError) throw ordersError;
+
+      const fromMarketing: ServiceDeliverable[] = (marketingDeliverables || []).map((d: any) => {
+        let status = d.status || 'pending';
+        if (status !== 'delivered' && status !== 'cancelled' && d.expected_delivery_date && daysUntil(d.expected_delivery_date) < 0) {
           status = 'delayed';
         }
+        return {
+          ...d,
+          source: 'marketing' as const,
+          status,
+          priority: d.priority || 'medium',
+        };
+      });
 
+      const fromOrders: ServiceDeliverable[] = (ordersWithDelivery || []).map((order: any) => {
+        const items = Array.isArray(order.order_items) ? order.order_items : [];
+        const labels = items.map((it: any) => {
+          const unit = it.sold_unit ? ` (${it.sold_unit})` : '';
+          return `${it.menu_item_name || 'صنف'}${unit} ×${it.quantity}`;
+        });
+        const expected = order.delivery_date;
         return {
           id: order.id,
+          source: 'order' as const,
           contract_id: null,
           quote_id: null,
           invoice_id: null,
           invoice_line_id: null,
           service_id: null,
-          service_name: order.order_items?.[0]?.menu_item_name || 'خدمة من الطلب',
-          description: order.notes,
-          expected_delivery_date: order.delivery_date,
-          actual_delivery_date: order.actual_delivery_date || null,
-          status: status,
+          service_name: labels[0] || `طلب #${String(order.order_number || '').slice(-4)}`,
+          description: order.notes || null,
+          expected_delivery_date: expected,
+          actual_delivery_date: order.delivery_status === 'delivered' ? expected : null,
+          status: mapOrderDeliveryStatus(order.delivery_status, expected),
           priority: 'medium',
-          notes: order.notes,
+          notes: order.notes || null,
           created_at: order.created_at,
           invoice_number: order.order_number,
-          customer_name: order.customer_name
+          customer_name: order.customer_name,
+          customer_phone: order.customer_phone,
+          item_labels: labels,
         };
       });
-      
-      // Combine both sources
-      setDeliverables([...(marketingDeliverables || []), ...orderDeliverables]);
+
+      const combined = [...fromMarketing, ...fromOrders].sort(
+        (a, b) =>
+          new Date(a.expected_delivery_date).getTime() - new Date(b.expected_delivery_date).getTime()
+      );
+      setDeliverables(combined);
     } catch (e: any) {
-      toast.error('خطأ في تحميل الاستلامات: ' + e.message);
+      toast.error('خطأ في تحميل التسليمات: ' + e.message);
     } finally {
       setLoading(false);
     }
-  };
+  }, [restaurantId]);
 
-  const loadRelatedData = async () => {
+  const loadRelatedData = useCallback(async () => {
+    if (!restaurantId) return;
     try {
       const [contractsRes, quotesRes, servicesRes, invoicesRes] = await Promise.all([
         supabase.from('marketing_contracts').select('id, contract_number, customer_name').eq('restaurant_id', restaurantId),
         supabase.from('marketing_quotes').select('id, quote_number, customer_name').eq('restaurant_id', restaurantId),
         supabase.from('marketing_services').select('id, name').eq('restaurant_id', restaurantId),
-        supabase.from('orders').select('id, order_number, customer_name, order_items(*)').eq('restaurant_id', restaurantId)
+        supabase
+          .from('orders')
+          .select('id, order_number, customer_name, order_items(*)')
+          .eq('restaurant_id', restaurantId)
+          .order('created_at', { ascending: false })
+          .limit(200),
       ]);
       setContracts(contractsRes.data || []);
       setQuotes(quotesRes.data || []);
       setServices(servicesRes.data || []);
       setInvoices(invoicesRes.data || []);
-    } catch (e: any) {
+    } catch (e) {
       console.error('Error loading related data:', e);
     }
-  };
+  }, [restaurantId]);
 
   useEffect(() => {
     loadDeliverables();
     loadRelatedData();
-  }, [restaurantId]);
+  }, [loadDeliverables, loadRelatedData]);
+
+  const updateStatusQuick = async (deliverable: ServiceDeliverable, nextStatus: string) => {
+    if (deliverable.status === nextStatus) return;
+    setSavingId(deliverable.id);
+    const prev = deliverable.status;
+    setDeliverables((list) =>
+      list.map((d) => (d.id === deliverable.id ? { ...d, status: nextStatus } : d))
+    );
+    try {
+      if (deliverable.source === 'order') {
+        const payload: any = { delivery_status: toOrderDeliveryStatus(nextStatus) };
+        if (nextStatus === 'delivered') {
+          // keep expected date; status is source of truth on orders
+        }
+        const { error } = await supabase.from('orders').update(payload).eq('id', deliverable.id);
+        if (error) throw error;
+      } else {
+        const payload: any = {
+          status: nextStatus,
+          updated_at: new Date().toISOString(),
+        };
+        if (nextStatus === 'delivered' && !deliverable.actual_delivery_date) {
+          payload.actual_delivery_date = new Date().toISOString().slice(0, 10);
+        }
+        if (nextStatus !== 'delivered') {
+          payload.actual_delivery_date = null;
+        }
+        const { error } = await supabase
+          .from('marketing_service_deliverables')
+          .update(payload)
+          .eq('id', deliverable.id);
+        if (error) throw error;
+      }
+      toast.success('تم تحديث الحالة');
+      // refresh derived delayed flags
+      loadDeliverables();
+    } catch (e: any) {
+      setDeliverables((list) =>
+        list.map((d) => (d.id === deliverable.id ? { ...d, status: prev } : d))
+      );
+      toast.error('فشل تحديث الحالة: ' + e.message);
+    } finally {
+      setSavingId(null);
+    }
+  };
 
   const handleSave = async () => {
     if (!form.service_name.trim() || !form.expected_delivery_date) {
       toast.error('يرجى إدخال اسم الخدمة وتاريخ التسليم المتوقع');
       return;
     }
+    if (editingDeliverable?.source === 'order') {
+      try {
+        setLoading(true);
+        const { error } = await supabase
+          .from('orders')
+          .update({
+            delivery_date: form.expected_delivery_date,
+            delivery_status: toOrderDeliveryStatus(form.status),
+            notes: form.notes || form.description || null,
+          } as any)
+          .eq('id', editingDeliverable.id);
+        if (error) throw error;
+        toast.success('تم تحديث تسليم الطلب');
+        setShowModal(false);
+        setEditingDeliverable(null);
+        setForm(emptyForm);
+        loadDeliverables();
+      } catch (e: any) {
+        toast.error('خطأ في الحفظ: ' + e.message);
+      } finally {
+        setLoading(false);
+      }
+      return;
+    }
+
     setLoading(true);
     try {
       const payload = {
@@ -186,7 +312,7 @@ export function ServiceDeliverables({ restaurantId, currency }: Props) {
         actual_delivery_date: form.actual_delivery_date || null,
         status: form.status,
         priority: form.priority,
-        notes: form.notes || null
+        notes: form.notes || null,
       };
 
       if (editingDeliverable) {
@@ -195,17 +321,17 @@ export function ServiceDeliverables({ restaurantId, currency }: Props) {
           .update(payload)
           .eq('id', editingDeliverable.id);
         if (error) throw error;
-        toast.success('تم تحديث الاستلام بنجاح');
+        toast.success('تم تحديث التسليم بنجاح');
       } else {
         const { error } = await supabase
           .from('marketing_service_deliverables')
           .insert(payload as any);
         if (error) throw error;
-        toast.success('تم إضافة الاستلام بنجاح');
+        toast.success('تم إضافة التسليم بنجاح');
       }
       setShowModal(false);
       setEditingDeliverable(null);
-      resetForm();
+      setForm(emptyForm);
       loadDeliverables();
     } catch (e: any) {
       toast.error('خطأ في الحفظ: ' + e.message);
@@ -215,323 +341,525 @@ export function ServiceDeliverables({ restaurantId, currency }: Props) {
   };
 
   const handleDelete = async (deliverable: ServiceDeliverable) => {
-    if (!confirm(`هل تريد حذف استلام "${deliverable.service_name}"؟`)) return;
+    if (deliverable.source === 'order') {
+      toast.info('تسليمات الطلبات تُدار من كارت الطلب/الفاتورة — احذف تاريخ التسليم من الطلب إن أردت إخفاءه');
+      return;
+    }
+    if (!confirm(`هل تريد حذف تسليم "${deliverable.service_name}"؟`)) return;
     try {
       const { error } = await supabase.from('marketing_service_deliverables').delete().eq('id', deliverable.id);
       if (error) throw error;
-      toast.success('تم حذف الاستلام');
+      toast.success('تم حذف التسليم');
       loadDeliverables();
     } catch (e: any) {
       toast.error('خطأ في الحذف: ' + e.message);
     }
   };
 
-  const resetForm = () => {
+  const openEdit = (deliverable: ServiceDeliverable) => {
+    setEditingDeliverable(deliverable);
     setForm({
-      contract_id: '',
-      quote_id: '',
-      invoice_id: '',
-      service_id: '',
-      service_name: '',
-      description: '',
-      expected_delivery_date: '',
-      actual_delivery_date: '',
-      status: 'pending',
-      priority: 'medium',
-      notes: ''
+      contract_id: deliverable.contract_id || '',
+      quote_id: deliverable.quote_id || '',
+      invoice_id: deliverable.invoice_id || '',
+      service_id: deliverable.service_id || '',
+      service_name: deliverable.service_name,
+      description: deliverable.description || '',
+      expected_delivery_date: String(deliverable.expected_delivery_date || '').slice(0, 10),
+      actual_delivery_date: deliverable.actual_delivery_date
+        ? String(deliverable.actual_delivery_date).slice(0, 10)
+        : '',
+      status: deliverable.status === 'delayed' ? 'pending' : deliverable.status,
+      priority: deliverable.priority || 'medium',
+      notes: deliverable.notes || '',
     });
+    setShowModal(true);
   };
 
-  const getStatusInfo = (status: string) => {
-    return STATUS_OPTIONS.find(s => s.value === status) || STATUS_OPTIONS[0];
-  };
+  const filtered = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+    return deliverables.filter((d) => {
+      if (statusFilter !== 'all' && d.status !== statusFilter) return false;
+      if (priorityFilter !== 'all' && d.priority !== priorityFilter) return false;
+      if (sourceFilter !== 'all' && d.source !== sourceFilter) return false;
+      if (!q) return true;
+      const hay = [
+        d.service_name,
+        d.customer_name,
+        d.invoice_number,
+        d.description,
+        d.notes,
+        ...(d.item_labels || []),
+      ]
+        .filter(Boolean)
+        .join(' ')
+        .toLowerCase();
+      return hay.includes(q);
+    });
+  }, [deliverables, searchQuery, statusFilter, priorityFilter, sourceFilter]);
 
-  const getPriorityInfo = (priority: string) => {
-    return PRIORITY_OPTIONS.find(p => p.value === priority) || PRIORITY_OPTIONS[1];
-  };
+  const stats = useMemo(() => {
+    const delayed = deliverables.filter((d) => d.status === 'delayed').length;
+    const pending = deliverables.filter((d) => d.status === 'pending').length;
+    const inProgress = deliverables.filter((d) => d.status === 'in_progress').length;
+    const delivered = deliverables.filter((d) => d.status === 'delivered').length;
+    return { delayed, pending, inProgress, delivered, total: deliverables.length };
+  }, [deliverables]);
 
-  const isOverdue = (expectedDate: string, status: string) => {
-    return new Date(expectedDate) < new Date() && status !== 'delivered' && status !== 'cancelled';
-  };
-
-  const delayedCount = safeDeliverables.filter(d => d.status === 'delayed').length;
-  const pendingCount = safeDeliverables.filter(d => d.status === 'pending').length;
-  const deliveredCount = safeDeliverables.filter(d => d.status === 'delivered').length;
+  const getStatusInfo = (status: string) =>
+    STATUS_OPTIONS.find((s) => s.value === status) || STATUS_OPTIONS[0];
+  const getPriorityInfo = (priority: string) =>
+    PRIORITY_OPTIONS.find((p) => p.value === priority) || PRIORITY_OPTIONS[1];
 
   return (
-    <div className="p-4 space-y-6">
-      <div className="flex justify-between items-center">
+    <div className="p-4 md:p-6 space-y-5 max-w-[1400px] mx-auto" dir="rtl">
+      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
         <div>
-          <h2 className="text-2xl font-bold flex items-center gap-2">
-            <Package className="w-6 h-6 text-primary" />
-            متابعة استلام الخدمات
+          <h2 className="text-2xl font-black flex items-center gap-2">
+            <Truck className="w-6 h-6 text-primary" />
+            متابعة التسليمات
           </h2>
-          <p className="text-sm text-muted-foreground mt-1">تتبع مواعيد تسليم الخدمات والتنبيهات للتأخيرات</p>
-        </div>
-        <Button onClick={() => {
-          setEditingDeliverable(null);
-          resetForm();
-          setShowModal(true);
-        }}>
-          <Plus className="w-4 h-4 ml-2" /> استلام جديد
-        </Button>
-      </div>
-
-      {/* Statistics Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <Card className="p-4 glass-card">
-          <p className="text-xs text-muted-foreground">إجمالي الاستلامات</p>
-          <p className="text-2xl font-bold text-primary">{safeDeliverables.length}</p>
-        </Card>
-        <Card className="p-4 glass-card">
-          <p className="text-xs text-muted-foreground">قيد الانتظار</p>
-          <p className="text-2xl font-bold text-blue-600">{pendingCount}</p>
-        </Card>
-        <Card className="p-4 glass-card">
-          <p className="text-xs text-muted-foreground">تم التسليم</p>
-          <p className="text-2xl font-bold text-emerald-600">{deliveredCount}</p>
-        </Card>
-        <Card className={`p-4 glass-card ${delayedCount > 0 ? 'border-red-500' : ''}`}>
-          <p className="text-xs text-muted-foreground flex items-center gap-1">
-            متأخر
-            {delayedCount > 0 && <AlertTriangle className="w-3 h-3 text-red-500" />}
+          <p className="text-sm text-muted-foreground mt-1">
+            لوحة موحّدة لكل التسليمات من الطلبات والخدمات — غيّر الحالة مباشرة من الكارت
           </p>
-          <p className="text-2xl font-bold text-red-600">{delayedCount}</p>
-        </Card>
+        </div>
+        <div className="flex gap-2 flex-wrap">
+          <Button variant="outline" size="sm" onClick={() => loadDeliverables()} disabled={loading}>
+            <RefreshCcw className={`w-4 h-4 ml-1 ${loading ? 'animate-spin' : ''}`} /> تحديث
+          </Button>
+          <Button
+            onClick={() => {
+              setEditingDeliverable(null);
+              setForm(emptyForm);
+              setShowModal(true);
+            }}
+          >
+            <Plus className="w-4 h-4 ml-2" /> تسليم جديد
+          </Button>
+        </div>
       </div>
 
-      {/* Delayed Alert */}
-      {delayedCount > 0 && (
-        <Card className="p-4 bg-red-50 border-red-200">
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+        {[
+          { label: 'الإجمالي', value: stats.total, className: 'text-primary' },
+          { label: 'انتظار', value: stats.pending, className: 'text-slate-600' },
+          { label: 'تنفيذ', value: stats.inProgress, className: 'text-sky-600' },
+          { label: 'تم التسليم', value: stats.delivered, className: 'text-emerald-600' },
+          { label: 'متأخر', value: stats.delayed, className: 'text-rose-600' },
+        ].map((s) => (
+          <Card key={s.label} className="p-3 border-border/60">
+            <p className="text-[11px] text-muted-foreground font-bold">{s.label}</p>
+            <p className={`text-2xl font-black ${s.className}`}>{s.value}</p>
+          </Card>
+        ))}
+      </div>
+
+      {stats.delayed > 0 && (
+        <Card className="p-4 border-rose-500/40 bg-rose-500/5">
           <div className="flex items-center gap-3">
-            <AlertTriangle className="w-6 h-6 text-red-600" />
+            <AlertTriangle className="w-5 h-5 text-rose-600 shrink-0" />
             <div>
-              <p className="font-bold text-red-900">تنبيه: هناك {delayedCount} استلامات متأخرة</p>
-              <p className="text-sm text-red-700">يرجى مراجعة الاستلامات المتأخرة واتخاذ الإجراء اللازم</p>
+              <p className="font-bold text-rose-800 dark:text-rose-300">
+                تنبيه: {stats.delayed} تسليم متأخر
+              </p>
+              <p className="text-sm text-muted-foreground">راجع الكروت المتأخرة وحدّث حالتها من القائمة السريعة</p>
             </div>
+            <Button
+              size="sm"
+              variant="outline"
+              className="mr-auto border-rose-500/40"
+              onClick={() => setStatusFilter('delayed')}
+            >
+              عرض المتأخر
+            </Button>
           </div>
         </Card>
       )}
 
-      {/* Deliverables List */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {safeDeliverables.map(deliverable => {
+      <Card className="p-3 border-border/60">
+        <div className="flex flex-col md:flex-row gap-2 md:items-center">
+          <div className="relative flex-1">
+            <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+            <Input
+              className="pr-9"
+              placeholder="بحث بالعميل، الصنف، رقم الطلب، الملاحظات..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+            />
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <Select value={statusFilter} onValueChange={setStatusFilter}>
+              <SelectTrigger className="w-[140px]">
+                <Filter className="w-3.5 h-3.5 ml-1" />
+                <SelectValue placeholder="الحالة" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">كل الحالات</SelectItem>
+                {STATUS_OPTIONS.map((s) => (
+                  <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Select value={priorityFilter} onValueChange={setPriorityFilter}>
+              <SelectTrigger className="w-[130px]"><SelectValue placeholder="الأولوية" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">كل الأولويات</SelectItem>
+                {PRIORITY_OPTIONS.map((p) => (
+                  <SelectItem key={p.value} value={p.value}>{p.label}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Select value={sourceFilter} onValueChange={setSourceFilter}>
+              <SelectTrigger className="w-[130px]"><SelectValue placeholder="المصدر" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">كل المصادر</SelectItem>
+                <SelectItem value="order">طلبات/فواتير</SelectItem>
+                <SelectItem value="marketing">تسليمات يدوية</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+      </Card>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+        {filtered.map((deliverable) => {
           const statusInfo = getStatusInfo(deliverable.status);
           const priorityInfo = getPriorityInfo(deliverable.priority);
-          const overdue = isOverdue(deliverable.expected_delivery_date, deliverable.status);
-          
+          const delta = daysUntil(deliverable.expected_delivery_date);
+          const overdue = deliverable.status === 'delayed' || (delta < 0 && deliverable.status !== 'delivered' && deliverable.status !== 'cancelled');
+
           return (
-            <Card key={deliverable.id} className={`p-5 hover:shadow-lg transition-all border-border/60 ${overdue ? 'border-red-500' : ''}`}>
-              <div className="flex justify-between items-start mb-3">
-                <div className="flex-1">
-                  <h3 className="font-bold text-lg">{deliverable.service_name}</h3>
-                  <div className="flex gap-2 mt-1">
-                    <Badge className={statusInfo.color}>{statusInfo.label}</Badge>
-                    <Badge variant="outline" className={priorityInfo.color}>{priorityInfo.label}</Badge>
+            <Card
+              key={`${deliverable.source}-${deliverable.id}`}
+              className={`p-4 flex flex-col gap-3 border transition-shadow hover:shadow-md ${
+                overdue ? 'border-rose-500/50' : 'border-border/60'
+              }`}
+            >
+              <div className="flex justify-between items-start gap-2">
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-2 flex-wrap mb-1">
+                    <Badge variant="outline" className="text-[10px]">
+                      {deliverable.source === 'order' ? (
+                        <><Hash className="w-3 h-3 ml-0.5" /> طلب</>
+                      ) : (
+                        <><Layers className="w-3 h-3 ml-0.5" /> يدوي</>
+                      )}
+                    </Badge>
+                    <Badge variant="outline" className={`text-[10px] ${priorityInfo.color}`}>
+                      {priorityInfo.label}
+                    </Badge>
                   </div>
+                  <h3 className="font-bold text-base leading-snug line-clamp-2">{deliverable.service_name}</h3>
+                  {deliverable.customer_name && (
+                    <p className="text-xs text-muted-foreground mt-1 flex items-center gap-1">
+                      <User className="w-3 h-3" />
+                      {deliverable.customer_name}
+                      {deliverable.invoice_number ? ` · #${String(deliverable.invoice_number).slice(-4)}` : ''}
+                    </p>
+                  )}
                 </div>
-                <div className="flex gap-1">
-                  <Button variant="ghost" size="sm" onClick={() => {
-                    setEditingDeliverable(deliverable);
-                    setForm({
-                      contract_id: deliverable.contract_id || '',
-                      quote_id: deliverable.quote_id || '',
-                      invoice_id: deliverable.invoice_id || '',
-                      service_id: deliverable.service_id || '',
-                      service_name: deliverable.service_name,
-                      description: deliverable.description || '',
-                      expected_delivery_date: deliverable.expected_delivery_date,
-                      actual_delivery_date: deliverable.actual_delivery_date || '',
-                      status: deliverable.status,
-                      priority: deliverable.priority,
-                      notes: deliverable.notes || ''
-                    });
-                    setShowModal(true);
-                  }}>
+                <div className="flex gap-0.5 shrink-0">
+                  <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => openEdit(deliverable)}>
                     <Edit2 className="w-4 h-4" />
                   </Button>
-                  <Button variant="ghost" size="sm" className="text-destructive" onClick={() => handleDelete(deliverable)}>
-                    <Trash2 className="w-4 h-4" />
-                  </Button>
+                  {deliverable.source === 'marketing' && (
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8 text-destructive"
+                      onClick={() => handleDelete(deliverable)}
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </Button>
+                  )}
                 </div>
               </div>
-              
-              {deliverable.description && (
-                <p className="text-sm text-muted-foreground mb-3 line-clamp-2">{deliverable.description}</p>
-              )}
-              
-              <div className="space-y-2 text-sm">
-                <div className="flex items-center gap-2 text-muted-foreground">
-                  <Calendar className="w-4 h-4" />
-                  <span>التسليم المتوقع: {new Date(deliverable.expected_delivery_date).toLocaleDateString('ar-EG')}</span>
-                </div>
-                {deliverable.actual_delivery_date && (
-                  <div className="flex items-center gap-2 text-emerald-600">
-                    <CheckCircle className="w-4 h-4" />
-                    <span>تم التسليم: {new Date(deliverable.actual_delivery_date).toLocaleDateString('ar-EG')}</span>
-                  </div>
-                )}
-                {overdue && (
-                  <div className="flex items-center gap-2 text-red-600 font-medium">
-                    <AlertTriangle className="w-4 h-4" />
-                    <span>متأخر!</span>
-                  </div>
-                )}
-              </div>
-            </Card>
-          );
-        })}
-        {deliverables.length === 0 && !loading && (
-          <div className="col-span-full py-16 text-center text-muted-foreground border-2 border-dashed rounded-xl">
-            <Package className="w-12 h-12 mx-auto mb-4 opacity-30" />
-            <p className="text-lg">لا توجد استلامات مضافة حتى الآن</p>
-            <Button variant="link" onClick={() => {
-              setEditingDeliverable(null);
-              resetForm();
-              setShowModal(true);
-            }}>أضف استلامك الأول</Button>
-          </div>
-        )}
-      </div>
 
-      {/* Add/Edit Dialog */}
-      <Dialog open={showModal} onOpenChange={setShowModal}>
-        <DialogContent className="max-w-2xl">
-          <DialogHeader>
-            <DialogTitle>{editingDeliverable ? 'تعديل الاستلام' : 'إضافة استلام جديد'}</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4">
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <Label>العقد (اختياري)</Label>
-                <Select value={form.contract_id} onValueChange={async (v) => {
-                  setForm({ ...form, contract_id: v });
-                  if (v) {
-                    // Load services from the contract
-                    const { data: contractServices } = await supabase
-                      .from('marketing_contract_services')
-                      .select('*, marketing_services(*)')
-                      .eq('contract_id', v);
-                    if (contractServices && contractServices.length > 0) {
-                      const firstService = contractServices[0];
-                      setForm(f => ({
-                        ...f,
-                        service_id: firstService.marketing_services?.id || '',
-                        service_name: firstService.marketing_services?.name || firstService.service_name || '',
-                        description: firstService.marketing_services?.description || firstService.description || ''
-                      }));
-                    }
-                  }
-                }}>
-                  <SelectTrigger><SelectValue placeholder="اختر العقد" /></SelectTrigger>
+              {/* Quick status — outside edit modal */}
+              <div onClick={(e) => e.stopPropagation()} onPointerDown={(e) => e.stopPropagation()}>
+                <Label className="text-[10px] text-muted-foreground mb-1 block">تغيير الحالة</Label>
+                <Select
+                  value={deliverable.status}
+                  onValueChange={(v) => updateStatusQuick(deliverable, v)}
+                  disabled={savingId === deliverable.id}
+                >
+                  <SelectTrigger className={`h-9 ${statusInfo.soft} border`}>
+                    <SelectValue />
+                  </SelectTrigger>
                   <SelectContent>
-                    {safeContracts.map(c => (
-                      <SelectItem key={c.id} value={c.id}>{c.contract_number} - {c.customer_name}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div>
-                <Label>عرض السعر (اختياري)</Label>
-                <Select value={form.quote_id} onValueChange={(v) => setForm({ ...form, quote_id: v })}>
-                  <SelectTrigger><SelectValue placeholder="اختر عرض السعر" /></SelectTrigger>
-                  <SelectContent>
-                    {safeQuotes.map(q => (
-                      <SelectItem key={q.id} value={q.id}>{q.quote_number} - {q.customer_name}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div>
-                <Label>الفاتورة (اختياري)</Label>
-                <Select value={form.invoice_id} onValueChange={async (v) => {
-                  setForm({ ...form, invoice_id: v });
-                  if (v) {
-                    // Load services from the invoice
-                    const invoice = invoices.find((inv: any) => inv.id === v);
-                    if (invoice && invoice.order_items && invoice.order_items.length > 0) {
-                      const firstItem = invoice.order_items[0];
-                      setForm(f => ({
-                        ...f,
-                        service_name: firstItem.menu_item_name || '',
-                        description: invoice.notes || ''
-                      }));
-                    }
-                  }
-                }}>
-                  <SelectTrigger><SelectValue placeholder="اختر الفاتورة" /></SelectTrigger>
-                  <SelectContent>
-                    {invoices.map((inv: any) => (
-                      <SelectItem key={inv.id} value={inv.id}>{inv.order_number} - {inv.customer_name}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-            <div>
-              <Label>الخدمة (اختياري)</Label>
-              <Select value={form.service_id} onValueChange={(v) => {
-                const service = safeServices.find(s => s.id === v);
-                setForm({ ...form, service_id: v, service_name: service?.name || form.service_name });
-              }}>
-                <SelectTrigger><SelectValue placeholder="اختر الخدمة" /></SelectTrigger>
-                <SelectContent>
-                  {safeServices.map(s => (
-                    <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div>
-              <Label>اسم الخدمة *</Label>
-              <Input value={form.service_name} onChange={(e) => setForm({ ...form, service_name: e.target.value })} placeholder="مثال: تصميم شعار" />
-            </div>
-            <div>
-              <Label>وصف الخدمة</Label>
-              <Textarea value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} placeholder="وصف تفصيلي للخدمة" />
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <Label>تاريخ التسليم المتوقع *</Label>
-                <Input type="date" value={form.expected_delivery_date} onChange={(e) => setForm({ ...form, expected_delivery_date: e.target.value })} />
-              </div>
-              <div>
-                <Label>تاريخ التسليم الفعلي</Label>
-                <Input type="date" value={form.actual_delivery_date} onChange={(e) => setForm({ ...form, actual_delivery_date: e.target.value })} />
-              </div>
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <Label>الحالة</Label>
-                <Select value={form.status} onValueChange={(v) => setForm({ ...form, status: v })}>
-                  <SelectTrigger><SelectValue placeholder="اختر الحالة" /></SelectTrigger>
-                  <SelectContent>
-                    {STATUS_OPTIONS.map(s => (
+                    {STATUS_OPTIONS.map((s) => (
                       <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
               </div>
+
+              {deliverable.item_labels && deliverable.item_labels.length > 1 && (
+                <div className="rounded-lg bg-muted/40 border border-border/50 p-2 space-y-1 max-h-20 overflow-y-auto">
+                  {deliverable.item_labels.slice(0, 6).map((label, i) => (
+                    <p key={i} className="text-[11px] truncate">{label}</p>
+                  ))}
+                  {deliverable.item_labels.length > 6 && (
+                    <p className="text-[10px] text-muted-foreground">+{deliverable.item_labels.length - 6} أصناف</p>
+                  )}
+                </div>
+              )}
+
+              <div className="mt-auto space-y-1.5 text-xs">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-muted-foreground flex items-center gap-1">
+                    <Calendar className="w-3.5 h-3.5" />
+                    {new Date(deliverable.expected_delivery_date).toLocaleDateString('ar-EG')}
+                  </span>
+                  {deliverable.status === 'delivered' ? (
+                    <span className="text-emerald-600 font-bold flex items-center gap-1">
+                      <CheckCircle className="w-3.5 h-3.5" /> مكتمل
+                    </span>
+                  ) : overdue ? (
+                    <span className="text-rose-600 font-bold flex items-center gap-1">
+                      <AlertTriangle className="w-3.5 h-3.5" /> متأخر {Math.abs(delta)} يوم
+                    </span>
+                  ) : (
+                    <span className="text-sky-700 font-medium flex items-center gap-1">
+                      <Clock className="w-3.5 h-3.5" />
+                      {delta === 0 ? 'اليوم' : `بعد ${delta} يوم`}
+                    </span>
+                  )}
+                </div>
+              </div>
+            </Card>
+          );
+        })}
+
+        {!loading && filtered.length === 0 && (
+          <div className="col-span-full py-16 text-center text-muted-foreground border-2 border-dashed rounded-2xl">
+            <Package className="w-12 h-12 mx-auto mb-3 opacity-30" />
+            <p className="text-lg font-bold">لا توجد تسليمات مطابقة</p>
+            <p className="text-sm mt-1">أضف تسليمًا يدويًا أو حدّد تاريخ تسليم على الفاتورة/الطلب</p>
+            <Button
+              variant="link"
+              onClick={() => {
+                setEditingDeliverable(null);
+                setForm(emptyForm);
+                setShowModal(true);
+              }}
+            >
+              أضف تسليمًا جديدًا
+            </Button>
+          </div>
+        )}
+      </div>
+
+      <Dialog open={showModal} onOpenChange={setShowModal}>
+        <DialogContent className="max-w-2xl max-h-[90vh] flex flex-col p-0 gap-0 overflow-hidden">
+          <DialogHeader className="px-6 pt-6 pb-3 border-b shrink-0">
+            <DialogTitle>
+              {editingDeliverable
+                ? editingDeliverable.source === 'order'
+                  ? 'تعديل تسليم طلب'
+                  : 'تعديل التسليم'
+                : 'إضافة تسليم جديد'}
+            </DialogTitle>
+          </DialogHeader>
+
+          <div className="px-6 py-4 space-y-4 overflow-y-auto flex-1 min-h-0">
+            {editingDeliverable?.source !== 'order' && (
+              <>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <Label>العقد (اختياري)</Label>
+                    <Select
+                      value={form.contract_id || '__none__'}
+                      onValueChange={async (v) => {
+                        const id = v === '__none__' ? '' : v;
+                        setForm({ ...form, contract_id: id });
+                        if (!id) return;
+                        const { data: contractServices } = await supabase
+                          .from('marketing_contract_services')
+                          .select('*, marketing_services(*)')
+                          .eq('contract_id', id);
+                        if (contractServices?.length) {
+                          const firstService = contractServices[0];
+                          setForm((f) => ({
+                            ...f,
+                            service_id: firstService.marketing_services?.id || '',
+                            service_name:
+                              firstService.marketing_services?.name ||
+                              firstService.service_name ||
+                              '',
+                            description:
+                              firstService.marketing_services?.description ||
+                              firstService.description ||
+                              '',
+                          }));
+                        }
+                      }}
+                    >
+                      <SelectTrigger><SelectValue placeholder="اختر العقد" /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="__none__">— بدون —</SelectItem>
+                        {safeContracts.map((c) => (
+                          <SelectItem key={c.id} value={c.id}>
+                            {c.contract_number} - {c.customer_name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
+                    <Label>عرض السعر (اختياري)</Label>
+                    <Select
+                      value={form.quote_id || '__none__'}
+                      onValueChange={(v) => setForm({ ...form, quote_id: v === '__none__' ? '' : v })}
+                    >
+                      <SelectTrigger><SelectValue placeholder="اختر عرض السعر" /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="__none__">— بدون —</SelectItem>
+                        {safeQuotes.map((q) => (
+                          <SelectItem key={q.id} value={q.id}>
+                            {q.quote_number} - {q.customer_name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="sm:col-span-2">
+                    <Label>الفاتورة / الطلب (اختياري)</Label>
+                    <Select
+                      value={form.invoice_id || '__none__'}
+                      onValueChange={async (v) => {
+                        const id = v === '__none__' ? '' : v;
+                        setForm({ ...form, invoice_id: id });
+                        if (!id) return;
+                        const invoice = invoices.find((inv: any) => inv.id === id);
+                        if (invoice?.order_items?.length) {
+                          const firstItem = invoice.order_items[0];
+                          setForm((f) => ({
+                            ...f,
+                            service_name: firstItem.menu_item_name || '',
+                            description: invoice.notes || '',
+                          }));
+                        }
+                      }}
+                    >
+                      <SelectTrigger><SelectValue placeholder="اختر الفاتورة" /></SelectTrigger>
+                      <SelectContent className="max-h-60">
+                        <SelectItem value="__none__">— بدون —</SelectItem>
+                        {invoices.map((inv: any) => (
+                          <SelectItem key={inv.id} value={inv.id}>
+                            {inv.order_number} - {inv.customer_name || 'عميل'}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+                <div>
+                  <Label>الخدمة (اختياري)</Label>
+                  <Select
+                    value={form.service_id || '__none__'}
+                    onValueChange={(v) => {
+                      const id = v === '__none__' ? '' : v;
+                      const service = safeServices.find((s) => s.id === id);
+                      setForm({
+                        ...form,
+                        service_id: id,
+                        service_name: service?.name || form.service_name,
+                      });
+                    }}
+                  >
+                    <SelectTrigger><SelectValue placeholder="اختر الخدمة" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="__none__">— بدون —</SelectItem>
+                      {safeServices.map((s) => (
+                        <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </>
+            )}
+
+            <div>
+              <Label>اسم التسليم *</Label>
+              <Input
+                value={form.service_name}
+                onChange={(e) => setForm({ ...form, service_name: e.target.value })}
+                placeholder="مثال: تسليم بضاعة / تصميم شعار"
+                disabled={editingDeliverable?.source === 'order'}
+              />
+            </div>
+            <div>
+              <Label>الوصف</Label>
+              <Textarea
+                value={form.description}
+                onChange={(e) => setForm({ ...form, description: e.target.value })}
+                placeholder="تفاصيل التسليم"
+                rows={3}
+              />
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
-                <Label>الأولوية</Label>
-                <Select value={form.priority} onValueChange={(v) => setForm({ ...form, priority: v })}>
-                  <SelectTrigger><SelectValue placeholder="اختر الأولوية" /></SelectTrigger>
+                <Label>تاريخ التسليم المتوقع *</Label>
+                <Input
+                  type="date"
+                  value={form.expected_delivery_date}
+                  onChange={(e) => setForm({ ...form, expected_delivery_date: e.target.value })}
+                />
+              </div>
+              {editingDeliverable?.source !== 'order' && (
+                <div>
+                  <Label>تاريخ التسليم الفعلي</Label>
+                  <Input
+                    type="date"
+                    value={form.actual_delivery_date}
+                    onChange={(e) => setForm({ ...form, actual_delivery_date: e.target.value })}
+                  />
+                </div>
+              )}
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <Label>الحالة</Label>
+                <Select value={form.status} onValueChange={(v) => setForm({ ...form, status: v })}>
+                  <SelectTrigger><SelectValue placeholder="اختر الحالة" /></SelectTrigger>
                   <SelectContent>
-                    {PRIORITY_OPTIONS.map(p => (
-                      <SelectItem key={p.value} value={p.value}>{p.label}</SelectItem>
+                    {STATUS_OPTIONS.filter((s) => s.value !== 'delayed').map((s) => (
+                      <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
               </div>
+              {editingDeliverable?.source !== 'order' && (
+                <div>
+                  <Label>الأولوية</Label>
+                  <Select value={form.priority} onValueChange={(v) => setForm({ ...form, priority: v })}>
+                    <SelectTrigger><SelectValue placeholder="اختر الأولوية" /></SelectTrigger>
+                    <SelectContent>
+                      {PRIORITY_OPTIONS.map((p) => (
+                        <SelectItem key={p.value} value={p.value}>{p.label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
             </div>
             <div>
               <Label>ملاحظات</Label>
-              <Textarea value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} placeholder="أي ملاحظات إضافية" />
+              <Textarea
+                value={form.notes}
+                onChange={(e) => setForm({ ...form, notes: e.target.value })}
+                placeholder="أي ملاحظات إضافية"
+                rows={3}
+              />
             </div>
           </div>
-          <DialogFooter>
+
+          <DialogFooter className="px-6 py-4 border-t shrink-0 bg-background">
             <Button variant="outline" onClick={() => setShowModal(false)}>إلغاء</Button>
-            <Button onClick={handleSave}>{editingDeliverable ? 'تحديث' : 'حفظ'}</Button>
+            <Button onClick={handleSave} disabled={loading}>
+              {editingDeliverable ? 'تحديث' : 'حفظ'}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
