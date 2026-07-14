@@ -183,11 +183,26 @@ class CheckoutIntegration {
         customer_id: customerId,
       };
 
+      console.log('[checkout] Creating order with payload:', {
+        order_number: orderPayload.order_number,
+        total: orderPayload.total,
+        paid_amount: orderPayload.paid_amount,
+        payment_method: orderPayload.payment_method,
+        timestamp: new Date().toISOString()
+      });
+
       const { data: order, error: orderError } = await supabase
         .from('orders')
         .insert(orderPayload)
         .select()
         .single();
+
+      console.log('[checkout] Order created:', {
+        id: order?.id,
+        order_number: order?.order_number,
+        paid_amount: order?.paid_amount,
+        success: !orderError
+      });
 
       if (orderError || !order) {
         throw new Error(`فشل إنشاء الطلب: ${orderError?.message}`);
