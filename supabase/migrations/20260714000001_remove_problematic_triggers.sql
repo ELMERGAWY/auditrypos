@@ -113,6 +113,8 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
+DROP FUNCTION IF EXISTS public.recalculate_all_account_balances(UUID) CASCADE;
+DROP FUNCTION IF EXISTS public.recalculate_all_account_balances() CASCADE;
 CREATE OR REPLACE FUNCTION public.recalculate_all_account_balances(p_restaurant_id UUID DEFAULT NULL)
 RETURNS INTEGER AS $$
 DECLARE
