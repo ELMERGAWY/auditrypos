@@ -187,11 +187,35 @@ class CheckoutIntegration {
       const debugMsg = `جاري إنشاء الطلب #${orderPayload.order_number} - المبلغ: ${orderPayload.total} - المدفوع: ${orderPayload.paid_amount}`;
       toast.info(debugMsg);
 
-      const { data: order, error: orderError } = await supabase
+      // مهم: اجعل إنشاء الطلب Idempotent قدر الإمكان لتقليل التكرار في حالات
+      // النقر المزدوج/تذبذب الاتصال/إعادة المحاولة.
+      let order: any = null;
+      let orderError: any = null;
+
+      ({ data: order, error: orderError } = await supabase
         .from('orders')
         .insert(orderPayload)
         .select()
-        .single();
+        .single());
+
+      // لو حصل تعارض Unique (غالباً على client_order_id)، اعتبر العملية ناجحة
+      // وجلب نفس الطلب بدلاً من إنشاء طلب جديد أو كسر العملية.
+      if (orderError && (orderError.code === '23505' || String(orderError.message || '').includes('duplicate'))) {
+        const clientOrderId = (orderPayload as any).client_order_id;
+        if (clientOrderId) {
+          const { data: existingOrder, error: fetchErr } = await supabase
+            .from('orders')
+            .select('*')
+            .eq('client_order_id', clientOrderId)
+            .maybeSingle();
+
+          if (!fetchErr && existingOrder) {
+            order = existingOrder;
+            orderError = null;
+            toast.info('ℹ️ تم اكتشاف طلب مُنشأ مسبقاً، جاري إكمال العملية بدون تكرار.');
+          }
+        }
+      }
 
       // Show debug toast after creating order
       if (order) {
@@ -217,9 +241,18 @@ class CheckoutIntegration {
         variables: (item as any).variables || [],
       }));
 
-      const { error: itemsError } = await supabase
+      // تجنب تكرار أصناف الطلب إذا كانت العملية أعيدت بالخطأ
+      const { data: existingItems } = await supabase
         .from('order_items')
-        .insert(orderItems);
+        .select('id')
+        .eq('order_id', order.id)
+        .limit(1);
+
+      const shouldInsertItems = !existingItems || existingItems.length === 0;
+
+      const { error: itemsError } = shouldInsertItems
+        ? await supabase.from('order_items').insert(orderItems)
+        : { error: null as any };
 
       if (itemsError) {
         console.error('Failed to create order items:', itemsError);

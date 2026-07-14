@@ -165,6 +165,8 @@ export default function Dashboard() {
   const [autoPrint, setAutoPrint] = useState(false);
   const [viewingOrderId, setViewingOrderId] = useState<string | null>(null);
   const [isProcessingCheckout, setIsProcessingCheckout] = useState(false);
+  // قفل فوري لمنع تنفيذ checkout أكثر من مرة قبل إعادة الرندر (يحمي من النقر المزدوج السريع)
+  const checkoutLockRef = useRef(false);
   // Service item customization modal state
   const [showServiceModal, setShowServiceModal] = useState(false);
   const [selectedServiceItem, setSelectedServiceItem] = useState<MenuItem | null>(null);
@@ -612,10 +614,14 @@ export default function Dashboard() {
 
   const performCheckout = async (sendToPrep: boolean = false) => {
     if (cart.length === 0) return;
-    if (isProcessingCheckout) return; // Prevent double-click
+    // منع الازدواجية حتى لو حدثت نقرتين قبل تحديث state
+    if (checkoutLockRef.current) return;
+    checkoutLockRef.current = true;
+    if (isProcessingCheckout) return; // Prevent double-click (UI-level)
     if (!restaurant?.id) {
       toast.error('خطأ: بيانات المطعم غير متاحة');
       setIsProcessingCheckout(false);
+      checkoutLockRef.current = false;
       return;
     }
     setIsProcessingCheckout(true);
@@ -676,7 +682,10 @@ export default function Dashboard() {
         setActiveInvoiceId(null); // Reset to "فاتورة جديدة"!
       } else { throw new Error(result.error); }
     } catch (e) { toast.error(e.message || 'فشل في إتمام الطلب'); }
-    finally { setIsProcessingCheckout(false); }
+    finally {
+      setIsProcessingCheckout(false);
+      checkoutLockRef.current = false;
+    }
   };
 
   const holdCurrentInvoice = useCallback(() => {
