@@ -57,6 +57,7 @@ END;
 $$ LANGUAGE plpgsql;
 
 -- Create trigger only for validation (no side effects)
+DROP TRIGGER IF EXISTS trg_journal_entry_balance_validation ON public.journal_entries;
 CREATE TRIGGER trg_journal_entry_balance_validation
 AFTER INSERT OR UPDATE ON public.journal_entries
 FOR EACH ROW
