@@ -167,6 +167,22 @@ export default function Dashboard() {
   const [isProcessingCheckout, setIsProcessingCheckout] = useState(false);
   // قفل فوري لمنع تنفيذ checkout أكثر من مرة قبل إعادة الرندر (يحمي من النقر المزدوج السريع)
   const checkoutLockRef = useRef(false);
+  // مُعرّف ثابت للفاتورة الحالية (في حالة "فاتورة جديدة" بدون activeInvoiceId)
+  // الهدف: منع إنشاء طلبين في DB لو حصل Retry/Double Click/تذبذب اتصال.
+  const newInvoiceClientOrderIdRef = useRef<string>(
+    (crypto as any)?.randomUUID?.() || `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
+  );
+
+  const resetNewInvoiceClientOrderId = useCallback(() => {
+    newInvoiceClientOrderIdRef.current =
+      (crypto as any)?.randomUUID?.() || `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+  }, []);
+
+  const getClientOrderIdForCheckout = useCallback(() => {
+    // لو في فاتورة معلّقة/تاب مفتوح استخدم الـ id نفسه كـ client_order_id
+    if (activeInvoiceId) return activeInvoiceId;
+    return newInvoiceClientOrderIdRef.current;
+  }, [activeInvoiceId]);
   // Service item customization modal state
   const [showServiceModal, setShowServiceModal] = useState(false);
   const [selectedServiceItem, setSelectedServiceItem] = useState<MenuItem | null>(null);
@@ -276,7 +292,8 @@ export default function Dashboard() {
     setOrderNotes(''); setDiscount(''); setDeliveryAddress(''); setSelectedDeliveryAgent('');
     setPaymentMethod('cash'); setPaidAmount(''); setCustomerRef('');
     setOrderType(getDefaultOrderType(businessType) as OrderType); setActiveInvoiceId(null);
-  }, [businessType]);
+    resetNewInvoiceClientOrderId();
+  }, [businessType, resetNewInvoiceClientOrderId]);
 
   const addToCart = useCallback((item: MenuItem) => {
     // Check if it's a service item
@@ -637,7 +654,9 @@ export default function Dashboard() {
             service_details: c.service_details,
             variables: c.variables || null
           })),
-          customerName, customerPhone, customerRef, orderType: orderType as any, deliveryAddress, deliveryDate, deliveryAgentId: selectedDeliveryAgent, paymentMethod: paymentMethod as any, paidAmount: paidNum, discount: discountAmount, discountType: discountType === 'percent' ? 'percentage' : 'fixed', notes: orderNotes, destinationAccountId: selectedAccountId, customOrderNumber: customOrderNumber || undefined }
+          customerName, customerPhone, customerRef, orderType: orderType as any, deliveryAddress, deliveryDate, deliveryAgentId: selectedDeliveryAgent, paymentMethod: paymentMethod as any, paidAmount: paidNum, discount: discountAmount, discountType: discountType === 'percent' ? 'percentage' : 'fixed', notes: orderNotes, destinationAccountId: selectedAccountId, customOrderNumber: customOrderNumber || undefined,
+          clientOrderId: getClientOrderIdForCheckout()
+        }
       );
       if (result.success && result.order) {
         const completeOrder = {

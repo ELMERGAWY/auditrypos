@@ -56,12 +56,17 @@ class CheckoutIntegration {
       notes?: string;
       destinationAccountId?: string | null;
       customOrderNumber?: string;
+      // مُعرّف ثابت يمر من الواجهة لمنع إنشاء طلبين لنفس العملية
+      // (مهم خصوصاً عند Retry/Double Click/تذبذب اتصال)
+      clientOrderId?: string;
     }
   ): Promise<CheckoutResult> {
     // 7. Prepare order data first (so it's available in catch)
     const paidAmount = orderData.paidAmount ?? 0;
     const orderNum = orderData.customOrderNumber || (orderData.customerRef ? `ORD-${orderData.customerRef}-${Date.now().toString().slice(-6)}` : `ORD-${Date.now().toString().slice(-6)}`);
-    const clientOrderId = `${context.restaurantId}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    const clientOrderId =
+      orderData.clientOrderId ||
+      `${context.restaurantId}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
     
     let finalNotes = orderData.notes || '';
     if (orderData.customerRef) {
