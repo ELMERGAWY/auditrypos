@@ -18,6 +18,7 @@ import {
 import { CustomerSearch } from './CustomerSearch';
 import { PaymentAllocations, type Allocation } from '@/components/PaymentAllocations';
 import { allocatePaymentToUnpaidOrders } from '@/lib/accounting/receiptVoucherAllocation';
+import { actorCreateFields } from '@/lib/actor';
 
 import * as XLSX from 'xlsx';
 import jsPDF from 'jspdf';
@@ -830,6 +831,15 @@ export function CustomerManager({ restaurantId, currency }: Props) {
           payment_method: paymentForm.payment_method,
         } as any);
       } else {
+        if (voucherId) {
+          const actor = await actorCreateFields();
+          await supabase.from('receipt_vouchers').update({
+            created_by_name: actor.created_by_name,
+            updated_by_name: actor.updated_by_name,
+            created_by: actor.created_by,
+            updated_by: actor.updated_by,
+          }).eq('id', voucherId);
+        }
         await allocatePaymentToUnpaidOrders({
           restaurantId,
           customerId: selectedCustomer.id,

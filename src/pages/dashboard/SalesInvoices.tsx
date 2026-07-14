@@ -17,6 +17,7 @@ import { journalService } from '@/lib/accounting/journalService';
 import { CustomerSearch } from './CustomerSearch';
 import { InvoiceViewer } from '@/components/InvoiceViewer';
 import { extractCustomerRef } from './types';
+import { actorCreateFields, actorUpdateFields, formatActorLabel } from '@/lib/actor';
 
 interface Invoice {
   id: string;
@@ -145,6 +146,7 @@ export function SalesInvoices({ restaurantId, currency, restaurant, isSuperAdmin
       const paidAmount = parseFloat(form.paid_amount) || 0;
       const orderNumber = form.customer_ref ? `INV-${form.customer_ref}-${Date.now().toString().slice(-6)}` : `INV-${Date.now().toString().slice(-6)}`;
       
+      const actor = await actorCreateFields();
       // 1. Create the order record
       const { data: order, error: orderError } = await supabase
         .from('orders')
@@ -157,7 +159,8 @@ export function SalesInvoices({ restaurantId, currency, restaurant, isSuperAdmin
           status: 'completed',
           payment_method: form.payment_method,
           delivery_date: form.delivery_date || null,
-          is_pos: false // Mark as manual
+          is_pos: false, // Mark as manual
+          ...actor,
         })
         .select()
         .single();
@@ -345,7 +348,8 @@ export function SalesInvoices({ restaurantId, currency, restaurant, isSuperAdmin
           discount,
           notes: form.notes || '',
           payment_method: form.payment_method,
-          delivery_date: form.delivery_date || null
+          delivery_date: form.delivery_date || null,
+          ...(await actorUpdateFields()),
         })
         .eq('id', editingInvoice.id)
         .select()
@@ -571,6 +575,9 @@ export function SalesInvoices({ restaurantId, currency, restaurant, isSuperAdmin
                     <Badge variant="outline" className="text-[10px]">{inv.payment_method === 'cash' ? 'نقدي' : 'آجل'}</Badge>
                   </div>
                   <p className="text-xs text-muted-foreground">{inv.customer_name || 'عميل نقدي'} • {new Date(inv.created_at).toLocaleString('ar-EG')}</p>
+                  {formatActorLabel(inv) && (
+                    <p className="text-[10px] text-primary/80 mt-0.5">{formatActorLabel(inv)}</p>
+                  )}
                 </div>
               </div>
               <div className="flex items-center gap-6">

@@ -125,6 +125,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setSession(null);
     setLastKnownUser(null);
     localStorage.removeItem('last_known_user');
+    try {
+      localStorage.removeItem('active_staff_name');
+      localStorage.removeItem('active_staff_email');
+    } catch {}
   };
 
   const value = useMemo(() => ({

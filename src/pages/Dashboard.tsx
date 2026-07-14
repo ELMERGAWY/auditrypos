@@ -28,6 +28,7 @@ import { InvoiceViewer } from '@/components/InvoiceViewer';
 import { ProfessionalSidebar, type SidebarTab } from '@/components/professional/ProfessionalSidebar';
 import { ModuleErrorBoundary } from '@/components/professional/ModuleErrorBoundary';
 import { DashboardErrorBoundary } from '@/components/professional/DashboardErrorBoundary';
+import { actorCreateFields, actorUpdateFields } from '@/lib/actor';
 import { updateService } from '@/lib/updateService';
 
 // Lazy loaded components for performance
@@ -564,7 +565,8 @@ export default function Dashboard() {
         paid_amount: parseFloat(editOrderForm.paid_amount) || 0,
         status: editOrderForm.status,
         payment_method: editOrderForm.payment_method,
-        notes
+        notes,
+        ...(await actorUpdateFields()),
       };
       if (ref) payload.customer_ref = ref;
 
@@ -655,7 +657,8 @@ export default function Dashboard() {
         status: editOrderForm.status,
         payment_method: editOrderForm.payment_method,
         notes,
-        order_number: editingOrder.order_number // Keep same order number
+        order_number: editingOrder.order_number, // Keep same order number
+        ...(await actorCreateFields()),
       };
       if (ref) payload.customer_ref = ref;
 
@@ -833,6 +836,13 @@ export default function Dashboard() {
                   <div className="flex flex-col">
                     <span className="text-primary font-black">#{o.order_number.slice(-4)}</span>
                     <span className="text-[10px] text-muted-foreground">{new Date(o.created_at).toLocaleString('ar-EG')}</span>
+                    {(o as any).created_by_name || (o as any).updated_by_name ? (
+                      <span className="text-[10px] text-primary/80">
+                        {(o as any).updated_by_name && (o as any).created_by_name && (o as any).updated_by_name !== (o as any).created_by_name
+                          ? `أنشأه: ${(o as any).created_by_name} · عدّله: ${(o as any).updated_by_name}`
+                          : `بواسطة: ${(o as any).updated_by_name || (o as any).created_by_name}`}
+                      </span>
+                    ) : null}
                   </div>
                   <Badge variant={o.status === 'completed' ? 'default' : 'outline'} className={o.status === 'completed' ? 'bg-emerald-500' : ''}>
                     {STATUS_CONFIG[o.status as OrderStatus]?.label || o.status}

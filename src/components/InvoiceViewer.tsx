@@ -366,6 +366,13 @@ export function InvoiceViewer({
                         : '—'}
                     </div>
                   )}
+                  {(record?.created_by_name || record?.updated_by_name) && (
+                    <p className="text-[10px] opacity-90 mt-1">
+                      {record.updated_by_name && record.created_by_name && record.updated_by_name !== record.created_by_name
+                        ? `أنشأه: ${record.created_by_name} · عدّله: ${record.updated_by_name}`
+                        : `بواسطة: ${record.updated_by_name || record.created_by_name}`}
+                    </p>
+                  )}
                 </div>
               </div>
             </div>

@@ -15,6 +15,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { StaffAccessApprovals } from './StaffAccessApprovals';
 import * as XLSX from 'xlsx';
 
 const STANDARD_ROLES: Record<string, { label: string; icon: string; color: string }> = {
@@ -88,7 +89,7 @@ interface Props {
 }
 
 export function EmployeesTab({ restaurantId, currency, businessType }: Props) {
-  const [activeSubView, setActiveSubView] = useState<'staff' | 'departments' | 'payroll' | 'tax' | 'roles'>('staff');
+  const [activeSubView, setActiveSubView] = useState<'access' | 'staff' | 'departments' | 'payroll' | 'tax' | 'roles'>('access');
   const [staff, setStaff] = useState<any[]>([]);
   const [customRoles, setCustomRoles] = useState<any[]>([]);
   const [departments, setDepartments] = useState<any[]>([]);
@@ -499,13 +500,18 @@ export function EmployeesTab({ restaurantId, currency, businessType }: Props) {
         <div className="glass-card p-3 flex items-center gap-3 border border-border/50"><CreditCard className="w-5 h-5 text-emerald-500" /><div><p className="text-[10px] text-muted-foreground">صافي مصروف</p><p className="font-display font-bold text-sm text-emerald-500">{monthlyTotal.toLocaleString()} {currency}</p></div></div>
       </div>
 
-      <div className="flex gap-2 border-b pb-2 border-border/40">
+      <div className="flex gap-2 border-b pb-2 border-border/40 flex-wrap">
+        <Button variant={activeSubView === 'access' ? 'default' : 'outline'} size="sm" onClick={() => setActiveSubView('access')} className={activeSubView === 'access' ? 'gradient-bg text-primary-foreground border-0' : ''}><Shield className="w-4 h-4 ml-1" /> موافقات الدخول</Button>
         <Button variant={activeSubView === 'staff' ? 'default' : 'outline'} size="sm" onClick={() => setActiveSubView('staff')} className={activeSubView === 'staff' ? 'gradient-bg text-primary-foreground border-0' : ''}><Users className="w-4 h-4 ml-1" /> الموظفين</Button>
         <Button variant={activeSubView === 'departments' ? 'default' : 'outline'} size="sm" onClick={() => setActiveSubView('departments')} className={activeSubView === 'departments' ? 'gradient-bg text-primary-foreground border-0' : ''}><Building2 className="w-4 h-4 ml-1" /> الأقسام</Button>
         <Button variant={activeSubView === 'payroll' ? 'default' : 'outline'} size="sm" onClick={() => setActiveSubView('payroll')} className={activeSubView === 'payroll' ? 'gradient-bg text-primary-foreground border-0' : ''}><DollarSign className="w-4 h-4 ml-1" /> الرواتب</Button>
         <Button variant={activeSubView === 'roles' ? 'default' : 'outline'} size="sm" onClick={() => setActiveSubView('roles')} className={activeSubView === 'roles' ? 'gradient-bg text-primary-foreground border-0' : ''}><Shield className="w-4 h-4 ml-1" /> الأدوار الوظيفية</Button>
         <Button variant={activeSubView === 'tax' ? 'default' : 'outline'} size="sm" onClick={() => setActiveSubView('tax')} className={activeSubView === 'tax' ? 'gradient-bg text-primary-foreground border-0' : ''}><Globe className="w-4 h-4 ml-1" /> الضرائب</Button>
       </div>
+
+      {activeSubView === 'access' && (
+        <StaffAccessApprovals restaurantId={restaurantId} />
+      )}
 
       {activeSubView === 'staff' && (
         <div className="space-y-4">

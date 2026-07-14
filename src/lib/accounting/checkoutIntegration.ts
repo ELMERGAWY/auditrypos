@@ -12,6 +12,7 @@ import taxService from './taxService';
 import type { Order, OrderItem } from '@/pages/dashboard/types';
 import type { BusinessType } from '@/lib/businessTypes';
 import { queueOfflineOrder } from '@/lib/offlineEngine';
+import { actorCreateFields } from '@/lib/actor';
 
 export interface CheckoutContext {
   restaurantId: string;
@@ -190,6 +191,7 @@ class CheckoutIntegration {
         ['retail', 'grocery', 'pharmacy', 'wholesale', 'warehouse'].includes(context.businessType);
 
       // Update order payload with calculated values
+      const actorFields = await actorCreateFields();
       orderPayload = {
         ...orderPayload,
         total: finalTotal,
@@ -197,6 +199,7 @@ class CheckoutIntegration {
         status: isDirectSell ? 'completed' as const : 'pending' as const,
         paid_amount: paidAmount ?? finalTotal,
         customer_id: customerId,
+        ...actorFields,
       };
 
       // مهم: Idempotent عبر RPC ذرّي على السيرفر (يمنع سباق النقر المزدوج)
@@ -222,6 +225,9 @@ class CheckoutIntegration {
         notes: orderPayload.notes,
         client_order_id: clientOrderId,
         customer_id: orderPayload.customer_id,
+        created_by_name: actorFields.created_by_name,
+        updated_by_name: actorFields.updated_by_name,
+        created_by: actorFields.created_by,
       };
 
       const { data: upserted, error: upsertErr } = await supabase.rpc('upsert_pos_order', {

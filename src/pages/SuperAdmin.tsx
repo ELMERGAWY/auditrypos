@@ -21,6 +21,7 @@ import { useDarkMode } from '@/lib/useDarkMode';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { BUSINESS_TYPES, type BusinessType } from '@/lib/businessTypes';
+import { StaffAccessApprovals } from './dashboard/StaffAccessApprovals';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer, PieChart, Pie, Cell, Area, AreaChart
@@ -455,6 +456,8 @@ const SuperAdmin = () => {
 
         {tab === 'users' && (
           <div className="space-y-6">
+            <StaffAccessApprovals superAdmin />
+
             <div className="flex flex-col md:flex-row gap-4 items-center justify-between">
               <h2 className="text-2xl font-bold flex items-center gap-2"><Users className="w-6 h-6 text-primary" /> إدارة مستخدمي النظام</h2>
               <div className="flex gap-2 w-full md:w-auto">
