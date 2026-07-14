@@ -2,7 +2,7 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import {
   Plus, Edit2, Trash2, Calendar, AlertTriangle, CheckCircle, Clock,
-  Package, Search, Filter, Truck, RefreshCcw, User, Hash, Layers
+  Package, Search, Filter, Truck, RefreshCcw, User, Hash, Layers, ClipboardCheck
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -12,10 +12,20 @@ import { Card } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
+import { Checkbox } from '@/components/ui/checkbox';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 
 type DeliverableSource = 'marketing' | 'order';
+
+interface DeliverableItem {
+  id: string;
+  menu_item_name: string;
+  quantity: number;
+  sold_unit?: string | null;
+  variables?: any;
+  is_delivered?: boolean;
+}
 
 interface ServiceDeliverable {
   id: string;
@@ -37,6 +47,11 @@ interface ServiceDeliverable {
   customer_name?: string;
   customer_phone?: string;
   item_labels?: string[];
+  items?: DeliverableItem[];
+  delivery_received_by?: string | null;
+  delivery_receipt_note?: string | null;
+  delivered_count?: number;
+  items_count?: number;
 }
 
 interface Props {
@@ -47,6 +62,7 @@ interface Props {
 const STATUS_OPTIONS = [
   { value: 'pending', label: 'قيد الانتظار', color: 'bg-slate-500', text: 'text-slate-700', soft: 'bg-slate-500/10 border-slate-500/30' },
   { value: 'in_progress', label: 'قيد التنفيذ', color: 'bg-sky-500', text: 'text-sky-700', soft: 'bg-sky-500/10 border-sky-500/30' },
+  { value: 'partial', label: 'تسليم جزئي', color: 'bg-amber-500', text: 'text-amber-700', soft: 'bg-amber-500/10 border-amber-500/30' },
   { value: 'delivered', label: 'تم التسليم', color: 'bg-emerald-500', text: 'text-emerald-700', soft: 'bg-emerald-500/10 border-emerald-500/30' },
   { value: 'delayed', label: 'متأخر', color: 'bg-rose-500', text: 'text-rose-700', soft: 'bg-rose-500/10 border-rose-500/30' },
   { value: 'cancelled', label: 'ملغي', color: 'bg-zinc-400', text: 'text-zinc-600', soft: 'bg-zinc-500/10 border-zinc-500/30' },
@@ -67,10 +83,16 @@ function daysUntil(dateStr: string): number {
   return Math.round((target.getTime() - today.getTime()) / 86400000);
 }
 
-function mapOrderDeliveryStatus(deliveryStatus: string | null | undefined, expectedDate: string): string {
+function mapOrderDeliveryStatus(
+  deliveryStatus: string | null | undefined,
+  expectedDate: string,
+  deliveredCount = 0,
+  itemsCount = 0
+): string {
   const ds = String(deliveryStatus || 'pending');
   if (ds === 'delivered' || ds === 'completed') return 'delivered';
   if (ds === 'cancelled') return 'cancelled';
+  if (ds === 'partial' || (itemsCount > 0 && deliveredCount > 0 && deliveredCount < itemsCount)) return 'partial';
   if (ds === 'in_progress' || ds === 'out_for_delivery' || ds === 'preparing') return 'in_progress';
   if (daysUntil(expectedDate) < 0) return 'delayed';
   return 'pending';
@@ -79,6 +101,7 @@ function mapOrderDeliveryStatus(deliveryStatus: string | null | undefined, expec
 function toOrderDeliveryStatus(status: string): string {
   if (status === 'delivered') return 'delivered';
   if (status === 'cancelled') return 'cancelled';
+  if (status === 'partial') return 'partial';
   if (status === 'in_progress') return 'in_progress';
   return 'pending';
 }
@@ -113,6 +136,17 @@ export function ServiceDeliverables({ restaurantId }: Props) {
   const [priorityFilter, setPriorityFilter] = useState('all');
   const [sourceFilter, setSourceFilter] = useState('all');
 
+  // Receipt confirmation (who received + date + item selection)
+  const [showReceiptModal, setShowReceiptModal] = useState(false);
+  const [receiptTarget, setReceiptTarget] = useState<ServiceDeliverable | null>(null);
+  const [selectedItemIds, setSelectedItemIds] = useState<string[]>([]);
+  const [receiptForm, setReceiptForm] = useState({
+    received_by: '',
+    receipt_date: new Date().toISOString().slice(0, 10),
+    note: '',
+  });
+  const [savingReceipt, setSavingReceipt] = useState(false);
+
   const safeContracts = Array.isArray(contracts) ? contracts : [];
   const safeQuotes = Array.isArray(quotes) ? quotes : [];
   const safeServices = Array.isArray(services) ? services : [];
@@ -130,7 +164,7 @@ export function ServiceDeliverables({ restaurantId }: Props) {
             .order('expected_delivery_date', { ascending: true }),
           supabase
             .from('orders')
-            .select('id, order_number, customer_name, customer_phone, notes, delivery_date, delivery_status, created_at, status, order_items(menu_item_name, quantity, sold_unit, variables)')
+            .select('id, order_number, customer_name, customer_phone, notes, delivery_date, delivery_status, actual_delivery_date, delivery_received_by, delivery_receipt_note, created_at, status, order_items(id, menu_item_name, quantity, sold_unit, variables, is_delivered)')
             .eq('restaurant_id', restaurantId)
             .not('delivery_date', 'is', null)
             .neq('status', 'cancelled')
@@ -138,7 +172,19 @@ export function ServiceDeliverables({ restaurantId }: Props) {
         ]);
 
       if (marketingError) throw marketingError;
-      if (ordersError) throw ordersError;
+      let ordersData = ordersWithDelivery;
+      if (ordersError) {
+        // Fallback if new receipt columns not migrated yet
+        const fb = await supabase
+          .from('orders')
+          .select('id, order_number, customer_name, customer_phone, notes, delivery_date, delivery_status, created_at, status, order_items(id, menu_item_name, quantity, sold_unit, variables)')
+          .eq('restaurant_id', restaurantId)
+          .not('delivery_date', 'is', null)
+          .neq('status', 'cancelled')
+          .order('delivery_date', { ascending: true });
+        if (fb.error) throw fb.error;
+        ordersData = fb.data;
+      }
 
       const fromMarketing: ServiceDeliverable[] = (marketingDeliverables || []).map((d: any) => {
         let status = d.status || 'pending';
@@ -150,15 +196,26 @@ export function ServiceDeliverables({ restaurantId }: Props) {
           source: 'marketing' as const,
           status,
           priority: d.priority || 'medium',
+          items: [],
+          delivered_count: status === 'delivered' ? 1 : 0,
+          items_count: 1,
         };
       });
 
-      const fromOrders: ServiceDeliverable[] = (ordersWithDelivery || []).map((order: any) => {
-        const items = Array.isArray(order.order_items) ? order.order_items : [];
-        const labels = items.map((it: any) => {
+      const fromOrders: ServiceDeliverable[] = (ordersData || []).map((order: any) => {
+        const items: DeliverableItem[] = (Array.isArray(order.order_items) ? order.order_items : []).map((it: any) => ({
+          id: it.id,
+          menu_item_name: it.menu_item_name || 'صنف',
+          quantity: Number(it.quantity) || 0,
+          sold_unit: it.sold_unit,
+          variables: it.variables,
+          is_delivered: !!it.is_delivered,
+        }));
+        const labels = items.map((it) => {
           const unit = it.sold_unit ? ` (${it.sold_unit})` : '';
-          return `${it.menu_item_name || 'صنف'}${unit} ×${it.quantity}`;
+          return `${it.menu_item_name}${unit} ×${it.quantity}${it.is_delivered ? ' ✓' : ''}`;
         });
+        const deliveredCount = items.filter((i) => i.is_delivered).length;
         const expected = order.delivery_date;
         return {
           id: order.id,
@@ -171,8 +228,8 @@ export function ServiceDeliverables({ restaurantId }: Props) {
           service_name: labels[0] || `طلب #${String(order.order_number || '').slice(-4)}`,
           description: order.notes || null,
           expected_delivery_date: expected,
-          actual_delivery_date: order.delivery_status === 'delivered' ? expected : null,
-          status: mapOrderDeliveryStatus(order.delivery_status, expected),
+          actual_delivery_date: order.actual_delivery_date || null,
+          status: mapOrderDeliveryStatus(order.delivery_status, expected, deliveredCount, items.length),
           priority: 'medium',
           notes: order.notes || null,
           created_at: order.created_at,
@@ -180,6 +237,11 @@ export function ServiceDeliverables({ restaurantId }: Props) {
           customer_name: order.customer_name,
           customer_phone: order.customer_phone,
           item_labels: labels,
+          items,
+          delivery_received_by: order.delivery_received_by || null,
+          delivery_receipt_note: order.delivery_receipt_note || null,
+          delivered_count: deliveredCount,
+          items_count: items.length,
         };
       });
 
@@ -223,8 +285,33 @@ export function ServiceDeliverables({ restaurantId }: Props) {
     loadRelatedData();
   }, [loadDeliverables, loadRelatedData]);
 
+  const openReceiptConfirm = (deliverable: ServiceDeliverable, preferAll = false) => {
+    setReceiptTarget(deliverable);
+    const items = deliverable.items || [];
+    if (preferAll || deliverable.source === 'marketing') {
+      setSelectedItemIds(items.map((i) => i.id));
+    } else {
+      setSelectedItemIds(items.filter((i) => i.is_delivered).map((i) => i.id));
+    }
+    setReceiptForm({
+      received_by: deliverable.delivery_received_by || '',
+      receipt_date: deliverable.actual_delivery_date
+        ? String(deliverable.actual_delivery_date).slice(0, 10)
+        : new Date().toISOString().slice(0, 10),
+      note: deliverable.delivery_receipt_note || '',
+    });
+    setShowReceiptModal(true);
+  };
+
   const updateStatusQuick = async (deliverable: ServiceDeliverable, nextStatus: string) => {
     if (deliverable.status === nextStatus) return;
+
+    // تسليم كامل / جزئي → نافذة اختيار الأصناف + المستلم + التاريخ
+    if (nextStatus === 'delivered' || nextStatus === 'partial') {
+      openReceiptConfirm(deliverable, nextStatus === 'delivered');
+      return;
+    }
+
     setSavingId(deliverable.id);
     const prev = deliverable.status;
     setDeliverables((list) =>
@@ -232,23 +319,17 @@ export function ServiceDeliverables({ restaurantId }: Props) {
     );
     try {
       if (deliverable.source === 'order') {
-        const payload: any = { delivery_status: toOrderDeliveryStatus(nextStatus) };
-        if (nextStatus === 'delivered') {
-          // keep expected date; status is source of truth on orders
-        }
-        const { error } = await supabase.from('orders').update(payload).eq('id', deliverable.id);
+        const { error } = await supabase
+          .from('orders')
+          .update({ delivery_status: toOrderDeliveryStatus(nextStatus) } as any)
+          .eq('id', deliverable.id);
         if (error) throw error;
       } else {
         const payload: any = {
           status: nextStatus,
           updated_at: new Date().toISOString(),
         };
-        if (nextStatus === 'delivered' && !deliverable.actual_delivery_date) {
-          payload.actual_delivery_date = new Date().toISOString().slice(0, 10);
-        }
-        if (nextStatus !== 'delivered') {
-          payload.actual_delivery_date = null;
-        }
+        if (nextStatus !== 'delivered') payload.actual_delivery_date = null;
         const { error } = await supabase
           .from('marketing_service_deliverables')
           .update(payload)
@@ -256,7 +337,6 @@ export function ServiceDeliverables({ restaurantId }: Props) {
         if (error) throw error;
       }
       toast.success('تم تحديث الحالة');
-      // refresh derived delayed flags
       loadDeliverables();
     } catch (e: any) {
       setDeliverables((list) =>
@@ -265,6 +345,102 @@ export function ServiceDeliverables({ restaurantId }: Props) {
       toast.error('فشل تحديث الحالة: ' + e.message);
     } finally {
       setSavingId(null);
+    }
+  };
+
+  const saveReceiptConfirm = async () => {
+    if (!receiptTarget) return;
+    if (!receiptForm.received_by.trim()) {
+      toast.error('اكتب اسم من استلم الطلب');
+      return;
+    }
+    if (!receiptForm.receipt_date) {
+      toast.error('حدد تاريخ الاستلام');
+      return;
+    }
+
+    const items = receiptTarget.items || [];
+    if (receiptTarget.source === 'order' && items.length > 0 && selectedItemIds.length === 0) {
+      toast.error('اختر صنفًا واحدًا على الأقل، أو الكل');
+      return;
+    }
+
+    setSavingReceipt(true);
+    try {
+      const selected = new Set(selectedItemIds);
+      const allDelivered =
+        receiptTarget.source === 'marketing' ||
+        (items.length > 0 && items.every((i) => selected.has(i.id))) ||
+        (items.length === 0 && selectedItemIds.length === 0);
+      const anyDelivered = receiptTarget.source === 'marketing' || selectedItemIds.length > 0;
+      const nextStatus = allDelivered ? 'delivered' : anyDelivered ? 'partial' : 'pending';
+
+      if (receiptTarget.source === 'order') {
+        // Update each item delivery flag
+        for (const item of items) {
+          const delivered = selected.has(item.id);
+          const { error: itemErr } = await supabase
+            .from('order_items')
+            .update({
+              is_delivered: delivered,
+              delivered_at: delivered ? new Date().toISOString() : null,
+            } as any)
+            .eq('id', item.id);
+          if (itemErr) {
+            // Columns may not exist yet — soft warn once
+            if (String(itemErr.message || '').includes('is_delivered')) {
+              toast.error('يلزم تشغيل migration أعمدة التسليم الجزئي في Supabase');
+              throw itemErr;
+            }
+            throw itemErr;
+          }
+        }
+
+        const receiptNote = [
+          receiptForm.note?.trim() || '',
+          `استلم: ${receiptForm.received_by.trim()}`,
+          `بتاريخ: ${receiptForm.receipt_date}`,
+        ]
+          .filter(Boolean)
+          .join(' | ');
+
+        const { error } = await supabase
+          .from('orders')
+          .update({
+            delivery_status: toOrderDeliveryStatus(nextStatus),
+            actual_delivery_date: receiptForm.receipt_date,
+            delivery_received_by: receiptForm.received_by.trim(),
+            delivery_receipt_note: receiptNote,
+          } as any)
+          .eq('id', receiptTarget.id);
+        if (error) throw error;
+      } else {
+        const note = [
+          receiptForm.note?.trim() || receiptTarget.notes || '',
+          `استلم: ${receiptForm.received_by.trim()}`,
+        ]
+          .filter(Boolean)
+          .join(' | ');
+        const { error } = await supabase
+          .from('marketing_service_deliverables')
+          .update({
+            status: nextStatus,
+            actual_delivery_date: receiptForm.receipt_date,
+            notes: note,
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', receiptTarget.id);
+        if (error) throw error;
+      }
+
+      toast.success(allDelivered ? 'تم تسجيل التسليم الكامل' : 'تم تسجيل التسليم الجزئي');
+      setShowReceiptModal(false);
+      setReceiptTarget(null);
+      loadDeliverables();
+    } catch (e: any) {
+      toast.error('فشل تسجيل التسليم: ' + e.message);
+    } finally {
+      setSavingReceipt(false);
     }
   };
 
@@ -402,8 +578,9 @@ export function ServiceDeliverables({ restaurantId }: Props) {
     const delayed = deliverables.filter((d) => d.status === 'delayed').length;
     const pending = deliverables.filter((d) => d.status === 'pending').length;
     const inProgress = deliverables.filter((d) => d.status === 'in_progress').length;
+    const partial = deliverables.filter((d) => d.status === 'partial').length;
     const delivered = deliverables.filter((d) => d.status === 'delivered').length;
-    return { delayed, pending, inProgress, delivered, total: deliverables.length };
+    return { delayed, pending, inProgress, partial, delivered, total: deliverables.length };
   }, [deliverables]);
 
   const getStatusInfo = (status: string) =>
@@ -439,11 +616,12 @@ export function ServiceDeliverables({ restaurantId }: Props) {
         </div>
       </div>
 
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+      <div className="grid grid-cols-2 md:grid-cols-6 gap-3">
         {[
           { label: 'الإجمالي', value: stats.total, className: 'text-primary' },
           { label: 'انتظار', value: stats.pending, className: 'text-slate-600' },
           { label: 'تنفيذ', value: stats.inProgress, className: 'text-sky-600' },
+          { label: 'جزئي', value: stats.partial, className: 'text-amber-600' },
           { label: 'تم التسليم', value: stats.delivered, className: 'text-emerald-600' },
           { label: 'متأخر', value: stats.delayed, className: 'text-rose-600' },
         ].map((s) => (
@@ -592,15 +770,61 @@ export function ServiceDeliverables({ restaurantId }: Props) {
                     ))}
                   </SelectContent>
                 </Select>
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  className="w-full mt-2 h-8 text-xs gap-1"
+                  onClick={() => openReceiptConfirm(deliverable, false)}
+                >
+                  <ClipboardCheck className="w-3.5 h-3.5" />
+                  تسجيل تسليم / اختيار الأصناف
+                </Button>
               </div>
 
-              {deliverable.item_labels && deliverable.item_labels.length > 1 && (
-                <div className="rounded-lg bg-muted/40 border border-border/50 p-2 space-y-1 max-h-20 overflow-y-auto">
-                  {deliverable.item_labels.slice(0, 6).map((label, i) => (
-                    <p key={i} className="text-[11px] truncate">{label}</p>
-                  ))}
-                  {deliverable.item_labels.length > 6 && (
-                    <p className="text-[10px] text-muted-foreground">+{deliverable.item_labels.length - 6} أصناف</p>
+              {(deliverable.items_count || 0) > 0 && deliverable.source === 'order' && (
+                <div className="rounded-lg bg-muted/40 border border-border/50 p-2 space-y-1.5">
+                  <div className="flex justify-between text-[10px] font-bold text-muted-foreground">
+                    <span>الأصناف</span>
+                    <span>
+                      {deliverable.delivered_count || 0}/{deliverable.items_count || 0} تم تسليمها
+                    </span>
+                  </div>
+                  <div className="h-1.5 rounded-full bg-muted overflow-hidden">
+                    <div
+                      className="h-full bg-emerald-500 transition-all"
+                      style={{
+                        width: `${
+                          deliverable.items_count
+                            ? Math.round((100 * (deliverable.delivered_count || 0)) / deliverable.items_count)
+                            : 0
+                        }%`,
+                      }}
+                    />
+                  </div>
+                  <div className="space-y-1 max-h-24 overflow-y-auto">
+                    {(deliverable.items || []).map((it) => (
+                      <div key={it.id} className="flex justify-between gap-2 text-[11px]">
+                        <span className={`truncate ${it.is_delivered ? 'text-emerald-700' : ''}`}>
+                          {it.is_delivered ? '✓ ' : '○ '}
+                          {it.menu_item_name}
+                          {it.sold_unit ? ` (${it.sold_unit})` : ''} ×{it.quantity}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {(deliverable.delivery_received_by || deliverable.actual_delivery_date) && (
+                <div className="rounded-lg border border-emerald-500/20 bg-emerald-500/5 p-2 text-[11px] space-y-0.5">
+                  {deliverable.delivery_received_by && (
+                    <p><span className="text-muted-foreground">المستلم:</span> <strong>{deliverable.delivery_received_by}</strong></p>
+                  )}
+                  {deliverable.actual_delivery_date && (
+                    <p><span className="text-muted-foreground">تاريخ الاستلام:</span> {new Date(deliverable.actual_delivery_date).toLocaleDateString('ar-EG')}</p>
+                  )}
+                  {deliverable.delivery_receipt_note && (
+                    <p className="text-muted-foreground line-clamp-2">{deliverable.delivery_receipt_note}</p>
                   )}
                 </div>
               )}
@@ -609,12 +833,14 @@ export function ServiceDeliverables({ restaurantId }: Props) {
                 <div className="flex items-center justify-between gap-2">
                   <span className="text-muted-foreground flex items-center gap-1">
                     <Calendar className="w-3.5 h-3.5" />
-                    {new Date(deliverable.expected_delivery_date).toLocaleDateString('ar-EG')}
+                    متوقع: {new Date(deliverable.expected_delivery_date).toLocaleDateString('ar-EG')}
                   </span>
                   {deliverable.status === 'delivered' ? (
                     <span className="text-emerald-600 font-bold flex items-center gap-1">
                       <CheckCircle className="w-3.5 h-3.5" /> مكتمل
                     </span>
+                  ) : deliverable.status === 'partial' ? (
+                    <span className="text-amber-600 font-bold">جزئي</span>
                   ) : overdue ? (
                     <span className="text-rose-600 font-bold flex items-center gap-1">
                       <AlertTriangle className="w-3.5 h-3.5" /> متأخر {Math.abs(delta)} يوم
@@ -859,6 +1085,127 @@ export function ServiceDeliverables({ restaurantId }: Props) {
             <Button variant="outline" onClick={() => setShowModal(false)}>إلغاء</Button>
             <Button onClick={handleSave} disabled={loading}>
               {editingDeliverable ? 'تحديث' : 'حفظ'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Confirm delivery: which items + who received + date */}
+      <Dialog open={showReceiptModal} onOpenChange={setShowReceiptModal}>
+        <DialogContent className="max-w-lg max-h-[90vh] flex flex-col p-0 gap-0 overflow-hidden">
+          <DialogHeader className="px-6 pt-6 pb-3 border-b shrink-0">
+            <DialogTitle className="flex items-center gap-2">
+              <ClipboardCheck className="w-5 h-5 text-primary" />
+              تأكيد التسليم
+            </DialogTitle>
+          </DialogHeader>
+          <div className="px-6 py-4 space-y-4 overflow-y-auto flex-1 min-h-0">
+            {receiptTarget && (
+              <p className="text-sm text-muted-foreground">
+                {receiptTarget.customer_name || 'عميل'} · #{String(receiptTarget.invoice_number || receiptTarget.id).slice(-4)}
+              </p>
+            )}
+
+            {receiptTarget?.source === 'order' && (receiptTarget.items?.length || 0) > 0 && (
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <Label>الأصناف المسلّمة</Label>
+                  <div className="flex gap-2">
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      className="h-7 text-xs"
+                      onClick={() =>
+                        setSelectedItemIds((receiptTarget.items || []).map((i) => i.id))
+                      }
+                    >
+                      تحديد الكل
+                    </Button>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="ghost"
+                      className="h-7 text-xs"
+                      onClick={() => setSelectedItemIds([])}
+                    >
+                      إلغاء الكل
+                    </Button>
+                  </div>
+                </div>
+                <div className="rounded-xl border border-border divide-y max-h-48 overflow-y-auto">
+                  {(receiptTarget.items || []).map((it) => {
+                    const checked = selectedItemIds.includes(it.id);
+                    return (
+                      <label
+                        key={it.id}
+                        className="flex items-start gap-3 p-3 cursor-pointer hover:bg-muted/40"
+                      >
+                        <Checkbox
+                          checked={checked}
+                          onCheckedChange={(v) => {
+                            setSelectedItemIds((prev) =>
+                              v ? [...prev, it.id] : prev.filter((id) => id !== it.id)
+                            );
+                          }}
+                        />
+                        <div className="min-w-0 flex-1">
+                          <p className="text-sm font-bold leading-snug">
+                            {it.menu_item_name}
+                            {it.sold_unit ? ` (${it.sold_unit})` : ''} ×{it.quantity}
+                          </p>
+                          {it.variables && Array.isArray(it.variables) && it.variables.length > 0 && (
+                            <p className="text-[10px] text-muted-foreground mt-0.5">
+                              {it.variables.map((v: any) => `${v.label}: ${v.value}`).join(' · ')}
+                            </p>
+                          )}
+                        </div>
+                      </label>
+                    );
+                  })}
+                </div>
+                <p className="text-[11px] text-muted-foreground">
+                  محدد {selectedItemIds.length} من {(receiptTarget.items || []).length}
+                  {selectedItemIds.length > 0 &&
+                  selectedItemIds.length < (receiptTarget.items || []).length
+                    ? ' → تسليم جزئي'
+                    : selectedItemIds.length === (receiptTarget.items || []).length && selectedItemIds.length > 0
+                      ? ' → تسليم كامل'
+                      : ''}
+                </p>
+              </div>
+            )}
+
+            <div>
+              <Label>اسم المستلم *</Label>
+              <Input
+                value={receiptForm.received_by}
+                onChange={(e) => setReceiptForm({ ...receiptForm, received_by: e.target.value })}
+                placeholder="مثال: أحمد محمد / مندوب الفرع"
+              />
+            </div>
+            <div>
+              <Label>تاريخ الاستلام *</Label>
+              <Input
+                type="date"
+                value={receiptForm.receipt_date}
+                onChange={(e) => setReceiptForm({ ...receiptForm, receipt_date: e.target.value })}
+              />
+            </div>
+            <div>
+              <Label>ملاحظة تذكير (اختياري)</Label>
+              <Textarea
+                value={receiptForm.note}
+                onChange={(e) => setReceiptForm({ ...receiptForm, note: e.target.value })}
+                placeholder="أي ملاحظة بعد التسليم..."
+                rows={3}
+              />
+            </div>
+          </div>
+          <DialogFooter className="px-6 py-4 border-t shrink-0">
+            <Button variant="outline" onClick={() => setShowReceiptModal(false)}>إلغاء</Button>
+            <Button onClick={saveReceiptConfirm} disabled={savingReceipt}>
+              {savingReceipt ? 'جاري الحفظ...' : 'تأكيد التسليم'}
             </Button>
           </DialogFooter>
         </DialogContent>
