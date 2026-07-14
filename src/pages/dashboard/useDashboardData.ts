@@ -322,7 +322,16 @@ export function useDashboardData() {
           async (payload) => {
             const { data: items } = await supabase.from('order_items').select('*').eq('order_id', payload.new.id);
             const newOrder = { ...payload.new, items: (items || []) as OrderItem[] } as unknown as Order;
-            setOrders(prev => prev.some(order => order.id === newOrder.id) ? prev : [newOrder, ...prev]);
+            setOrders(prev => {
+              if (prev.some(order => order.id === newOrder.id)) {
+                return prev.map(order => order.id === newOrder.id ? { ...order, ...newOrder } : order);
+              }
+              const cid = (payload.new as any).client_order_id;
+              if (cid && prev.some(order => (order as any).client_order_id === cid)) {
+                return prev;
+              }
+              return [newOrder, ...prev];
+            });
             if (soundEnabled) playOrderSound();
             toast.success(`🆕 طلب جديد #${(payload.new as any).order_number?.slice(-4)}`, { duration: 5000 });
           }

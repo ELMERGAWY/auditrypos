@@ -176,13 +176,28 @@ export default function Dashboard() {
   const resetNewInvoiceClientOrderId = useCallback(() => {
     newInvoiceClientOrderIdRef.current =
       (crypto as any)?.randomUUID?.() || `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-  }, []);
+    try {
+      if (restaurant?.id) sessionStorage.removeItem(`pos_inflight_${restaurant.id}`);
+    } catch { /* ignore */ }
+  }, [restaurant?.id]);
 
   const getClientOrderIdForCheckout = useCallback(() => {
     // لو في فاتورة معلّقة/تاب مفتوح استخدم الـ id نفسه كـ client_order_id
     if (activeInvoiceId) return activeInvoiceId;
+    // قفل عبر sessionStorage يمنع تكرار المعرف بعد remount/StrictMode/تحديث الصفحة أثناء الدفع
+    try {
+      if (restaurant?.id) {
+        const key = `pos_inflight_${restaurant.id}`;
+        const existing = sessionStorage.getItem(key);
+        if (existing) {
+          newInvoiceClientOrderIdRef.current = existing;
+          return existing;
+        }
+        sessionStorage.setItem(key, newInvoiceClientOrderIdRef.current);
+      }
+    } catch { /* ignore */ }
     return newInvoiceClientOrderIdRef.current;
-  }, [activeInvoiceId]);
+  }, [activeInvoiceId, restaurant?.id]);
   // Service item customization modal state
   const [showServiceModal, setShowServiceModal] = useState(false);
   const [selectedServiceItem, setSelectedServiceItem] = useState<MenuItem | null>(null);
@@ -262,7 +277,45 @@ export default function Dashboard() {
         o.notes?.toLowerCase().includes(q)
       );
     }
-    return result;
+    // إزالة تكرار الواجهة: نفس id / نفس client_order_id / نفس الرقم+الثانية+الإجمالي
+    const seenIds = new Set<string>();
+    const seenClient = new Set<string>();
+    const seenNear = new Set<string>();
+    const deduped: typeof result = [];
+    for (const o of result) {
+      if (!o?.id || seenIds.has(o.id)) continue;
+      const cid = (o as any).client_order_id as string | undefined;
+      if (cid && seenClient.has(cid)) continue;
+      const nearKey = [
+        o.order_number?.slice(-4) || '',
+        o.total,
+        o.created_at ? new Date(o.created_at).toISOString().slice(0, 19) : '',
+        o.customer_name || '',
+      ].join('|');
+      if (seenNear.has(nearKey)) {
+        // احتفظ بالنسخة ذات المدفوع الأعلى
+        const idx = deduped.findIndex(x => {
+          const k = [
+            x.order_number?.slice(-4) || '',
+            x.total,
+            x.created_at ? new Date(x.created_at).toISOString().slice(0, 19) : '',
+            x.customer_name || '',
+          ].join('|');
+          return k === nearKey;
+        });
+        if (idx >= 0 && Number(o.paid_amount || 0) > Number(deduped[idx].paid_amount || 0)) {
+          seenIds.delete(deduped[idx].id);
+          deduped[idx] = o;
+          seenIds.add(o.id);
+        }
+        continue;
+      }
+      seenIds.add(o.id);
+      if (cid) seenClient.add(cid);
+      seenNear.add(nearKey);
+      deduped.push(o);
+    }
+    return deduped;
   }, [orders, orderFilter, orderSearchQuery]);
   const categories = useMemo(() => ['all', ...new Set((menuItems || []).filter(i => i && i.category).map(item => item.category))], [menuItems]);
   const filteredItems = useMemo(() => (menuItems || []).filter(item => {
@@ -677,7 +730,13 @@ export default function Dashboard() {
           direct_paid_amount: paidNum,
           payment_method: paymentMethod,
         };
-        setOrders(prev => [completeOrder as Order, ...(Array.isArray(prev) ? prev : [])]);
+        setOrders(prev => {
+          const list = Array.isArray(prev) ? prev : [];
+          return [completeOrder as Order, ...list.filter(o =>
+            o.id !== (completeOrder as any).id &&
+            (!(completeOrder as any).client_order_id || (o as any).client_order_id !== (completeOrder as any).client_order_id)
+          )];
+        });
         setLastReceipt(completeOrder as Order);
         setAutoPrint(false);
         setShowReceipt(true);
@@ -802,11 +861,14 @@ export default function Dashboard() {
                   </div>
                   <div className="flex justify-between text-xs">
                     <span className="text-muted-foreground">إجمالي المدفوع:</span>
-                    <span className="text-emerald-600 font-bold">{((Number(o.paid_amount || 0) + (receiptVouchersByCustomer[o.customer_id] || 0))).toLocaleString()} {currency}</span>
+                    <span className="text-emerald-600 font-bold">{Number(o.paid_amount || 0).toLocaleString()} {currency}</span>
                   </div>
                   <div className="flex justify-between text-xs">
                     <span className="text-muted-foreground">المتبقي:</span>
-                    <span className="text-destructive font-bold">{Math.max(0, Number(o.total) - (Number(o.paid_amount || 0) + (receiptVouchersByCustomer[o.customer_id] || 0))).toLocaleString()} {currency}</span>
+                    <span className="text-destructive font-bold">{Math.max(0, Number(o.total) - Number(o.paid_amount || 0)).toLocaleString()} {currency}</span>
+                  </div>
+                  <div className="text-[9px] text-muted-foreground/70 font-mono truncate" title={o.id}>
+                    ID:{o.id?.slice(-8)} { (o as any).client_order_id ? `· CID:${String((o as any).client_order_id).slice(-6)}` : '' }
                   </div>
                 </div>
 

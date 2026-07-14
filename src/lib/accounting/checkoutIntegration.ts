@@ -199,78 +199,106 @@ class CheckoutIntegration {
         customer_id: customerId,
       };
 
-      // مهم: Idempotent — ابحث أولاً عن طلب موجود لنفس العملية قبل أي INSERT
+      // مهم: Idempotent عبر RPC ذرّي على السيرفر (يمنع سباق النقر المزدوج)
       let order: any = null;
       let orderError: any = null;
 
-      const { data: existingByClient } = await supabase
-        .from('orders')
-        .select('*')
-        .eq('client_order_id', clientOrderId)
-        .maybeSingle();
+      const upsertPayload = {
+        restaurant_id: orderPayload.restaurant_id,
+        order_number: orderPayload.order_number,
+        total: orderPayload.total,
+        discount: orderPayload.discount,
+        status: orderPayload.status,
+        table_number: orderPayload.table_number,
+        order_type: orderPayload.order_type,
+        customer_name: orderPayload.customer_name,
+        customer_phone: orderPayload.customer_phone,
+        customer_ref: orderPayload.customer_ref,
+        delivery_address: orderPayload.delivery_address,
+        delivery_date: orderPayload.delivery_date,
+        delivery_agent_id: orderPayload.delivery_agent_id,
+        payment_method: orderPayload.payment_method,
+        paid_amount: orderPayload.paid_amount,
+        notes: orderPayload.notes,
+        client_order_id: clientOrderId,
+        customer_id: orderPayload.customer_id,
+      };
 
-      if (existingByClient) {
-        order = existingByClient;
-        toast.info('ℹ️ تم اكتشاف طلب مُنشأ مسبقاً، جاري إكمال العملية بدون تكرار.');
-        // أكمل/صحّح المدفوع والحالة إذا كانت المحاولة السابقة توقفت في المنتصف
-        const patch: Record<string, unknown> = {};
-        if (paidAmount > Number(existingByClient.paid_amount || 0)) {
-          patch.paid_amount = paidAmount;
-        }
-        if (existingByClient.status !== orderPayload.status) {
-          patch.status = orderPayload.status;
-        }
-        if (Number(existingByClient.total || 0) !== Number(orderPayload.total || 0) && Number(orderPayload.total || 0) > 0) {
-          patch.total = orderPayload.total;
-          patch.discount = orderPayload.discount;
-        }
-        if (Object.keys(patch).length > 0) {
-          const { data: patched } = await supabase
-            .from('orders')
-            .update(patch)
-            .eq('id', existingByClient.id)
-            .select()
-            .single();
-          if (patched) order = patched;
-        }
+      const { data: upserted, error: upsertErr } = await supabase.rpc('upsert_pos_order', {
+        p_payload: upsertPayload,
+      });
+
+      if (!upsertErr && upserted) {
+        order = Array.isArray(upserted) ? upserted[0] : upserted;
       } else {
-        ({ data: order, error: orderError } = await supabase
+        // fallback لو الـ RPC غير مطبّق بعد على قاعدة البيانات
+        console.warn('[checkout] upsert_pos_order RPC unavailable, falling back:', upsertErr?.message);
+
+        const { data: existingByClient } = await supabase
           .from('orders')
-          .insert(orderPayload)
-          .select()
-          .single());
+          .select('*')
+          .eq('client_order_id', clientOrderId)
+          .maybeSingle();
 
-        // تعارض Unique على client_order_id أو order_number → استرجع الطلب الموجود ولا تنشئ جديداً
-        if (orderError && (orderError.code === '23505' || String(orderError.message || '').includes('duplicate'))) {
-          const { data: byClient } = await supabase
+        if (existingByClient) {
+          order = existingByClient;
+          toast.info('ℹ️ تم اكتشاف طلب مُنشأ مسبقاً، جاري إكمال العملية بدون تكرار.');
+          const patch: Record<string, unknown> = {};
+          if (paidAmount > Number(existingByClient.paid_amount || 0)) {
+            patch.paid_amount = paidAmount;
+          }
+          if (existingByClient.status !== orderPayload.status) {
+            patch.status = orderPayload.status;
+          }
+          if (Number(existingByClient.total || 0) !== Number(orderPayload.total || 0) && Number(orderPayload.total || 0) > 0) {
+            patch.total = orderPayload.total;
+            patch.discount = orderPayload.discount;
+          }
+          if (Object.keys(patch).length > 0) {
+            const { data: patched } = await supabase
+              .from('orders')
+              .update(patch)
+              .eq('id', existingByClient.id)
+              .select()
+              .single();
+            if (patched) order = patched;
+          }
+        } else {
+          ({ data: order, error: orderError } = await supabase
             .from('orders')
-            .select('*')
-            .eq('client_order_id', clientOrderId)
-            .maybeSingle();
+            .insert(orderPayload)
+            .select()
+            .single());
 
-          if (byClient) {
-            order = byClient;
-            orderError = null;
-            toast.info('ℹ️ تم اكتشاف طلب مُنشأ مسبقاً، جاري إكمال العملية بدون تكرار.');
-          } else {
-            const { data: byNumber } = await supabase
+          if (orderError && (orderError.code === '23505' || String(orderError.message || '').includes('duplicate'))) {
+            const { data: byClient } = await supabase
               .from('orders')
               .select('*')
-              .eq('order_number', orderNum)
-              .eq('restaurant_id', context.restaurantId)
+              .eq('client_order_id', clientOrderId)
               .maybeSingle();
 
-            if (byNumber) {
-              order = byNumber;
+            if (byClient) {
+              order = byClient;
               orderError = null;
-              toast.info('ℹ️ تم اكتشاف طلب بنفس الرقم، جاري إكمال العملية بدون تكرار.');
+            } else {
+              const { data: byNumber } = await supabase
+                .from('orders')
+                .select('*')
+                .eq('order_number', orderNum)
+                .eq('restaurant_id', context.restaurantId)
+                .maybeSingle();
+
+              if (byNumber) {
+                order = byNumber;
+                orderError = null;
+              }
             }
           }
         }
       }
 
       if (orderError || !order) {
-        throw new Error(`فشل إنشاء الطلب: ${orderError?.message}`);
+        throw new Error(`فشل إنشاء الطلب: ${orderError?.message || upsertErr?.message || 'unknown'}`);
       }
 
       createdOrder = order;
