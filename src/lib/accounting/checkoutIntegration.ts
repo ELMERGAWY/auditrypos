@@ -183,13 +183,9 @@ class CheckoutIntegration {
         customer_id: customerId,
       };
 
-      console.log('[checkout] Creating order with payload:', {
-        order_number: orderPayload.order_number,
-        total: orderPayload.total,
-        paid_amount: orderPayload.paid_amount,
-        payment_method: orderPayload.payment_method,
-        timestamp: new Date().toISOString()
-      });
+      // Show debug toast before creating order
+      const debugMsg = `جاري إنشاء الطلب #${orderPayload.order_number} - المبلغ: ${orderPayload.total} - المدفوع: ${orderPayload.paid_amount}`;
+      toast.info(debugMsg);
 
       const { data: order, error: orderError } = await supabase
         .from('orders')
@@ -197,12 +193,10 @@ class CheckoutIntegration {
         .select()
         .single();
 
-      console.log('[checkout] Order created:', {
-        id: order?.id,
-        order_number: order?.order_number,
-        paid_amount: order?.paid_amount,
-        success: !orderError
-      });
+      // Show debug toast after creating order
+      if (order) {
+        toast.success(`تم إنشاء الطلب #${order.order_number} - ID: ${order.id.slice(-4)} - المدفوع: ${order.paid_amount}`);
+      }
 
       if (orderError || !order) {
         throw new Error(`فشل إنشاء الطلب: ${orderError?.message}`);
