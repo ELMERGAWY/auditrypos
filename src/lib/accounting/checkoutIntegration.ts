@@ -533,6 +533,36 @@ class CheckoutIntegration {
         await this.recordInventoryConsumption(order.id, context.restaurantId, inventoryItemsForCosting);
       }
 
+      // 16. CRITICAL: أعِد تثبيت المدفوع في النهاية — بعض الـ triggers كانت تصفّر paid_amount
+      // بعد الإدراج/مزامنة الفاتورة. بدون هذه الخطوة الواجهة تظهر المدفوع من الذاكرة ثم يختفي بعد الريفريش.
+      if (paidAmount > 0) {
+        const { data: paidFixed, error: paidFixErr } = await supabase
+          .from('orders')
+          .update({
+            paid_amount: paidAmount,
+            direct_paid_amount: paidAmount,
+          })
+          .eq('id', order.id)
+          .select('*')
+          .single();
+
+        if (paidFixErr) {
+          console.error('[checkout] Failed to persist paid_amount:', paidFixErr);
+          toast.error('تحذير: فشل حفظ المبلغ المدفوع في قاعدة البيانات');
+        } else if (paidFixed) {
+          order = paidFixed;
+          if (Number(paidFixed.paid_amount || 0) !== Number(paidAmount)) {
+            console.error('[checkout] paid_amount mismatch after persist', {
+              expected: paidAmount,
+              actual: paidFixed.paid_amount,
+            });
+            toast.error(`تحذير: المدفوع لم يُحفظ (متوقع ${paidAmount} / فعلي ${paidFixed.paid_amount})`);
+          }
+        }
+      }
+
+      createdOrder = order;
+
       toast.success(`✅ تم إنشاء الطلب #${orderNum.slice(-4)} - ${finalTotal.toFixed(2)} ${context.currency}`);
 
       return {

@@ -324,7 +324,22 @@ export function useDashboardData() {
             const newOrder = { ...payload.new, items: (items || []) as OrderItem[] } as unknown as Order;
             setOrders(prev => {
               if (prev.some(order => order.id === newOrder.id)) {
-                return prev.map(order => order.id === newOrder.id ? { ...order, ...newOrder } : order);
+                // لا تستبدل مدفوعاً أعلى بقيمة أقل قادمة من الـ realtime (قد تكون قديمة قبل تثبيت المدفوع)
+                return prev.map(order => {
+                  if (order.id !== newOrder.id) return order;
+                  const merged = { ...order, ...newOrder } as Order;
+                  const localPaid = Number((order as any).paid_amount || 0);
+                  const remotePaid = Number((newOrder as any).paid_amount || 0);
+                  if (localPaid > remotePaid) {
+                    (merged as any).paid_amount = localPaid;
+                    (merged as any).direct_paid_amount = Math.max(
+                      Number((order as any).direct_paid_amount || 0),
+                      Number((newOrder as any).direct_paid_amount || 0),
+                      localPaid
+                    );
+                  }
+                  return merged;
+                });
               }
               const cid = (payload.new as any).client_order_id;
               if (cid && prev.some(order => (order as any).client_order_id === cid)) {
@@ -334,6 +349,21 @@ export function useDashboardData() {
             });
             if (soundEnabled) playOrderSound();
             toast.success(`🆕 طلب جديد #${(payload.new as any).order_number?.slice(-4)}`, { duration: 5000 });
+          }
+        )
+        .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'orders', filter: `restaurant_id=eq.${restaurant.id}` },
+          (payload) => {
+            setOrders(prev => prev.map(order => {
+              if (order.id !== payload.new.id) return order;
+              const merged = { ...order, ...payload.new } as Order;
+              const localPaid = Number((order as any).paid_amount || 0);
+              const remotePaid = Number((payload.new as any).paid_amount || 0);
+              // احتفظ بالمدفوع الأعلى حتى لا يمسح الـ trigger قيمة صحيحة من الواجهة
+              if (localPaid > remotePaid && remotePaid === 0) {
+                (merged as any).paid_amount = localPaid;
+              }
+              return merged;
+            }));
           }
         )
         .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'delivery_agents', filter: `restaurant_id=eq.${restaurant.id}` },

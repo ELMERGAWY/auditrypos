@@ -726,8 +726,9 @@ export default function Dashboard() {
             variables: c.variables || null,
             service_details: c.service_details,
           })),
-          paid_amount: paidNum,
-          direct_paid_amount: paidNum,
+          // استخدم قيمة قاعدة البيانات بعد التثبيت — لا نخادع الواجهة بمبلغ من الذاكرة فقط
+          paid_amount: Number((result.order as any).paid_amount ?? paidNum),
+          direct_paid_amount: Number((result.order as any).direct_paid_amount ?? (result.order as any).paid_amount ?? paidNum),
           payment_method: paymentMethod,
         };
         setOrders(prev => {
