@@ -443,10 +443,12 @@ export default function Dashboard() {
       if (error) throw error;
       setOrders(prev => (prev || []).filter(o => o.id !== id));
       toast.success('تم حذف الطلب بنجاح');
+      // Reload data from server to ensure UI is in sync
+      await loadData();
     } catch (e: any) {
       toast.error('فشل حذف الطلب: ' + (e?.message || ''));
     }
-  }, []);
+  }, [loadData]);
 
   const handleEditOrder = useCallback(async (order: any) => {
     setEditingOrder(order);
