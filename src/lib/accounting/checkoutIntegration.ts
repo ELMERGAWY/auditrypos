@@ -435,7 +435,6 @@ class CheckoutIntegration {
           });
 
           toast.success('✅ تم حفظ الطلب محلياً! سيتم مزامنته تلقائياً عند إعادة الاتصال.');
-        }
       }
       // RLS/Permission
       else if (error?.code === '42501' || error?.message?.includes('permission denied')) {
