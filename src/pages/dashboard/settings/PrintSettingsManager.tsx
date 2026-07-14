@@ -95,7 +95,7 @@ export function PrintSettingsManager({ restaurantId }: PrintSettingsManagerProps
         }
         
         if (data?.settings) {
-          setPrintSettings(data.settings as CombinedPrintSettings);
+          setPrintSettings(prev => ({ ...prev, ...(data.settings as CombinedPrintSettings) }));
         }
       } catch (error) {
         console.error('Failed to load print settings:', error);

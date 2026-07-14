@@ -93,9 +93,49 @@ interface PrintElementSettings {
   paidAmount: boolean;
   remaining: boolean;
   change: boolean;
+  directPayment: boolean;
   notes: boolean;
   thankYou: boolean;
   poweredBy: boolean;
+}
+
+type CombinedPrintSettings = PrintElementSettings & {
+  customerCopy: boolean;
+  businessCopy: boolean;
+  kitchenCopy: boolean;
+};
+
+const DEFAULT_PRINT_SETTINGS: CombinedPrintSettings = {
+  logo: true,
+  restaurantName: true,
+  invoiceNumber: true,
+  dateTime: true,
+  itemCount: true,
+  customerName: true,
+  customerPhone: true,
+  customerRef: true,
+  deliveryAddress: true,
+  items: true,
+  variables: true,
+  totalQty: true,
+  subtotal: true,
+  discount: true,
+  total: true,
+  paymentMethod: true,
+  paidAmount: true,
+  remaining: true,
+  change: true,
+  directPayment: true,
+  notes: true,
+  thankYou: true,
+  poweredBy: true,
+  customerCopy: true,
+  businessCopy: true,
+  kitchenCopy: true,
+};
+
+function mergePrintSettings(saved: Partial<CombinedPrintSettings> | null | undefined): CombinedPrintSettings {
+  return { ...DEFAULT_PRINT_SETTINGS, ...(saved || {}) };
 }
 
 function ReceiptContent({ 
@@ -144,24 +184,24 @@ function ReceiptContent({
           <span className="info-label">الفاتورة / <span className="bold">{order.order_number.slice(-4)}</span></span>
         )}
         {printSettings.itemCount && (
-          <span className="info-label">عدد الأصناف / <span className="bold">{order.items.length}</span></span>
+          <span className="info-label">عدد الأصناف / <span className="bold">{items.length}</span></span>
         )}
       </div>
-      {printSettings.customerName && order.customer_name && (
-        <div className="row"><span className="info-label">إسم العميل / <span className="bold">{order.customer_name}</span></span></div>
+      {printSettings.customerName && (
+        <div className="row"><span className="info-label">إسم العميل / <span className="bold">{order.customer_name || 'عميل نقدي'}</span></span></div>
       )}
-      {printSettings.customerPhone && order.customer_phone && (
+      {printSettings.customerPhone && (
         <div className="row">
-          <span className="info-label">التليفون / <span dir="ltr">{order.customer_phone}</span></span>
+          <span className="info-label">التليفون / <span dir="ltr">{order.customer_phone || '-'}</span></span>
         </div>
       )}
-      {printSettings.customerRef && extractCustomerRef(order) && (
+      {printSettings.customerRef && (
         <div className="row">
-          <span className="info-label">مرجع العميل / <span className="bold">{extractCustomerRef(order)}</span></span>
+          <span className="info-label">مرجع العميل / <span className="bold">{extractCustomerRef(order) || '-'}</span></span>
         </div>
       )}
-      {printSettings.deliveryAddress && order.delivery_address && (
-        <div className="row"><span className="info-label">العنوان / {order.delivery_address}</span></div>
+      {printSettings.deliveryAddress && (
+        <div className="row"><span className="info-label">العنوان / {order.delivery_address || '-'}</span></div>
       )}
 
       {/* Items Section - Using divs instead of table for better thermal printer support */}
@@ -173,11 +213,14 @@ function ReceiptContent({
             <span className="item-price">السعر</span>
             <span className="item-total">الإجمالي</span>
           </div>
-          {order.items && order.items.length > 0 ? (
-            order.items.map((item, idx) => (
+          {items.length > 0 ? (
+            items.map((item, idx) => (
               <div key={idx}>
                 <div className="item-row">
-                  <span className="item-name">{item.menu_item_name || 'صنف'}</span>
+                  <span className="item-name">
+                    {item.menu_item_name || 'صنف'}
+                    {(item as any).sold_unit ? ` (${(item as any).sold_unit})` : ''}
+                  </span>
                   <span className="item-qty">{item.quantity}</span>
                   <span className="item-price">{Number(item.price).toFixed(2)}</span>
                   <span className="item-total">{(Number(item.price) * Number(item.quantity)).toFixed(2)}</span>
@@ -226,10 +269,10 @@ function ReceiptContent({
               <td>{subtotal.toFixed(2)}</td>
             </tr>
           )}
-          {printSettings.discount && Number(order.discount) > 0 && (
+          {printSettings.discount && (
             <tr>
               <td>الخصم</td>
-              <td>{Number(order.discount).toFixed(2)}</td>
+              <td>{Number(order.discount || 0).toFixed(2)}</td>
             </tr>
           )}
           {printSettings.total && (
@@ -262,7 +305,7 @@ function ReceiptContent({
               <td className="bold text-green">{totalPaid.toFixed(2)}</td>
             </tr>
           )}
-          {printSettings.remaining && remaining > 0 && (
+          {printSettings.remaining && (
             <tr>
               <td>المتبقي</td>
               <td className="text-red">{remaining.toFixed(2)}</td>
@@ -299,84 +342,86 @@ function ReceiptContent({
 
 export { ReceiptContent, THERMAL_STYLES };
 
-// Extend PrintElementSettings with copy options
-type CombinedPrintSettings = PrintElementSettings & {
-  customerCopy: boolean;
-  businessCopy: boolean;
-  kitchenCopy: boolean;
-};
-
 export function ReceiptModalWrapper({ order, restaurant, onClose, onComplete, isOpen = true, autoPrint = false }: ReceiptProps) {
   const ref = useRef<HTMLDivElement>(null);
   const [showPrintSettings, setShowPrintSettings] = useState(false);
   const [receiptVouchers, setReceiptVouchers] = useState<ReceiptVoucher[]>([]);
-  const [printSettings, setPrintSettings] = useState<CombinedPrintSettings>({
-    // Element settings
-    logo: true,
-    restaurantName: true,
-    invoiceNumber: true,
-    dateTime: true,
-    itemCount: true,
-    customerName: true,
-    customerPhone: true,
-    customerRef: true,
-    deliveryAddress: true,
-    items: true,
-    variables: true,
-    totalQty: true,
-    subtotal: true,
-    discount: true,
-    total: true,
-    paymentMethod: true,
-    paidAmount: true,
-    remaining: true,
-    change: true,
-    notes: true,
-    thankYou: true,
-    poweredBy: true,
-    // Copy settings
-    customerCopy: true,
-    businessCopy: true,
-    kitchenCopy: true,
-  });
+  const [printSettings, setPrintSettings] = useState<CombinedPrintSettings>(DEFAULT_PRINT_SETTINGS);
+  const [printSettingsReady, setPrintSettingsReady] = useState(false);
+  const [resolvedOrder, setResolvedOrder] = useState<Order>(order);
+  const [itemsReady, setItemsReady] = useState(false);
+
+  // ضمان تحميل أصناف الطلب قبل العرض/الطباعة (مهم لموديولات الجملة والمخازن)
+  useEffect(() => {
+    let cancelled = false;
+    const ensureItems = async () => {
+      setItemsReady(false);
+      const existing = Array.isArray(order?.items) ? order.items : [];
+      if (existing.length > 0 || !order?.id) {
+        if (!cancelled) {
+          setResolvedOrder({ ...order, items: existing });
+          setItemsReady(true);
+        }
+        return;
+      }
+      try {
+        const { data, error } = await supabase
+          .from('order_items')
+          .select('*')
+          .eq('order_id', order.id);
+        if (error) throw error;
+        if (!cancelled) {
+          setResolvedOrder({ ...order, items: (data || []) as any });
+          setItemsReady(true);
+        }
+      } catch (e) {
+        console.error('Failed to load order items for receipt:', e);
+        if (!cancelled) {
+          setResolvedOrder({ ...order, items: [] });
+          setItemsReady(true);
+        }
+      }
+    };
+    if (isOpen) ensureItems();
+    return () => { cancelled = true; };
+  }, [isOpen, order]);
 
   // Load receipt vouchers for this customer
   useEffect(() => {
-    if (isOpen && (order as any).customer_id && restaurant.id) {
+    if (isOpen && (resolvedOrder as any).customer_id && restaurant.id) {
       supabase
         .from('receipt_vouchers')
         .select('*')
-        .eq('customer_id', (order as any).customer_id)
+        .eq('customer_id', (resolvedOrder as any).customer_id)
         .eq('restaurant_id', restaurant.id)
         .order('voucher_date', { ascending: true })
         .then(({ data }) => {
           setReceiptVouchers(data || []);
         });
     }
-  }, [isOpen, order, restaurant.id]);
+  }, [isOpen, resolvedOrder, restaurant.id]);
 
-  // Load print settings from database on mount
+  // Load print settings from database on mount — merge with defaults so missing keys stay ON
   useEffect(() => {
     const loadPrintSettings = async () => {
-      if (!restaurant?.id) return;
+      if (!restaurant?.id) {
+        setPrintSettingsReady(true);
+        return;
+      }
       try {
         const { data, error } = await supabase
           .from('print_settings')
           .select('settings')
           .eq('restaurant_id', restaurant.id)
-          .single();
+          .maybeSingle();
         
-        if (error && error.code !== 'PGRST116') {
-          // PGRST116 = no rows returned, which is expected for new restaurants
-          throw error;
-        }
-        
-        if (data?.settings) {
-          setPrintSettings(data.settings as CombinedPrintSettings);
-        }
+        if (error && error.code !== 'PGRST116') throw error;
+        setPrintSettings(mergePrintSettings(data?.settings as any));
       } catch (error) {
         console.error('Failed to load print settings:', error);
-        // Keep default settings if load fails
+        setPrintSettings(DEFAULT_PRINT_SETTINGS);
+      } finally {
+        setPrintSettingsReady(true);
       }
     };
     loadPrintSettings();
@@ -390,7 +435,7 @@ export function ReceiptModalWrapper({ order, restaurant, onClose, onComplete, is
         .from('print_settings')
         .upsert({
           restaurant_id: restaurant.id,
-          settings: newSettings,
+          settings: mergePrintSettings(newSettings),
           updated_at: new Date().toISOString()
         }, {
           onConflict: 'restaurant_id'
@@ -405,9 +450,13 @@ export function ReceiptModalWrapper({ order, restaurant, onClose, onComplete, is
   };
 
   const printReceipt = () => {
+    const order = resolvedOrder;
+    const orderItems = Array.isArray(order.items) ? order.items : [];
     const isFood = restaurant.business_type === 'restaurant' || restaurant.business_type === 'cafe';
-    const isWholesale = restaurant.business_type === 'wholesale';
-    const kitchenTitle = isFood ? 'طلب تحضير (مطبخ)' : (isWholesale ? 'طلب تجهيز (مخزن)' : 'نسخة تحضير');
+    const isWarehouseLike = ['wholesale', 'warehouse', 'retail', 'grocery', 'pharmacy'].includes(
+      String(restaurant.business_type || '')
+    );
+    const kitchenTitle = isFood ? 'طلب تحضير (مطبخ)' : (isWarehouseLike ? 'طلب تجهيز (مخزن)' : 'نسخة تحضير');
 
     const printWindow = window.open('', '_blank', 'width=400,height=800,scrollbars=yes');
     if (!printWindow) { 
@@ -418,7 +467,7 @@ export function ReceiptModalWrapper({ order, restaurant, onClose, onComplete, is
     // Generate receipt content with current print settings
     const generateReceiptContent = () => {
       const currency = restaurant.currency || 'ج.م';
-      const items = Array.isArray(order.items) ? order.items : [];
+      const items = orderItems;
       const subtotal = items.reduce((s, i) => s + (Number(i.price) || 0) * (Number(i.quantity) || 0), 0);
       const itemCount = items.reduce((s, i) => s + (Number(i.quantity) || 0), 0);
       const paidAmount = Number((order as any).paid_amount) || 0;
@@ -450,20 +499,20 @@ export function ReceiptModalWrapper({ order, restaurant, onClose, onComplete, is
         content += `<span class="info-label">الفاتورة / <span class="bold">${order.order_number.slice(-4)}</span></span>`;
       }
       if (printSettings.itemCount) {
-        content += `<span class="info-label">عدد الأصناف / <span class="bold">${order.items.length}</span></span>`;
+        content += `<span class="info-label">عدد الأصناف / <span class="bold">${orderItems.length}</span></span>`;
       }
       content += '</div>';
-      if (printSettings.customerName && order.customer_name) {
-        content += `<div class="row"><span class="info-label">إسم العميل / <span class="bold">${order.customer_name}</span></span></div>`;
+      if (printSettings.customerName) {
+        content += `<div class="row"><span class="info-label">إسم العميل / <span class="bold">${order.customer_name || 'عميل نقدي'}</span></span></div>`;
       }
-      if (printSettings.customerPhone && order.customer_phone) {
-        content += `<div class="row"><span class="info-label">التليفون / <span dir="ltr">${order.customer_phone}</span></span></div>`;
+      if (printSettings.customerPhone) {
+        content += `<div class="row"><span class="info-label">التليفون / <span dir="ltr">${order.customer_phone || '-'}</span></span></div>`;
       }
-      if (printSettings.customerRef && extractCustomerRef(order)) {
-        content += `<div class="row"><span class="info-label">مرجع العميل / <span class="bold">${extractCustomerRef(order)}</span></span></div>`;
+      if (printSettings.customerRef) {
+        content += `<div class="row"><span class="info-label">مرجع العميل / <span class="bold">${extractCustomerRef(order) || '-'}</span></span></div>`;
       }
-      if (printSettings.deliveryAddress && order.delivery_address) {
-        content += `<div class="row"><span class="info-label">العنوان / ${order.delivery_address}</span></div>`;
+      if (printSettings.deliveryAddress) {
+        content += `<div class="row"><span class="info-label">العنوان / ${order.delivery_address || '-'}</span></div>`;
       }
 
       // Items Section
@@ -475,11 +524,12 @@ export function ReceiptModalWrapper({ order, restaurant, onClose, onComplete, is
         content += '<span class="item-price">السعر</span>';
         content += '<span class="item-total">الإجمالي</span>';
         content += '</div>';
-        if (order.items && order.items.length > 0) {
-          order.items.forEach((item) => {
+        if (orderItems.length > 0) {
+          orderItems.forEach((item) => {
+            const unitLabel = (item as any).sold_unit ? ` (${(item as any).sold_unit})` : '';
             content += `<div>`;
             content += `<div class="item-row">`;
-            content += `<span class="item-name">${item.menu_item_name || 'صنف'}</span>`;
+            content += `<span class="item-name">${item.menu_item_name || 'صنف'}${unitLabel}</span>`;
             content += `<span class="item-qty">${item.quantity}</span>`;
             content += `<span class="item-price">${Number(item.price).toFixed(2)}</span>`;
             content += `<span class="item-total">${(Number(item.price) * Number(item.quantity)).toFixed(2)}</span>`;
@@ -487,7 +537,7 @@ export function ReceiptModalWrapper({ order, restaurant, onClose, onComplete, is
             if ((item as any).service_details) {
               content += `<div style="font-size: 9px; padding: 2px 0; color: #555;">📝 ${(item as any).service_details}</div>`;
             }
-            if ((item as any).variables) {
+            if (printSettings.variables && (item as any).variables) {
               content += `<div style="font-size: 9px; padding: 2px 4px; color: #000; border-bottom: 1px dotted #000; display: grid; grid-template-columns: 1fr 1fr; gap: 2px;">`;
               if (Array.isArray((item as any).variables)) {
                 (item as any).variables.forEach((v: any) => {
@@ -514,8 +564,8 @@ export function ReceiptModalWrapper({ order, restaurant, onClose, onComplete, is
       if (printSettings.subtotal) {
         content += `<tr><td>الإجمالي</td><td>${subtotal.toFixed(2)}</td></tr>`;
       }
-      if (printSettings.discount && Number(order.discount) > 0) {
-        content += `<tr><td>الخصم</td><td>${Number(order.discount).toFixed(2)}</td></tr>`;
+      if (printSettings.discount) {
+        content += `<tr><td>الخصم</td><td>${Number(order.discount || 0).toFixed(2)}</td></tr>`;
       }
       if (printSettings.total) {
         content += `<tr><td>المجموع النهائي</td><td>${Number(order.total).toFixed(2)} ${currency}</td></tr>`;
@@ -532,7 +582,7 @@ export function ReceiptModalWrapper({ order, restaurant, onClose, onComplete, is
       if (printSettings.paidAmount) {
         content += `<tr><td class="bold">إجمالي المدفوع</td><td class="bold">${totalPaid.toFixed(2)} ${currency}</td></tr>`;
       }
-      if (printSettings.remaining && remaining > 0) {
+      if (printSettings.remaining) {
         content += `<tr><td>المتبقي</td><td>${remaining.toFixed(2)} ${currency}</td></tr>`;
       }
       if (printSettings.change && change > 0) {
@@ -563,7 +613,7 @@ export function ReceiptModalWrapper({ order, restaurant, onClose, onComplete, is
     };
 
     // Kitchen/Warehouse Copy (Items only)
-    const kitchenItems = Array.isArray(order.items) ? order.items : [];
+    const kitchenItems = orderItems;
     const kitchenCopy = `
       <div class="receipt">
         <div class="center">
@@ -575,7 +625,7 @@ export function ReceiptModalWrapper({ order, restaurant, onClose, onComplete, is
         <div class="items-section">
           ${kitchenItems.map(item => `
             <div class="item-row">
-              <span class="item-name" style="font-size: 16px; font-weight: bold;">${item.menu_item_name}</span>
+              <span class="item-name" style="font-size: 16px; font-weight: bold;">${item.menu_item_name}${(item as any).sold_unit ? ' (' + (item as any).sold_unit + ')' : ''}</span>
               <span class="item-qty" style="font-size: 16px; font-weight: bold;">x ${item.quantity}</span>
             </div>
           `).join('')}
@@ -607,8 +657,12 @@ export function ReceiptModalWrapper({ order, restaurant, onClose, onComplete, is
       `;
     }
     
-    if (printSettings.kitchenCopy && (isFood || isWholesale)) {
+    if (printSettings.kitchenCopy && (isFood || isWarehouseLike)) {
       printContent += kitchenCopy;
+    }
+
+    if (!printContent) {
+      printContent = `<div class="receipt">${generateReceiptContent()}</div>`;
     }
 
     printWindow.document.open();
@@ -635,13 +689,13 @@ export function ReceiptModalWrapper({ order, restaurant, onClose, onComplete, is
   };
 
   useEffect(() => {
-    if (isOpen && autoPrint) {
+    if (isOpen && autoPrint && printSettingsReady && itemsReady) {
       const timer = setTimeout(() => {
         printReceipt();
-      }, 500);
+      }, 400);
       return () => clearTimeout(timer);
     }
-  }, [isOpen, autoPrint]);
+  }, [isOpen, autoPrint, printSettingsReady, itemsReady, resolvedOrder]);
 
   return (
     <AnimatePresence>
@@ -692,7 +746,7 @@ export function ReceiptModalWrapper({ order, restaurant, onClose, onComplete, is
                   .summary-table tr:last-child td { border-bottom: 2px solid #000; }
                 `}} />
                 <div ref={ref}>
-                  <ReceiptContent order={order} restaurant={restaurant} printSettings={printSettings} receiptVouchers={receiptVouchers} />
+                  <ReceiptContent order={resolvedOrder} restaurant={restaurant} printSettings={printSettings} receiptVouchers={receiptVouchers} />
                 </div>
               </div>
             </div>

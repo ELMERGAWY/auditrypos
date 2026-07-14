@@ -9,6 +9,7 @@ import {
   Package, Hash, Receipt, Building2, Phone, MapPin, RefreshCcw, Settings
 } from 'lucide-react';
 import { toast } from 'sonner';
+import { extractCustomerRef } from '@/pages/dashboard/types';
 
 interface InvoiceViewerProps {
   open: boolean;
@@ -22,28 +23,65 @@ interface InvoiceViewerProps {
   restaurantId?: string;
 }
 
-// Reuse or redefine PrintElementSettings here for InvoiceViewer
+// Align with PrintSettingsManager / ReceiptModal so checked fields actually render
 interface PrintElementSettings {
   logo: boolean;
   restaurantName: boolean;
   invoiceNumber: boolean;
   dateTime: boolean;
+  itemCount: boolean;
   customerName: boolean;
   customerPhone: boolean;
+  customerRef: boolean;
   deliveryAddress: boolean;
   paymentMethod: boolean;
   status: boolean;
   items: boolean;
   variables: boolean;
+  totalQty: boolean;
   subtotal: boolean;
   discount: boolean;
   tax: boolean;
   total: boolean;
   paidAmount: boolean;
   remaining: boolean;
+  change: boolean;
+  directPayment: boolean;
   notes: boolean;
   thankYou: boolean;
   poweredBy: boolean;
+}
+
+const DEFAULT_INVOICE_PRINT_SETTINGS: PrintElementSettings = {
+  logo: true,
+  restaurantName: true,
+  invoiceNumber: true,
+  dateTime: true,
+  itemCount: true,
+  customerName: true,
+  customerPhone: true,
+  customerRef: true,
+  deliveryAddress: true,
+  paymentMethod: true,
+  status: true,
+  items: true,
+  variables: true,
+  totalQty: true,
+  subtotal: true,
+  discount: true,
+  tax: true,
+  total: true,
+  paidAmount: true,
+  remaining: true,
+  change: true,
+  directPayment: true,
+  notes: true,
+  thankYou: true,
+  poweredBy: true,
+};
+
+function mergeInvoicePrintSettings(saved: Partial<PrintElementSettings> | null | undefined): PrintElementSettings {
+  return { ...DEFAULT_INVOICE_PRINT_SETTINGS, ...(saved || {}) };
 }
 
 export function InvoiceViewer({
@@ -54,28 +92,7 @@ export function InvoiceViewer({
   const [record, setRecord] = useState<any>(null);
   const [items, setItems] = useState<any[]>([]);
   const [showPrintSettings, setShowPrintSettings] = useState(false);
-  const [printSettings, setPrintSettings] = useState<PrintElementSettings>({
-    logo: true,
-    restaurantName: true,
-    invoiceNumber: true,
-    dateTime: true,
-    customerName: true,
-    customerPhone: true,
-    deliveryAddress: true,
-    paymentMethod: true,
-    status: true,
-    items: true,
-    variables: true,
-    subtotal: true,
-    discount: true,
-    tax: true,
-    total: true,
-    paidAmount: true,
-    remaining: true,
-    notes: true,
-    thankYou: true,
-    poweredBy: true,
-  });
+  const [printSettings, setPrintSettings] = useState<PrintElementSettings>(DEFAULT_INVOICE_PRINT_SETTINGS);
 
   // Load print settings from database
   useEffect(() => {
@@ -92,31 +109,10 @@ export function InvoiceViewer({
         .eq('restaurant_id', restaurantId)
         .maybeSingle();
       if (error && error.code !== 'PGRST116') throw error;
-      const saved: any = data?.settings || {};
-      setPrintSettings(prev => ({
-        logo: saved.logo ?? prev.logo,
-        restaurantName: saved.restaurantName ?? prev.restaurantName,
-        invoiceNumber: saved.invoiceNumber ?? prev.invoiceNumber,
-        dateTime: saved.dateTime ?? prev.dateTime,
-        customerName: saved.customerName ?? prev.customerName,
-        customerPhone: saved.customerPhone ?? prev.customerPhone,
-        deliveryAddress: saved.deliveryAddress ?? prev.deliveryAddress,
-        paymentMethod: saved.paymentMethod ?? prev.paymentMethod,
-        status: saved.status ?? prev.status,
-        items: saved.items ?? prev.items,
-        variables: saved.variables ?? prev.variables,
-        subtotal: saved.subtotal ?? prev.subtotal,
-        discount: saved.discount ?? prev.discount,
-        tax: saved.tax ?? prev.tax,
-        total: saved.total ?? prev.total,
-        paidAmount: saved.paidAmount ?? prev.paidAmount,
-        remaining: saved.remaining ?? prev.remaining,
-        notes: saved.notes ?? prev.notes,
-        thankYou: saved.thankYou ?? prev.thankYou,
-        poweredBy: saved.poweredBy ?? prev.poweredBy,
-      }));
+      setPrintSettings(mergeInvoicePrintSettings(data?.settings as any));
     } catch (e) {
       console.error('Failed to load print settings:', e);
+      setPrintSettings(DEFAULT_INVOICE_PRINT_SETTINGS);
     }
   };
 
@@ -129,7 +125,7 @@ export function InvoiceViewer({
         .select('settings')
         .eq('restaurant_id', restaurantId)
         .maybeSingle();
-      const merged = { ...(existing?.settings as any || {}), ...newSettings };
+      const merged = mergeInvoicePrintSettings({ ...(existing?.settings as any || {}), ...newSettings });
       const { error } = await supabase
         .from('print_settings')
         .upsert({
@@ -168,27 +164,26 @@ export function InvoiceViewer({
         if (error) throw error;
 
         setRecord(data);
-        setItems(data?.order_items || []);
+        let lineItems = data?.order_items || [];
+        if ((!lineItems || lineItems.length === 0) && data?.id) {
+          const { data: fallbackItems } = await supabase
+            .from('order_items')
+            .select('*')
+            .eq('order_id', data.id);
+          lineItems = fallbackItems || [];
+        }
+        setItems(lineItems);
 
-        // Load receipt vouchers for this customer (all vouchers, not date-restricted)
-        if (!data?.customer_id) {
-          toast.error('الطلب لا يحتوي على عميل');
-        } else if (!restaurantId) {
-          toast.error('restaurantId غير موجود');
-        } else {
+        // Load receipt vouchers when customer is linked (cash walk-ins are fine without)
+        if (data?.customer_id && restaurantId) {
           const { data: vouchers } = await supabase
             .from('receipt_vouchers')
             .select('*')
             .eq('customer_id', data.customer_id)
             .eq('restaurant_id', restaurantId)
             .order('voucher_date', { ascending: true });
-          
-          toast.info(`تم تحميل ${vouchers?.length || 0} سند قبض`);
-          
-          // Calculate total from receipt vouchers
+
           const voucherTotal = vouchers?.reduce((sum, v) => sum + (v.amount || 0), 0) || 0;
-          
-          // Store vouchers for display
           setRecord(prev => ({
             ...prev,
             receipt_vouchers: vouchers || [],
@@ -270,15 +265,19 @@ export function InvoiceViewer({
   if (!open) return null;
 
   const subtotal = items.reduce((s, it) => s + (Number(it.price || 0) * Number(it.quantity || 0)), 0);
+  const itemCount = items.reduce((s, it) => s + (Number(it.quantity || 0)), 0);
   const total = Number(record?.total || record?.total_amount || subtotal);
-  const tax = Number(record?.tax_amount || 0);
-  const discount = Number(record?.discount_amount || 0);
+  const tax = Number(record?.tax_amount || record?.tax || 0);
+  // orders table uses `discount`; sales_orders may use `discount_amount`
+  const discount = Number(record?.discount_amount ?? record?.discount ?? 0);
   // paid_amount represents direct payments only (at order creation)
   // receipt vouchers are tracked separately in receipt_voucher_ids array
   const directPaidAmount = Number(record?.paid_amount || 0);
   const receiptVoucherTotal = Number(record?.receipt_voucher_total || 0);
   const totalPaid = directPaidAmount + receiptVoucherTotal;
   const remaining = total - totalPaid;
+  const change = totalPaid > total ? totalPaid - total : 0;
+  const customerRef = extractCustomerRef(record) || record?.customer_ref || '';
 
   return (
     <AnimatePresence>
@@ -379,11 +378,21 @@ export function InvoiceViewer({
                 </div>
                 <div className="min-w-0">
                   <p className="text-[10px] text-muted-foreground font-bold uppercase tracking-wider">العميل</p>
-                  {printSettings.customerName && <p className="font-bold truncate">{record?.customer_name || 'عميل نقدي'}</p>}
-                  {printSettings.customerPhone && record?.customer_phone && (
+                  {printSettings.customerName && (
+                    <p className="font-bold truncate">{record?.customer_name || 'عميل نقدي'}</p>
+                  )}
+                  {printSettings.customerPhone && (
                     <p className="text-xs text-muted-foreground flex items-center gap-1 mt-0.5">
-                      <Phone className="w-3 h-3" /> {record.customer_phone}
+                      <Phone className="w-3 h-3" /> {record?.customer_phone || '—'}
                     </p>
+                  )}
+                  {printSettings.customerRef && (
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      مرجع العميل: <span className="font-bold text-foreground">{customerRef || '—'}</span>
+                    </p>
+                  )}
+                  {printSettings.itemCount && (
+                    <p className="text-xs text-muted-foreground mt-0.5">عدد الأصناف: {items.length}</p>
                   )}
                 </div>
               </div>
@@ -414,14 +423,14 @@ export function InvoiceViewer({
                 </div>
               </div>
 
-              {printSettings.deliveryAddress && record?.delivery_address && (
+              {printSettings.deliveryAddress && (
                 <div className="flex items-start gap-3">
                   <div className="w-10 h-10 rounded-xl bg-amber-500/10 text-amber-500 flex items-center justify-center shrink-0">
                     <MapPin className="w-5 h-5" />
                   </div>
                   <div className="min-w-0">
                     <p className="text-[10px] text-muted-foreground font-bold uppercase tracking-wider">العنوان</p>
-                    <p className="text-sm truncate">{record.delivery_address}</p>
+                    <p className="text-sm truncate">{record?.delivery_address || '—'}</p>
                   </div>
                 </div>
               )}
@@ -473,7 +482,7 @@ export function InvoiceViewer({
                                     {it.sold_unit && (
                                       <p className="text-[10px] text-muted-foreground">{it.sold_unit}</p>
                                     )}
-                                    {it.variables && (
+                                    {printSettings.variables && it.variables && (
                                       <div className="mt-1 grid grid-cols-2 gap-1">
                                         {Array.isArray(it.variables) ? it.variables.map((v: any, i: number) => (
                                           <span key={i} className="text-[10px] bg-primary/5 border border-primary/20 rounded px-1.5 py-0.5">
@@ -507,9 +516,10 @@ export function InvoiceViewer({
             {/* Totals */}
             <div className="relative px-6 pb-6">
               <div className="ml-auto md:max-w-sm space-y-2 bg-muted/40 rounded-2xl p-5 border border-border">
+                {printSettings.totalQty && <Row label="إجمالي الكمية" value={itemCount} currency="" />}
                 {printSettings.subtotal && <Row label="المجموع الفرعي" value={subtotal} currency={currency} />}
-                {printSettings.discount && discount > 0 && <Row label="الخصم" value={-discount} currency={currency} className="text-amber-500" />}
-                {printSettings.tax && tax > 0 && <Row label="الضريبة" value={tax} currency={currency} />}
+                {printSettings.discount && <Row label="الخصم" value={-discount} currency={currency} className="text-amber-500" />}
+                {printSettings.tax && <Row label="الضريبة" value={tax} currency={currency} />}
                 <div className="h-px bg-border my-2" />
                 {printSettings.total && (
                   <div className="flex justify-between items-center">
@@ -535,13 +545,16 @@ export function InvoiceViewer({
                 {printSettings.remaining && (
                   <Row label="المتبقي" value={remaining} currency={currency} className={remaining > 0 ? "text-destructive font-black" : "text-emerald-500 font-black"} />
                 )}
+                {printSettings.change && change > 0 && (
+                  <Row label="الباقي للعميل" value={change} currency={currency} className="text-emerald-500 font-black" />
+                )}
               </div>
             </div>
 
             {/* Notes */}
             {printSettings.notes && record?.notes && (
               <div className="relative px-6 pb-4">
-                <p className="text-sm text-muted-foreground">{record.notes}</p>
+                <p className="text-sm text-muted-foreground">ملاحظات: {record.notes}</p>
               </div>
             )}
 
@@ -568,86 +581,43 @@ export function InvoiceViewer({
                 <div className="border border-border rounded-xl p-4">
                   <h4 className="font-bold text-sm mb-3 text-primary">عناصر الفاتورة</h4>
                   <div className="grid grid-cols-2 gap-3">
-                    <label className="flex items-center gap-2 cursor-pointer">
-                      <input type="checkbox" checked={printSettings.logo} onChange={(e) => handlePrintSettingChange('logo', e.target.checked)} className="w-4 h-4" />
-                      <span className="text-sm">الشعار</span>
-                    </label>
-                    <label className="flex items-center gap-2 cursor-pointer">
-                      <input type="checkbox" checked={printSettings.restaurantName} onChange={(e) => handlePrintSettingChange('restaurantName', e.target.checked)} className="w-4 h-4" />
-                      <span className="text-sm">اسم المطعم</span>
-                    </label>
-                    <label className="flex items-center gap-2 cursor-pointer">
-                      <input type="checkbox" checked={printSettings.invoiceNumber} onChange={(e) => handlePrintSettingChange('invoiceNumber', e.target.checked)} className="w-4 h-4" />
-                      <span className="text-sm">رقم الفاتورة</span>
-                    </label>
-                    <label className="flex items-center gap-2 cursor-pointer">
-                      <input type="checkbox" checked={printSettings.dateTime} onChange={(e) => handlePrintSettingChange('dateTime', e.target.checked)} className="w-4 h-4" />
-                      <span className="text-sm">التاريخ والوقت</span>
-                    </label>
-                    <label className="flex items-center gap-2 cursor-pointer">
-                      <input type="checkbox" checked={printSettings.customerName} onChange={(e) => handlePrintSettingChange('customerName', e.target.checked)} className="w-4 h-4" />
-                      <span className="text-sm">اسم العميل</span>
-                    </label>
-                    <label className="flex items-center gap-2 cursor-pointer">
-                      <input type="checkbox" checked={printSettings.customerPhone} onChange={(e) => handlePrintSettingChange('customerPhone', e.target.checked)} className="w-4 h-4" />
-                      <span className="text-sm">هاتف العميل</span>
-                    </label>
-                    <label className="flex items-center gap-2 cursor-pointer">
-                      <input type="checkbox" checked={printSettings.deliveryAddress} onChange={(e) => handlePrintSettingChange('deliveryAddress', e.target.checked)} className="w-4 h-4" />
-                      <span className="text-sm">العنوان</span>
-                    </label>
-                    <label className="flex items-center gap-2 cursor-pointer">
-                      <input type="checkbox" checked={printSettings.paymentMethod} onChange={(e) => handlePrintSettingChange('paymentMethod', e.target.checked)} className="w-4 h-4" />
-                      <span className="text-sm">طريقة الدفع</span>
-                    </label>
-                    <label className="flex items-center gap-2 cursor-pointer">
-                      <input type="checkbox" checked={printSettings.status} onChange={(e) => handlePrintSettingChange('status', e.target.checked)} className="w-4 h-4" />
-                      <span className="text-sm">الحالة</span>
-                    </label>
-                    <label className="flex items-center gap-2 cursor-pointer">
-                      <input type="checkbox" checked={printSettings.items} onChange={(e) => handlePrintSettingChange('items', e.target.checked)} className="w-4 h-4" />
-                      <span className="text-sm">الأصناف</span>
-                    </label>
-                    <label className="flex items-center gap-2 cursor-pointer">
-                      <input type="checkbox" checked={printSettings.variables} onChange={(e) => handlePrintSettingChange('variables', e.target.checked)} className="w-4 h-4" />
-                      <span className="text-sm">متغيرات الخدمة</span>
-                    </label>
-                    <label className="flex items-center gap-2 cursor-pointer">
-                      <input type="checkbox" checked={printSettings.subtotal} onChange={(e) => handlePrintSettingChange('subtotal', e.target.checked)} className="w-4 h-4" />
-                      <span className="text-sm">المجموع الفرعي</span>
-                    </label>
-                    <label className="flex items-center gap-2 cursor-pointer">
-                      <input type="checkbox" checked={printSettings.discount} onChange={(e) => handlePrintSettingChange('discount', e.target.checked)} className="w-4 h-4" />
-                      <span className="text-sm">الخصم</span>
-                    </label>
-                    <label className="flex items-center gap-2 cursor-pointer">
-                      <input type="checkbox" checked={printSettings.tax} onChange={(e) => handlePrintSettingChange('tax', e.target.checked)} className="w-4 h-4" />
-                      <span className="text-sm">الضريبة</span>
-                    </label>
-                    <label className="flex items-center gap-2 cursor-pointer">
-                      <input type="checkbox" checked={printSettings.total} onChange={(e) => handlePrintSettingChange('total', e.target.checked)} className="w-4 h-4" />
-                      <span className="text-sm">الإجمالي</span>
-                    </label>
-                    <label className="flex items-center gap-2 cursor-pointer">
-                      <input type="checkbox" checked={printSettings.paidAmount} onChange={(e) => handlePrintSettingChange('paidAmount', e.target.checked)} className="w-4 h-4" />
-                      <span className="text-sm">المدفوع</span>
-                    </label>
-                    <label className="flex items-center gap-2 cursor-pointer">
-                      <input type="checkbox" checked={printSettings.remaining} onChange={(e) => handlePrintSettingChange('remaining', e.target.checked)} className="w-4 h-4" />
-                      <span className="text-sm">المتبقي</span>
-                    </label>
-                    <label className="flex items-center gap-2 cursor-pointer">
-                      <input type="checkbox" checked={printSettings.notes} onChange={(e) => handlePrintSettingChange('notes', e.target.checked)} className="w-4 h-4" />
-                      <span className="text-sm">الملاحظات</span>
-                    </label>
-                    <label className="flex items-center gap-2 cursor-pointer">
-                      <input type="checkbox" checked={printSettings.thankYou} onChange={(e) => handlePrintSettingChange('thankYou', e.target.checked)} className="w-4 h-4" />
-                      <span className="text-sm">شكراً لتعاملكم</span>
-                    </label>
-                    <label className="flex items-center gap-2 cursor-pointer">
-                      <input type="checkbox" checked={printSettings.poweredBy} onChange={(e) => handlePrintSettingChange('poweredBy', e.target.checked)} className="w-4 h-4" />
-                      <span className="text-sm">Powered by Auditry</span>
-                    </label>
+                    {[
+                      { key: 'logo', label: 'الشعار' },
+                      { key: 'restaurantName', label: 'اسم المطعم' },
+                      { key: 'invoiceNumber', label: 'رقم الفاتورة' },
+                      { key: 'dateTime', label: 'التاريخ والوقت' },
+                      { key: 'itemCount', label: 'عدد الأصناف' },
+                      { key: 'customerName', label: 'اسم العميل' },
+                      { key: 'customerPhone', label: 'هاتف العميل' },
+                      { key: 'customerRef', label: 'مرجع العميل' },
+                      { key: 'deliveryAddress', label: 'العنوان' },
+                      { key: 'paymentMethod', label: 'طريقة الدفع' },
+                      { key: 'status', label: 'الحالة' },
+                      { key: 'items', label: 'الأصناف' },
+                      { key: 'variables', label: 'متغيرات الخدمة' },
+                      { key: 'totalQty', label: 'إجمالي الكمية' },
+                      { key: 'subtotal', label: 'المجموع الفرعي' },
+                      { key: 'discount', label: 'الخصم' },
+                      { key: 'tax', label: 'الضريبة' },
+                      { key: 'total', label: 'الإجمالي' },
+                      { key: 'paidAmount', label: 'إجمالي المدفوع' },
+                      { key: 'directPayment', label: 'المدفوع مباشرة' },
+                      { key: 'remaining', label: 'المتبقي' },
+                      { key: 'change', label: 'الباقي للعميل' },
+                      { key: 'notes', label: 'الملاحظات' },
+                      { key: 'thankYou', label: 'شكراً لتعاملكم' },
+                      { key: 'poweredBy', label: 'Powered by Auditry' },
+                    ].map(({ key, label }) => (
+                      <label key={key} className="flex items-center gap-2 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={!!printSettings[key as keyof PrintElementSettings]}
+                          onChange={(e) => handlePrintSettingChange(key as keyof PrintElementSettings, e.target.checked)}
+                          className="w-4 h-4"
+                        />
+                        <span className="text-sm">{label}</span>
+                      </label>
+                    ))}
                   </div>
                 </div>
 

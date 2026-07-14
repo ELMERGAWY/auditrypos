@@ -171,10 +171,10 @@
   /* Show only the invoice body and its children */
   .invoice-print-body,
   .invoice-print-body * {
-    visibility: visible;
+    visibility: visible !important;
   }
   
-  /* Position the invoice body for printing */
+  /* Force readable print colors (dark theme tokens otherwise print as light-on-white) */
   .invoice-print-body {
     position: absolute !important;
     top: 0 !important;
@@ -186,5 +186,31 @@
     box-shadow: none !important;
     border: none !important;
     border-radius: 0 !important;
+    background: #fff !important;
+    color: #000 !important;
+  }
+
+  .invoice-print-body * {
+    color: #000 !important;
+    background-image: none !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  .invoice-print-body .bg-gradient-to-br,
+  .invoice-print-body .bg-gradient-to-r,
+  .invoice-print-body [class*="bg-primary"],
+  .invoice-print-body [class*="bg-muted"],
+  .invoice-print-body [class*="bg-card"] {
+    background: #fff !important;
+  }
+
+  .invoice-print-body [class*="text-primary"],
+  .invoice-print-body [class*="text-muted"],
+  .invoice-print-body [class*="text-destructive"],
+  .invoice-print-body [class*="text-emerald"],
+  .invoice-print-body [class*="opacity-"] {
+    color: #000 !important;
+    opacity: 1 !important;
   }
 }

@@ -1104,7 +1104,7 @@ export default function Dashboard() {
             recordId={viewingOrderId}
             currency={currency}
             restaurantName={restaurant?.name}
-            restaurantLogo={restaurant?.logo}
+            restaurantLogo={restaurant?.logo_url || restaurant?.logo}
             restaurantId={restaurant?.id}
           />
         )}

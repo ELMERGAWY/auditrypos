@@ -930,6 +930,8 @@ export function SalesInvoices({ restaurantId, currency, restaurant, isSuperAdmin
           recordId={viewingId}
           currency={currency}
           restaurantId={restaurantId}
+          restaurantName={restaurant?.name}
+          restaurantLogo={restaurant?.logo_url || restaurant?.logo}
         />
       )}
     </div>
