@@ -38,6 +38,9 @@ export interface OrderItem {
   menu_item_image: string;
   quantity: number;
   price: number;
+  sold_unit?: string | null;
+  variables?: Array<{ label?: string; value?: string }> | string | null;
+  service_details?: string | null;
 }
 
 export interface Order {
@@ -59,6 +62,9 @@ export interface Order {
   customer_phone: string;
   customer_ref?: string; // قابل للتعديل يدويًا
   paid_amount?: number;
+  display_paid_amount?: number;
+  direct_paid_amount?: number;
+  customer_id?: string | null;
   delivery_lat: number | null;
   delivery_lng: number | null;
   tracking_token: string | null;

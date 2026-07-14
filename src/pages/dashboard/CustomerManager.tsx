@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 import { CustomerSearch } from './CustomerSearch';
 import { PaymentAllocations, type Allocation } from '@/components/PaymentAllocations';
+import { allocatePaymentToUnpaidOrders } from '@/lib/accounting/receiptVoucherAllocation';
 
 import * as XLSX from 'xlsx';
 import jsPDF from 'jspdf';
@@ -725,7 +726,7 @@ export function CustomerManager({ restaurantId, currency }: Props) {
           }).eq('id', customer.id);
         }
       } else {
-        const { error } = await supabase.rpc('save_receipt_voucher', {
+        const { data: voucherId, error } = await supabase.rpc('save_receipt_voucher', {
           p_restaurant_id: restaurantId,
           p_customer_id: receiptVoucherForm.customer_id,
           p_amount: amount,
@@ -737,35 +738,28 @@ export function CustomerManager({ restaurantId, currency }: Props) {
           p_voucher_id: editingReceiptVoucher?.id || null
         });
         if (error) throw error;
-      }
 
-      // Apply allocations to unpaid orders (multi-invoice payment)
-      // Receipt vouchers are shown in orders/invoices based on customer and date
-      // No need to save voucher IDs in orders - they are queried dynamically
-      if (voucherAllocations.length > 0) {
-        for (const a of voucherAllocations) {
-          // Update order paid_amount to include this allocation
-          const { data: order } = await supabase
-            .from('orders')
-            .select('paid_amount, total')
-            .eq('id', a.order_id)
-            .single();
-
-          const newPaid = Number(order?.paid_amount || 0) + Number(a.amount || 0);
-          const fullyPaid = newPaid >= Number(order?.total || 0) - 0.01;
-
-          await supabase.from('orders').update({
-            paid_amount: newPaid,
-            ...(fullyPaid ? { payment_status: 'paid' } : { payment_status: 'partial' }),
-          } as any).eq('id', a.order_id);
+        // توزيع السند على الفواتير غير المسددة (يدوي إن وُجد، وإلا تلقائي FIFO)
+        // حتى يظهر إجمالي المدفوع على كارت الطلب فورًا
+        if (!editingReceiptVoucher?.id) {
+          await allocatePaymentToUnpaidOrders({
+            restaurantId,
+            customerId: receiptVoucherForm.customer_id,
+            amount,
+            voucherId: voucherId || null,
+            allocations: voucherAllocations.map((a) => ({
+              order_id: a.order_id,
+              amount: Number(a.amount) || 0,
+            })),
+          });
         }
       }
 
       toast.success(editingReceiptVoucher ? 'تم تحديث سند القبض' : 'تم إضافة سند القبض');
 
-
       setShowReceiptVoucherModal(false);
       setEditingReceiptVoucher(null);
+      setVoucherAllocations([]);
       setReceiptVoucherForm({
         customer_id: '',
         customer_name: '',
@@ -778,6 +772,7 @@ export function CustomerManager({ restaurantId, currency }: Props) {
       });
       loadReceiptVouchers();
       loadCustomers();
+      window.dispatchEvent(new CustomEvent('auditry:orders-reload'));
     } catch (error: any) {
       toast.error('فشل حفظ سند القبض: ' + error.message);
     }
@@ -811,7 +806,7 @@ export function CustomerManager({ restaurantId, currency }: Props) {
     setProcessingPayment(true);
     try {
       const recAcc = accounts.find(acc => acc.code?.startsWith('12') || acc.name?.includes('عملاء') || acc.name?.includes('مدينة'));
-      const { error: rpcError } = await supabase.rpc('save_receipt_voucher', {
+      const { data: voucherId, error: rpcError } = await supabase.rpc('save_receipt_voucher', {
         p_restaurant_id: restaurantId,
         p_customer_id: selectedCustomer.id,
         p_amount: amount,
@@ -834,6 +829,13 @@ export function CustomerManager({ restaurantId, currency }: Props) {
           description: paymentForm.notes || 'دفعة نقدية من العميل',
           payment_method: paymentForm.payment_method,
         } as any);
+      } else {
+        await allocatePaymentToUnpaidOrders({
+          restaurantId,
+          customerId: selectedCustomer.id,
+          amount,
+          voucherId: voucherId || null,
+        });
       }
 
       toast.success(`تم تسجيل دفعة ${amount.toFixed(2)} ${currency}`);
@@ -841,6 +843,7 @@ export function CustomerManager({ restaurantId, currency }: Props) {
       setPaymentForm({ amount: '', payment_method: 'cash', notes: '' });
       loadCustomers();
       loadReceiptVouchers();
+      window.dispatchEvent(new CustomEvent('auditry:orders-reload'));
     } catch (error: any) {
       toast.error('فشل تسجيل الدفعة: ' + error.message);
     } finally {

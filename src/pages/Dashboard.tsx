@@ -823,7 +823,11 @@ export default function Dashboard() {
                 </div>
               </div>
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">{filteredOrders.map(o => (
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">{filteredOrders.map(o => {
+              const displayPaid = Number((o as any).display_paid_amount ?? o.paid_amount ?? 0);
+              const remainingAmt = Math.max(0, Number(o.total) - displayPaid);
+              const orderItems = Array.isArray(o.items) ? o.items : [];
+              return (
               <Card key={o.id} className="p-4 hover:shadow-md transition-shadow border-primary/10 cursor-pointer" onClick={() => { setLastReceipt(o); setAutoPrint(false); setShowReceipt(true); }}>
                 <div className="flex justify-between items-start font-bold mb-3">
                   <div className="flex flex-col">
@@ -863,12 +867,50 @@ export default function Dashboard() {
                   </div>
                   <div className="flex justify-between text-xs">
                     <span className="text-muted-foreground">إجمالي المدفوع:</span>
-                    <span className="text-emerald-600 font-bold">{Number(o.paid_amount || 0).toLocaleString()} {currency}</span>
+                    <span className="text-emerald-600 font-bold">{displayPaid.toLocaleString()} {currency}</span>
                   </div>
                   <div className="flex justify-between text-xs">
                     <span className="text-muted-foreground">المتبقي:</span>
-                    <span className="text-destructive font-bold">{Math.max(0, Number(o.total) - Number(o.paid_amount || 0)).toLocaleString()} {currency}</span>
+                    <span className="text-destructive font-bold">{remainingAmt.toLocaleString()} {currency}</span>
                   </div>
+
+                  {orderItems.length > 0 && (
+                    <div className="mt-2 rounded-xl border border-border/60 bg-muted/30 p-2 space-y-1.5 max-h-36 overflow-y-auto">
+                      <p className="text-[10px] font-bold text-muted-foreground">تفاصيل الأصناف ({orderItems.length})</p>
+                      {orderItems.map((item: any, idx: number) => (
+                        <div key={item.id || idx} className="text-[11px] leading-tight">
+                          <div className="flex justify-between gap-2">
+                            <span className="font-bold truncate">
+                              {item.menu_item_name || 'صنف'}
+                              {item.sold_unit ? ` (${item.sold_unit})` : ''}
+                            </span>
+                            <span className="shrink-0 text-muted-foreground">
+                              ×{item.quantity} · {(Number(item.price) * Number(item.quantity)).toLocaleString()}
+                            </span>
+                          </div>
+                          {item.service_details && (
+                            <p className="text-[10px] text-muted-foreground truncate">{item.service_details}</p>
+                          )}
+                          {item.variables && (
+                            <div className="flex flex-wrap gap-1 mt-0.5">
+                              {Array.isArray(item.variables)
+                                ? item.variables.map((v: any, i: number) => (
+                                    <span key={i} className="text-[9px] bg-primary/10 text-primary rounded px-1.5 py-0.5">
+                                      {v.label}: {v.value}
+                                    </span>
+                                  ))
+                                : (
+                                    <span className="text-[9px] bg-primary/10 text-primary rounded px-1.5 py-0.5">
+                                      {String(item.variables)}
+                                    </span>
+                                  )}
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
                   <div className="text-[9px] text-muted-foreground/70 font-mono truncate" title={o.id}>
                     ID:{o.id?.slice(-8)} { (o as any).client_order_id ? `· CID:${String((o as any).client_order_id).slice(-6)}` : '' }
                   </div>
@@ -889,7 +931,8 @@ export default function Dashboard() {
                 </Button>
               </div>
               </Card>
-            ))}</div>
+            );})}
+            </div>
           </div>
         )}
         

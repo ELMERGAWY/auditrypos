@@ -225,7 +225,34 @@ export function useDashboardData() {
         } as unknown as Order);
       }
     }
-    setOrders(ordersWithItems);
+
+    // Attach display_paid_amount including unallocated manual receipt vouchers
+    const customerIds = [
+      ...new Set(
+        ordersWithItems
+          .map((o: any) => o.customer_id)
+          .filter(Boolean)
+      ),
+    ] as string[];
+    let enrichedOrders = ordersWithItems as any[];
+    if (customerIds.length > 0) {
+      const { data: vouchers } = await supabase
+        .from('receipt_vouchers')
+        .select('customer_id, amount, notes')
+        .eq('restaurant_id', rest.id)
+        .in('customer_id', customerIds);
+      const { enrichOrdersDisplayPaid } = await import(
+        '@/lib/accounting/receiptVoucherAllocation'
+      );
+      enrichedOrders = enrichOrdersDisplayPaid(ordersWithItems as any[], vouchers || []);
+    } else {
+      enrichedOrders = ordersWithItems.map((o: any) => ({
+        ...o,
+        display_paid_amount: Number(o.paid_amount || 0),
+      }));
+    }
+
+    setOrders(enrichedOrders as Order[]);
     setDataLoaded(true);
 
     // Cache everything for offline use
@@ -233,7 +260,7 @@ export function useDashboardData() {
       restaurant: rest,
       menuItems: loadedMenuItems,
       servicePackages: loadedServicePackages,
-      orders: ordersWithItems,
+      orders: enrichedOrders,
       waiterCalls: loadedCalls,
       agents: loadedAgents,
       taxes: loadedTaxes,
@@ -273,6 +300,15 @@ export function useDashboardData() {
       runPendingSync(true);
     }
   }, [isOnline, user, dataLoaded, runPendingSync]);
+
+  // Reload orders after manual receipt vouchers / payments
+  useEffect(() => {
+    const onReload = () => {
+      if (user) loadData();
+    };
+    window.addEventListener('auditry:orders-reload', onReload);
+    return () => window.removeEventListener('auditry:orders-reload', onReload);
+  }, [user, loadData]);
 
   useEffect(() => {
     if (!authLoading && !user) { 
@@ -362,6 +398,12 @@ export function useDashboardData() {
               if (localPaid > remotePaid && remotePaid === 0) {
                 (merged as any).paid_amount = localPaid;
               }
+              const paid = Number((merged as any).paid_amount || 0);
+              (merged as any).display_paid_amount = Math.max(
+                paid,
+                Number((order as any).display_paid_amount || 0),
+                Number((payload.new as any).display_paid_amount || 0)
+              );
               return merged;
             }));
           }
