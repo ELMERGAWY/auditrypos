@@ -610,6 +610,7 @@ export default function Dashboard() {
 
   const performCheckout = async (sendToPrep: boolean = false) => {
     if (cart.length === 0) return;
+    if (isProcessingCheckout) return; // Prevent double-click
     if (!restaurant?.id) {
       toast.error('خطأ: بيانات المطعم غير متاحة');
       setIsProcessingCheckout(false);
