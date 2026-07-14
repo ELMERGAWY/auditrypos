@@ -252,37 +252,71 @@ class CheckoutIntegration {
 
       // 13. Handle customer balance and transactions
       if (customerId) {
-        if (paidAmount < finalTotal) {
-          const remaining = finalTotal - paidAmount;
-          await this.updateCustomerBalance(customerId, context.restaurantId, remaining, order.id, orderNum);
-        }
-        // 13b. Auto-create Receipt Voucher for the paid portion (so customer ledger reflects it)
+        // 13a. Auto-create Receipt Voucher for the paid portion using the new RPC function
+        // This will automatically create: receipt_voucher, customer_transaction, journal_entry
+        // and update customer balance via triggers
         if (paidAmount > 0) {
           try {
-            const voucherNumber = `RCV-${orderNum.slice(-6)}-${Date.now().toString().slice(-4)}`;
-            const { data: voucher } = await supabase.from('receipt_vouchers').insert({
-              restaurant_id: context.restaurantId,
-              voucher_number: voucherNumber,
-              voucher_date: new Date().toISOString().slice(0, 10),
-              customer_id: customerId,
-              amount: paidAmount,
-              payment_method: orderData.paymentMethod,
-              notes: `سداد تلقائي عند إنشاء الفاتورة ${orderNum}`,
-            }).select('id').single();
+            // Get account IDs for the receipt voucher
+            const { data: cashAcc } = await supabase
+              .from('chart_of_accounts')
+              .select('id')
+              .eq('restaurant_id', context.restaurantId)
+              .eq('is_cash_account', true)
+              .limit(1)
+              .single();
 
-            if (voucher?.id) {
-              await supabase.from('orders').update({
-                direct_paid_amount: paidAmount,
-                receipt_voucher_ids: [voucher.id],
-                paid_amount: paidAmount,
-              }).eq('id', order.id);
-              (order as any).direct_paid_amount = paidAmount;
-              (order as any).receipt_voucher_ids = [voucher.id];
-              (order as any).paid_amount = paidAmount;
+            const { data: arAcc } = await supabase
+              .from('chart_of_accounts')
+              .select('id')
+              .eq('restaurant_id', context.restaurantId)
+              .eq('code', '1.01.003') // Accounts Receivable
+              .limit(1)
+              .single();
+
+            if (cashAcc?.id && arAcc?.id) {
+              const { data: voucher } = await supabase.rpc('save_receipt_voucher', {
+                p_restaurant_id: context.restaurantId,
+                p_customer_id: customerId,
+                p_amount: paidAmount,
+                p_payment_method: orderData.paymentMethod,
+                p_voucher_date: new Date().toISOString().slice(0, 10),
+                p_notes: `سداد تلقائي عند إنشاء الفاتورة ${orderNum}`,
+                p_account_id: cashAcc.id,
+                p_counter_account_id: arAcc.id,
+              });
+
+              if (voucher) {
+                await supabase.from('orders').update({
+                  direct_paid_amount: paidAmount,
+                  receipt_voucher_ids: [voucher],
+                  paid_amount: paidAmount,
+                }).eq('id', order.id);
+                (order as any).direct_paid_amount = paidAmount;
+                (order as any).receipt_voucher_ids = [voucher];
+                (order as any).paid_amount = paidAmount;
+              }
             }
           } catch (rcvErr) {
             console.warn('[checkout] auto receipt voucher failed:', rcvErr);
           }
+        }
+
+        // 13b. Record remaining balance as credit (if any)
+        // The triggers will handle balance updates automatically
+        if (paidAmount < finalTotal) {
+          const remaining = finalTotal - paidAmount;
+          await supabase.from('customer_transactions').insert({
+            customer_id: customerId,
+            restaurant_id: context.restaurantId,
+            type: 'sale',
+            amount: remaining,
+            description: `فاتورة #${orderNum.slice(-4)} - متبقي`,
+            order_id: order.id,
+            payment_method: 'credit',
+            reference_type: 'order',
+            reference_id: order.id
+          });
         }
       }
 
@@ -558,40 +592,8 @@ class CheckoutIntegration {
     }
   }
 
-  private async updateCustomerBalance(
-    customerId: string,
-    restaurantId: string,
-    amount: number,
-    orderId: string,
-    orderNumber: string
-  ): Promise<void> {
-    // Update customer balance
-    const { data: customer } = await supabase
-      .from('customers')
-      .select('balance')
-      .eq('id', customerId)
-      .single();
-
-    if (customer) {
-      await supabase
-        .from('customers')
-        .update({ balance: (customer.balance || 0) + amount })
-        .eq('id', customerId);
-    }
-
-    // Record transaction
-    await supabase.from('customer_transactions').insert({
-      customer_id: customerId,
-      restaurant_id: restaurantId,
-      type: 'sale',
-      amount,
-      description: `فاتورة #${orderNumber.slice(-4)} - متبقي`,
-      order_id: orderId,
-      payment_method: 'credit',
-      reference_type: 'order',
-      reference_id: orderId
-    });
-  }
+  // Note: updateCustomerBalance is no longer needed
+  // The triggers on customer_transactions will handle balance updates automatically
 
   private async getDeliveryFee(restaurantId: string): Promise<number> {
     const { data } = await supabase

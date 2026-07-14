@@ -376,13 +376,8 @@ class JournalService {
       await this.createCOGSJournalEntry(restaurantId, order, businessType, cogs);
     }
 
-    // 6. Update Customer Balance if credit sale
-    if (remaining > 0 && order.customer_id) {
-      await supabase.rpc('update_customer_balance', {
-        p_customer_id: order.customer_id,
-        p_amount: remaining
-      });
-    }
+    // Note: Customer balance is now handled by triggers on customer_transactions
+    // The checkoutIntegration will create the necessary transactions
 
     return entry;
   }
