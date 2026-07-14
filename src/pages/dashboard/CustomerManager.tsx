@@ -48,6 +48,27 @@ interface CustomerTransaction {
   items?: any[];
 }
 
+/** True if checkout payment is already represented by a customer_transactions payment/voucher row. */
+function isCheckoutPaymentCoveredByTx(
+  order: { id: string; order_number?: string; receipt_voucher_ids?: string[] | null },
+  payments: Array<{ order_id?: string | null; description?: string | null; type?: string | null; amount?: number | null }>
+): boolean {
+  if (Array.isArray(order.receipt_voucher_ids) && order.receipt_voucher_ids.length > 0) {
+    return true;
+  }
+  const orderNum = String(order.order_number || '');
+  return (payments || []).some((p) => {
+    if (p.type === 'debit' || p.type === 'sale') return false;
+    const amt = Math.abs(Number(p.amount) || 0);
+    if (amt <= 0) return false;
+    if (p.order_id && p.order_id === order.id) return true;
+    const desc = String(p.description || '');
+    if (orderNum && desc.includes(orderNum)) return true;
+    if (desc.includes('سداد تلقائي') && orderNum && desc.includes(orderNum.slice(-8))) return true;
+    return false;
+  });
+}
+
 interface CustomerSalesReturn {
   id: string;
   return_number: string;
@@ -393,14 +414,14 @@ export function CustomerManager({ restaurantId, currency }: Props) {
         // Get orders (invoices) for this customer
         const { data: ordersData } = await supabase
           .from('orders')
-          .select('id, total, paid_amount, status, created_at')
+          .select('id, order_number, total, paid_amount, status, created_at, receipt_voucher_ids')
           .eq('customer_id', c.id)
           .eq('restaurant_id', restaurantId);
         
         // Get customer transactions (payments, etc.)
         const { data: txData } = await supabase
           .from('customer_transactions')
-          .select('id, amount, type, created_at')
+          .select('id, amount, type, created_at, order_id, description')
           .eq('customer_id', c.id)
           .neq('type', 'sale'); // Exclude 'sale' type as it's redundant with orders
         
@@ -415,9 +436,9 @@ export function CustomerManager({ restaurantId, currency }: Props) {
               debit: Number(order.total) || 0,
               credit: 0
             });
-            // Add immediate payment as credit
+            // Credit paid_amount only if not already in a payment CT / auto voucher
             const paidAtCheckout = Number(order.paid_amount) || 0;
-            if (paidAtCheckout > 0) {
+            if (paidAtCheckout > 0 && !isCheckoutPaymentCoveredByTx(order, txData || [])) {
               allTransactions.push({
                 date: order.created_at,
                 debit: 0,
@@ -474,7 +495,7 @@ export function CustomerManager({ restaurantId, currency }: Props) {
       const { data: ordersData } = await supabase
         .from('orders')
         .select(`
-          id, order_number, created_at, total, paid_amount, status,
+          id, order_number, created_at, total, paid_amount, status, receipt_voucher_ids,
           order_items(menu_item_name, quantity, price)
         `)
         .eq('customer_id', customerId)
@@ -492,6 +513,7 @@ export function CustomerManager({ restaurantId, currency }: Props) {
 
       // Build statement
       const statement: CustomerTransaction[] = [];
+      const orderById = new Map((ordersData || []).map((o: any) => [o.id, o]));
 
       // Add orders and their immediate payments
       ordersData?.forEach((order: any) => {
@@ -512,14 +534,14 @@ export function CustomerManager({ restaurantId, currency }: Props) {
             items: order.order_items
           });
 
-          // 2. Add the payment made at checkout as a CREDIT (What they paid)
-          if (paidAtCheckout > 0) {
+          // 2. Credit paid_at_invoice ONLY if not already posted as سند/حركة سداد
+          if (paidAtCheckout > 0 && !isCheckoutPaymentCoveredByTx(order, paymentsData || [])) {
             statement.push({
               id: `${order.id}-payment`,
               date: order.created_at,
               type: 'payment',
               reference: order.order_number,
-              description: 'سداد دفعة مقدمة (عند الفاتورة)',
+              description: 'سداد عند الفاتورة',
               debit: 0,
               credit: paidAtCheckout,
               balance: 0
@@ -531,11 +553,12 @@ export function CustomerManager({ restaurantId, currency }: Props) {
       // Add other transactions (subsequent payments, returns, etc.)
       paymentsData?.forEach((payment: any) => {
         const amount = Number(payment.amount);
+        const linkedOrder = payment.order_id ? orderById.get(payment.order_id) : null;
         statement.push({
           id: payment.id,
           date: payment.created_at,
           type: payment.type as any,
-          reference: '',
+          reference: linkedOrder?.order_number || '',
           description: payment.description || (payment.type === 'payment' ? 'سداد' : 'تسوية'),
           debit: payment.type === 'debit' ? Math.abs(amount) : 0,
           credit: payment.type !== 'debit' ? Math.abs(amount) : 0,
