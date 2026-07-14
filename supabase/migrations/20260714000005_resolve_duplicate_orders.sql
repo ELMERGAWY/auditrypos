@@ -14,18 +14,18 @@ BEGIN;
 -- Create a temporary table to track which orders to keep
 CREATE TEMP TABLE orders_to_keep AS
 WITH ranked_orders AS (
-  SELECT 
+  SELECT
     id,
     order_number,
     paid_amount,
     created_at,
     receipt_voucher_ids,
     ROW_NUMBER() OVER (
-      PARTITION BY order_number 
-      ORDER BY 
-        CASE 
+      PARTITION BY order_number
+      ORDER BY
+        CASE
           WHEN paid_amount > 0 THEN 0
-          WHEN receipt_voucher_ids IS NOT NULL AND jsonb_array_length(receipt_voucher_ids) > 0 THEN 1
+          WHEN receipt_voucher_ids IS NOT NULL AND cardinality(receipt_voucher_ids) > 0 THEN 1
           ELSE 2
         END,
         created_at ASC
