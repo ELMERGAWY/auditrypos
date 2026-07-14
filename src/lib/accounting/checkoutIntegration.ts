@@ -264,7 +264,7 @@ class CheckoutIntegration {
               .eq('restaurant_id', context.restaurantId)
               .eq('is_cash_account', true)
               .limit(1)
-              .single();
+              .maybeSingle();
 
             const { data: arAcc } = await supabase
               .from('chart_of_accounts')
@@ -272,10 +272,12 @@ class CheckoutIntegration {
               .eq('restaurant_id', context.restaurantId)
               .eq('code', '1.01.003') // Accounts Receivable
               .limit(1)
-              .single();
+              .maybeSingle();
 
             if (cashAcc?.id && arAcc?.id) {
-              const { data: voucher } = await supabase.rpc('save_receipt_voucher', {
+              console.log('[checkout] Creating receipt voucher with accounts:', { cashAcc: cashAcc.id, arAcc: arAcc.id });
+              
+              const { data: voucher, error: voucherError } = await supabase.rpc('save_receipt_voucher', {
                 p_restaurant_id: context.restaurantId,
                 p_customer_id: customerId,
                 p_amount: paidAmount,
@@ -286,7 +288,21 @@ class CheckoutIntegration {
                 p_counter_account_id: arAcc.id,
               });
 
-              if (voucher) {
+              if (voucherError) {
+                console.error('[checkout] Receipt voucher RPC error:', voucherError);
+                // Fallback: create simple customer transaction
+                await supabase.from('customer_transactions').insert({
+                  customer_id: customerId,
+                  restaurant_id: context.restaurantId,
+                  type: 'payment',
+                  amount: -paidAmount,
+                  description: `دفعة عند الفاتورة ${orderNum}`,
+                  order_id: order.id,
+                  payment_method: orderData.paymentMethod,
+                  reference_type: 'order',
+                  reference_id: order.id
+                });
+              } else if (voucher) {
                 await supabase.from('orders').update({
                   direct_paid_amount: paidAmount,
                   receipt_voucher_ids: [voucher],
@@ -295,10 +311,41 @@ class CheckoutIntegration {
                 (order as any).direct_paid_amount = paidAmount;
                 (order as any).receipt_voucher_ids = [voucher];
                 (order as any).paid_amount = paidAmount;
+                console.log('[checkout] Receipt voucher created successfully:', voucher);
               }
+            } else {
+              console.warn('[checkout] Required accounts not found:', { cashAcc, arAcc });
+              // Fallback: create simple customer transaction
+              await supabase.from('customer_transactions').insert({
+                customer_id: customerId,
+                restaurant_id: context.restaurantId,
+                type: 'payment',
+                amount: -paidAmount,
+                description: `دفعة عند الفاتورة ${orderNum}`,
+                order_id: order.id,
+                payment_method: orderData.paymentMethod,
+                reference_type: 'order',
+                reference_id: order.id
+              });
             }
           } catch (rcvErr) {
-            console.warn('[checkout] auto receipt voucher failed:', rcvErr);
+            console.error('[checkout] Auto receipt voucher failed:', rcvErr);
+            // Fallback: create simple customer transaction
+            try {
+              await supabase.from('customer_transactions').insert({
+                customer_id: customerId,
+                restaurant_id: context.restaurantId,
+                type: 'payment',
+                amount: -paidAmount,
+                description: `دفعة عند الفاتورة ${orderNum}`,
+                order_id: order.id,
+                payment_method: orderData.paymentMethod,
+                reference_type: 'order',
+                reference_id: order.id
+              });
+            } catch (fallbackErr) {
+              console.error('[checkout] Fallback transaction also failed:', fallbackErr);
+            }
           }
         }
 

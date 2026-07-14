@@ -182,37 +182,67 @@ WHEN (NEW.is_posted = true OR NEW.is_posted IS NULL)
 EXECUTE FUNCTION public.check_journal_entry_balance();
 
 -- ============================================================
--- FIX 4: ACCOUNT BALANCE AUTO-UPDATE
+-- FIX 4: ACCOUNT BALANCE AUTO-UPDATE (DISABLED - CAUSES STACK DEPTH)
 -- ============================================================
 
--- 4.1 Create function to update account balance from journal lines
-CREATE OR REPLACE FUNCTION public.update_account_balance_from_journal()
-RETURNS TRIGGER AS $$
-DECLARE
-  v_balance_change NUMERIC;
+-- NOTE: This trigger is disabled because it causes "stack depth limit exceeded"
+-- The account balance should be calculated dynamically from journal entries
+-- We'll create a function to calculate balance on demand instead
+
+-- 4.1 Create function to calculate account balance dynamically
+CREATE OR REPLACE FUNCTION public.get_account_balance(p_account_id UUID)
+RETURNS NUMERIC AS $$
 BEGIN
-  -- Calculate net change for this line
-  v_balance_change := NEW.debit - NEW.credit;
-  
-  -- Update account current balance
+  RETURN COALESCE(
+    (SELECT COALESCE(SUM(debit - credit), 0)
+    FROM public.journal_entry_lines
+    WHERE account_id = p_account_id),
+    0
+  );
+END;
+$$ LANGUAGE plpgsql STABLE;
+
+-- 4.2 Create function to update account balance (for manual recalculation)
+CREATE OR REPLACE FUNCTION public.recalculate_account_balance(p_account_id UUID)
+RETURNS NUMERIC AS $$
+BEGIN
   UPDATE public.chart_of_accounts
-  SET current_balance = current_balance + v_balance_change,
+  SET current_balance = public.get_account_balance(p_account_id),
       updated_at = NOW()
-  WHERE id = NEW.account_id;
+  WHERE id = p_account_id;
   
-  RETURN NEW;
+  RETURN public.get_account_balance(p_account_id);
 END;
 $$ LANGUAGE plpgsql;
 
--- 4.2 Create trigger for journal entry lines
-DROP TRIGGER IF EXISTS trg_journal_line_update_balance ON public.journal_entry_lines;
-CREATE TRIGGER trg_journal_line_update_balance
-AFTER INSERT ON public.journal_entry_lines
-FOR EACH ROW
-EXECUTE FUNCTION public.update_account_balance_from_journal();
+-- 4.3 Function to recalculate all account balances
+CREATE OR REPLACE FUNCTION public.recalculate_all_account_balances(p_restaurant_id UUID DEFAULT NULL)
+RETURNS INTEGER AS $$
+DECLARE
+  v_count INTEGER;
+BEGIN
+  IF p_restaurant_id IS NOT NULL THEN
+    UPDATE public.chart_of_accounts
+    SET current_balance = public.get_account_balance(id)
+    WHERE restaurant_id = p_restaurant_id;
+    
+    SELECT COUNT(*) INTO v_count
+    FROM public.chart_of_accounts
+    WHERE restaurant_id = p_restaurant_id;
+  ELSE
+    UPDATE public.chart_of_accounts
+    SET current_balance = public.get_account_balance(id);
+    
+    SELECT COUNT(*) INTO v_count
+    FROM public.chart_of_accounts;
+  END IF;
+  
+  RETURN v_count;
+END;
+$$ LANGUAGE plpgsql;
 
--- Note: We don't create UPDATE/DELETE triggers for journal lines
--- to allow for corrections through separate adjustment entries
+-- Note: We don't create triggers for journal lines to avoid stack depth issues
+-- Account balances will be recalculated periodically or on demand
 
 -- ============================================================
 -- FIX 5: IMPROVED RECEIPT VOUCHER WITH ROLLBACK
