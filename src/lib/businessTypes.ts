@@ -209,7 +209,7 @@ export const BUSINESS_TYPES: Record<BusinessType, BusinessTypeConfig> = {
       requireCustomer: false
     },
     
-    tabs: ['home', 'employees', 'marketing_services', 'marketing_quotes', 'marketing_contracts', 'pos', 'orders', 'service_deliverables', 'menu', 'bom', 'service_packages', 'inventory', 'inventory_receipts', 'purchase_invoices', 'purchase_orders', 'supplier_contracts', 'sales_invoices', 'sales_orders', 'crm', 'delivery', 'customers', 'customer_accounts', 'sales_returns', 'suppliers', 'supplier_accounts', 'contractors', 'shifts', 'stats', 'analytics', 'ai_assistant', 'financials', 'treasury', 'chart_of_accounts', 'manual_journal', 'accounting_mapping', 'fixed_assets', 'expenses', 'staff', 'users', 'notifications', 'settings'],
+    tabs: ['home', 'pos', 'orders', 'kds', 'menu', 'bom', 'inventory', 'inventory_receipts', 'purchase_invoices', 'purchase_orders', 'sales_invoices', 'sales_orders', 'crm', 'delivery', 'customers', 'customer_accounts', 'sales_returns', 'suppliers', 'supplier_accounts', 'shifts', 'employees', 'stats', 'analytics', 'ai_assistant', 'financials', 'treasury', 'chart_of_accounts', 'manual_journal', 'accounting_mapping', 'fixed_assets', 'expenses', 'staff', 'users', 'notifications', 'settings'],
     
     specialFields: [
       { name: 'guest_count', type: 'number', label: 'عدد الضيوف', required: false },
@@ -289,7 +289,7 @@ export const BUSINESS_TYPES: Record<BusinessType, BusinessTypeConfig> = {
       requireCustomer: false
     },
     
-    tabs: ['home', 'employees', 'marketing_services', 'marketing_quotes', 'marketing_contracts', 'pos', 'orders', 'service_deliverables', 'menu', 'service_packages', 'inventory', 'inventory_receipts', 'purchase_invoices', 'purchase_orders', 'supplier_contracts', 'sales_invoices', 'sales_orders', 'crm', 'delivery', 'customers', 'customer_accounts', 'sales_returns', 'suppliers', 'supplier_accounts', 'shifts', 'stats', 'analytics', 'ai_assistant', 'financials', 'treasury', 'fixed_assets', 'expenses', 'staff', 'users', 'notifications', 'settings'],
+    tabs: ['home', 'pos', 'orders', 'kds', 'menu', 'inventory', 'inventory_receipts', 'purchase_invoices', 'purchase_orders', 'sales_invoices', 'sales_orders', 'crm', 'delivery', 'customers', 'customer_accounts', 'sales_returns', 'suppliers', 'supplier_accounts', 'shifts', 'employees', 'stats', 'analytics', 'ai_assistant', 'financials', 'treasury', 'chart_of_accounts', 'manual_journal', 'accounting_mapping', 'fixed_assets', 'expenses', 'staff', 'users', 'notifications', 'settings'],
   },
   
   retail: {
@@ -1284,7 +1284,7 @@ export const BUSINESS_TYPES: Record<BusinessType, BusinessTypeConfig> = {
       allowCredit: true,
       requireCustomer: true
     },
-    tabs: ['home', 'employees', 'marketing_services', 'marketing_quotes', 'marketing_contracts', 'marketing_workflow', 'marketing_accounting', 'service_deliverables', 'contracting', 'projects', 'pos', 'orders', 'menu', 'service_packages', 'inventory', 'inventory_receipts', 'purchase_invoices', 'purchase_orders', 'supplier_contracts', 'crm', 'delivery', 'customers', 'customer_accounts', 'suppliers', 'supplier_accounts', 'stats', 'analytics', 'ai_assistant', 'financials', 'treasury', 'chart_of_accounts', 'manual_journal', 'accounting_mapping', 'fixed_assets', 'settings']
+    tabs: ['home', 'contracting', 'contractors', 'employees', 'inventory', 'inventory_receipts', 'purchase_invoices', 'purchase_orders', 'supplier_contracts', 'sales_invoices', 'sales_orders', 'crm', 'customers', 'customer_accounts', 'suppliers', 'supplier_accounts', 'stats', 'analytics', 'ai_assistant', 'financials', 'treasury', 'chart_of_accounts', 'manual_journal', 'accounting_mapping', 'fixed_assets', 'expenses', 'staff', 'users', 'notifications', 'settings']
   },
   finishing: {
     id: 'finishing',
@@ -1604,7 +1604,7 @@ export const BUSINESS_TYPES: Record<BusinessType, BusinessTypeConfig> = {
       allowCredit: true,
       requireCustomer: true
     },
-    tabs: ['home', 'employees', 'marketing_services', 'marketing_quotes', 'marketing_contracts', 'marketing_workflow', 'marketing_accounting', 'service_deliverables', 'crm', 'projects', 'customers', 'suppliers', 'sales_orders', 'sales_invoices', 'purchase_orders', 'supplier_contracts', 'purchase_invoices', 'stats', 'analytics', 'ai_assistant', 'financials', 'treasury', 'chart_of_accounts', 'manual_journal', 'accounting_mapping', 'fixed_assets', 'expenses', 'staff', 'payroll', 'chat', 'users', 'notifications', 'settings']
+    tabs: ['home', 'marketing_hub', 'crm', 'employees', 'customers', 'suppliers', 'sales_orders', 'sales_invoices', 'purchase_orders', 'supplier_contracts', 'purchase_invoices', 'stats', 'analytics', 'ai_assistant', 'financials', 'treasury', 'chart_of_accounts', 'manual_journal', 'accounting_mapping', 'fixed_assets', 'expenses', 'staff', 'payroll', 'chat', 'users', 'notifications', 'settings']
   },
   gym: {
     id: 'gym',

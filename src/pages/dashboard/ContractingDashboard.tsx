@@ -28,6 +28,8 @@ export function ContractingDashboard({ restaurantId, currency }: Props) {
   
   const [selectedProject, setSelectedProject] = useState<any>(null);
   const [selectedSite, setSelectedSite] = useState<any>(null);
+  const [showExtract, setShowExtract] = useState<any | null>(null);
+  const [extractForm, setExtractForm] = useState({ amount: '', note: '', site_id: '', block_id: '' });
 
   const loadData = async () => {
     setLoading(true);
@@ -44,12 +46,18 @@ export function ContractingDashboard({ restaurantId, currency }: Props) {
       .eq('restaurant_id', restaurantId)
       .not('project_id', 'is', null);
 
-    // Calculate actual revenues from sales_invoices (مستخلصات)
+    // Calculate actual revenues from sales_invoices (مستخلصات) + extract orders
     const { data: invoicesData } = await supabase
       .from('sales_invoices')
-      .select('project_id, site_id, block_id, grand_total')
+      .select('project_id, site_id, block_id, grand_total, total_amount')
       .eq('restaurant_id', restaurantId)
       .not('project_id', 'is', null);
+
+    const { data: extractItems } = await supabase
+      .from('order_items')
+      .select('price, quantity, variables, orders!inner(restaurant_id, status)')
+      .eq('orders.restaurant_id', restaurantId)
+      .eq('orders.status', 'completed');
 
     // Calculate pass-through purchase invoices for projects
     const { data: passThroughData } = await supabase
@@ -63,13 +71,15 @@ export function ContractingDashboard({ restaurantId, currency }: Props) {
       const pExpenses = expensesData?.filter(e => e.project_id === p.id) || [];
       const pInvoices = invoicesData?.filter(i => i.project_id === p.id) || [];
       const pPassThrough = passThroughData?.filter(pt => pt.project_id === p.id) || [];
+      const pExtracts = (extractItems || []).filter((it: any) => it.variables?.project_id === p.id);
 
       // Total cost includes both expenses and purchase invoice totals (for supplier bonus)
       const totalCost = pExpenses.reduce((s, e) => s + Number(e.amount), 0) +
                        pPassThrough.reduce((s, pt) => s + Number(pt.total_amount), 0);
       
-      // Total revenue includes sales invoices plus pass-through client sales amounts
-      const totalRevenue = pInvoices.reduce((s, i) => s + Number(i.grand_total), 0) +
+      // Total revenue includes sales invoices + extract order items + pass-through client sales
+      const totalRevenue = pInvoices.reduce((s, i) => s + Number(i.grand_total || i.total_amount || 0), 0) +
+                          pExtracts.reduce((s: number, it: any) => s + Number(it.price || 0) * Number(it.quantity || 1), 0) +
                           pPassThrough.reduce((s, pt) => s + Number(pt.client_sales_amount), 0);
       
       // Calculate total markup from pass-through invoices
@@ -212,6 +222,61 @@ export function ContractingDashboard({ restaurantId, currency }: Props) {
     if (!error) { toast.success('تم الحذف'); loadData(); }
   };
 
+  const issueExtract = async () => {
+    if (!showExtract) return;
+    const amount = Number(extractForm.amount);
+    if (!amount || amount <= 0) return toast.error('أدخل مبلغ المستخلص');
+    const orderNumber = `EX-${Date.now().toString().slice(-8)}`;
+    const { data: order, error } = await supabase.from('orders').insert({
+      restaurant_id: restaurantId,
+      order_number: orderNumber,
+      customer_name: showExtract.client_name || showExtract.name || 'عميل مقاولة',
+      total: amount,
+      paid_amount: 0,
+      status: 'completed',
+      payment_method: 'credit',
+      notes: extractForm.note || `مستخلص مشروع: ${showExtract.name}`,
+      is_pos: false,
+    }).select('id').single();
+    if (error) return toast.error(error.message);
+
+    await supabase.from('order_items').insert({
+      order_id: order.id,
+      menu_item_name: `مستخلص — ${showExtract.name}`,
+      quantity: 1,
+      price: amount,
+      variables: {
+        project_id: showExtract.id,
+        site_id: extractForm.site_id || null,
+        block_id: extractForm.block_id || null,
+        extract: true,
+      },
+    });
+
+    const { data: rest } = await supabase.from('restaurants').select('company_id').eq('id', restaurantId).maybeSingle();
+    if (rest?.company_id) {
+      await supabase.from('sales_invoices').insert({
+        company_id: rest.company_id,
+        invoice_number: orderNumber,
+        order_id: order.id,
+        total_amount: amount,
+        paid_amount: 0,
+        status: 'issued',
+        notes: extractForm.note || `مستخلص ${showExtract.name}`,
+        project_id: showExtract.id,
+        site_id: extractForm.site_id || null,
+        block_id: extractForm.block_id || null,
+        is_progress_invoice: true,
+        source_type: 'contracting_extract',
+      });
+    }
+
+    toast.success(`تم إصدار المستخلص ${orderNumber} — يظهر في فواتير البيع`);
+    setShowExtract(null);
+    setExtractForm({ amount: '', note: '', site_id: '', block_id: '' });
+    loadData();
+  };
+
   return (
     <div className="space-y-6">
       <header className="flex justify-between items-center bg-card p-6 rounded-2xl border shadow-sm">
@@ -279,9 +344,25 @@ export function ContractingDashboard({ restaurantId, currency }: Props) {
                   )}
                 </div>
               </div>
-              <div className="bg-secondary/30 px-6 py-3 border-t text-xs font-bold text-muted-foreground flex justify-between">
+              <div className="bg-secondary/30 px-6 py-3 border-t text-xs font-bold text-muted-foreground flex justify-between items-center gap-2">
                 <span>{(p.project_sites?.length || 0) + (p.project_blocks?.length || 0)} مواقع ومراحل</span>
-                <span>الموازنة: {Number(p.total_budget || 0).toLocaleString()}</span>
+                <Button
+                  size="sm"
+                  variant="default"
+                  className="h-7 text-[10px]"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setShowExtract(p);
+                    setExtractForm({
+                      amount: String(Math.max(0, Number(p.total_budget || 0) - Number(p.total_revenue || 0)) || ''),
+                      note: '',
+                      site_id: '',
+                      block_id: '',
+                    });
+                  }}
+                >
+                  إصدار مستخلص
+                </Button>
               </div>
             </Card>
           ))}
@@ -540,6 +621,43 @@ export function ContractingDashboard({ restaurantId, currency }: Props) {
                </motion.div>
             </div>
          )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {showExtract && (
+          <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+            <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.9, opacity: 0 }} className="bg-card border rounded-2xl p-6 max-w-md w-full shadow-2xl space-y-4" dir="rtl">
+              <h3 className="text-xl font-black">إصدار مستخلص — {showExtract.name}</h3>
+              <p className="text-xs text-muted-foreground">ينشئ فاتورة بيع مرتبطة بالمشروع وتظهر في الإيرادات مباشرة.</p>
+              <div>
+                <Label>المبلغ ({currency})</Label>
+                <Input type="number" value={extractForm.amount} onChange={e => setExtractForm(f => ({ ...f, amount: e.target.value }))} />
+              </div>
+              {(showExtract.project_sites || []).length > 0 && (
+                <div>
+                  <Label>الموقع (اختياري)</Label>
+                  <Select value={extractForm.site_id || 'none'} onValueChange={v => setExtractForm(f => ({ ...f, site_id: v === 'none' ? '' : v }))}>
+                    <SelectTrigger><SelectValue placeholder="كل المشروع" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">كل المشروع</SelectItem>
+                      {(showExtract.project_sites || []).map((s: any) => (
+                        <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+              <div>
+                <Label>ملاحظة</Label>
+                <Input value={extractForm.note} onChange={e => setExtractForm(f => ({ ...f, note: e.target.value }))} placeholder="مستخلص رقم ..." />
+              </div>
+              <div className="flex gap-2 pt-2">
+                <Button className="flex-1" onClick={issueExtract}>إصدار</Button>
+                <Button variant="outline" onClick={() => setShowExtract(null)}>إلغاء</Button>
+              </div>
+            </motion.div>
+          </div>
+        )}
       </AnimatePresence>
     </div>
   );

@@ -2,7 +2,8 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   AlertTriangle, CheckCircle2, ClipboardList, Package, Plus, RefreshCcw,
-  Scissors, Shirt, Truck, Ruler, Layers, Search, DollarSign, Factory
+  Scissors, Shirt, Truck, Ruler, Layers, Search, DollarSign, Factory,
+  ChevronUp, ChevronDown, Settings2, Trash2,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -10,6 +11,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Card } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { supabase } from '@/integrations/supabase/client';
@@ -24,23 +26,38 @@ interface Props {
   profileName?: string;
 }
 
-const STAGES = [
-  { id: 'fabric_receipt', label: 'استلام أتواب', icon: Package },
-  { id: 'cutting', label: 'القص', icon: Scissors },
-  { id: 'preparation', label: 'التحضير', icon: Layers },
-  { id: 'front', label: 'الصدر', icon: Shirt },
-  { id: 'back', label: 'الظهر', icon: Shirt },
-  { id: 'sleeve', label: 'الكوع', icon: Shirt },
-  { id: 'assembly', label: 'التجميع', icon: Layers },
-  { id: 'quality', label: 'الجودة', icon: CheckCircle2 },
-  { id: 'laundry_out', label: 'خروج مغسلة', icon: Truck },
-  { id: 'laundry_in', label: 'عودة مغسلة', icon: Truck },
-  { id: 'packing', label: 'التعبئة', icon: Package },
-  { id: 'delivery', label: 'التسليم', icon: Truck },
-  { id: 'completed', label: 'مكتمل', icon: CheckCircle2 },
-] as const;
+type StageDef = {
+  id?: string;
+  restaurant_id?: string;
+  stage_key: string;
+  label_ar: string;
+  order_index: number;
+  is_active: boolean;
+  is_system: boolean;
+  triggers_invoice: boolean;
+  is_terminal: boolean;
+  tracks_cutting: boolean;
+  tracks_packing: boolean;
+  icon_key?: string | null;
+  notes?: string | null;
+};
 
-const STAGE_LABEL: Record<string, string> = Object.fromEntries(STAGES.map(s => [s.id, s.label]));
+const FALLBACK_STAGES: StageDef[] = [
+  { stage_key: 'fabric_receipt', label_ar: 'استلام أتواب', order_index: 10, is_active: true, is_system: true, triggers_invoice: false, is_terminal: false, tracks_cutting: false, tracks_packing: false, icon_key: 'package' },
+  { stage_key: 'cutting', label_ar: 'القص', order_index: 20, is_active: true, is_system: true, triggers_invoice: false, is_terminal: false, tracks_cutting: true, tracks_packing: false, icon_key: 'scissors' },
+  { stage_key: 'preparation', label_ar: 'التحضير', order_index: 30, is_active: true, is_system: false, triggers_invoice: false, is_terminal: false, tracks_cutting: false, tracks_packing: false, icon_key: 'layers' },
+  { stage_key: 'front', label_ar: 'الصدر', order_index: 40, is_active: true, is_system: false, triggers_invoice: false, is_terminal: false, tracks_cutting: false, tracks_packing: false, icon_key: 'shirt' },
+  { stage_key: 'back', label_ar: 'الظهر', order_index: 50, is_active: true, is_system: false, triggers_invoice: false, is_terminal: false, tracks_cutting: false, tracks_packing: false, icon_key: 'shirt' },
+  { stage_key: 'sleeve', label_ar: 'الكوع', order_index: 60, is_active: true, is_system: false, triggers_invoice: false, is_terminal: false, tracks_cutting: false, tracks_packing: false, icon_key: 'shirt' },
+  { stage_key: 'assembly', label_ar: 'التجميع', order_index: 70, is_active: true, is_system: false, triggers_invoice: false, is_terminal: false, tracks_cutting: false, tracks_packing: false, icon_key: 'layers' },
+  { stage_key: 'quality', label_ar: 'الجودة', order_index: 80, is_active: true, is_system: false, triggers_invoice: false, is_terminal: false, tracks_cutting: false, tracks_packing: false, icon_key: 'check' },
+  { stage_key: 'laundry_out', label_ar: 'خروج مغسلة', order_index: 90, is_active: true, is_system: false, triggers_invoice: false, is_terminal: false, tracks_cutting: false, tracks_packing: false, icon_key: 'truck' },
+  { stage_key: 'laundry_in', label_ar: 'عودة مغسلة', order_index: 100, is_active: true, is_system: false, triggers_invoice: false, is_terminal: false, tracks_cutting: false, tracks_packing: false, icon_key: 'truck' },
+  { stage_key: 'packing', label_ar: 'التعبئة', order_index: 110, is_active: true, is_system: false, triggers_invoice: false, is_terminal: false, tracks_cutting: false, tracks_packing: true, icon_key: 'package' },
+  { stage_key: 'delivery', label_ar: 'التسليم', order_index: 120, is_active: true, is_system: true, triggers_invoice: true, is_terminal: false, tracks_cutting: false, tracks_packing: false, icon_key: 'truck' },
+  { stage_key: 'completed', label_ar: 'مكتمل', order_index: 130, is_active: true, is_system: true, triggers_invoice: true, is_terminal: true, tracks_cutting: false, tracks_packing: false, icon_key: 'check' },
+];
+
 const COST_TYPES = [
   { id: 'internal', label: 'داخلي' },
   { id: 'outsourcing', label: 'تصنيع خارجي' },
@@ -48,10 +65,39 @@ const COST_TYPES = [
   { id: 'overhead', label: 'أعباء' },
 ];
 
-function nextStage(current: string): string | null {
-  const idx = STAGES.findIndex(s => s.id === current);
-  if (idx < 0 || idx >= STAGES.length - 1) return null;
-  return STAGES[idx + 1].id;
+const ICON_MAP: Record<string, typeof Package> = {
+  package: Package,
+  scissors: Scissors,
+  layers: Layers,
+  shirt: Shirt,
+  truck: Truck,
+  check: CheckCircle2,
+};
+
+const AR_TRANSLIT: Record<string, string> = {
+  ا: 'a', أ: 'a', إ: 'i', آ: 'a', ب: 'b', ت: 't', ث: 'th', ج: 'j', ح: 'h', خ: 'kh',
+  د: 'd', ذ: 'dh', ر: 'r', ز: 'z', س: 's', ش: 'sh', ص: 's', ض: 'd', ط: 't', ظ: 'z',
+  ع: 'a', غ: 'gh', ف: 'f', ق: 'q', ك: 'k', ل: 'l', م: 'm', ن: 'n', ه: 'h', و: 'w',
+  ي: 'y', ى: 'a', ة: 'h', ء: '', ئ: 'y', ؤ: 'w', ' ': '_',
+};
+
+function slugStageKey(label: string): string {
+  const raw = (label || '').trim().toLowerCase();
+  if (!raw) return `custom_${Date.now()}`;
+  let out = '';
+  for (const ch of raw) {
+    if (/[a-z0-9_]/.test(ch)) out += ch;
+    else if (AR_TRANSLIT[ch] !== undefined) out += AR_TRANSLIT[ch];
+    else if (/\s|-/.test(ch)) out += '_';
+  }
+  out = out.replace(/_+/g, '_').replace(/^_|_$/g, '');
+  if (!out || out.length < 2) return `custom_${Date.now()}`;
+  return out.slice(0, 48);
+}
+
+function stageIcon(def: StageDef | undefined) {
+  if (!def) return Layers;
+  return ICON_MAP[def.icon_key || ''] || ICON_MAP[def.stage_key] || Layers;
 }
 
 export function GarmentFactoryHub({ restaurantId, currency = 'ج.م', profileName }: Props) {
@@ -62,6 +108,7 @@ export function GarmentFactoryHub({ restaurantId, currency = 'ج.م', profileNam
   const [costs, setCosts] = useState<any[]>([]);
   const [jobs, setJobs] = useState<any[]>([]);
   const [products, setProducts] = useState<any[]>([]);
+  const [stageDefs, setStageDefs] = useState<StageDef[]>(FALLBACK_STAGES);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(true);
@@ -73,7 +120,10 @@ export function GarmentFactoryHub({ restaurantId, currency = 'ج.م', profileNam
   const [costOpen, setCostOpen] = useState(false);
   const [outOpen, setOutOpen] = useState(false);
   const [recvOpen, setRecvOpen] = useState(false);
+  const [stagesOpen, setStagesOpen] = useState(false);
   const [recvJobId, setRecvJobId] = useState<string | null>(null);
+  const [newStageLabel, setNewStageLabel] = useState('');
+  const [stagesSaving, setStagesSaving] = useState(false);
 
   const [orderForm, setOrderForm] = useState({
     order_number: '', style_name: '', style_code: '', color: '', fabric_type: '',
@@ -102,6 +152,21 @@ export function GarmentFactoryHub({ restaurantId, currency = 'ج.م', profileNam
 
   const actor = profileName || 'مستخدم';
 
+  const loadStages = useCallback(async () => {
+    if (!restaurantId) return;
+    await supabase.rpc('garment_seed_default_stages', { p_restaurant_id: restaurantId });
+    const { data, error } = await supabase
+      .from('garment_stage_defs')
+      .select('*')
+      .eq('restaurant_id', restaurantId)
+      .order('order_index', { ascending: true });
+    if (error || !data?.length) {
+      setStageDefs(FALLBACK_STAGES);
+      return;
+    }
+    setStageDefs(data as StageDef[]);
+  }, [restaurantId]);
+
   const load = useCallback(async () => {
     if (!restaurantId) return;
     setLoading(true);
@@ -113,6 +178,7 @@ export function GarmentFactoryHub({ restaurantId, currency = 'ج.م', profileNam
       supabase.from('garment_outsourcing_jobs').select('*').eq('restaurant_id', restaurantId).order('created_at', { ascending: false }).limit(300),
       supabase.from('products').select('id, name, quantity, unit').eq('restaurant_id', restaurantId).order('name').limit(500),
     ]);
+    await loadStages();
     if (o.error) toast.error(o.error.message);
     setOrders(o.data || []);
     setRolls(r.data || []);
@@ -121,9 +187,44 @@ export function GarmentFactoryHub({ restaurantId, currency = 'ج.م', profileNam
     setJobs(oj.error ? [] : (oj.data || []));
     setProducts(p.data || []);
     setLoading(false);
-  }, [restaurantId]);
+  }, [restaurantId, loadStages]);
 
   useEffect(() => { load(); }, [load]);
+
+  const activeStages = useMemo(
+    () => stageDefs.filter(s => s.is_active).sort((a, b) => a.order_index - b.order_index),
+    [stageDefs]
+  );
+
+  const allStagesSorted = useMemo(
+    () => [...stageDefs].sort((a, b) => a.order_index - b.order_index),
+    [stageDefs]
+  );
+
+  const stageLabel = useCallback((key: string) => {
+    const def = stageDefs.find(s => s.stage_key === key);
+    return def?.label_ar || FALLBACK_STAGES.find(s => s.stage_key === key)?.label_ar || key;
+  }, [stageDefs]);
+
+  const nextStage = useCallback((current: string): string | null => {
+    const list = activeStages;
+    const idx = list.findIndex(s => s.stage_key === current);
+    if (idx < 0) {
+      const byOrder = list[0];
+      return byOrder?.stage_key || null;
+    }
+    if (idx >= list.length - 1) return null;
+    return list[idx + 1].stage_key;
+  }, [activeStages]);
+
+  const getDef = useCallback((key: string) => {
+    return stageDefs.find(s => s.stage_key === key) || FALLBACK_STAGES.find(s => s.stage_key === key);
+  }, [stageDefs]);
+
+  const advanceTargetTriggersInvoice = useMemo(() => {
+    const def = getDef(advanceForm.to_stage);
+    return !!(def?.triggers_invoice || advanceForm.to_stage === 'delivery' || advanceForm.to_stage === 'completed');
+  }, [advanceForm.to_stage, getDef]);
 
   const selected = useMemo(() => orders.find(o => o.id === selectedId) || null, [orders, selectedId]);
 
@@ -167,6 +268,8 @@ export function GarmentFactoryHub({ restaurantId, currency = 'ج.م', profileNam
     return out;
   };
 
+  const firstStageKey = activeStages[0]?.stage_key || 'fabric_receipt';
+
   const createOrder = async () => {
     if (!orderForm.style_name.trim()) return toast.error('اسم الموديل مطلوب');
     const sizes = parseSizes(orderForm.sizes);
@@ -194,7 +297,7 @@ export function GarmentFactoryHub({ restaurantId, currency = 'ج.م', profileNam
       due_date: orderForm.due_date || null,
       cutting_waste_limit_pct: Number(orderForm.cutting_waste_limit_pct) || 5,
       notes: orderForm.notes || null,
-      current_stage: 'fabric_receipt',
+      current_stage: firstStageKey,
       status: 'open',
       created_by_name: actor,
     });
@@ -234,7 +337,7 @@ export function GarmentFactoryHub({ restaurantId, currency = 'ج.م', profileNam
       await supabase.from('garment_orders').update({ fabric_product_id: productId }).eq('id', orderId).is('fabric_product_id', null);
     }
     await supabase.from('garment_orders').update({
-      current_stage: 'fabric_receipt',
+      current_stage: firstStageKey,
       status: 'in_progress',
       updated_by_name: actor,
       updated_at: new Date().toISOString(),
@@ -288,8 +391,10 @@ export function GarmentFactoryHub({ restaurantId, currency = 'ج.م', profileNam
 
   const advanceStage = async () => {
     if (!selectedId || !advanceForm.to_stage) return toast.error('حدد المرحلة التالية');
-    const delivering = advanceForm.to_stage === 'delivery' || advanceForm.to_stage === 'completed';
-    if (delivering) {
+    const targetDef = getDef(advanceForm.to_stage);
+    const triggeringInvoice = !!(targetDef?.triggers_invoice || advanceForm.to_stage === 'delivery' || advanceForm.to_stage === 'completed');
+
+    if (triggeringInvoice) {
       const { error } = await supabase.rpc('garment_deliver_and_invoice', {
         p_order_id: selectedId,
         p_quantity: Number(advanceForm.quantity) || null,
@@ -298,7 +403,20 @@ export function GarmentFactoryHub({ restaurantId, currency = 'ج.م', profileNam
         p_actor_name: actor,
         p_notes: advanceForm.notes || null,
       });
-      if (error) return toast.error(error.message);
+      if (error) {
+        // Fall through to advance_stage which also handles invoice when defs exist
+        const { error: advErr } = await supabase.rpc('garment_advance_stage', {
+          p_order_id: selectedId,
+          p_to_stage: advanceForm.to_stage,
+          p_quantity: Number(advanceForm.quantity) || 0,
+          p_qc_pass: Number(advanceForm.qc_pass) || 0,
+          p_qc_fail: Number(advanceForm.qc_fail) || 0,
+          p_laundry_ref: advanceForm.laundry_ref || null,
+          p_actor_name: actor,
+          p_notes: advanceForm.notes || null,
+        });
+        if (advErr) return toast.error(advErr.message || error.message);
+      }
       toast.success('تم التسليم وإنشاء فاتورة بيع تلقائياً');
     } else {
       const { error } = await supabase.rpc('garment_advance_stage', {
@@ -312,7 +430,7 @@ export function GarmentFactoryHub({ restaurantId, currency = 'ج.م', profileNam
         p_notes: advanceForm.notes || null,
       });
       if (error) return toast.error(error.message);
-      toast.success(`تم النقل إلى: ${STAGE_LABEL[advanceForm.to_stage] || advanceForm.to_stage}`);
+      toast.success(`تم النقل إلى: ${stageLabel(advanceForm.to_stage)}`);
     }
     setAdvanceOpen(false);
     load();
@@ -331,6 +449,17 @@ export function GarmentFactoryHub({ restaurantId, currency = 'ج.م', profileNam
     if (error) return toast.error(error.message);
     toast.success('فاتورة بيع تم إنشاؤها من التسليم');
     load();
+  };
+
+  const showDeliverButton = (order: any) => {
+    if (order.sales_order_id) return false;
+    const def = getDef(order.current_stage);
+    return !!(
+      def?.tracks_packing
+      || def?.triggers_invoice
+      || order.current_stage === 'packing'
+      || order.current_stage === 'delivery'
+    );
   };
 
   const saveCost = async () => {
@@ -376,7 +505,10 @@ export function GarmentFactoryHub({ restaurantId, currency = 'ج.م', profileNam
     if (error) return toast.error(error.message);
     toast.success('تم إرسال المرحلة للتصنيع الخارجي + تسجيل التكلفة');
     setOutOpen(false);
-    setOutForm({ stage: 'front', vendor_name: '', vendor_phone: '', qty_sent: '', unit_cost: '', due_date: '', external_ref: '', notes: '' });
+    setOutForm({
+      stage: activeStages.find(s => !s.is_terminal && s.stage_key !== firstStageKey)?.stage_key || 'front',
+      vendor_name: '', vendor_phone: '', qty_sent: '', unit_cost: '', due_date: '', external_ref: '', notes: '',
+    });
     setView('outsourcing');
     load();
   };
@@ -400,8 +532,9 @@ export function GarmentFactoryHub({ restaurantId, currency = 'ج.م', profileNam
   const openAdvance = (order: any) => {
     setSelectedId(order.id);
     const nxt = nextStage(order.current_stage);
+    const terminal = activeStages.find(s => s.is_terminal)?.stage_key || 'completed';
     setAdvanceForm({
-      to_stage: nxt || 'completed',
+      to_stage: nxt || terminal,
       quantity: String(order.quantity_planned || 0),
       qc_pass: '',
       qc_fail: '',
@@ -411,9 +544,108 @@ export function GarmentFactoryHub({ restaurantId, currency = 'ج.م', profileNam
     setAdvanceOpen(true);
   };
 
+  const updateStageLocal = (stageKey: string, patch: Partial<StageDef>) => {
+    setStageDefs(prev => prev.map(s => (s.stage_key === stageKey ? { ...s, ...patch } : s)));
+  };
+
+  const persistStagePatch = async (stageKey: string, patch: Partial<StageDef>) => {
+    const row = stageDefs.find(s => s.stage_key === stageKey);
+    if (!row?.id) {
+      updateStageLocal(stageKey, patch);
+      return toast.error('تعذر الحفظ — جدول المراحل غير متاح');
+    }
+    const { error } = await supabase
+      .from('garment_stage_defs')
+      .update({ ...patch, updated_at: new Date().toISOString() })
+      .eq('id', row.id);
+    if (error) return toast.error(error.message);
+    updateStageLocal(stageKey, patch);
+  };
+
+  const moveStage = async (stageKey: string, dir: -1 | 1) => {
+    const sorted = [...allStagesSorted];
+    const idx = sorted.findIndex(s => s.stage_key === stageKey);
+    const swapIdx = idx + dir;
+    if (idx < 0 || swapIdx < 0 || swapIdx >= sorted.length) return;
+    const next = [...sorted];
+    [next[idx], next[swapIdx]] = [next[swapIdx], next[idx]];
+    const keys = next.map(s => s.stage_key);
+    const orderMap = Object.fromEntries(keys.map((k, i) => [k, (i + 1) * 10]));
+    setStagesSaving(true);
+    const { error } = await supabase.rpc('garment_reorder_stages', {
+      p_restaurant_id: restaurantId,
+      p_ordered_keys: keys,
+    });
+    if (error) {
+      // Batch update order_index if RPC unavailable
+      for (const k of keys) {
+        const row = stageDefs.find(s => s.stage_key === k);
+        if (row?.id) {
+          await supabase
+            .from('garment_stage_defs')
+            .update({ order_index: orderMap[k], updated_at: new Date().toISOString() })
+            .eq('id', row.id);
+        }
+      }
+    }
+    setStageDefs(prev => prev.map(s => (orderMap[s.stage_key] != null ? { ...s, order_index: orderMap[s.stage_key] } : s)));
+    setStagesSaving(false);
+  };
+
+  const softDeleteStage = async (def: StageDef) => {
+    if (def.is_system && (def.triggers_invoice || def.is_terminal)) {
+      toast.error('لا يمكن تعطيل مرحلة النظام المرتبطة بالفاتورة أو الختام');
+      return;
+    }
+    if (def.is_system) {
+      const ok = window.confirm(`«${def.label_ar}» مرحلة نظام. هل تريد تعطيلها؟`);
+      if (!ok) return;
+    }
+    await persistStagePatch(def.stage_key, { is_active: false });
+    toast.success('تم تعطيل المرحلة');
+  };
+
+  const addCustomStage = async () => {
+    const label = newStageLabel.trim();
+    if (!label) return toast.error('اسم المرحلة مطلوب');
+    let stage_key = slugStageKey(label);
+    if (stageDefs.some(s => s.stage_key === stage_key)) {
+      stage_key = `custom_${Date.now()}`;
+    }
+    const maxOrder = stageDefs.reduce((m, s) => Math.max(m, Number(s.order_index) || 0), 0);
+    const payload = {
+      restaurant_id: restaurantId,
+      stage_key,
+      label_ar: label,
+      order_index: maxOrder + 10,
+      is_active: true,
+      is_system: false,
+      triggers_invoice: false,
+      is_terminal: false,
+      tracks_cutting: false,
+      tracks_packing: false,
+      icon_key: 'layers',
+    };
+    const { data, error } = await supabase.from('garment_stage_defs').insert(payload).select('*').maybeSingle();
+    if (error) return toast.error(error.message);
+    setStageDefs(prev => [...prev, (data as StageDef) || payload]);
+    setNewStageLabel('');
+    toast.success('تمت إضافة المرحلة');
+  };
+
+  const boardColumns = useMemo(
+    () => activeStages.filter(s => !s.is_terminal),
+    [activeStages]
+  );
+
   const orderRolls = useMemo(
     () => rolls.filter(r => !selectedId || r.garment_order_id === selectedId),
     [rolls, selectedId]
+  );
+
+  const outsourcingStageOptions = useMemo(
+    () => activeStages.filter(s => !s.is_terminal && s.stage_key !== firstStageKey),
+    [activeStages, firstStageKey]
   );
 
   const VIEWS = [
@@ -433,6 +665,9 @@ export function GarmentFactoryHub({ restaurantId, currency = 'ج.م', profileNam
         </div>
         <div className="flex flex-wrap gap-2">
           <Button variant="outline" size="sm" onClick={load}><RefreshCcw className="w-4 h-4 ml-1" />تحديث</Button>
+          <Button variant="outline" size="sm" onClick={() => { setStagesOpen(true); loadStages(); }}>
+            <Settings2 className="w-4 h-4 ml-1" />إعداد المراحل
+          </Button>
           <Button size="sm" onClick={() => setOrderOpen(true)}><Plus className="w-4 h-4 ml-1" />أمر تشغيل</Button>
           <Button size="sm" variant="secondary" onClick={() => setRollOpen(true)}><Package className="w-4 h-4 ml-1" />استلام توب</Button>
           <Button size="sm" variant="secondary" disabled={!selectedId} onClick={() => setCutOpen(true)}>
@@ -480,14 +715,14 @@ export function GarmentFactoryHub({ restaurantId, currency = 'ج.م', profileNam
       ) : view === 'board' ? (
         <div className="overflow-x-auto pb-2">
           <div className="flex gap-3 min-w-max">
-            {STAGES.filter(s => s.id !== 'completed').map(stage => {
-              const Icon = stage.icon;
-              const col = filteredOrders.filter(o => o.current_stage === stage.id && o.status !== 'cancelled');
+            {boardColumns.map(stage => {
+              const Icon = stageIcon(stage);
+              const col = filteredOrders.filter(o => o.current_stage === stage.stage_key && o.status !== 'cancelled');
               return (
-                <div key={stage.id} className="w-64 shrink-0">
+                <div key={stage.stage_key} className="w-64 shrink-0">
                   <div className="flex items-center gap-2 mb-2 px-1">
                     <Icon className="w-4 h-4 text-primary" />
-                    <span className="text-xs font-black">{stage.label}</span>
+                    <span className="text-xs font-black">{stage.label_ar}</span>
                     <Badge variant="secondary" className="text-[10px] mr-auto">{col.length}</Badge>
                   </div>
                   <div className="space-y-2 max-h-[62vh] overflow-y-auto pr-1">
@@ -517,7 +752,7 @@ export function GarmentFactoryHub({ restaurantId, currency = 'ج.م', profileNam
                           <Button size="sm" className="h-7 text-[10px] flex-1" onClick={e => { e.stopPropagation(); openAdvance(o); }}>
                             مرحلة
                           </Button>
-                          {!o.sales_order_id && (o.current_stage === 'packing' || o.current_stage === 'delivery') && (
+                          {showDeliverButton(o) && (
                             <Button size="sm" variant="outline" className="h-7 text-[10px]" onClick={e => { e.stopPropagation(); deliverNow(o); }}>
                               تسليم+فاتورة
                             </Button>
@@ -613,7 +848,7 @@ export function GarmentFactoryHub({ restaurantId, currency = 'ج.م', profileNam
             <div className="grid md:grid-cols-3 gap-2">
               {Object.entries(stageCostSummary).map(([stage, vals]) => (
                 <Card key={stage} className="p-3 border-border/50">
-                  <div className="font-bold text-sm">{STAGE_LABEL[stage] || stage}</div>
+                  <div className="font-bold text-sm">{stageLabel(stage)}</div>
                   <div className="text-[10px] text-muted-foreground mt-1 space-y-0.5">
                     <div>داخلي: {vals.internal.toLocaleString()}</div>
                     <div>خارجي: {vals.outsourcing.toLocaleString()}</div>
@@ -645,7 +880,7 @@ export function GarmentFactoryHub({ restaurantId, currency = 'ج.م', profileNam
                   return (
                     <tr key={c.id} className="border-b border-border/40">
                       <td className="py-2">{ord?.order_number || '—'}</td>
-                      <td className="py-2">{STAGE_LABEL[c.stage] || c.stage}</td>
+                      <td className="py-2">{stageLabel(c.stage)}</td>
                       <td className="py-2"><Badge variant="outline">{COST_TYPES.find(t => t.id === c.cost_type)?.label || c.cost_type}</Badge></td>
                       <td className="py-2">{Number(c.quantity).toLocaleString()} × {Number(c.unit_cost).toLocaleString()}</td>
                       <td className="py-2 font-black">{Number(c.total_cost).toLocaleString()}</td>
@@ -678,7 +913,7 @@ export function GarmentFactoryHub({ restaurantId, currency = 'ج.م', profileNam
                   return (
                     <tr key={j.id} className="border-b border-border/40">
                       <td className="py-2 font-bold">{ord?.order_number || '—'}</td>
-                      <td className="py-2">{STAGE_LABEL[j.stage] || j.stage}</td>
+                      <td className="py-2">{stageLabel(j.stage)}</td>
                       <td className="py-2">
                         <div>{j.vendor_name}</div>
                         <div className="text-[10px] text-muted-foreground">{j.vendor_phone || j.external_ref || ''}</div>
@@ -711,7 +946,7 @@ export function GarmentFactoryHub({ restaurantId, currency = 'ج.م', profileNam
             <Ruler className="w-4 h-4 text-primary" />
             <span className="font-black">{selected.order_number}</span>
             <span>{selected.style_name}</span>
-            <Badge>{STAGE_LABEL[selected.current_stage] || selected.current_stage}</Badge>
+            <Badge>{stageLabel(selected.current_stage)}</Badge>
             <span>داخلي {Number(selected.total_stage_cost || 0).toLocaleString()} · خارجي {Number(selected.total_outsourcing_cost || 0).toLocaleString()} {currency}</span>
             {selected.sales_order_id && <Badge className="bg-emerald-600">فاتورة بيع</Badge>}
             <Button size="sm" className="h-7 mr-auto" onClick={() => openAdvance(selected)}>نقل مرحلة</Button>
@@ -808,10 +1043,12 @@ export function GarmentFactoryHub({ restaurantId, currency = 'ج.م', profileNam
             <Select value={advanceForm.to_stage} onValueChange={v => setAdvanceForm(f => ({ ...f, to_stage: v }))}>
               <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>
-                {STAGES.map(s => <SelectItem key={s.id} value={s.id}>{s.label}</SelectItem>)}
+                {activeStages.map(s => (
+                  <SelectItem key={s.stage_key} value={s.stage_key}>{s.label_ar}</SelectItem>
+                ))}
               </SelectContent>
             </Select>
-            {(advanceForm.to_stage === 'delivery' || advanceForm.to_stage === 'completed') && (
+            {advanceTargetTriggersInvoice && (
               <div className="text-xs bg-emerald-500/10 border border-emerald-500/30 rounded-lg p-2 text-emerald-800">
                 سيتم إنشاء فاتورة بيع تلقائياً وربطها بالأمر.
               </div>
@@ -829,7 +1066,11 @@ export function GarmentFactoryHub({ restaurantId, currency = 'ج.م', profileNam
           <div className="space-y-3">
             <Select value={costForm.stage} onValueChange={v => setCostForm(f => ({ ...f, stage: v }))}>
               <SelectTrigger><SelectValue /></SelectTrigger>
-              <SelectContent>{STAGES.map(s => <SelectItem key={s.id} value={s.id}>{s.label}</SelectItem>)}</SelectContent>
+              <SelectContent>
+                {activeStages.map(s => (
+                  <SelectItem key={s.stage_key} value={s.stage_key}>{s.label_ar}</SelectItem>
+                ))}
+              </SelectContent>
             </Select>
             <Select value={costForm.cost_type} onValueChange={v => setCostForm(f => ({ ...f, cost_type: v }))}>
               <SelectTrigger><SelectValue /></SelectTrigger>
@@ -853,7 +1094,11 @@ export function GarmentFactoryHub({ restaurantId, currency = 'ج.م', profileNam
             <p className="text-[11px] text-muted-foreground">لو مرحلة معينة مكلفة داخلياً، أرسلها لورشة خارجية وتابع الاستلام والتكلفة هنا.</p>
             <Select value={outForm.stage} onValueChange={v => setOutForm(f => ({ ...f, stage: v }))}>
               <SelectTrigger><SelectValue /></SelectTrigger>
-              <SelectContent>{STAGES.filter(s => !['fabric_receipt','completed'].includes(s.id)).map(s => <SelectItem key={s.id} value={s.id}>{s.label}</SelectItem>)}</SelectContent>
+              <SelectContent>
+                {outsourcingStageOptions.map(s => (
+                  <SelectItem key={s.stage_key} value={s.stage_key}>{s.label_ar}</SelectItem>
+                ))}
+              </SelectContent>
             </Select>
             <Input placeholder="اسم الورشة / المصنع *" value={outForm.vendor_name} onChange={e => setOutForm(f => ({ ...f, vendor_name: e.target.value }))} />
             <Input placeholder="هاتف" value={outForm.vendor_phone} onChange={e => setOutForm(f => ({ ...f, vendor_phone: e.target.value }))} />
@@ -877,6 +1122,133 @@ export function GarmentFactoryHub({ restaurantId, currency = 'ج.م', profileNam
             <Textarea placeholder="ملاحظات" value={recvForm.notes} onChange={e => setRecvForm(f => ({ ...f, notes: e.target.value }))} />
           </div>
           <DialogFooter><Button onClick={receiveOutsourcing}>تأكيد الاستلام</Button></DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={stagesOpen} onOpenChange={setStagesOpen}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto" dir="rtl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Settings2 className="w-5 h-5" />
+              إعداد مراحل الإنتاج
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            <p className="text-[11px] text-muted-foreground">
+              رتّب المراحل، عدّل التسميات، وفعّل علامات الفاتورة / الختام / القص / التعبئة. المراحل المعطّلة لا تظهر في اللوحة.
+            </p>
+            {allStagesSorted.map((def, idx) => (
+              <Card
+                key={def.stage_key}
+                className={cn('p-3 space-y-2', !def.is_active && 'opacity-60 border-dashed')}
+              >
+                <div className="flex flex-wrap items-start gap-2">
+                  <div className="flex-1 min-w-[160px] space-y-1">
+                    <Input
+                      value={def.label_ar}
+                      onChange={e => updateStageLocal(def.stage_key, { label_ar: e.target.value })}
+                      onBlur={e => persistStagePatch(def.stage_key, { label_ar: e.target.value.trim() || def.label_ar })}
+                      className="h-8 font-bold"
+                    />
+                    <div className="text-[10px] text-muted-foreground font-mono">{def.stage_key}</div>
+                  </div>
+                  <div className="flex gap-1">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="h-8 w-8 p-0"
+                      disabled={stagesSaving || idx === 0}
+                      onClick={() => moveStage(def.stage_key, -1)}
+                    >
+                      <ChevronUp className="w-4 h-4" />
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="h-8 w-8 p-0"
+                      disabled={stagesSaving || idx === allStagesSorted.length - 1}
+                      onClick={() => moveStage(def.stage_key, 1)}
+                    >
+                      <ChevronDown className="w-4 h-4" />
+                    </Button>
+                    {def.is_active ? (
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="h-8 w-8 p-0 text-rose-600"
+                        onClick={() => softDeleteStage(def)}
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </Button>
+                    ) : (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="h-8 text-[10px]"
+                        onClick={() => persistStagePatch(def.stage_key, { is_active: true })}
+                      >
+                        تفعيل
+                      </Button>
+                    )}
+                  </div>
+                </div>
+                <div className="flex flex-wrap gap-3 text-[11px]">
+                  <label className="flex items-center gap-1.5 cursor-pointer">
+                    <Checkbox
+                      checked={!!def.triggers_invoice}
+                      onCheckedChange={v => persistStagePatch(def.stage_key, { triggers_invoice: !!v })}
+                    />
+                    <Badge variant={def.triggers_invoice ? 'default' : 'outline'} className="text-[9px]">فاتورة</Badge>
+                  </label>
+                  <label className="flex items-center gap-1.5 cursor-pointer">
+                    <Checkbox
+                      checked={!!def.is_terminal}
+                      onCheckedChange={v => persistStagePatch(def.stage_key, { is_terminal: !!v })}
+                    />
+                    <Badge variant={def.is_terminal ? 'default' : 'outline'} className="text-[9px]">ختام</Badge>
+                  </label>
+                  <label className="flex items-center gap-1.5 cursor-pointer">
+                    <Checkbox
+                      checked={!!def.tracks_cutting}
+                      onCheckedChange={v => persistStagePatch(def.stage_key, { tracks_cutting: !!v })}
+                    />
+                    <Badge variant={def.tracks_cutting ? 'default' : 'outline'} className="text-[9px]">قص</Badge>
+                  </label>
+                  <label className="flex items-center gap-1.5 cursor-pointer">
+                    <Checkbox
+                      checked={!!def.tracks_packing}
+                      onCheckedChange={v => persistStagePatch(def.stage_key, { tracks_packing: !!v })}
+                    />
+                    <Badge variant={def.tracks_packing ? 'default' : 'outline'} className="text-[9px]">تعبئة</Badge>
+                  </label>
+                  {def.is_system && <Badge variant="secondary" className="text-[9px]">نظام</Badge>}
+                </div>
+              </Card>
+            ))}
+
+            <Card className="p-3 border-dashed space-y-2">
+              <div className="text-xs font-black">إضافة مرحلة جديدة</div>
+              <div className="flex gap-2">
+                <Input
+                  placeholder="اسم المرحلة بالعربية *"
+                  value={newStageLabel}
+                  onChange={e => setNewStageLabel(e.target.value)}
+                  className="h-9"
+                />
+                <Button size="sm" className="h-9 shrink-0" onClick={addCustomStage}>
+                  <Plus className="w-4 h-4 ml-1" />إضافة
+                </Button>
+              </div>
+              {newStageLabel.trim() && (
+                <div className="text-[10px] text-muted-foreground">
+                  المفتاح: <span className="font-mono">{slugStageKey(newStageLabel)}</span>
+                </div>
+              )}
+            </Card>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => { setStagesOpen(false); loadStages(); }}>إغلاق</Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>

@@ -180,7 +180,75 @@ export function MarketingQuotes({ restaurantId, currency }: Props) {
       }))
       );
 
-      toast.success(editingQuote ? 'تم تحديث عرض الأسعار بنجاح' : 'تم إنشاء عرض الأسعار بنجاح');
+      // عند الموافقة: إنشاء عقد + سير عمل تلقائياً (مرة واحدة)
+      const wasApproved = editingQuote?.status === 'approved';
+      if (form.status === 'approved' && !wasApproved) {
+        const { data: existingContracts } = await supabase
+          .from('marketing_contracts')
+          .select('id')
+          .eq('quote_id', quoteId)
+          .limit(1);
+
+        let contractId = existingContracts?.[0]?.id || null;
+        if (!contractId) {
+          const { data: contract, error: cErr } = await supabase.from('marketing_contracts').insert({
+            restaurant_id: restaurantId,
+            customer_id: customerId,
+            customer_name: form.customer_name,
+            quote_id: quoteId,
+            contract_number: `C-${Date.now().toString().slice(-8)}`,
+            start_date: new Date().toISOString().slice(0, 10),
+            status: 'active',
+            notes: `تلقائي من عرض سعر ${quoteNumber}`,
+          }).select('id').single();
+          if (!cErr && contract) {
+            contractId = contract.id;
+            await supabase.from('marketing_contract_services').insert(
+              safeItems.map(item => ({
+                contract_id: contractId,
+                service_id: item.service_id || null,
+                service_name: item.service_name,
+                description: item.description,
+                price: item.total_price,
+              }))
+            );
+          }
+        }
+
+        await supabase.rpc('create_default_workflow_stages', { p_restaurant_id: restaurantId });
+        const { data: stages } = await supabase
+          .from('marketing_workflow_stages')
+          .select('id')
+          .eq('restaurant_id', restaurantId)
+          .order('order_index')
+          .limit(1);
+        const { data: existingWf } = await supabase
+          .from('marketing_workflow_instances')
+          .select('id')
+          .eq('quote_id', quoteId)
+          .limit(1);
+        if (!existingWf?.length) {
+          await supabase.from('marketing_workflow_instances').insert({
+            restaurant_id: restaurantId,
+            quote_id: quoteId,
+            contract_id: contractId,
+            workflow_name: `مشروع من عرض ${quoteNumber}`,
+            current_stage_id: stages?.[0]?.id || null,
+            status: 'active',
+            priority: 'medium',
+            total_budget: total,
+            notes: form.notes || null,
+          });
+        }
+
+        await supabase.from('marketing_quotes').update({
+          approved_at: new Date().toISOString(),
+        }).eq('id', quoteId);
+
+        toast.success('تم اعتماد العرض وإنشاء العقد وسير العمل تلقائياً');
+      } else {
+        toast.success(editingQuote ? 'تم تحديث عرض الأسعار بنجاح' : 'تم إنشاء عرض الأسعار بنجاح');
+      }
       setShowModal(false);
       resetForm();
       loadData();
@@ -401,7 +469,7 @@ export function MarketingQuotes({ restaurantId, currency }: Props) {
               <div>
                 <Label>الحالة</Label>
                 <Select value={form.status} onValueChange={(v) => setForm({ ...form, status: v })}>
-                  <SelectTrigger><SelectValue placeholder="الstatus" /></SelectTrigger>
+                  <SelectTrigger><SelectValue placeholder="الحالة" /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="draft">مسودة</SelectItem>
                     <SelectItem value="sent">مرسل</SelectItem>

@@ -984,6 +984,7 @@ export default function Dashboard() {
         {activeTab === 'overheads' && <OverheadManager {...commonProps} />}
         {activeTab === 'delivery' && <DeliveryHub {...commonProps} agents={agents} setAgents={setAgents} deliveryOrders={deliveryOrders} restaurantId={restaurant?.id} currency={currency} onAssignAgent={(oid, aid) => supabase.from('orders').update({ delivery_agent_id: aid }).eq('id', oid).then(loadData)} />}
         {activeTab === 'marketing_hub' && <MarketingHub {...commonProps} />}
+        {activeTab === 'kds' && <KitchenDisplay />}
         {activeTab === 'shifts' && <ShiftsTab restaurant={restaurant} currentShift={currentShift} setCurrentShift={setCurrentShift} profileName={profileName} userId={user!.id} />}
         
         {/* Accounting Tabs */}
