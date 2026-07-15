@@ -88,6 +88,7 @@ const MarketingWorkflow = lazy(() => import('./dashboard/MarketingWorkflow').the
 const MarketingAccounting = lazy(() => import('./dashboard/MarketingAccounting'));
 const ServiceDeliverables = lazy(() => import('./dashboard/ServiceDeliverables').then(m => ({ default: m.ServiceDeliverables })));
 const ContractorsTab = lazy(() => import('./dashboard/ContractorsTab').then(m => ({ default: m.ContractorsTab })));
+const GarmentFactoryHub = lazy(() => import('./dashboard/GarmentFactoryHub').then(m => ({ default: m.GarmentFactoryHub })));
 
 import { BUSINESS_TYPES, BUSINESS_TABS, getBusinessConfig, getDefaultOrderType, isFoodSector, isInventoryDrivenBusiness, type BusinessType } from '@/lib/businessTypes';
 import { useAuth } from '@/lib/AuthContext';
@@ -974,6 +975,7 @@ export default function Dashboard() {
           </ModuleErrorBoundary>
         )}
         {activeTab === 'service_deliverables' && <ServiceDeliverables {...commonProps} />}
+        {activeTab === 'garment_production' && <GarmentFactoryHub {...commonProps} profileName={profileName} />}
         {activeTab === 'super_admin' && <SuperAdmin />}
         {activeTab === 'contracting' && <ContractingDashboard {...commonProps} />}
         {activeTab === 'contractors' && <ContractorsTab {...commonProps} />}

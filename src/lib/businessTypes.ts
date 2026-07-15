@@ -1,5 +1,5 @@
 // @ts-nocheck
-export type BusinessType = 'restaurant' | 'retail' | 'wholesale' | 'warehouse' | 'cafe' | 'grocery' | 'pharmacy' | 'services' | 'shipping' | 'distribution' | 'hospital' | 'factory' | 'real_estate' | 'contracting' | 'finishing' | 'rental' | 'education' | 'law_firm' | 'marketing_agency' | 'gym' | 'beauty_salon' | 'auto_repair' | 'other';
+export type BusinessType = 'restaurant' | 'retail' | 'wholesale' | 'warehouse' | 'cafe' | 'grocery' | 'pharmacy' | 'services' | 'shipping' | 'distribution' | 'hospital' | 'factory' | 'garment_factory' | 'real_estate' | 'contracting' | 'finishing' | 'rental' | 'education' | 'law_firm' | 'marketing_agency' | 'gym' | 'beauty_salon' | 'auto_repair' | 'other';
 export type BusinessCategory = 'food' | 'retail' | 'health' | 'services' | 'logistics' | 'other';
 export type PosLayout = 'classic' | 'grid' | 'list' | 'compact' | 'restaurant' | 'retail' | 'grocery' | 'services' | 'pharmacy';
 export type FeatureFlag = 
@@ -25,6 +25,7 @@ const BUSINESS_ITEM_ICONS: Record<BusinessType, string[]> = {
   shipping: ['🚢', '✈️', '🚚', '📦', '🗺️', '⚓', '🏢', '🏗️', '📦', '🏷️', '📦', '📋'],
   hospital: ['🏥', '💊', '🩺', '🚑', '💉', '🩹', '🌡️', '🦷', '🧪', '🧬', '🩸', '🩻'],
   factory: ['🏭', '🏗️', '⚙️', '🔩', '🛠️', '👷', '📦', '🏷️', '🧱', '🪵', '🎨', '👔'],
+  garment_factory: ['👔', '👕', '🧵', '✂️', '👗', '👖', '🧥', '🏭', '📦', '🏷️', '📏', '🧺'],
   real_estate: ['🏠', '🏢', '🔑', '🏠', '🏨', '🏰', '🏘️', '🏙️', '🏡', '🗺️', '📋', '🏗️'],
   contracting: ['🏗️', '🚧', '🏢', '🏗️', '📐', '🛠️', '🧱', '🪵', '🎨', '🚜', '👷', '📋'],
   finishing: ['🎨', '🖌️', '🛋️', '🏡', '📐', '🧱', '🪵', '🛠️', '🏠', '✨', '📋', '👔'],
@@ -1089,7 +1090,72 @@ export const BUSINESS_TYPES: Record<BusinessType, BusinessTypeConfig> = {
       allowCredit: true,
       requireCustomer: false
     },
-    tabs: ['home', 'employees', 'marketing_services', 'marketing_quotes', 'marketing_contracts', 'marketing_workflow', 'marketing_accounting', 'service_deliverables', 'bom', 'pos', 'orders', 'menu', 'service_packages', 'inventory', 'inventory_receipts', 'purchase_invoices', 'purchase_orders', 'supplier_contracts', 'sales_orders', 'crm', 'delivery', 'customers', 'customer_accounts', 'suppliers', 'supplier_accounts', 'stats', 'analytics', 'ai_assistant', 'financials', 'accounting', 'settings']
+    tabs: ['home', 'garment_production', 'employees', 'bom', 'pos', 'orders', 'menu', 'inventory', 'inventory_receipts', 'purchase_invoices', 'purchase_orders', 'sales_orders', 'sales_invoices', 'crm', 'service_deliverables', 'customers', 'customer_accounts', 'suppliers', 'supplier_accounts', 'stats', 'analytics', 'ai_assistant', 'financials', 'treasury', 'chart_of_accounts', 'manual_journal', 'accounting_mapping', 'fixed_assets', 'expenses', 'staff', 'users', 'notifications', 'settings']
+  },
+  garment_factory: {
+    id: 'garment_factory',
+    label: 'مصنع ملابس',
+    icon: '👔',
+    description: 'إنتاج ملابس متكامل: أتواب، قص وميتراج رقابي، تحضير، صدر/ظهر/كوع، تجميع، جودة، مغسلة، تعبئة، تسليم',
+    category: 'other',
+    color: 'hsl(330, 65%, 45%)',
+    theme: {
+      primary: '330 65% 45%',
+      accent: '340 55% 50%',
+      gradient: 'linear-gradient(135deg, #db2777 0%, #9d174d 100%)',
+      sidebarBg: 'hsl(330 65% 45% / 0.05)',
+      sidebarText: 'hsl(330 65% 45%)'
+    },
+    posLayout: {
+      type: 'compact',
+      showTableGrid: false,
+      showCategoriesSidebar: true,
+      itemGridCols: 4,
+      showItemImages: true,
+      showPrices: true,
+      cartPosition: 'right',
+      showBarcodeScanner: true,
+      showScale: false,
+      quickActions: ['garment_order', 'fabric_receipt', 'cutting', 'quality']
+    },
+    orderTypes: [
+      { id: 'pickup', label: 'أمر تشغيل', icon: '✂️', color: '#db2777', requiresTable: false, requiresAddress: false, requiresPhone: false },
+      { id: 'delivery', label: 'تسليم عميل', icon: '🚚', color: '#9d174d', requiresTable: false, requiresAddress: true, requiresPhone: true }
+    ],
+    features: ['inventory', 'multi_unit', 'variants', 'customers', 'invoicing', 'crm'],
+    labels: {
+      menu: 'الموديلات / الأصناف',
+      item: 'موديل',
+      items: 'موديلات',
+      order: 'أمر تشغيل',
+      orders: 'أوامر التشغيل',
+      customer: 'العميل',
+      customers: 'العملاء',
+      inventory: 'أقمشة ومواد',
+      category: 'خط الإنتاج',
+      checkout: 'تسجيل حركة',
+      receipt: 'إذن تسليم',
+      table: 'خط',
+      tables: 'الخطوط',
+      section: 'قسم',
+      branch: 'فرع'
+    },
+    placeholders: {
+      search: '🔍 بحث عن موديل أو أمر تشغيل...',
+      customer: 'اسم العميل',
+      notes: 'ملاحظات الإنتاج...',
+      address: 'عنوان التسليم'
+    },
+    defaults: {
+      taxRate: 14,
+      serviceCharge: 0,
+      enableTax: true,
+      priceIncludesTax: false,
+      currency: 'ج.م',
+      allowCredit: true,
+      requireCustomer: true
+    },
+    tabs: ['home', 'garment_production', 'employees', 'pos', 'orders', 'menu', 'inventory', 'inventory_receipts', 'purchase_invoices', 'purchase_orders', 'sales_invoices', 'sales_orders', 'crm', 'customers', 'customer_accounts', 'suppliers', 'supplier_accounts', 'stats', 'analytics', 'ai_assistant', 'financials', 'treasury', 'chart_of_accounts', 'manual_journal', 'accounting_mapping', 'fixed_assets', 'expenses', 'staff', 'users', 'notifications', 'settings']
   },
   real_estate: {
     id: 'real_estate',
@@ -1748,6 +1814,7 @@ export const BUSINESS_TABS: Record<BusinessType, string[]> = {
   distribution: BUSINESS_TYPES.distribution.tabs,
   hospital: BUSINESS_TYPES.hospital.tabs,
   factory: BUSINESS_TYPES.factory.tabs,
+  garment_factory: BUSINESS_TYPES.garment_factory.tabs,
   real_estate: BUSINESS_TYPES.real_estate.tabs,
   contracting: BUSINESS_TYPES.contracting.tabs,
   finishing: BUSINESS_TYPES.finishing.tabs,

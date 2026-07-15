@@ -7,7 +7,7 @@ import {
   LayoutGrid, LogOut, MessageSquare, Moon, Network, Package, QrCode, Receipt, RefreshCw,
   RotateCcw, Settings, Settings2, Shield, ShoppingCart, Sparkles, Sun,
   Truck, Users, UsersRound, Volume2, VolumeX, Wallet, Wifi, WifiOff,
-  Search, User, ChevronDown, Warehouse, ArrowRightLeft
+  Search, User, ChevronDown, Warehouse, ArrowRightLeft, Scissors
 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
@@ -30,7 +30,7 @@ export type SidebarTab =
   | 'sales_orders' | 'purchase_orders' | 'projects' | 'manual_journal'
   | 'chart_of_accounts' | 'accounting_mapping' | 'fixed_assets'
   | 'loyalty' | 'gift_cards' | 'branches' | 'contracting' | 'bom' | 'service_packages' | 'payroll' | 'chat'
-  | 'employees' | 'supplier_contracts' | 'marketing_services' | 'marketing_quotes' | 'marketing_contracts' | 'marketing_workflow' | 'marketing_accounting' | 'service_deliverables' | 'contractors' | 'warehouses' | 'sub_warehouses' | 'inventory_transfers';
+  | 'employees' | 'supplier_contracts' | 'marketing_services' | 'marketing_quotes' | 'marketing_contracts' | 'marketing_workflow' | 'marketing_accounting' | 'service_deliverables' | 'contractors' | 'warehouses' | 'sub_warehouses' | 'inventory_transfers' | 'garment_production';
 
 interface NavItem {
   id: SidebarTab;
@@ -198,6 +198,7 @@ export const ProfessionalSidebar = memo(function ProfessionalSidebar({
     marketing_accounting: { label: 'المحاسبة التسويقية', icon: DollarSign, section: 'finance' },
     service_deliverables: { label: 'متابعة التسليمات', icon: Package, section: 'main' },
     contractors: { label: 'الصنايعية', icon: UsersRound, section: 'main' },
+    garment_production: { label: 'إنتاج الملابس', icon: Scissors, section: 'main' },
   };
 
   const navItems = useMemo(() => {

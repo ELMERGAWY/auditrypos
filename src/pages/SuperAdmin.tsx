@@ -88,7 +88,8 @@ const ALL_TABS_CONFIG = {
   marketing_contracts: { label: 'عقود التسويق', icon: '📄' },
   marketing_workflow: { label: 'سير العمل التسويقي', icon: '🔄' },
   marketing_accounting: { label: 'المحاسبة التسويقية', icon: '💰' },
-  service_deliverables: { label: 'متابعة التسليمات', icon: '📦' }
+  service_deliverables: { label: 'متابعة التسليمات', icon: '📦' },
+  garment_production: { label: 'إنتاج الملابس', icon: '✂️' }
 };
 
 const SuperAdmin = () => {
