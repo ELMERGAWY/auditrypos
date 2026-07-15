@@ -2,7 +2,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   AlertTriangle, CheckCircle2, ClipboardList, Package, Plus, RefreshCcw,
-  Scissors, Shirt, Truck, Ruler, Layers, Search
+  Scissors, Shirt, Truck, Ruler, Layers, Search, DollarSign, Factory
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -15,6 +15,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
+import { findOrCreateCustomer } from '@/lib/customerUtils';
 
 interface Props {
   restaurantId: string;
@@ -39,9 +40,13 @@ const STAGES = [
   { id: 'completed', label: 'مكتمل', icon: CheckCircle2 },
 ] as const;
 
-type StageId = (typeof STAGES)[number]['id'];
-
 const STAGE_LABEL: Record<string, string> = Object.fromEntries(STAGES.map(s => [s.id, s.label]));
+const COST_TYPES = [
+  { id: 'internal', label: 'داخلي' },
+  { id: 'outsourcing', label: 'تصنيع خارجي' },
+  { id: 'material', label: 'مواد' },
+  { id: 'overhead', label: 'أعباء' },
+];
 
 function nextStage(current: string): string | null {
   const idx = STAGES.findIndex(s => s.id === current);
@@ -50,10 +55,13 @@ function nextStage(current: string): string | null {
 }
 
 export function GarmentFactoryHub({ restaurantId, currency = 'ج.م', profileName }: Props) {
-  const [view, setView] = useState<'board' | 'fabrics' | 'cutting'>('board');
+  const [view, setView] = useState<'board' | 'fabrics' | 'cutting' | 'costs' | 'outsourcing'>('board');
   const [orders, setOrders] = useState<any[]>([]);
   const [rolls, setRolls] = useState<any[]>([]);
   const [lots, setLots] = useState<any[]>([]);
+  const [costs, setCosts] = useState<any[]>([]);
+  const [jobs, setJobs] = useState<any[]>([]);
+  const [products, setProducts] = useState<any[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(true);
@@ -62,15 +70,19 @@ export function GarmentFactoryHub({ restaurantId, currency = 'ج.م', profileNam
   const [rollOpen, setRollOpen] = useState(false);
   const [cutOpen, setCutOpen] = useState(false);
   const [advanceOpen, setAdvanceOpen] = useState(false);
+  const [costOpen, setCostOpen] = useState(false);
+  const [outOpen, setOutOpen] = useState(false);
+  const [recvOpen, setRecvOpen] = useState(false);
+  const [recvJobId, setRecvJobId] = useState<string | null>(null);
 
   const [orderForm, setOrderForm] = useState({
     order_number: '', style_name: '', style_code: '', color: '', fabric_type: '',
     customer_name: '', quantity_planned: 100, unit_price: 0, due_date: '',
-    cutting_waste_limit_pct: 5, notes: '', sizes: 'S:0,M:0,L:0,XL:0',
+    cutting_waste_limit_pct: 5, notes: '', sizes: 'S:0,M:0,L:0,XL:0', fabric_product_id: '',
   });
   const [rollForm, setRollForm] = useState({
     roll_number: '', fabric_type: '', color: '', width_cm: '', meters_received: '',
-    weight_kg: '', supplier_name: '', notes: '',
+    weight_kg: '', supplier_name: '', notes: '', product_id: '',
   });
   const [cutForm, setCutForm] = useState({
     fabric_roll_id: '', lot_number: '', marker_length_m: '', lays_count: '1',
@@ -79,21 +91,35 @@ export function GarmentFactoryHub({ restaurantId, currency = 'ج.م', profileNam
   const [advanceForm, setAdvanceForm] = useState({
     to_stage: '', quantity: '', qc_pass: '', qc_fail: '', laundry_ref: '', notes: '',
   });
+  const [costForm, setCostForm] = useState({
+    stage: 'cutting', cost_type: 'internal', quantity: '', unit_cost: '', vendor_name: '', notes: '',
+  });
+  const [outForm, setOutForm] = useState({
+    stage: 'front', vendor_name: '', vendor_phone: '', qty_sent: '', unit_cost: '',
+    due_date: '', external_ref: '', notes: '',
+  });
+  const [recvForm, setRecvForm] = useState({ qty_received: '', qty_rejected: '', notes: '' });
 
   const actor = profileName || 'مستخدم';
 
   const load = useCallback(async () => {
     if (!restaurantId) return;
     setLoading(true);
-    const [o, r, c] = await Promise.all([
+    const [o, r, c, sc, oj, p] = await Promise.all([
       supabase.from('garment_orders').select('*').eq('restaurant_id', restaurantId).order('created_at', { ascending: false }),
       supabase.from('garment_fabric_rolls').select('*').eq('restaurant_id', restaurantId).order('received_at', { ascending: false }),
       supabase.from('garment_cutting_lots').select('*').eq('restaurant_id', restaurantId).order('created_at', { ascending: false }).limit(200),
+      supabase.from('garment_stage_costs').select('*').eq('restaurant_id', restaurantId).order('created_at', { ascending: false }).limit(500),
+      supabase.from('garment_outsourcing_jobs').select('*').eq('restaurant_id', restaurantId).order('created_at', { ascending: false }).limit(300),
+      supabase.from('products').select('id, name, quantity, unit').eq('restaurant_id', restaurantId).order('name').limit(500),
     ]);
     if (o.error) toast.error(o.error.message);
     setOrders(o.data || []);
     setRolls(r.data || []);
     setLots(c.data || []);
+    setCosts(sc.error ? [] : (sc.data || []));
+    setJobs(oj.error ? [] : (oj.data || []));
+    setProducts(p.data || []);
     setLoading(false);
   }, [restaurantId]);
 
@@ -115,9 +141,22 @@ export function GarmentFactoryHub({ restaurantId, currency = 'ج.م', profileNam
     const pendingCut = lots.filter(l => l.requires_approval && l.status === 'pending').length;
     const fabricM = rolls.reduce((s, r) => s + Number(r.meters_remaining ?? Math.max(Number(r.meters_received) - Number(r.meters_consumed), 0)), 0);
     const delivered = orders.reduce((s, o) => s + Number(o.quantity_delivered || 0), 0);
-    const value = orders.reduce((s, o) => s + Number(o.total_value || 0), 0);
-    return { open, pendingCut, fabricM, delivered, value };
-  }, [orders, lots, rolls]);
+    const outOpen = jobs.filter(j => j.status === 'sent' || j.status === 'partial').length;
+    const stageCost = orders.reduce((s, o) => s + Number(o.total_stage_cost || 0) + Number(o.total_outsourcing_cost || 0), 0);
+    return { open, pendingCut, fabricM, delivered, outOpen, stageCost };
+  }, [orders, lots, rolls, jobs]);
+
+  const stageCostSummary = useMemo(() => {
+    const map: Record<string, { internal: number; outsourcing: number; material: number; overhead: number; total: number }> = {};
+    const list = selectedId ? costs.filter(c => c.garment_order_id === selectedId) : costs;
+    for (const c of list) {
+      if (!map[c.stage]) map[c.stage] = { internal: 0, outsourcing: 0, material: 0, overhead: 0, total: 0 };
+      const t = c.cost_type || 'internal';
+      map[c.stage][t] = (map[c.stage][t] || 0) + Number(c.total_cost || 0);
+      map[c.stage].total += Number(c.total_cost || 0);
+    }
+    return map;
+  }, [costs, selectedId]);
 
   const parseSizes = (raw: string) => {
     const out: Record<string, number> = {};
@@ -134,6 +173,10 @@ export function GarmentFactoryHub({ restaurantId, currency = 'ج.م', profileNam
     const qty = Number(orderForm.quantity_planned) || Object.values(sizes).reduce((a, b) => a + b, 0);
     const order_number = orderForm.order_number.trim() || `GO-${Date.now().toString().slice(-8)}`;
     const unit = Number(orderForm.unit_price) || 0;
+    let customer_id: string | null = null;
+    if (orderForm.customer_name.trim()) {
+      customer_id = await findOrCreateCustomer(restaurantId, orderForm.customer_name.trim());
+    }
     const { error } = await supabase.from('garment_orders').insert({
       restaurant_id: restaurantId,
       order_number,
@@ -142,6 +185,8 @@ export function GarmentFactoryHub({ restaurantId, currency = 'ج.م', profileNam
       color: orderForm.color || null,
       fabric_type: orderForm.fabric_type || null,
       customer_name: orderForm.customer_name || null,
+      customer_id,
+      fabric_product_id: orderForm.fabric_product_id || null,
       sizes,
       quantity_planned: qty,
       unit_price: unit,
@@ -159,7 +204,7 @@ export function GarmentFactoryHub({ restaurantId, currency = 'ج.م', profileNam
     setOrderForm({
       order_number: '', style_name: '', style_code: '', color: '', fabric_type: '',
       customer_name: '', quantity_planned: 100, unit_price: 0, due_date: '',
-      cutting_waste_limit_pct: 5, notes: '', sizes: 'S:0,M:0,L:0,XL:0',
+      cutting_waste_limit_pct: 5, notes: '', sizes: 'S:0,M:0,L:0,XL:0', fabric_product_id: '',
     });
     load();
   };
@@ -168,6 +213,7 @@ export function GarmentFactoryHub({ restaurantId, currency = 'ج.م', profileNam
     const orderId = selectedId || orders.find(o => o.status !== 'completed' && o.status !== 'cancelled')?.id;
     if (!orderId) return toast.error('أنشئ أمر تشغيل أولاً');
     if (!rollForm.roll_number.trim() || !rollForm.meters_received) return toast.error('رقم التوب والمتراج مطلوبان');
+    const productId = rollForm.product_id || selected?.fabric_product_id || null;
     const { error } = await supabase.from('garment_fabric_rolls').insert({
       restaurant_id: restaurantId,
       garment_order_id: orderId,
@@ -179,26 +225,30 @@ export function GarmentFactoryHub({ restaurantId, currency = 'ج.م', profileNam
       weight_kg: rollForm.weight_kg ? Number(rollForm.weight_kg) : null,
       supplier_name: rollForm.supplier_name || null,
       notes: rollForm.notes || null,
+      product_id: productId,
       received_by_name: actor,
       status: 'in_stock',
     });
     if (error) return toast.error(error.message);
+    if (productId) {
+      await supabase.from('garment_orders').update({ fabric_product_id: productId }).eq('id', orderId).is('fabric_product_id', null);
+    }
     await supabase.from('garment_orders').update({
       current_stage: 'fabric_receipt',
       status: 'in_progress',
       updated_by_name: actor,
       updated_at: new Date().toISOString(),
     }).eq('id', orderId);
-    toast.success('تم استلام التوب');
+    toast.success(productId ? 'تم استلام التوب وربطه بالمخزون' : 'تم استلام التوب');
     setRollOpen(false);
-    setRollForm({ roll_number: '', fabric_type: '', color: '', width_cm: '', meters_received: '', weight_kg: '', supplier_name: '', notes: '' });
+    setRollForm({ roll_number: '', fabric_type: '', color: '', width_cm: '', meters_received: '', weight_kg: '', supplier_name: '', notes: '', product_id: '' });
     load();
   };
 
   const recordCutting = async () => {
     const orderId = selectedId;
     if (!orderId) return toast.error('اختر أمر تشغيل');
-    if (!cutForm.meters_actual || !cutForm.pieces_cut) return toast.error('المتراج الفعلي والقطع م المطلوبان');
+    if (!cutForm.meters_actual || !cutForm.pieces_cut) return toast.error('المتراج الفعلي والقطع مطلوبان');
     const { data, error } = await supabase.rpc('garment_record_cutting', {
       p_restaurant_id: restaurantId,
       p_garment_order_id: orderId,
@@ -214,9 +264,10 @@ export function GarmentFactoryHub({ restaurantId, currency = 'ج.م', profileNam
       p_notes: cutForm.notes || null,
     });
     if (error) return toast.error(error.message);
-    const lot = (await supabase.from('garment_cutting_lots').select('variance_flag').eq('id', data).maybeSingle()).data;
+    const lot = (await supabase.from('garment_cutting_lots').select('variance_flag, inventory_deducted').eq('id', data).maybeSingle()).data;
     if (lot?.variance_flag) toast.warning('انحراف قص — يحتاج موافقة قبل ترحيل القطع');
-    else toast.success('تم تسجيل القص وترحيل القطع');
+    else if (lot?.inventory_deducted) toast.success('تم القص + خصم المتراج من المخزون');
+    else toast.success('تم تسجيل القص (اربط أصناف القماش من المخزون للخصم التلقائي)');
     setCutOpen(false);
     setCutForm({
       fabric_roll_id: '', lot_number: '', marker_length_m: '', lays_count: '1',
@@ -237,19 +288,112 @@ export function GarmentFactoryHub({ restaurantId, currency = 'ج.م', profileNam
 
   const advanceStage = async () => {
     if (!selectedId || !advanceForm.to_stage) return toast.error('حدد المرحلة التالية');
-    const { error } = await supabase.rpc('garment_advance_stage', {
-      p_order_id: selectedId,
-      p_to_stage: advanceForm.to_stage,
-      p_quantity: Number(advanceForm.quantity) || 0,
-      p_qc_pass: Number(advanceForm.qc_pass) || 0,
-      p_qc_fail: Number(advanceForm.qc_fail) || 0,
-      p_laundry_ref: advanceForm.laundry_ref || null,
+    const delivering = advanceForm.to_stage === 'delivery' || advanceForm.to_stage === 'completed';
+    if (delivering) {
+      const { error } = await supabase.rpc('garment_deliver_and_invoice', {
+        p_order_id: selectedId,
+        p_quantity: Number(advanceForm.quantity) || null,
+        p_paid_amount: 0,
+        p_payment_method: 'credit',
+        p_actor_name: actor,
+        p_notes: advanceForm.notes || null,
+      });
+      if (error) return toast.error(error.message);
+      toast.success('تم التسليم وإنشاء فاتورة بيع تلقائياً');
+    } else {
+      const { error } = await supabase.rpc('garment_advance_stage', {
+        p_order_id: selectedId,
+        p_to_stage: advanceForm.to_stage,
+        p_quantity: Number(advanceForm.quantity) || 0,
+        p_qc_pass: Number(advanceForm.qc_pass) || 0,
+        p_qc_fail: Number(advanceForm.qc_fail) || 0,
+        p_laundry_ref: advanceForm.laundry_ref || null,
+        p_actor_name: actor,
+        p_notes: advanceForm.notes || null,
+      });
+      if (error) return toast.error(error.message);
+      toast.success(`تم النقل إلى: ${STAGE_LABEL[advanceForm.to_stage] || advanceForm.to_stage}`);
+    }
+    setAdvanceOpen(false);
+    load();
+  };
+
+  const deliverNow = async (order: any) => {
+    setSelectedId(order.id);
+    const { error } = await supabase.rpc('garment_deliver_and_invoice', {
+      p_order_id: order.id,
+      p_quantity: order.quantity_packed || order.quantity_planned,
+      p_paid_amount: 0,
+      p_payment_method: 'credit',
       p_actor_name: actor,
-      p_notes: advanceForm.notes || null,
+      p_notes: null,
     });
     if (error) return toast.error(error.message);
-    toast.success(`تم النقل إلى: ${STAGE_LABEL[advanceForm.to_stage] || advanceForm.to_stage}`);
-    setAdvanceOpen(false);
+    toast.success('فاتورة بيع تم إنشاؤها من التسليم');
+    load();
+  };
+
+  const saveCost = async () => {
+    const orderId = selectedId;
+    if (!orderId) return toast.error('اختر أمر تشغيل');
+    if (!costForm.unit_cost && !costForm.quantity) return toast.error('أدخل الكمية وسعر الوحدة');
+    const { error } = await supabase.rpc('garment_record_stage_cost', {
+      p_restaurant_id: restaurantId,
+      p_garment_order_id: orderId,
+      p_stage: costForm.stage,
+      p_cost_type: costForm.cost_type,
+      p_quantity: Number(costForm.quantity) || 0,
+      p_unit_cost: Number(costForm.unit_cost) || 0,
+      p_vendor_name: costForm.vendor_name || null,
+      p_outsourcing_job_id: null,
+      p_notes: costForm.notes || null,
+      p_actor_name: actor,
+    });
+    if (error) return toast.error(error.message);
+    toast.success('تم تسجيل تكلفة المرحلة');
+    setCostOpen(false);
+    load();
+  };
+
+  const createOutsourcing = async () => {
+    const orderId = selectedId;
+    if (!orderId) return toast.error('اختر أمر تشغيل');
+    if (!outForm.vendor_name.trim() || !outForm.qty_sent) return toast.error('الورشة والكمية مطلوبان');
+    const { error } = await supabase.rpc('garment_create_outsourcing', {
+      p_restaurant_id: restaurantId,
+      p_garment_order_id: orderId,
+      p_stage: outForm.stage,
+      p_vendor_name: outForm.vendor_name.trim(),
+      p_qty_sent: Number(outForm.qty_sent),
+      p_unit_cost: Number(outForm.unit_cost) || 0,
+      p_vendor_phone: outForm.vendor_phone || null,
+      p_due_date: outForm.due_date || null,
+      p_external_ref: outForm.external_ref || null,
+      p_notes: outForm.notes || null,
+      p_actor_name: actor,
+      p_auto_cost: true,
+    });
+    if (error) return toast.error(error.message);
+    toast.success('تم إرسال المرحلة للتصنيع الخارجي + تسجيل التكلفة');
+    setOutOpen(false);
+    setOutForm({ stage: 'front', vendor_name: '', vendor_phone: '', qty_sent: '', unit_cost: '', due_date: '', external_ref: '', notes: '' });
+    setView('outsourcing');
+    load();
+  };
+
+  const receiveOutsourcing = async () => {
+    if (!recvJobId) return;
+    const { error } = await supabase.rpc('garment_receive_outsourcing', {
+      p_job_id: recvJobId,
+      p_qty_received: Number(recvForm.qty_received) || 0,
+      p_qty_rejected: Number(recvForm.qty_rejected) || 0,
+      p_actor_name: actor,
+      p_notes: recvForm.notes || null,
+    });
+    if (error) return toast.error(error.message);
+    toast.success('تم استلام التصنيع الخارجي');
+    setRecvOpen(false);
+    setRecvForm({ qty_received: '', qty_rejected: '', notes: '' });
     load();
   };
 
@@ -272,30 +416,45 @@ export function GarmentFactoryHub({ restaurantId, currency = 'ج.م', profileNam
     [rolls, selectedId]
   );
 
+  const VIEWS = [
+    { id: 'board', label: 'لوحة المراحل' },
+    { id: 'fabrics', label: 'الأقمشة' },
+    { id: 'cutting', label: 'رقابة القص' },
+    { id: 'costs', label: 'تكاليف المراحل' },
+    { id: 'outsourcing', label: 'تصنيع خارجي' },
+  ] as const;
+
   return (
     <div className="space-y-4 p-1" dir="rtl">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="text-xl font-black tracking-tight">إنتاج مصنع الملابس</h1>
-          <p className="text-xs text-muted-foreground">أتواب → قص رقابي → خط الإنتاج → مغسلة → تعبئة → تسليم</p>
+          <p className="text-xs text-muted-foreground">أتواب → قص + مخزون → مراحل/خارجي → فاتورة عند التسليم</p>
         </div>
         <div className="flex flex-wrap gap-2">
           <Button variant="outline" size="sm" onClick={load}><RefreshCcw className="w-4 h-4 ml-1" />تحديث</Button>
           <Button size="sm" onClick={() => setOrderOpen(true)}><Plus className="w-4 h-4 ml-1" />أمر تشغيل</Button>
           <Button size="sm" variant="secondary" onClick={() => setRollOpen(true)}><Package className="w-4 h-4 ml-1" />استلام توب</Button>
           <Button size="sm" variant="secondary" disabled={!selectedId} onClick={() => setCutOpen(true)}>
-            <Scissors className="w-4 h-4 ml-1" />تسجيل قص
+            <Scissors className="w-4 h-4 ml-1" />قص
+          </Button>
+          <Button size="sm" variant="secondary" disabled={!selectedId} onClick={() => setCostOpen(true)}>
+            <DollarSign className="w-4 h-4 ml-1" />تكلفة مرحلة
+          </Button>
+          <Button size="sm" variant="secondary" disabled={!selectedId} onClick={() => setOutOpen(true)}>
+            <Factory className="w-4 h-4 ml-1" />تصنيع خارجي
           </Button>
         </div>
       </div>
 
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-2">
+      <div className="grid grid-cols-2 md:grid-cols-6 gap-2">
         {[
           { label: 'أوامر نشطة', value: kpis.open, color: 'text-rose-600' },
           { label: 'قص بانتظار موافقة', value: kpis.pendingCut, color: 'text-amber-600' },
-          { label: 'متر أقمشة متاح', value: `${kpis.fabricM.toFixed(1)} م`, color: 'text-sky-600' },
+          { label: 'متر أقمشة', value: `${kpis.fabricM.toFixed(1)} م`, color: 'text-sky-600' },
+          { label: 'خارجي معلّق', value: kpis.outOpen, color: 'text-orange-600' },
+          { label: 'تكاليف مراحل', value: `${kpis.stageCost.toLocaleString()} ${currency}`, color: 'text-violet-600' },
           { label: 'قطع مسلّمة', value: kpis.delivered, color: 'text-emerald-600' },
-          { label: 'قيمة الأوامر', value: `${kpis.value.toLocaleString()} ${currency}`, color: 'text-violet-600' },
         ].map(k => (
           <Card key={k.label} className="p-3 border-border/60">
             <div className="text-[10px] text-muted-foreground font-bold">{k.label}</div>
@@ -305,19 +464,14 @@ export function GarmentFactoryHub({ restaurantId, currency = 'ج.م', profileNam
       </div>
 
       <div className="flex flex-wrap items-center gap-2">
-        {(['board', 'fabrics', 'cutting'] as const).map(v => (
-          <Button
-            key={v}
-            size="sm"
-            variant={view === v ? 'default' : 'outline'}
-            onClick={() => setView(v)}
-          >
-            {v === 'board' ? 'لوحة المراحل' : v === 'fabrics' ? 'الأقمشة' : 'رقابة القص'}
+        {VIEWS.map(v => (
+          <Button key={v.id} size="sm" variant={view === v.id ? 'default' : 'outline'} onClick={() => setView(v.id)}>
+            {v.label}
           </Button>
         ))}
         <div className="relative flex-1 min-w-[180px]">
           <Search className="w-3.5 h-3.5 absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground" />
-          <Input className="pr-8 h-9" placeholder="بحث بأمر / موديل / عميل..." value={search} onChange={e => setSearch(e.target.value)} />
+          <Input className="pr-8 h-9" placeholder="بحث..." value={search} onChange={e => setSearch(e.target.value)} />
         </div>
       </div>
 
@@ -355,13 +509,19 @@ export function GarmentFactoryHub({ restaurantId, currency = 'ج.م', profileNam
                         </div>
                         <div className="text-[10px] text-muted-foreground mt-1 space-y-0.5">
                           {o.customer_name && <div>عميل: {o.customer_name}</div>}
-                          <div>قص: {o.quantity_cut || 0} · تعبئة: {o.quantity_packed || 0} · تسليم: {o.quantity_delivered || 0}</div>
-                          {o.unit_price > 0 && <div className="font-bold text-foreground/80">{Number(o.total_value).toLocaleString()} {currency}</div>}
+                          <div>قص {o.quantity_cut || 0} · تعبئة {o.quantity_packed || 0}</div>
+                          <div>تكلفة: {(Number(o.total_stage_cost || 0) + Number(o.total_outsourcing_cost || 0)).toLocaleString()} {currency}</div>
+                          {o.sales_order_id && <Badge className="text-[9px] bg-emerald-600">فاتورة مرتبطة</Badge>}
                         </div>
                         <div className="flex gap-1 mt-2">
                           <Button size="sm" className="h-7 text-[10px] flex-1" onClick={e => { e.stopPropagation(); openAdvance(o); }}>
-                            مرحلة تالية
+                            مرحلة
                           </Button>
+                          {!o.sales_order_id && (o.current_stage === 'packing' || o.current_stage === 'delivery') && (
+                            <Button size="sm" variant="outline" className="h-7 text-[10px]" onClick={e => { e.stopPropagation(); deliverNow(o); }}>
+                              تسليم+فاتورة
+                            </Button>
+                          )}
                         </div>
                       </Card>
                     ))}
@@ -381,10 +541,8 @@ export function GarmentFactoryHub({ restaurantId, currency = 'ج.م', profileNam
               <tr className="text-[10px] text-muted-foreground border-b">
                 <th className="py-2 text-right">التوب</th>
                 <th className="py-2 text-right">الأمر</th>
-                <th className="py-2 text-right">نوع / لون</th>
-                <th className="py-2 text-right">مستلم</th>
-                <th className="py-2 text-right">مستهلك</th>
-                <th className="py-2 text-right">متبقي</th>
+                <th className="py-2 text-right">صنف مخزون</th>
+                <th className="py-2 text-right">مستلم / مستهلك / متبقي</th>
                 <th className="py-2 text-right">الحالة</th>
               </tr>
             </thead>
@@ -392,32 +550,26 @@ export function GarmentFactoryHub({ restaurantId, currency = 'ج.م', profileNam
               {rolls.map(r => {
                 const rem = Number(r.meters_remaining ?? Math.max(Number(r.meters_received) - Number(r.meters_consumed), 0));
                 const ord = orders.find(o => o.id === r.garment_order_id);
+                const prod = products.find(p => p.id === r.product_id);
                 return (
-                  <tr key={r.id} className="border-b border-border/40 hover:bg-muted/40">
+                  <tr key={r.id} className="border-b border-border/40">
                     <td className="py-2 font-bold">{r.roll_number}</td>
                     <td className="py-2">{ord?.order_number || '—'}</td>
-                    <td className="py-2">{r.fabric_type || '—'} / {r.color || '—'}</td>
-                    <td className="py-2">{Number(r.meters_received).toFixed(2)} م</td>
-                    <td className="py-2">{Number(r.meters_consumed).toFixed(2)} م</td>
-                    <td className={cn('py-2 font-black', rem < 5 ? 'text-rose-600' : 'text-emerald-600')}>{rem.toFixed(2)} م</td>
+                    <td className="py-2 text-xs">{prod ? `${prod.name} (${Number(prod.quantity).toFixed(1)})` : 'غير مربوط'}</td>
+                    <td className="py-2">{Number(r.meters_received).toFixed(1)} / {Number(r.meters_consumed).toFixed(1)} / <span className={cn('font-black', rem < 5 ? 'text-rose-600' : 'text-emerald-600')}>{rem.toFixed(1)} م</span></td>
                     <td className="py-2"><Badge variant="outline">{r.status}</Badge></td>
                   </tr>
                 );
               })}
-              {rolls.length === 0 && (
-                <tr><td colSpan={7} className="py-10 text-center text-muted-foreground">لا توجد أتواب بعد</td></tr>
-              )}
+              {rolls.length === 0 && <tr><td colSpan={5} className="py-10 text-center text-muted-foreground">لا توجد أتواب</td></tr>}
             </tbody>
           </table>
         </Card>
-      ) : (
+      ) : view === 'cutting' ? (
         <div className="space-y-3">
-          {lots.filter(l => l.requires_approval && l.status === 'pending').length > 0 && (
-            <Card className="p-3 border-amber-500/40 bg-amber-500/5">
-              <div className="flex items-center gap-2 text-amber-700 font-bold text-sm">
-                <AlertTriangle className="w-4 h-4" />
-                دفعات قص تحتاج موافقة (هدر أعلى من الحد أو نقص قطع)
-              </div>
+          {lots.some(l => l.requires_approval && l.status === 'pending') && (
+            <Card className="p-3 border-amber-500/40 bg-amber-500/5 text-amber-700 font-bold text-sm flex items-center gap-2">
+              <AlertTriangle className="w-4 h-4" /> دفعات قص تحتاج موافقة
             </Card>
           )}
           <Card className="p-4 overflow-x-auto">
@@ -426,11 +578,9 @@ export function GarmentFactoryHub({ restaurantId, currency = 'ج.م', profileNam
                 <tr className="text-[10px] text-muted-foreground border-b">
                   <th className="py-2 text-right">الدفعة</th>
                   <th className="py-2 text-right">الأمر</th>
-                  <th className="py-2 text-right">مخطط / فعلي</th>
+                  <th className="py-2 text-right">مخطط/فعلي</th>
                   <th className="py-2 text-right">هدر %</th>
-                  <th className="py-2 text-right">قطع</th>
-                  <th className="py-2 text-right">القاص</th>
-                  <th className="py-2 text-right">الحالة</th>
+                  <th className="py-2 text-right">مخزون</th>
                   <th className="py-2 text-right">إجراء</th>
                 </tr>
               </thead>
@@ -438,17 +588,12 @@ export function GarmentFactoryHub({ restaurantId, currency = 'ج.م', profileNam
                 {lots.map(l => {
                   const ord = orders.find(o => o.id === l.garment_order_id);
                   return (
-                    <tr key={l.id} className={cn('border-b border-border/40', l.variance_flag && 'bg-rose-500/5')}>
+                    <tr key={l.id} className={cn('border-b', l.variance_flag && 'bg-rose-500/5')}>
                       <td className="py-2 font-bold">{l.lot_number}</td>
                       <td className="py-2">{ord?.order_number || '—'}</td>
-                      <td className="py-2">{Number(l.meters_planned).toFixed(2)} / {Number(l.meters_actual).toFixed(2)} م</td>
-                      <td className={cn('py-2 font-black', Number(l.waste_pct) > 5 ? 'text-rose-600' : '')}>
-                        {Number(l.waste_pct || 0).toFixed(1)}%
-                        {l.variance_flag && <AlertTriangle className="w-3.5 h-3.5 inline mr-1 text-amber-500" />}
-                      </td>
-                      <td className="py-2">{l.pieces_cut}/{l.pieces_planned}</td>
-                      <td className="py-2 text-xs">{l.cut_by_name || '—'}</td>
-                      <td className="py-2"><Badge variant={l.status === 'posted' ? 'default' : 'secondary'}>{l.status}</Badge></td>
+                      <td className="py-2">{Number(l.meters_planned).toFixed(1)} / {Number(l.meters_actual).toFixed(1)}</td>
+                      <td className="py-2 font-black">{Number(l.waste_pct || 0).toFixed(1)}%</td>
+                      <td className="py-2">{l.inventory_deducted ? <Badge className="bg-emerald-600 text-[9px]">خُصم</Badge> : <Badge variant="outline" className="text-[9px]">—</Badge>}</td>
                       <td className="py-2">
                         {l.status === 'pending' && l.requires_approval && (
                           <Button size="sm" className="h-7 text-[10px]" onClick={() => approveLot(l.id)}>موافقة</Button>
@@ -457,9 +602,103 @@ export function GarmentFactoryHub({ restaurantId, currency = 'ج.م', profileNam
                     </tr>
                   );
                 })}
-                {lots.length === 0 && (
-                  <tr><td colSpan={8} className="py-10 text-center text-muted-foreground">لا توجد دفعات قص</td></tr>
-                )}
+              </tbody>
+            </table>
+          </Card>
+        </div>
+      ) : view === 'costs' ? (
+        <div className="space-y-3">
+          <Card className="p-4">
+            <div className="text-xs font-black mb-3">ملخص تكلفة المراحل {selected ? `— ${selected.order_number}` : '(كل الأوامر)'}</div>
+            <div className="grid md:grid-cols-3 gap-2">
+              {Object.entries(stageCostSummary).map(([stage, vals]) => (
+                <Card key={stage} className="p-3 border-border/50">
+                  <div className="font-bold text-sm">{STAGE_LABEL[stage] || stage}</div>
+                  <div className="text-[10px] text-muted-foreground mt-1 space-y-0.5">
+                    <div>داخلي: {vals.internal.toLocaleString()}</div>
+                    <div>خارجي: {vals.outsourcing.toLocaleString()}</div>
+                    <div>مواد/أعباء: {(vals.material + vals.overhead).toLocaleString()}</div>
+                  </div>
+                  <div className="font-black text-primary mt-1">{vals.total.toLocaleString()} {currency}</div>
+                </Card>
+              ))}
+              {Object.keys(stageCostSummary).length === 0 && (
+                <div className="text-sm text-muted-foreground col-span-3 py-8 text-center">لا توجد تكاليف مراحل بعد — سجّل تكلفة أو صرّف مرحلة خارجياً</div>
+              )}
+            </div>
+          </Card>
+          <Card className="p-4 overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="text-[10px] text-muted-foreground border-b">
+                  <th className="py-2 text-right">الأمر</th>
+                  <th className="py-2 text-right">المرحلة</th>
+                  <th className="py-2 text-right">النوع</th>
+                  <th className="py-2 text-right">كمية × سعر</th>
+                  <th className="py-2 text-right">الإجمالي</th>
+                  <th className="py-2 text-right">جهة</th>
+                </tr>
+              </thead>
+              <tbody>
+                {(selectedId ? costs.filter(c => c.garment_order_id === selectedId) : costs).map(c => {
+                  const ord = orders.find(o => o.id === c.garment_order_id);
+                  return (
+                    <tr key={c.id} className="border-b border-border/40">
+                      <td className="py-2">{ord?.order_number || '—'}</td>
+                      <td className="py-2">{STAGE_LABEL[c.stage] || c.stage}</td>
+                      <td className="py-2"><Badge variant="outline">{COST_TYPES.find(t => t.id === c.cost_type)?.label || c.cost_type}</Badge></td>
+                      <td className="py-2">{Number(c.quantity).toLocaleString()} × {Number(c.unit_cost).toLocaleString()}</td>
+                      <td className="py-2 font-black">{Number(c.total_cost).toLocaleString()}</td>
+                      <td className="py-2 text-xs">{c.vendor_name || '—'}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </Card>
+        </div>
+      ) : (
+        <div className="space-y-3">
+          <Card className="p-4 overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="text-[10px] text-muted-foreground border-b">
+                  <th className="py-2 text-right">الأمر</th>
+                  <th className="py-2 text-right">المرحلة</th>
+                  <th className="py-2 text-right">الورشة</th>
+                  <th className="py-2 text-right">مرسل / مستلم / مرفوض</th>
+                  <th className="py-2 text-right">تكلفة</th>
+                  <th className="py-2 text-right">الحالة</th>
+                  <th className="py-2 text-right">إجراء</th>
+                </tr>
+              </thead>
+              <tbody>
+                {jobs.map(j => {
+                  const ord = orders.find(o => o.id === j.garment_order_id);
+                  return (
+                    <tr key={j.id} className="border-b border-border/40">
+                      <td className="py-2 font-bold">{ord?.order_number || '—'}</td>
+                      <td className="py-2">{STAGE_LABEL[j.stage] || j.stage}</td>
+                      <td className="py-2">
+                        <div>{j.vendor_name}</div>
+                        <div className="text-[10px] text-muted-foreground">{j.vendor_phone || j.external_ref || ''}</div>
+                      </td>
+                      <td className="py-2">{j.qty_sent} / {j.qty_received} / {j.qty_rejected}</td>
+                      <td className="py-2 font-black">{Number(j.total_cost).toLocaleString()} {currency}</td>
+                      <td className="py-2"><Badge variant={j.status === 'received' ? 'default' : 'secondary'}>{j.status}</Badge></td>
+                      <td className="py-2">
+                        {(j.status === 'sent' || j.status === 'partial') && (
+                          <Button size="sm" className="h-7 text-[10px]" onClick={() => {
+                            setRecvJobId(j.id);
+                            setRecvForm({ qty_received: String(j.qty_sent - j.qty_received), qty_rejected: '0', notes: '' });
+                            setRecvOpen(true);
+                          }}>استلام</Button>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
+                {jobs.length === 0 && <tr><td colSpan={7} className="py-10 text-center text-muted-foreground">لا أوامر تصنيع خارجي</td></tr>}
               </tbody>
             </table>
           </Card>
@@ -473,221 +712,171 @@ export function GarmentFactoryHub({ restaurantId, currency = 'ج.م', profileNam
             <span className="font-black">{selected.order_number}</span>
             <span>{selected.style_name}</span>
             <Badge>{STAGE_LABEL[selected.current_stage] || selected.current_stage}</Badge>
-            <span className="text-muted-foreground">حد هدر القص: {selected.cutting_waste_limit_pct}%</span>
+            <span>داخلي {Number(selected.total_stage_cost || 0).toLocaleString()} · خارجي {Number(selected.total_outsourcing_cost || 0).toLocaleString()} {currency}</span>
+            {selected.sales_order_id && <Badge className="bg-emerald-600">فاتورة بيع</Badge>}
             <Button size="sm" className="h-7 mr-auto" onClick={() => openAdvance(selected)}>نقل مرحلة</Button>
           </div>
         </Card>
       )}
 
-      {/* New order */}
+      {/* dialogs */}
       <Dialog open={orderOpen} onOpenChange={setOrderOpen}>
         <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto" dir="rtl">
           <DialogHeader><DialogTitle>أمر تشغيل جديد</DialogTitle></DialogHeader>
           <div className="grid grid-cols-2 gap-3">
+            <div className="col-span-2 space-y-1"><Label>الموديل *</Label><Input value={orderForm.style_name} onChange={e => setOrderForm(f => ({ ...f, style_name: e.target.value }))} /></div>
+            <div className="space-y-1"><Label>رقم الأمر</Label><Input value={orderForm.order_number} onChange={e => setOrderForm(f => ({ ...f, order_number: e.target.value }))} /></div>
+            <div className="space-y-1"><Label>كود الموديل</Label><Input value={orderForm.style_code} onChange={e => setOrderForm(f => ({ ...f, style_code: e.target.value }))} /></div>
+            <div className="space-y-1"><Label>العميل</Label><Input value={orderForm.customer_name} onChange={e => setOrderForm(f => ({ ...f, customer_name: e.target.value }))} /></div>
+            <div className="space-y-1"><Label>الكمية</Label><Input type="number" value={orderForm.quantity_planned} onChange={e => setOrderForm(f => ({ ...f, quantity_planned: Number(e.target.value) }))} /></div>
+            <div className="space-y-1"><Label>سعر القطعة</Label><Input type="number" value={orderForm.unit_price} onChange={e => setOrderForm(f => ({ ...f, unit_price: Number(e.target.value) }))} /></div>
+            <div className="space-y-1"><Label>حد هدر %</Label><Input type="number" value={orderForm.cutting_waste_limit_pct} onChange={e => setOrderForm(f => ({ ...f, cutting_waste_limit_pct: Number(e.target.value) }))} /></div>
             <div className="col-span-2 space-y-1">
-              <Label>الموديل *</Label>
-              <Input value={orderForm.style_name} onChange={e => setOrderForm(f => ({ ...f, style_name: e.target.value }))} />
+              <Label>صنف قماش من المخزون (للخصم عند القص)</Label>
+              <Select value={orderForm.fabric_product_id || 'none'} onValueChange={v => setOrderForm(f => ({ ...f, fabric_product_id: v === 'none' ? '' : v }))}>
+                <SelectTrigger><SelectValue placeholder="اختياري" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">بدون ربط</SelectItem>
+                  {products.map(p => (
+                    <SelectItem key={p.id} value={p.id}>{p.name} — رصيد {Number(p.quantity).toFixed(1)} {p.unit || 'م'}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
-            <div className="space-y-1">
-              <Label>رقم الأمر</Label>
-              <Input placeholder="تلقائي إن تُرك فارغاً" value={orderForm.order_number} onChange={e => setOrderForm(f => ({ ...f, order_number: e.target.value }))} />
-            </div>
-            <div className="space-y-1">
-              <Label>كود الموديل</Label>
-              <Input value={orderForm.style_code} onChange={e => setOrderForm(f => ({ ...f, style_code: e.target.value }))} />
-            </div>
-            <div className="space-y-1">
-              <Label>العميل</Label>
-              <Input value={orderForm.customer_name} onChange={e => setOrderForm(f => ({ ...f, customer_name: e.target.value }))} />
-            </div>
-            <div className="space-y-1">
-              <Label>الكمية المخططة</Label>
-              <Input type="number" value={orderForm.quantity_planned} onChange={e => setOrderForm(f => ({ ...f, quantity_planned: Number(e.target.value) }))} />
-            </div>
-            <div className="space-y-1">
-              <Label>اللون</Label>
-              <Input value={orderForm.color} onChange={e => setOrderForm(f => ({ ...f, color: e.target.value }))} />
-            </div>
-            <div className="space-y-1">
-              <Label>نوع القماش</Label>
-              <Input value={orderForm.fabric_type} onChange={e => setOrderForm(f => ({ ...f, fabric_type: e.target.value }))} />
-            </div>
-            <div className="space-y-1">
-              <Label>سعر القطعة ({currency})</Label>
-              <Input type="number" value={orderForm.unit_price} onChange={e => setOrderForm(f => ({ ...f, unit_price: Number(e.target.value) }))} />
-            </div>
-            <div className="space-y-1">
-              <Label>حد هدر القص %</Label>
-              <Input type="number" value={orderForm.cutting_waste_limit_pct} onChange={e => setOrderForm(f => ({ ...f, cutting_waste_limit_pct: Number(e.target.value) }))} />
-            </div>
-            <div className="space-y-1">
-              <Label>موعد التسليم</Label>
-              <Input type="date" value={orderForm.due_date} onChange={e => setOrderForm(f => ({ ...f, due_date: e.target.value }))} />
-            </div>
-            <div className="col-span-2 space-y-1">
-              <Label>المقاسات (مثال S:20,M:40,L:30)</Label>
-              <Input value={orderForm.sizes} onChange={e => setOrderForm(f => ({ ...f, sizes: e.target.value }))} />
-            </div>
-            <div className="col-span-2 space-y-1">
-              <Label>ملاحظات</Label>
-              <Textarea value={orderForm.notes} onChange={e => setOrderForm(f => ({ ...f, notes: e.target.value }))} />
-            </div>
+            <div className="col-span-2 space-y-1"><Label>ملاحظات</Label><Textarea value={orderForm.notes} onChange={e => setOrderForm(f => ({ ...f, notes: e.target.value }))} /></div>
           </div>
-          <DialogFooter>
-            <Button onClick={createOrder}>حفظ الأمر</Button>
-          </DialogFooter>
+          <DialogFooter><Button onClick={createOrder}>حفظ</Button></DialogFooter>
         </DialogContent>
       </Dialog>
 
-      {/* Fabric roll */}
       <Dialog open={rollOpen} onOpenChange={setRollOpen}>
         <DialogContent className="max-w-md" dir="rtl">
-          <DialogHeader><DialogTitle>استلام توب قماش</DialogTitle></DialogHeader>
+          <DialogHeader><DialogTitle>استلام توب</DialogTitle></DialogHeader>
           <div className="space-y-3">
-            <div className="space-y-1">
-              <Label>ربط بأمر تشغيل</Label>
-              <Select value={selectedId || ''} onValueChange={setSelectedId}>
-                <SelectTrigger><SelectValue placeholder="اختر الأمر" /></SelectTrigger>
-                <SelectContent>
-                  {orders.filter(o => o.status !== 'completed' && o.status !== 'cancelled').map(o => (
-                    <SelectItem key={o.id} value={o.id}>{o.order_number} — {o.style_name}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-1">
-              <Label>رقم التوب *</Label>
-              <Input value={rollForm.roll_number} onChange={e => setRollForm(f => ({ ...f, roll_number: e.target.value }))} />
-            </div>
-            <div className="grid grid-cols-2 gap-2">
-              <div className="space-y-1">
-                <Label>المتراج المستلم *</Label>
-                <Input type="number" value={rollForm.meters_received} onChange={e => setRollForm(f => ({ ...f, meters_received: e.target.value }))} />
-              </div>
-              <div className="space-y-1">
-                <Label>العرض (سم)</Label>
-                <Input type="number" value={rollForm.width_cm} onChange={e => setRollForm(f => ({ ...f, width_cm: e.target.value }))} />
-              </div>
-              <div className="space-y-1">
-                <Label>الوزن (كجم)</Label>
-                <Input type="number" value={rollForm.weight_kg} onChange={e => setRollForm(f => ({ ...f, weight_kg: e.target.value }))} />
-              </div>
-              <div className="space-y-1">
-                <Label>المورد</Label>
-                <Input value={rollForm.supplier_name} onChange={e => setRollForm(f => ({ ...f, supplier_name: e.target.value }))} />
-              </div>
-            </div>
+            <Select value={selectedId || ''} onValueChange={setSelectedId}>
+              <SelectTrigger><SelectValue placeholder="أمر التشغيل" /></SelectTrigger>
+              <SelectContent>
+                {orders.filter(o => o.status !== 'completed' && o.status !== 'cancelled').map(o => (
+                  <SelectItem key={o.id} value={o.id}>{o.order_number} — {o.style_name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Input placeholder="رقم التوب *" value={rollForm.roll_number} onChange={e => setRollForm(f => ({ ...f, roll_number: e.target.value }))} />
+            <Input type="number" placeholder="المتراج المستلم *" value={rollForm.meters_received} onChange={e => setRollForm(f => ({ ...f, meters_received: e.target.value }))} />
+            <Select value={rollForm.product_id || 'none'} onValueChange={v => setRollForm(f => ({ ...f, product_id: v === 'none' ? '' : v }))}>
+              <SelectTrigger><SelectValue placeholder="صنف المخزون" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="none">بدون ربط مخزون</SelectItem>
+                {products.map(p => (
+                  <SelectItem key={p.id} value={p.id}>{p.name} ({Number(p.quantity).toFixed(1)})</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <p className="text-[10px] text-muted-foreground">عند القص يُخصم المتراج الفعلي من رصيد هذا الصنف مباشرة.</p>
           </div>
-          <DialogFooter>
-            <Button onClick={addRoll}>تسجيل الاستلام</Button>
-          </DialogFooter>
+          <DialogFooter><Button onClick={addRoll}>حفظ</Button></DialogFooter>
         </DialogContent>
       </Dialog>
 
-      {/* Cutting */}
       <Dialog open={cutOpen} onOpenChange={setCutOpen}>
         <DialogContent className="max-w-lg" dir="rtl">
-          <DialogHeader><DialogTitle>تسجيل قص + رقابة ميتراج</DialogTitle></DialogHeader>
+          <DialogHeader><DialogTitle>قص + خصم مخزون</DialogTitle></DialogHeader>
           <div className="space-y-3">
-            <div className="text-xs text-muted-foreground bg-muted/50 rounded-lg p-2">
-              إذا تجاوز الهدر حد الأمر ({selected?.cutting_waste_limit_pct ?? 5}%) أو نقصت القطع عن المخطط — يُجمَّد الترحيل حتى موافقة مشرف.
-            </div>
-            <div className="space-y-1">
-              <Label>التوب</Label>
-              <Select value={cutForm.fabric_roll_id} onValueChange={v => setCutForm(f => ({ ...f, fabric_roll_id: v }))}>
-                <SelectTrigger><SelectValue placeholder="اختر التوب" /></SelectTrigger>
-                <SelectContent>
-                  {orderRolls.map(r => (
-                    <SelectItem key={r.id} value={r.id}>
-                      {r.roll_number} — متبقي {(Number(r.meters_remaining ?? Number(r.meters_received) - Number(r.meters_consumed))).toFixed(1)} م
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+            <Select value={cutForm.fabric_roll_id} onValueChange={v => setCutForm(f => ({ ...f, fabric_roll_id: v }))}>
+              <SelectTrigger><SelectValue placeholder="التوب" /></SelectTrigger>
+              <SelectContent>
+                {orderRolls.map(r => (
+                  <SelectItem key={r.id} value={r.id}>{r.roll_number}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
             <div className="grid grid-cols-2 gap-2">
-              <div className="space-y-1">
-                <Label>رقم الدفعة</Label>
-                <Input value={cutForm.lot_number} onChange={e => setCutForm(f => ({ ...f, lot_number: e.target.value }))} />
-              </div>
-              <div className="space-y-1">
-                <Label>عدد الطبقات</Label>
-                <Input type="number" value={cutForm.lays_count} onChange={e => setCutForm(f => ({ ...f, lays_count: e.target.value }))} />
-              </div>
-              <div className="space-y-1">
-                <Label>طول الماركر (م)</Label>
-                <Input type="number" value={cutForm.marker_length_m} onChange={e => setCutForm(f => ({ ...f, marker_length_m: e.target.value }))} />
-              </div>
-              <div className="space-y-1">
-                <Label>متراج مخطط</Label>
-                <Input type="number" value={cutForm.meters_planned} onChange={e => setCutForm(f => ({ ...f, meters_planned: e.target.value }))} />
-              </div>
-              <div className="space-y-1">
-                <Label>متراج فعلي *</Label>
-                <Input type="number" value={cutForm.meters_actual} onChange={e => setCutForm(f => ({ ...f, meters_actual: e.target.value }))} />
-              </div>
-              <div className="space-y-1">
-                <Label>قطع مخططة</Label>
-                <Input type="number" value={cutForm.pieces_planned} onChange={e => setCutForm(f => ({ ...f, pieces_planned: e.target.value }))} />
-              </div>
-              <div className="space-y-1">
-                <Label>قطع مقصوصة *</Label>
-                <Input type="number" value={cutForm.pieces_cut} onChange={e => setCutForm(f => ({ ...f, pieces_cut: e.target.value }))} />
-              </div>
+              <Input type="number" placeholder="متراج مخطط" value={cutForm.meters_planned} onChange={e => setCutForm(f => ({ ...f, meters_planned: e.target.value }))} />
+              <Input type="number" placeholder="متراج فعلي *" value={cutForm.meters_actual} onChange={e => setCutForm(f => ({ ...f, meters_actual: e.target.value }))} />
+              <Input type="number" placeholder="قطع مخططة" value={cutForm.pieces_planned} onChange={e => setCutForm(f => ({ ...f, pieces_planned: e.target.value }))} />
+              <Input type="number" placeholder="قطع مقصوصة *" value={cutForm.pieces_cut} onChange={e => setCutForm(f => ({ ...f, pieces_cut: e.target.value }))} />
             </div>
-            <Textarea placeholder="ملاحظات القص..." value={cutForm.notes} onChange={e => setCutForm(f => ({ ...f, notes: e.target.value }))} />
           </div>
-          <DialogFooter>
-            <Button onClick={recordCutting}><ClipboardList className="w-4 h-4 ml-1" />حفظ القص</Button>
-          </DialogFooter>
+          <DialogFooter><Button onClick={recordCutting}><ClipboardList className="w-4 h-4 ml-1" />حفظ</Button></DialogFooter>
         </DialogContent>
       </Dialog>
 
-      {/* Advance stage */}
       <Dialog open={advanceOpen} onOpenChange={setAdvanceOpen}>
         <DialogContent className="max-w-md" dir="rtl">
-          <DialogHeader><DialogTitle>نقل مرحلة الإنتاج</DialogTitle></DialogHeader>
+          <DialogHeader><DialogTitle>نقل مرحلة</DialogTitle></DialogHeader>
           <div className="space-y-3">
-            <div className="space-y-1">
-              <Label>إلى مرحلة</Label>
-              <Select value={advanceForm.to_stage} onValueChange={v => setAdvanceForm(f => ({ ...f, to_stage: v }))}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  {STAGES.map(s => (
-                    <SelectItem key={s.id} value={s.id}>{s.label}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="grid grid-cols-2 gap-2">
-              <div className="space-y-1">
-                <Label>الكمية</Label>
-                <Input type="number" value={advanceForm.quantity} onChange={e => setAdvanceForm(f => ({ ...f, quantity: e.target.value }))} />
+            <Select value={advanceForm.to_stage} onValueChange={v => setAdvanceForm(f => ({ ...f, to_stage: v }))}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                {STAGES.map(s => <SelectItem key={s.id} value={s.id}>{s.label}</SelectItem>)}
+              </SelectContent>
+            </Select>
+            {(advanceForm.to_stage === 'delivery' || advanceForm.to_stage === 'completed') && (
+              <div className="text-xs bg-emerald-500/10 border border-emerald-500/30 rounded-lg p-2 text-emerald-800">
+                سيتم إنشاء فاتورة بيع تلقائياً وربطها بالأمر.
               </div>
-              {(advanceForm.to_stage === 'quality' || advanceForm.to_stage === 'laundry_out') && (
-                <>
-                  <div className="space-y-1">
-                    <Label>نجاح جودة</Label>
-                    <Input type="number" value={advanceForm.qc_pass} onChange={e => setAdvanceForm(f => ({ ...f, qc_pass: e.target.value }))} />
-                  </div>
-                  <div className="space-y-1">
-                    <Label>رفض جودة</Label>
-                    <Input type="number" value={advanceForm.qc_fail} onChange={e => setAdvanceForm(f => ({ ...f, qc_fail: e.target.value }))} />
-                  </div>
-                </>
-              )}
-              {(advanceForm.to_stage === 'laundry_out' || advanceForm.to_stage === 'laundry_in') && (
-                <div className="col-span-2 space-y-1">
-                  <Label>مرجع المغسلة</Label>
-                  <Input value={advanceForm.laundry_ref} onChange={e => setAdvanceForm(f => ({ ...f, laundry_ref: e.target.value }))} />
-                </div>
-              )}
-            </div>
-            <Textarea placeholder="ملاحظات..." value={advanceForm.notes} onChange={e => setAdvanceForm(f => ({ ...f, notes: e.target.value }))} />
+            )}
+            <Input type="number" placeholder="الكمية" value={advanceForm.quantity} onChange={e => setAdvanceForm(f => ({ ...f, quantity: e.target.value }))} />
+            <Textarea placeholder="ملاحظات" value={advanceForm.notes} onChange={e => setAdvanceForm(f => ({ ...f, notes: e.target.value }))} />
           </div>
-          <DialogFooter>
-            <Button onClick={advanceStage}>تأكيد النقل</Button>
-          </DialogFooter>
+          <DialogFooter><Button onClick={advanceStage}>تأكيد</Button></DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={costOpen} onOpenChange={setCostOpen}>
+        <DialogContent className="max-w-md" dir="rtl">
+          <DialogHeader><DialogTitle>تكلفة مرحلة إنتاجية</DialogTitle></DialogHeader>
+          <div className="space-y-3">
+            <Select value={costForm.stage} onValueChange={v => setCostForm(f => ({ ...f, stage: v }))}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>{STAGES.map(s => <SelectItem key={s.id} value={s.id}>{s.label}</SelectItem>)}</SelectContent>
+            </Select>
+            <Select value={costForm.cost_type} onValueChange={v => setCostForm(f => ({ ...f, cost_type: v }))}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>{COST_TYPES.map(t => <SelectItem key={t.id} value={t.id}>{t.label}</SelectItem>)}</SelectContent>
+            </Select>
+            <div className="grid grid-cols-2 gap-2">
+              <Input type="number" placeholder="الكمية" value={costForm.quantity} onChange={e => setCostForm(f => ({ ...f, quantity: e.target.value }))} />
+              <Input type="number" placeholder="تكلفة الوحدة" value={costForm.unit_cost} onChange={e => setCostForm(f => ({ ...f, unit_cost: e.target.value }))} />
+            </div>
+            <Input placeholder="جهة / مركز تكلفة" value={costForm.vendor_name} onChange={e => setCostForm(f => ({ ...f, vendor_name: e.target.value }))} />
+            <Textarea placeholder="ملاحظات" value={costForm.notes} onChange={e => setCostForm(f => ({ ...f, notes: e.target.value }))} />
+          </div>
+          <DialogFooter><Button onClick={saveCost}>حفظ التكلفة</Button></DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={outOpen} onOpenChange={setOutOpen}>
+        <DialogContent className="max-w-md" dir="rtl">
+          <DialogHeader><DialogTitle>إرسال مرحلة لتصنيع خارجي</DialogTitle></DialogHeader>
+          <div className="space-y-3">
+            <p className="text-[11px] text-muted-foreground">لو مرحلة معينة مكلفة داخلياً، أرسلها لورشة خارجية وتابع الاستلام والتكلفة هنا.</p>
+            <Select value={outForm.stage} onValueChange={v => setOutForm(f => ({ ...f, stage: v }))}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>{STAGES.filter(s => !['fabric_receipt','completed'].includes(s.id)).map(s => <SelectItem key={s.id} value={s.id}>{s.label}</SelectItem>)}</SelectContent>
+            </Select>
+            <Input placeholder="اسم الورشة / المصنع *" value={outForm.vendor_name} onChange={e => setOutForm(f => ({ ...f, vendor_name: e.target.value }))} />
+            <Input placeholder="هاتف" value={outForm.vendor_phone} onChange={e => setOutForm(f => ({ ...f, vendor_phone: e.target.value }))} />
+            <div className="grid grid-cols-2 gap-2">
+              <Input type="number" placeholder="كمية مرسلة *" value={outForm.qty_sent} onChange={e => setOutForm(f => ({ ...f, qty_sent: e.target.value }))} />
+              <Input type="number" placeholder="تكلفة القطعة" value={outForm.unit_cost} onChange={e => setOutForm(f => ({ ...f, unit_cost: e.target.value }))} />
+              <Input type="date" value={outForm.due_date} onChange={e => setOutForm(f => ({ ...f, due_date: e.target.value }))} />
+              <Input placeholder="مرجع خارجي" value={outForm.external_ref} onChange={e => setOutForm(f => ({ ...f, external_ref: e.target.value }))} />
+            </div>
+          </div>
+          <DialogFooter><Button onClick={createOutsourcing}>إرسال + تسجيل تكلفة</Button></DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={recvOpen} onOpenChange={setRecvOpen}>
+        <DialogContent className="max-w-sm" dir="rtl">
+          <DialogHeader><DialogTitle>استلام من التصنيع الخارجي</DialogTitle></DialogHeader>
+          <div className="space-y-3">
+            <Input type="number" placeholder="كمية مستلمة" value={recvForm.qty_received} onChange={e => setRecvForm(f => ({ ...f, qty_received: e.target.value }))} />
+            <Input type="number" placeholder="مرفوض" value={recvForm.qty_rejected} onChange={e => setRecvForm(f => ({ ...f, qty_rejected: e.target.value }))} />
+            <Textarea placeholder="ملاحظات" value={recvForm.notes} onChange={e => setRecvForm(f => ({ ...f, notes: e.target.value }))} />
+          </div>
+          <DialogFooter><Button onClick={receiveOutsourcing}>تأكيد الاستلام</Button></DialogFooter>
         </DialogContent>
       </Dialog>
     </div>
