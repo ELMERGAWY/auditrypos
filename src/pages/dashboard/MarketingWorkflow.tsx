@@ -136,7 +136,10 @@ export function MarketingWorkflow({ restaurantId, currency }: Props) {
         
         if (error) {
           console.error('Error creating default stages:', error);
-          toast.error('خطأ في إنشاء المراحل الافتراضية');
+          // Ignore race/duplicate — stages for another restaurant or concurrent call
+          if (!String(error.message || '').includes('duplicate key')) {
+            toast.error('خطأ في إنشاء المراحل الافتراضية');
+          }
         } else {
           toast.success('تم إنشاء المراحل الافتراضية بنجاح');
         }
