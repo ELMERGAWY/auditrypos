@@ -3,7 +3,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import {
-  Mail, Shield, ArrowRight, User, Building2, KeyRound, Briefcase,
+  Mail, Shield, ArrowRight, User, Building2, Briefcase,
   Link2, Lock, Eye, EyeOff, ArrowLeft,
 } from 'lucide-react';
 import { Card } from '@/components/ui/card';
@@ -20,7 +20,6 @@ type PendingPayload = {
   mode: 'login' | 'register';
   email: string;
   staffName: string;
-  companyCode: string;
   companyHint: string;
   requestedRole: string;
 };
@@ -53,7 +52,6 @@ export default function StaffLogin() {
   const [showPassword, setShowPassword] = useState(false);
   const [otp, setOtp] = useState('');
   const [staffName, setStaffName] = useState('');
-  const [companyCode, setCompanyCode] = useState('');
   const [companyHint, setCompanyHint] = useState('');
   const [requestedRole, setRequestedRole] = useState('cashier');
   const [loading, setLoading] = useState(false);
@@ -72,7 +70,6 @@ export default function StaffLogin() {
       user?.email ||
       email.trim();
     const role = pending?.requestedRole || requestedRole;
-    const join = (pending?.companyCode || companyCode).trim() || null;
     const hint = (pending?.companyHint || companyHint).trim() || null;
     const mail = (pending?.email || email || user?.email || '').trim();
 
@@ -81,7 +78,7 @@ export default function StaffLogin() {
         const { data: reqId, error: reqErr } = await supabase.rpc('submit_staff_access_request', {
           p_full_name: displayName,
           p_requested_role: role,
-          p_join_code: join,
+          p_join_code: null,
           p_company_hint: hint,
         });
         if (reqErr) {
@@ -131,7 +128,7 @@ export default function StaffLogin() {
       setLoading(false);
       finishing.current = false;
     }
-  }, [mode, staffName, email, requestedRole, companyCode, companyHint, navigate]);
+  }, [mode, staffName, email, requestedRole, companyHint, navigate]);
 
   // Magic link return (optional path)
   useEffect(() => {
@@ -177,13 +174,9 @@ export default function StaffLogin() {
           </Select>
         </div>
         <div>
-          <label className="text-xs font-bold flex items-center gap-1 mb-1"><KeyRound className="w-3 h-3" /> كود انضمام الشركة</label>
-          <Input dir="ltr" placeholder="ABCD1234" value={companyCode} onChange={e => setCompanyCode(e.target.value.toUpperCase())} />
-          <p className="text-[10px] text-muted-foreground mt-1">اطلب الكود من أدمن شركتك (تاب الموظفين ← موافقات الدخول).</p>
-        </div>
-        <div>
           <label className="text-xs font-bold flex items-center gap-1 mb-1"><Building2 className="w-3 h-3" /> اسم الشركة (اختياري)</label>
-          <Input placeholder="للتسهيل على السوبر أدمن" value={companyHint} onChange={e => setCompanyHint(e.target.value)} />
+          <Input placeholder="مثال: شركة النور — يسهّل على الأدمن قبولك" value={companyHint} onChange={e => setCompanyHint(e.target.value)} />
+          <p className="text-[10px] text-muted-foreground mt-1">لن تدخل النظام إلا بعد موافقة أدمن شركتك.</p>
         </div>
       </>
     );
@@ -250,7 +243,6 @@ export default function StaffLogin() {
       mode,
       email: email.trim().toLowerCase(),
       staffName: staffName.trim(),
-      companyCode: companyCode.trim(),
       companyHint: companyHint.trim(),
       requestedRole,
     });
@@ -286,7 +278,6 @@ export default function StaffLogin() {
       mode,
       email: email.trim().toLowerCase(),
       staffName: staffName.trim(),
-      companyCode: companyCode.trim(),
       companyHint: companyHint.trim(),
       requestedRole,
     });

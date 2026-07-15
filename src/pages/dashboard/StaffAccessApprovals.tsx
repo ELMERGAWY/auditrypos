@@ -1,6 +1,6 @@
 // @ts-nocheck
 import { useEffect, useState } from 'react';
-import { CheckCircle2, XCircle, RefreshCw, KeyRound, Copy, UserPlus } from 'lucide-react';
+import { CheckCircle2, XCircle, RefreshCw, UserPlus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card } from '@/components/ui/card';
@@ -26,7 +26,6 @@ export function StaffAccessApprovals({ restaurantId, superAdmin }: Props) {
   const [loading, setLoading] = useState(true);
   const [requests, setRequests] = useState<any[]>([]);
   const [companies, setCompanies] = useState<any[]>([]);
-  const [joinCode, setJoinCode] = useState('');
   const [companyId, setCompanyId] = useState<string | null>(null);
   const [roleByReq, setRoleByReq] = useState<Record<string, string>>({});
   const [extraCompanies, setExtraCompanies] = useState<Record<string, string[]>>({});
@@ -35,34 +34,23 @@ export function StaffAccessApprovals({ restaurantId, superAdmin }: Props) {
     setLoading(true);
     try {
       let cid: string | null = null;
-      let code = '';
 
       if (restaurantId && !superAdmin) {
         const { data: rest } = await supabase
           .from('restaurants')
-          .select('company_id, companies:company_id(id, name, join_code)')
+          .select('company_id')
           .eq('id', restaurantId)
           .maybeSingle();
         cid = rest?.company_id || null;
-        code = (rest as any)?.companies?.join_code || '';
-        if (cid && !code) {
-          const { data: c } = await supabase.from('companies').select('id, join_code, name').eq('id', cid).maybeSingle();
-          code = c?.join_code || '';
-          if (c && !c.join_code) {
-            const newCode = Math.random().toString(36).slice(2, 10).toUpperCase();
-            await supabase.from('companies').update({ join_code: newCode }).eq('id', cid);
-            code = newCode;
-          }
-        }
         setCompanyId(cid);
-        setJoinCode(code);
       }
 
       if (superAdmin) {
-        const { data: allCos } = await supabase.from('companies').select('id, name, join_code').order('name');
+        const { data: allCos } = await supabase.from('companies').select('id, name').order('name');
         setCompanies(allCos || []);
       }
 
+      // Pending: assigned to this company OR unassigned (admin will bind on approve)
       let q = supabase
         .from('staff_access_requests')
         .select('*')
@@ -76,16 +64,7 @@ export function StaffAccessApprovals({ restaurantId, superAdmin }: Props) {
       const { data, error } = await q;
       if (error) throw error;
 
-      let list = data || [];
-      if (!superAdmin && code) {
-        list = list.filter(
-          (r) =>
-            r.company_id === cid ||
-            (r.company_id == null && (r.join_code || '').toUpperCase() === code.toUpperCase())
-        );
-      } else if (!superAdmin && cid) {
-        list = list.filter((r) => r.company_id === cid);
-      }
+      const list = data || [];
       setRequests(list);
       const roles: Record<string, string> = {};
       list.forEach((r) => { roles[r.id] = r.requested_role || 'cashier'; });
@@ -143,38 +122,22 @@ export function StaffAccessApprovals({ restaurantId, superAdmin }: Props) {
     load();
   };
 
-  const copyCode = () => {
-    if (!joinCode) return;
-    navigator.clipboard?.writeText(joinCode);
-    toast.success('تم نسخ كود الانضمام');
-  };
-
   return (
     <div className="space-y-4" dir="rtl">
-      {!superAdmin && (
-        <Card className="p-4 flex flex-wrap items-center justify-between gap-3 border-primary/20 bg-primary/5">
-          <div>
-            <p className="text-xs text-muted-foreground font-bold flex items-center gap-1">
-              <KeyRound className="w-3.5 h-3.5" /> كود انضمام الموظفين للشركة
-            </p>
-            <p className="text-2xl font-black tracking-widest font-mono mt-1" dir="ltr">{joinCode || '—'}</p>
-            <p className="text-[10px] text-muted-foreground mt-1">أعطِ هذا الكود للموظف عند التسجيل من /staff-login</p>
-          </div>
-          <div className="flex gap-2">
-            <Button variant="outline" size="sm" onClick={copyCode} disabled={!joinCode}><Copy className="w-3 h-3 ml-1" /> نسخ</Button>
-            <Button variant="ghost" size="sm" onClick={load}><RefreshCw className="w-3 h-3" /></Button>
-          </div>
-        </Card>
-      )}
-
       <div className="flex items-center justify-between">
         <h3 className="font-bold flex items-center gap-2">
           <UserPlus className="w-4 h-4 text-primary" />
           طلبات انضمام بانتظار الموافقة
           <Badge variant="secondary">{requests.length}</Badge>
         </h3>
-        {superAdmin && <Button variant="ghost" size="sm" onClick={load}><RefreshCw className="w-3 h-3" /></Button>}
+        <Button variant="ghost" size="sm" onClick={load}><RefreshCw className="w-3 h-3" /></Button>
       </div>
+
+      {!superAdmin && (
+        <p className="text-xs text-muted-foreground">
+          الموظف يسجّل من /staff-login ثم يظهر هنا للموافقة. عند الموافقة يُضم تلقائياً لشركتك.
+        </p>
+      )}
 
       {loading ? (
         <p className="text-sm text-muted-foreground text-center py-6">جاري التحميل...</p>
@@ -190,8 +153,7 @@ export function StaffAccessApprovals({ restaurantId, superAdmin }: Props) {
                   <p className="text-xs text-muted-foreground" dir="ltr">{req.email}</p>
                   <p className="text-[10px] text-muted-foreground mt-1">
                     {new Date(req.created_at).toLocaleString('ar-EG')}
-                    {req.join_code ? ` · كود: ${req.join_code}` : ''}
-                    {req.company_hint ? ` · تلميح: ${req.company_hint}` : ''}
+                    {req.company_hint ? ` · الشركة المذكورة: ${req.company_hint}` : ''}
                   </p>
                 </div>
                 <Badge>{ROLE_LABELS[req.requested_role] || req.requested_role}</Badge>
