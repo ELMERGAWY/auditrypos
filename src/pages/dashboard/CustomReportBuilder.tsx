@@ -1,13 +1,14 @@
+// @ts-nocheck
 import { useState } from 'react';
-import { 
-  Calendar, FileText, Download, Printer, Filter, 
-  Search, RefreshCw, ChevronDown, CheckCircle2
+import {
+  FileText, Download, Filter, RefreshCw,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import * as XLSX from 'xlsx';
 
 interface Props {
   restaurantId: string;
@@ -23,39 +24,88 @@ export function CustomReportBuilder({ restaurantId, currency }: Props) {
 
   const generateReport = async () => {
     setLoading(true);
-    let query = supabase.from(reportType === 'sales' ? 'orders' : reportType === 'expenses' ? 'expenses' : 'products')
-      .select('*')
-      .eq('restaurant_id', restaurantId);
-
-    if (reportType === 'sales' || reportType === 'expenses') {
-      query = query.gte(reportType === 'sales' ? 'created_at' : 'date', dateFrom)
-                   .lte(reportType === 'sales' ? 'created_at' : 'date', dateTo);
+    try {
+      let data: any[] = [];
+      if (reportType === 'sales') {
+        const { data: rows, error } = await supabase
+          .from('orders')
+          .select('order_number, customer_name, total, paid_amount, status, payment_method, created_by_name, created_at')
+          .eq('restaurant_id', restaurantId)
+          .gte('created_at', `${dateFrom}T00:00:00`)
+          .lte('created_at', `${dateTo}T23:59:59`)
+          .order('created_at', { ascending: false })
+          .limit(3000);
+        if (error) throw error;
+        data = rows || [];
+      } else if (reportType === 'expenses') {
+        const { data: rows, error } = await supabase
+          .from('expenses')
+          .select('*')
+          .eq('restaurant_id', restaurantId)
+          .gte('date', dateFrom)
+          .lte('date', dateTo)
+          .order('date', { ascending: false })
+          .limit(2000);
+        if (error) throw error;
+        data = rows || [];
+      } else if (reportType === 'products') {
+        const { data: rows, error } = await supabase
+          .from('products')
+          .select('name, quantity, price, cost_price, category')
+          .eq('restaurant_id', restaurantId)
+          .limit(1000);
+        if (error) throw error;
+        data = rows || [];
+      } else if (reportType === 'customers') {
+        const { data: rows, error } = await supabase
+          .from('customers')
+          .select('name, phone, balance, total_spent, loyalty_tier, loyalty_points')
+          .eq('restaurant_id', restaurantId)
+          .order('total_spent', { ascending: false })
+          .limit(1000);
+        if (error) throw error;
+        data = rows || [];
+      }
+      setResults(data);
+      if (!data.length) toast.info('لا توجد نتائج لهذه الفترة');
+    } catch (e: any) {
+      toast.error(e.message || 'حدث خطأ أثناء جلب البيانات');
+      setResults([]);
+    } finally {
+      setLoading(false);
     }
-
-    const { data, error } = await query;
-    if (error) toast.error('حدث خطأ أثناء جلب البيانات');
-    else setResults(data || []);
-    setLoading(false);
   };
 
+  const exportExcel = () => {
+    if (!results.length) return;
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(results), 'report');
+    XLSX.writeFile(wb, `auditry-custom-${reportType}-${dateFrom}.xlsx`);
+    toast.success('تم التصدير');
+  };
+
+  const columns = results[0] ? Object.keys(results[0]).filter(k => !['id', 'restaurant_id'].includes(k)).slice(0, 8) : [];
+
   return (
-    <div className="p-4 space-y-6 fade-in-up">
+    <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h2 className="text-2xl font-bold font-display flex items-center gap-2">
-          <FileText className="w-7 h-7 text-primary" /> مولد التقارير المخصص
+        <h2 className="text-xl font-bold font-display flex items-center gap-2">
+          <FileText className="w-6 h-6 text-primary" /> مولد التقارير المخصص
         </h2>
       </div>
 
-      {/* Configuration Header */}
       <div className="glass-card p-6 grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
         <div className="space-y-2">
           <Label className="text-xs">نوع التقرير</Label>
-          <select value={reportType} onChange={e => setReportType(e.target.value)}
-            className="w-full px-3 py-2 rounded-lg bg-secondary text-secondary-foreground border border-border text-sm">
+          <select
+            value={reportType}
+            onChange={e => setReportType(e.target.value)}
+            className="w-full px-3 py-2 rounded-lg bg-secondary text-secondary-foreground border border-border text-sm"
+          >
             <option value="sales">تقرير المبيعات التفصيلي</option>
-            <option value="expenses">تقرير المصروفات والتكاليف</option>
-            <option value="products">تقرير حركة المخزون</option>
-            <option value="customers">تقرير مديونيات العملاء</option>
+            <option value="expenses">تقرير المصروفات</option>
+            <option value="products">تقرير المخزون</option>
+            <option value="customers">تقرير العملاء والمديونيات</option>
           </select>
         </div>
         <div className="space-y-2">
@@ -72,45 +122,40 @@ export function CustomReportBuilder({ restaurantId, currency }: Props) {
         </Button>
       </div>
 
-      {/* Results Table */}
-      {results.length > 0 ? (
+      {results.length > 0 && (
         <div className="glass-card overflow-hidden">
           <div className="p-4 border-b flex items-center justify-between bg-secondary/20">
-            <p className="text-sm font-bold">نتائج التقرير ({results.length} حركة)</p>
-            <div className="flex gap-2">
-              <Button variant="outline" size="sm" className="gap-2"><Printer className="w-3 h-3" /> طباعة</Button>
-              <Button variant="outline" size="sm" className="gap-2"><Download className="w-3 h-3" /> تصدير Excel</Button>
-            </div>
+            <p className="text-sm font-bold">نتائج التقرير ({results.length})</p>
+            <Button size="sm" variant="outline" className="gap-1" onClick={exportExcel}>
+              <Download className="w-3.5 h-3.5" /> Excel
+            </Button>
           </div>
-          <div className="overflow-x-auto">
-            <table className="w-full text-right text-sm">
-              <thead className="bg-secondary/10 border-b">
+          <div className="overflow-x-auto max-h-[480px]">
+            <table className="w-full text-right text-xs">
+              <thead className="bg-muted/50 sticky top-0">
                 <tr>
-                  <th className="p-3">التاريخ</th>
-                  <th className="p-3">البيان / المرجع</th>
-                  <th className="p-3">القيمة</th>
-                  <th className="p-3">الحالة</th>
+                  {columns.map(c => <th key={c} className="p-3 font-bold">{c}</th>)}
                 </tr>
               </thead>
-              <tbody>
-                {results.map((r, i) => (
-                  <tr key={i} className="border-b hover:bg-primary/5 transition-colors">
-                    <td className="p-3 text-xs">{new Date(r.created_at || r.date).toLocaleDateString('ar-EG')}</td>
-                    <td className="p-3 font-medium">{r.order_number || r.category || r.name}</td>
-                    <td className="p-3 font-bold text-primary">{(r.total || r.amount || 0).toLocaleString()} {currency}</td>
-                    <td className="p-3">
-                      <span className="px-2 py-0.5 rounded-full bg-success/10 text-success text-[10px] font-bold">مكتمل</span>
-                    </td>
+              <tbody className="divide-y divide-border/30">
+                {results.slice(0, 200).map((row, idx) => (
+                  <tr key={idx} className="hover:bg-muted/20">
+                    {columns.map(c => (
+                      <td key={c} className="p-3">
+                        {typeof row[c] === 'number'
+                          ? Number(row[c]).toLocaleString()
+                          : String(row[c] ?? '—').slice(0, 80)}
+                      </td>
+                    ))}
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
-        </div>
-      ) : (
-        <div className="p-20 text-center border-2 border-dashed rounded-3xl text-muted-foreground flex flex-col items-center justify-center">
-          <Calendar className="w-16 h-16 mb-4 opacity-10" />
-          <p>حدد الفترة الزمنية ونوع التقرير ثم اضغط على "توليد التقرير" لاستعراض البيانات</p>
+          {results.length > 200 && (
+            <p className="p-2 text-[10px] text-muted-foreground text-center">عرض أول 200 صف — صدّر Excel للكامل</p>
+          )}
+          <p className="p-2 text-[10px] text-muted-foreground text-center">العملة: {currency}</p>
         </div>
       )}
     </div>

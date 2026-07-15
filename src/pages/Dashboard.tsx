@@ -51,7 +51,8 @@ const EmployeesTab = lazy(() => import('./dashboard/EmployeesTab').then(m => ({ 
 const NotificationsTab = lazy(() => import('./dashboard/NotificationsTab').then(m => ({ default: m.NotificationsTab })));
 const FinancialsTab = lazy(() => import('./dashboard/FinancialsTab').then(m => ({ default: m.FinancialsTab })));
 const OverheadManager = lazy(() => import('./dashboard/OverheadManager').then(m => ({ default: m.OverheadManager })));
-const AdvancedReportsHub = lazy(() => import('./dashboard/AuditryIntelligenceV3').then(m => ({ default: m.default })));
+const AdvancedReportsHub = lazy(() => import('./dashboard/StatsReportsHub').then(m => ({ default: m.default })));
+const StatsReportsHub = lazy(() => import('./dashboard/StatsReportsHub').then(m => ({ default: m.default })));
 const AIAccountantUnified = lazy(() => import('./dashboard/AIAccountantUnified').then(m => ({ default: m.default })));
 const TreasuryTab = lazy(() => import('./dashboard/TreasuryTab').then(m => ({ default: m.TreasuryTab })));
 const ChartOfAccountsTab = lazy(() => import('./dashboard/ChartOfAccountsTab').then(m => ({ default: m.ChartOfAccountsTab })));
@@ -996,7 +997,8 @@ export default function Dashboard() {
         
         {/* Advanced Tabs */}
         {activeTab === 'crm' && <AuditryCRM {...commonProps} businessType={businessType} />}
-        {activeTab === 'analytics' && <AdvancedReportsHub {...commonProps} onNavigate={setActiveTab} />}
+        {activeTab === 'stats' && <StatsReportsHub {...commonProps} businessType={businessType} onNavigate={setActiveTab} mode="stats" />}
+        {activeTab === 'analytics' && <AdvancedReportsHub {...commonProps} businessType={businessType} onNavigate={setActiveTab} mode="analytics" />}
         {activeTab === 'ai_assistant' && <AIAccountantUnified {...commonProps} />}
         {activeTab === 'loyalty' && <LoyaltyPoints {...commonProps} />}
         {activeTab === 'gift_cards' && <GiftCards {...commonProps} />}

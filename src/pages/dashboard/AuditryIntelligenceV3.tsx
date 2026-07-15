@@ -117,11 +117,11 @@ export default function AuditryIntelligenceV3({ restaurantId, currency, onNaviga
       const inventoryValue = (bsDataResult as BalanceSheetReport)?.assets?.current?.inventory || 0;
 
       setQuickStats([
-        { label: 'إجمالي الإيرادات', value: totalRevenue, change: 12.5, trend: 'up', format: 'currency' },
-        { label: 'صافي الربح', value: netProfit, change: netProfit > 0 ? 8.3 : -8.3, trend: netProfit > 0 ? 'up' : 'down', format: 'currency' },
+        { label: 'إجمالي الإيرادات', value: totalRevenue, format: 'currency' },
+        { label: 'صافي الربح', value: netProfit, trend: netProfit > 0 ? 'up' : netProfit < 0 ? 'down' : 'neutral', format: 'currency' },
         { label: 'رصيد الخزينة والبنوك', value: treasuryTotal, format: 'currency' },
-        { label: 'مديونيات العملاء', value: receivables, trend: 'up', format: 'currency' },
-        { label: 'مستحقات الموردين', value: payables, trend: 'down', format: 'currency' },
+        { label: 'مديونيات العملاء', value: receivables, format: 'currency' },
+        { label: 'مستحقات الموردين', value: payables, format: 'currency' },
         { label: 'قيمة المخزون', value: inventoryValue, format: 'currency' }
       ]);
 
