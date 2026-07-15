@@ -1,0 +1,20 @@
+<!--
+  انسخ هذا القالب إلى Supabase Dashboard:
+  Authentication → Email Templates → Magic Link
+
+  بعد الحفظ، الرسالة ستحتوي على رمز OTP من 6 أرقام يمكن إدخاله في /staff-login
+  بالإضافة للرابط الاحتياطي.
+-->
+<div style="font-family: Tahoma, Arial, sans-serif; direction: rtl; text-align: right; max-width: 520px; margin: 0 auto; padding: 24px; color: #0f172a;">
+  <h2 style="margin: 0 0 12px;">رمز دخول الموظف — Auditry</h2>
+  <p style="margin: 0 0 16px; color: #475569;">استخدم الرمز التالي لإكمال الدخول أو التسجيل:</p>
+  <p style="font-size: 32px; font-weight: 800; letter-spacing: 8px; text-align: center; background: #f1f5f9; padding: 16px; border-radius: 12px; direction: ltr;">
+    {{ .Token }}
+  </p>
+  <p style="margin: 16px 0 8px; color: #64748b; font-size: 13px;">الرمز صالح لمدة ساعة تقريباً.</p>
+  <p style="margin: 0 0 8px; color: #64748b; font-size: 13px;">أو يمكنك فتح الرابط التالي مباشرة:</p>
+  <p style="word-break: break-all;">
+    <a href="{{ .ConfirmationURL }}">تأكيد وتسجيل الدخول</a>
+  </p>
+  <p style="margin-top: 24px; font-size: 12px; color: #94a3b8;">إذا لم تطلب هذا الرمز، تجاهل الرسالة.</p>
+</div>

@@ -1,8 +1,8 @@
 // @ts-nocheck
-import { useState } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Mail, Shield, ArrowRight, User, Building2, KeyRound, Briefcase } from 'lucide-react';
+import { Mail, Shield, ArrowRight, User, Building2, KeyRound, Briefcase, Link2 } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -11,10 +11,33 @@ import { supabase } from '@/integrations/supabase/client';
 import { persistActor } from '@/lib/actor';
 import { toast } from 'sonner';
 
+const PENDING_KEY = 'auditry_staff_pending';
+
+type PendingPayload = {
+  mode: 'login' | 'register';
+  email: string;
+  staffName: string;
+  companyCode: string;
+  companyHint: string;
+  requestedRole: string;
+};
+
+function savePending(p: PendingPayload) {
+  try { sessionStorage.setItem(PENDING_KEY, JSON.stringify(p)); } catch {}
+}
+function loadPending(): PendingPayload | null {
+  try {
+    const raw = sessionStorage.getItem(PENDING_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch { return null; }
+}
+function clearPending() {
+  try { sessionStorage.removeItem(PENDING_KEY); } catch {}
+}
+
 /**
- * Staff auth via Email OTP (free — no SMS).
- * First-time registration creates a pending access request;
- * company admin or super admin must approve once.
+ * Staff auth: Email OTP when template shows {{ .Token }},
+ * or Magic Link click (Lovable default) — both supported.
  */
 export default function StaffLogin() {
   const navigate = useNavigate();
@@ -27,17 +50,130 @@ export default function StaffLogin() {
   const [companyHint, setCompanyHint] = useState('');
   const [requestedRole, setRequestedRole] = useState('cashier');
   const [loading, setLoading] = useState(false);
+  const finishing = useRef(false);
+
+  const finishAfterAuth = useCallback(async (user: any) => {
+    if (finishing.current) return;
+    finishing.current = true;
+    setLoading(true);
+
+    const pending = loadPending();
+    const useMode = pending?.mode || mode;
+    const displayName =
+      (pending?.staffName || staffName).trim() ||
+      user?.user_metadata?.full_name ||
+      user?.email ||
+      email.trim();
+    const role = pending?.requestedRole || requestedRole;
+    const join = (pending?.companyCode || companyCode).trim() || null;
+    const hint = (pending?.companyHint || companyHint).trim() || null;
+    const mail = (pending?.email || email || user?.email || '').trim();
+
+    try {
+      if (useMode === 'register') {
+        const { data: reqId, error: reqErr } = await supabase.rpc('submit_staff_access_request', {
+          p_full_name: displayName,
+          p_requested_role: role,
+          p_join_code: join,
+          p_company_hint: hint,
+        });
+        if (reqErr) {
+          toast.error('تم الدخول لكن فشل إرسال طلب الانضمام: ' + reqErr.message);
+          return;
+        }
+        persistActor(displayName, mail);
+        clearPending();
+        if (reqId === null) {
+          toast.success(`أهلاً ${displayName} — حسابك مفعّل مسبقاً`);
+          navigate('/dashboard');
+          return;
+        }
+        toast.success('تم إرسال طلب الانضمام. بانتظار موافقة أدمن الشركة (مرة واحدة فقط).');
+        await supabase.auth.signOut();
+        setStep('email');
+        setMode('login');
+        setOtp('');
+        return;
+      }
+
+      const { data: access, error: accessErr } = await supabase.rpc('get_my_staff_access');
+      if (accessErr) {
+        toast.error(accessErr.message);
+        return;
+      }
+      const row = Array.isArray(access) ? access[0] : access;
+      const name = row?.full_name || displayName;
+      persistActor(name, mail);
+      clearPending();
+
+      if (row?.has_access) {
+        toast.success(`أهلاً ${name}`);
+        navigate('/dashboard');
+        return;
+      }
+      if (row?.pending_request) {
+        toast.info('حسابك بانتظار موافقة الأدمن — سجّل الدخول مجدداً بعد التفعيل.');
+        await supabase.auth.signOut();
+        return;
+      }
+      toast.info('لا توجد عضوية نشطة. أكمل طلب الانضمام.');
+      setMode('register');
+      setStep('email');
+      setStaffName(name);
+      if (mail) setEmail(mail);
+    } finally {
+      setLoading(false);
+      finishing.current = false;
+    }
+  }, [mode, staffName, email, requestedRole, companyCode, companyHint, navigate]);
+
+  // Magic link / recovery: session restored after clicking Lovable email link
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      // Parse hash tokens if present (supabase-js usually does this automatically)
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!alive) return;
+      if (session?.user && loadPending()) {
+        toast.success('تم التحقق من الرابط');
+        await finishAfterAuth(session.user);
+      }
+    })();
+
+    const { data: sub } = supabase.auth.onAuthStateChange((event, session) => {
+      if ((event === 'SIGNED_IN' || event === 'PASSWORD_RECOVERY') && session?.user && loadPending()) {
+        finishAfterAuth(session.user);
+      }
+    });
+    return () => {
+      alive = false;
+      sub.subscription.unsubscribe();
+    };
+  }, [finishAfterAuth]);
 
   const sendOtp = async () => {
     if (!email.trim()) return toast.error('اكتب البريد الإلكتروني');
     if (mode === 'register' && !staffName.trim()) return toast.error('اكتب اسمك الكامل');
-    setLoading(true);
-    const { error } = await supabase.auth.signInWithOtp({
+
+    const pending: PendingPayload = {
+      mode,
       email: email.trim().toLowerCase(),
+      staffName: staffName.trim(),
+      companyCode: companyCode.trim(),
+      companyHint: companyHint.trim(),
+      requestedRole,
+    };
+    savePending(pending);
+
+    setLoading(true);
+    const redirectTo = `${window.location.origin}/staff-login`;
+    const { error } = await supabase.auth.signInWithOtp({
+      email: pending.email,
       options: {
         shouldCreateUser: true,
+        emailRedirectTo: redirectTo,
         data: {
-          full_name: staffName.trim() || undefined,
+          full_name: pending.staffName || undefined,
           role: 'staff',
           pending_approval: true,
         },
@@ -45,85 +181,48 @@ export default function StaffLogin() {
     });
     setLoading(false);
     if (error) {
-      toast.error(error.message || 'فشل إرسال الرمز');
+      toast.error(error.message || 'فشل إرسال رسالة التحقق');
       return;
     }
-    toast.success('تم إرسال رمز التحقق إلى بريدك');
+    toast.success('تم إرسال رسالة التحقق إلى بريدك');
     setStep('otp');
   };
 
   const verifyAndContinue = async () => {
-    if (!otp.trim() || otp.trim().length < 6) return toast.error('أدخل رمز التحقق (6 أرقام)');
+    if (!otp.trim() || otp.trim().length < 6) {
+      return toast.error('أدخل الرمز إن ظهر في الإيميل، أو افتح رابط التحقق من الرسالة');
+    }
     setLoading(true);
-    const { data, error } = await supabase.auth.verifyOtp({
+    savePending({
+      mode,
       email: email.trim().toLowerCase(),
-      token: otp.trim(),
-      type: 'email',
+      staffName: staffName.trim(),
+      companyCode: companyCode.trim(),
+      companyHint: companyHint.trim(),
+      requestedRole,
     });
-    if (error) {
-      setLoading(false);
-      toast.error(error.message || 'رمز غير صحيح');
-      return;
-    }
 
-    const user = data.user;
-    const displayName =
-      staffName.trim() ||
-      user?.user_metadata?.full_name ||
-      email.trim();
-
-    if (mode === 'register') {
-      const { data: reqId, error: reqErr } = await supabase.rpc('submit_staff_access_request', {
-        p_full_name: displayName,
-        p_requested_role: requestedRole,
-        p_join_code: companyCode.trim() || null,
-        p_company_hint: companyHint.trim() || null,
+    // Try email OTP token first, then magiclink token type
+    let user = null;
+    let lastErr = null;
+    for (const type of ['email', 'magiclink'] as const) {
+      const { data, error } = await supabase.auth.verifyOtp({
+        email: email.trim().toLowerCase(),
+        token: otp.trim(),
+        type,
       });
-      if (reqErr) {
-        setLoading(false);
-        toast.error('تم الدخول لكن فشل إرسال طلب الانضمام: ' + reqErr.message);
-        return;
+      if (!error && data?.user) {
+        user = data.user;
+        break;
       }
-      persistActor(displayName, email.trim());
+      lastErr = error;
+    }
+    if (!user) {
       setLoading(false);
-      if (reqId === null) {
-        toast.success(`أهلاً ${displayName} — حسابك مفعّل مسبقاً`);
-        navigate('/dashboard');
-        return;
-      }
-      toast.success('تم إرسال طلب الانضمام. بانتظار موافقة أدمن الشركة (مرة واحدة فقط).');
-      setStep('email');
-      setMode('login');
-      setOtp('');
+      toast.error(lastErr?.message || 'رمز غير صحيح — جرّب فتح رابط الإيميل مباشرة');
       return;
     }
-
-    // Login mode — check access
-    const { data: access, error: accessErr } = await supabase.rpc('get_my_staff_access');
-    setLoading(false);
-    if (accessErr) {
-      toast.error(accessErr.message);
-      return;
-    }
-    const row = Array.isArray(access) ? access[0] : access;
-    const name = row?.full_name || displayName;
-    persistActor(name, email.trim());
-
-    if (row?.has_access) {
-      toast.success(`أهلاً ${name}`);
-      navigate('/dashboard');
-      return;
-    }
-    if (row?.pending_request) {
-      toast.info('حسابك بانتظار موافقة الأدمن — يمكنك الانتظار ثم الدخول مجدداً بعد التفعيل.');
-      await supabase.auth.signOut();
-      return;
-    }
-    // No request yet — create one lightly
-    toast.info('لا توجد عضوية نشطة. سجّل طلب انضمام أولاً.');
-    setMode('register');
-    setStep('email');
-    setStaffName(name);
+    await finishAfterAuth(user);
   };
 
   return (
@@ -138,7 +237,7 @@ export default function StaffLogin() {
               {mode === 'login' ? 'دخول الموظف' : 'تسجيل موظف جديد'}
             </h1>
             <p className="text-xs text-muted-foreground">
-              دخول مجاني برمز يُرسل إلى الإيميل (OTP) — بدون رسائل SMS
+              تحقق عبر الإيميل مجاناً — رمز رقمي أو رابط دخول
             </p>
           </div>
 
@@ -166,7 +265,7 @@ export default function StaffLogin() {
                   <div>
                     <label className="text-xs font-bold flex items-center gap-1 mb-1"><KeyRound className="w-3 h-3" /> كود انضمام الشركة</label>
                     <Input dir="ltr" placeholder="ABCD1234" value={companyCode} onChange={e => setCompanyCode(e.target.value.toUpperCase())} />
-                    <p className="text-[10px] text-muted-foreground mt-1">اطلب الكود من أدمن شركتك (يظهر في تاب الموظفين).</p>
+                    <p className="text-[10px] text-muted-foreground mt-1">اطلب الكود من أدمن شركتك (تاب الموظفين ← موافقات الدخول).</p>
                   </div>
                   <div>
                     <label className="text-xs font-bold flex items-center gap-1 mb-1"><Building2 className="w-3 h-3" /> اسم الشركة (اختياري)</label>
@@ -179,14 +278,17 @@ export default function StaffLogin() {
                 <Input type="email" dir="ltr" placeholder="you@example.com" value={email} onChange={e => setEmail(e.target.value)} />
               </div>
               <Button className="w-full gap-2" onClick={sendOtp} disabled={loading}>
-                {loading ? 'جاري الإرسال...' : <>إرسال رمز التحقق <ArrowRight className="w-4 h-4" /></>}
+                {loading ? 'جاري الإرسال...' : <>إرسال رسالة التحقق <ArrowRight className="w-4 h-4" /></>}
               </Button>
             </div>
           ) : (
             <div className="space-y-3">
-              <p className="text-xs text-muted-foreground text-center">
-                أدخل الرمز المرسل إلى <span className="font-bold text-foreground" dir="ltr">{email}</span>
-              </p>
+              <div className="rounded-xl border border-amber-500/30 bg-amber-500/5 p-3 text-[11px] text-amber-900 dark:text-amber-100 space-y-1.5">
+                <p className="font-bold flex items-center gap-1"><Link2 className="w-3.5 h-3.5" /> تحقق من بريدك</p>
+                <p>1) إن وُجد <strong>رمز من 6 أرقام</strong> — أدخله بالأسفل.</p>
+                <p>2) إن وصل <strong>رابط دخول (Lovable)</strong> — افتحه في نفس المتصفح، وسيكتمل التسجيل تلقائياً.</p>
+              </div>
+              <p className="text-xs text-muted-foreground text-center" dir="ltr">{email}</p>
               <Input
                 dir="ltr"
                 className="text-center text-2xl tracking-[0.4em] font-mono h-14"
@@ -195,8 +297,8 @@ export default function StaffLogin() {
                 value={otp}
                 onChange={e => setOtp(e.target.value.replace(/\D/g, ''))}
               />
-              <Button className="w-full gap-2" onClick={verifyAndContinue} disabled={loading}>
-                {loading ? 'جاري التحقق...' : <>تأكيد والدخول <ArrowRight className="w-4 h-4" /></>}
+              <Button className="w-full gap-2" onClick={verifyAndContinue} disabled={loading || otp.length < 6}>
+                {loading ? 'جاري التحقق...' : <>تأكيد بالرمز <ArrowRight className="w-4 h-4" /></>}
               </Button>
               <Button variant="ghost" className="w-full text-xs" onClick={() => { setStep('email'); setOtp(''); }}>
                 تغيير البريد / إعادة الإرسال
@@ -213,7 +315,7 @@ export default function StaffLogin() {
           </Button>
 
           <p className="text-[10px] text-muted-foreground text-center">
-            اسمك يظهر على الطلبات والفواتير والسندات والأذون وأي تعديل تقوم به بعد موافقة الأدمن.
+            اسمك يظهر على الطلبات والفواتير والسندات بعد موافقة الأدمن.
           </p>
         </Card>
       </motion.div>
