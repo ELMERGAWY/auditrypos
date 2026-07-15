@@ -172,7 +172,7 @@ BEGIN
 
   v_limit := COALESCE(v_order.cutting_waste_limit_pct, 5);
   IF p_meters_planned > 0 THEN
-    v_waste_pct := ROUND(((GREATEST(p_meters_actual - p_meters_planned, 0) / p_meters_planned) * 100)::2);
+    v_waste_pct := ROUND(((GREATEST(p_meters_actual - p_meters_planned, 0) / p_meters_planned) * 100)::numeric, 2);
   ELSE
     v_waste_pct := 0;
   END IF;
