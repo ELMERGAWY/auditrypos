@@ -4,7 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import {
   Mail, Shield, ArrowRight, User, Building2, KeyRound, Briefcase,
-  Link2, Lock, Eye, EyeOff,
+  Link2, Lock, Eye, EyeOff, ArrowLeft,
 } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -431,10 +431,20 @@ export default function StaffLogin() {
             {mode === 'login' ? 'موظف جديد؟ سجّل واطلب الانضمام' : 'لديك حساب؟ تسجيل الدخول'}
           </Button>
 
-          <p className="text-[10px] text-muted-foreground text-center leading-relaxed">
-            بعد التسجيل الأول، يوافق أدmin الشركة من تاب الموظفين ← موافقات الدخول.
-            اسمك يظهر على الطلبات والفواتير والسندات.
-          </p>
+          <div className="border-t pt-4 space-y-2">
+            <Button
+              variant="outline"
+              className="w-full gap-2 text-sm"
+              onClick={() => navigate('/login')}
+            >
+              <ArrowLeft className="w-4 h-4" />
+              رجوع لدخول صاحب النشاط / الأدمن
+            </Button>
+            <p className="text-[10px] text-muted-foreground text-center leading-relaxed">
+              بعد التسجيل الأول، يوافق أدمن الشركة من تاب الموظفين ← موافقات الدخول.
+              اسمك يظهر على الطلبات والفواتير والسندات.
+            </p>
+          </div>
         </Card>
       </motion.div>
     </div>

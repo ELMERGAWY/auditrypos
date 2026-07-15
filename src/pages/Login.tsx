@@ -75,7 +75,7 @@ const Login = () => {
         </p>
         <p className="text-center text-xs text-muted-foreground mt-2">
           موظف؟{' '}
-          <button onClick={() => navigate('/staff-login')} className="text-primary hover:underline">دخول ببريدك وكود تحقق</button>
+          <button onClick={() => navigate('/staff-login')} className="text-primary hover:underline">دخول الموظفين</button>
         </p>
       </div>
     </div>
