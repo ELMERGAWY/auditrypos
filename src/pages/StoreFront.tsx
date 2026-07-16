@@ -327,9 +327,9 @@ const StoreFront = () => {
           })),
         p_customer_name: customerForm.name,
         p_customer_phone: customerForm.phone,
-        p_delivery_address: customerForm.address || null,
-        p_notes: customerForm.notes || null,
-        p_order_type: customerForm.address ? 'delivery' : 'takeaway',
+        p_delivery_address: customerForm.address || '',
+        p_notes: customerForm.notes || '',
+        p_order_type: customerForm.address && customerForm.address !== 'العنوان بالتفصيل' ? 'delivery' : 'takeaway',
       });
 
       if (error) throw new Error(error.message);

@@ -1,70 +1,99 @@
-import { useEffect, useRef, useCallback } from 'react';
+import { useCallback } from 'react';
 
-// Generate notification sounds using Web Audio API
-function playSound(type: 'order' | 'waiter') {
+// ──────────────────────────────────────────────
+// Helper: play a single tone burst
+// ──────────────────────────────────────────────
+function playTone(
+  ctx: AudioContext,
+  freq: number,
+  startTime: number,
+  duration: number,
+  gainPeak: number,
+  type: OscillatorType = 'sine'
+) {
+  const osc = ctx.createOscillator();
+  const gain = ctx.createGain();
+  osc.connect(gain);
+  gain.connect(ctx.destination);
+  osc.type = type;
+  osc.frequency.setValueAtTime(freq, startTime);
+  gain.gain.setValueAtTime(0, startTime);
+  gain.gain.linearRampToValueAtTime(gainPeak, startTime + 0.03);
+  gain.gain.setValueAtTime(gainPeak, startTime + duration - 0.05);
+  gain.gain.exponentialRampToValueAtTime(0.001, startTime + duration);
+  osc.start(startTime);
+  osc.stop(startTime + duration);
+}
+
+// ──────────────────────────────────────────────
+// NEW ORDER – loud urgent alarm (3 × ding-ding-DONG)
+// Total ≈ 2.4 s, near-max volume (gain 0.9)
+// ──────────────────────────────────────────────
+function playOrderAlarm() {
   try {
     const ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
-    const oscillator = ctx.createOscillator();
-    const gainNode = ctx.createGain();
-    
-    oscillator.connect(gainNode);
-    gainNode.connect(ctx.destination);
-    
-    if (type === 'order') {
-      // Two-tone ascending chime for new order
-      oscillator.type = 'sine';
-      oscillator.frequency.setValueAtTime(523, ctx.currentTime); // C5
-      oscillator.frequency.setValueAtTime(659, ctx.currentTime + 0.15); // E5
-      oscillator.frequency.setValueAtTime(784, ctx.currentTime + 0.3); // G5
-      gainNode.gain.setValueAtTime(0.3, ctx.currentTime);
-      gainNode.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.5);
-      oscillator.start(ctx.currentTime);
-      oscillator.stop(ctx.currentTime + 0.5);
-    } else {
-      // Bell-like sound for waiter call
-      oscillator.type = 'sine';
-      oscillator.frequency.setValueAtTime(880, ctx.currentTime); // A5
-      gainNode.gain.setValueAtTime(0.4, ctx.currentTime);
-      gainNode.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.15);
-      
-      // Second ring
-      const osc2 = ctx.createOscillator();
-      const gain2 = ctx.createGain();
-      osc2.connect(gain2);
-      gain2.connect(ctx.destination);
-      osc2.type = 'sine';
-      osc2.frequency.setValueAtTime(880, ctx.currentTime + 0.2);
-      gain2.gain.setValueAtTime(0, ctx.currentTime);
-      gain2.gain.setValueAtTime(0.4, ctx.currentTime + 0.2);
-      gain2.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.35);
-      osc2.start(ctx.currentTime + 0.2);
-      osc2.stop(ctx.currentTime + 0.4);
-      
-      // Third ring
-      const osc3 = ctx.createOscillator();
-      const gain3 = ctx.createGain();
-      osc3.connect(gain3);
-      gain3.connect(ctx.destination);
-      osc3.type = 'sine';
-      osc3.frequency.setValueAtTime(1047, ctx.currentTime + 0.45); // C6
-      gain3.gain.setValueAtTime(0, ctx.currentTime);
-      gain3.gain.setValueAtTime(0.35, ctx.currentTime + 0.45);
-      gain3.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.7);
-      osc3.start(ctx.currentTime + 0.45);
-      osc3.stop(ctx.currentTime + 0.7);
-      
-      oscillator.start(ctx.currentTime);
-      oscillator.stop(ctx.currentTime + 0.2);
+    const GAIN = 0.9;
+    const t = ctx.currentTime;
+
+    // Attention grabber square beep at the very start
+    playTone(ctx, 1047, t, 0.08, 0.75, 'square');
+
+    // 3 repetitions of: ding (C5) → ding (E5) → DONG (G5)
+    for (let rep = 0; rep < 3; rep++) {
+      const base = t + rep * 0.8;
+      playTone(ctx, 523, base,       0.18, GAIN, 'triangle'); // ding
+      playTone(ctx, 659, base + 0.2, 0.18, GAIN, 'triangle'); // ding
+      playTone(ctx, 784, base + 0.4, 0.35, GAIN, 'sine');     // DONG
     }
   } catch {
-    // Fallback: silent if AudioContext unavailable
+    // AudioContext not available
   }
 }
 
+// ──────────────────────────────────────────────
+// WAITER CALL – softer triple bell
+// ──────────────────────────────────────────────
+function playWaiterAlarm() {
+  try {
+    const ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
+    const t = ctx.currentTime;
+    for (let i = 0; i < 3; i++) {
+      playTone(ctx, 880, t + i * 0.22, 0.18, 0.5, 'sine');
+    }
+    playTone(ctx, 1047, t + 0.66, 0.25, 0.4, 'sine');
+  } catch {
+    // silent fallback
+  }
+}
+
+// ──────────────────────────────────────────────
+// Browser Notification helpers
+// ──────────────────────────────────────────────
+export async function requestNotificationPermission() {
+  if ('Notification' in window && Notification.permission === 'default') {
+    await Notification.requestPermission();
+  }
+}
+
+export function showBrowserNotification(title: string, body: string) {
+  if ('Notification' in window && Notification.permission === 'granted') {
+    const n = new Notification(title, {
+      body,
+      icon: '/favicon.ico',
+      requireInteraction: true, // stays on screen until dismissed
+      tag: 'new-order',
+    });
+    setTimeout(() => n.close(), 15000);
+  }
+}
+
+// ──────────────────────────────────────────────
+// Exported hooks
+// ──────────────────────────────────────────────
 export function useOrderNotificationSound() {
-  return useCallback(() => playSound('order'), []);
+  return useCallback(() => playOrderAlarm(), []);
 }
 
 export function useWaiterCallSound() {
-  return useCallback(() => playSound('waiter'), []);
+  return useCallback(() => playWaiterAlarm(), []);
 }

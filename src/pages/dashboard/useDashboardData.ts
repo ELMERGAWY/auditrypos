@@ -7,7 +7,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { cacheData, getCachedData, syncPendingData } from '@/lib/offlineEngine';
 import type { MenuItem, Order, OrderItem, WaiterCall, Restaurant, DeliveryAgent, Shift } from './types';
-import { useOrderNotificationSound, useWaiterCallSound } from './SoundNotifications';
+import { useOrderNotificationSound, useWaiterCallSound, showBrowserNotification, requestNotificationPermission } from './SoundNotifications';
 import { getDefaultItemIcon, isInventoryDrivenBusiness, type BusinessType } from '@/lib/businessTypes';
 import { journalService } from '@/lib/accounting/journalService';
 
@@ -30,6 +30,9 @@ export function useDashboardData() {
   const { isOnline, wasOffline, justBack } = useOnlineStatus();
   const playOrderSound = useOrderNotificationSound();
   const playWaiterSound = useWaiterCallSound();
+
+  // Request browser notification permission on first load
+  useEffect(() => { requestNotificationPermission(); }, []);
 
   const [restaurant, setRestaurant] = useState<Restaurant | null>(null);
   const [menuItems, setMenuItems] = useState<MenuItem[]>([]);
@@ -384,7 +387,14 @@ export function useDashboardData() {
               return [newOrder, ...prev];
             });
             if (soundEnabled) playOrderSound();
-            toast.success(`🆕 طلب جديد #${(payload.new as any).order_number?.slice(-4)}`, { duration: 5000 });
+            // Show a persistent browser notification (works even if tab is in background)
+            const orderNum = (payload.new as any).order_number?.slice(-4) || '????';
+            const customerName = (payload.new as any).customer_name || 'عميل';
+            showBrowserNotification(
+              `🛒 طلب جديد #${orderNum}`,
+              `من: ${customerName} – المجموع: ${(payload.new as any).total || 0} ج.م`
+            );
+            toast.success(`🛒 طلب جديد #${orderNum} من المتجر`, { duration: 8000 });
           }
         )
         .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'orders', filter: `restaurant_id=eq.${restaurant.id}` },
