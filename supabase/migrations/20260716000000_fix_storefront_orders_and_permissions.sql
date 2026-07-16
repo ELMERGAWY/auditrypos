@@ -98,7 +98,7 @@ BEGIN
     COALESCE(p_customer_name, ''), 
     COALESCE(p_customer_phone, ''), 
     p_delivery_address, 
-    p_notes, 
+    COALESCE(p_notes, ''), 
     'cash', 
     0, 
     now()
