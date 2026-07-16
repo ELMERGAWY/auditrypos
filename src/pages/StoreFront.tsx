@@ -1,5 +1,5 @@
 // @ts-nocheck
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Search, ShoppingCart, Plus, Minus, Trash2, Send, CheckCircle, Phone, MapPin, User, StickyNote, X, Store } from 'lucide-react';
@@ -33,6 +33,22 @@ const StoreFront = () => {
   const [trackingPixels, setTrackingPixels] = useState<any[]>([]);
   const [selectedProduct, setSelectedProduct] = useState<MenuItem | null>(null);
 
+  // ── Anonymous visitor ID (for retargeting & cart persistence) ──────────────
+  const CART_KEY = `sf_cart_${restaurantId}`;
+  const VISITOR_KEY = 'sf_visitor_id';
+
+  const getOrCreateVisitorId = (): string => {
+    let vid = localStorage.getItem(VISITOR_KEY);
+    if (!vid) {
+      vid = crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+      localStorage.setItem(VISITOR_KEY, vid);
+    }
+    return vid;
+  };
+
+  const visitorId = useRef<string>(getOrCreateVisitorId());
+  const syncTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   // Dynamic Google Font Load
   useEffect(() => {
     const link = document.createElement('link');
@@ -40,6 +56,24 @@ const StoreFront = () => {
     link.rel = 'stylesheet';
     document.head.appendChild(link);
   }, []);
+
+  // ── Restore cart from localStorage on first mount ──────────────────────────
+  useEffect(() => {
+    if (!restaurantId) return;
+    try {
+      const saved = localStorage.getItem(CART_KEY);
+      if (saved) {
+        const parsed: CartItem[] = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          setCart(parsed);
+          toast.info(`🛝 تم استعادة سلتك (${parsed.length} صنف)`, { duration: 3000 });
+        }
+      }
+    } catch {
+      // Ignore parse errors
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [restaurantId]);
 
   useEffect(() => {
     if (!restaurantId) return;
@@ -276,6 +310,49 @@ const StoreFront = () => {
     });
   }, [trackingPixels]);
 
+  // ── Persist cart to localStorage on every change ──────────────────────────
+  useEffect(() => {
+    if (!restaurantId) return;
+    try {
+      if (cart.length > 0) {
+        localStorage.setItem(CART_KEY, JSON.stringify(cart));
+      } else {
+        localStorage.removeItem(CART_KEY);
+      }
+    } catch {
+      // Ignore storage errors (private mode, quota, etc.)
+    }
+  }, [cart, restaurantId]);
+
+  // ── Debounced sync to Supabase abandoned_carts (fire-and-forget) ──────────
+  const syncAbandonedCart = useCallback((currentCart: CartItem[]) => {
+    if (!restaurantId) return;
+    if (syncTimer.current) clearTimeout(syncTimer.current);
+    syncTimer.current = setTimeout(async () => {
+      try {
+        const total = currentCart.reduce((s, c) => s + c.item.price * c.qty, 0);
+        const count = currentCart.reduce((s, c) => s + c.qty, 0);
+        if (count === 0) return;
+        await supabase.rpc('upsert_abandoned_cart', {
+          p_restaurant_id: restaurantId,
+          p_visitor_id:    visitorId.current,
+          p_cart_items:    currentCart.map(c => ({
+            item_id: c.item.id,
+            name:    c.item.name,
+            price:   c.item.price,
+            qty:     c.qty,
+            image:   c.item.image,
+            category: c.item.category,
+          })),
+          p_cart_total:    total,
+          p_item_count:    count,
+        });
+      } catch {
+        // Non-critical – silent fail
+      }
+    }, 3000); // wait 3 s of inactivity before syncing
+  }, [restaurantId]);
+
   const filtered = items.filter(i => {
     if (selectedCat !== 'all' && i.category !== selectedCat) return false;
     if (search && !i.name.toLowerCase().includes(search.toLowerCase())) return false;
@@ -285,8 +362,11 @@ const StoreFront = () => {
   const addToCart = (item: MenuItem) => {
     setCart(prev => {
       const existing = prev.find(c => c.item.id === item.id);
-      if (existing) return prev.map(c => c.item.id === item.id ? { ...c, qty: c.qty + 1 } : c);
-      return [...prev, { item, qty: 1 }];
+      const next = existing
+        ? prev.map(c => c.item.id === item.id ? { ...c, qty: c.qty + 1 } : c)
+        : [...prev, { item, qty: 1 }];
+      syncAbandonedCart(next);
+      return next;
     });
     
     // Track AddToCart event
@@ -301,8 +381,15 @@ const StoreFront = () => {
     toast.success(`تمت الإضافة: ${item.name}`);
   };
 
-  const updateQty = (id: string, d: number) =>
-    setCart(prev => prev.map(c => c.item.id === id ? { ...c, qty: Math.max(0, c.qty + d) } : c).filter(c => c.qty > 0));
+  const updateQty = (id: string, d: number) => {
+    setCart(prev => {
+      const next = prev
+        .map(c => c.item.id === id ? { ...c, qty: Math.max(0, c.qty + d) } : c)
+        .filter(c => c.qty > 0);
+      syncAbandonedCart(next);
+      return next;
+    });
+  };
 
   const cartTotal = cart.reduce((s, c) => s + c.item.price * c.qty, 0);
   const cartCount = cart.reduce((s, c) => s + c.qty, 0);
@@ -343,6 +430,17 @@ const StoreFront = () => {
         num_items: cartCount,
         order_number: data.order_number
       });
+
+      // Mark cart as converted in Supabase (no longer abandoned)
+      try {
+        await supabase.rpc('mark_cart_converted', {
+          p_restaurant_id: restaurantId,
+          p_visitor_id: visitorId.current,
+        });
+      } catch { /* non-critical */ }
+
+      // Clear localStorage cart
+      localStorage.removeItem(CART_KEY);
 
       setOrderPlaced(data.order_number);
       setCart([]);
