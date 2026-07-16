@@ -1,0 +1,196 @@
+{
+  "common": {
+    "login": "Connexion",
+    "register": "Créer un compte",
+    "freeTrial": "Essai gratuit",
+    "getStarted": "Commencer",
+    "learnMore": "En savoir plus",
+    "month": "mois",
+    "year": "an",
+    "upgrade": "Mettre à niveau",
+    "activate": "Activer",
+    "loading": "Chargement...",
+    "save": "Enregistrer",
+    "cancel": "Annuler",
+    "search": "Rechercher",
+    "notifications": "Notifications",
+    "language": "Langue",
+    "currency": "Devise",
+    "backHome": "Retour à l'accueil",
+    "contactUs": "Contactez-nous",
+    "subscribeNow": "S'abonner",
+    "startFree": "Commencer gratuitement",
+    "trustedBy": "Approuvé par +1 500 entreprises",
+    "daysLeft": "jours restants",
+    "lockedFeature": "Fonctionnalité verrouillée",
+    "upgradeToUnlock": "Mettez à niveau pour débloquer"
+  },
+  "landing": {
+    "badge": "La première plateforme ERP modulaire mondiale",
+    "heroTitle1": "Transformez votre entreprise en",
+    "heroTitle2": "Entreprise Intelligente",
+    "heroSubtitle": "Auditry ERP est bien plus qu'une caisse — c'est le cerveau de votre activité. Choisissez uniquement les modules dont vous avez besoin.",
+    "heroCta": "Commencez gratuitement",
+    "modulesTitle": "Modules spécialisés",
+    "modulesTitleHighlight": "Pour chaque secteur",
+    "modulesSubtitle": "Un système qui s'adapte à vos besoins, pas l'inverse.",
+    "viewAllModules": "Voir tous les modules (18+)",
+    "featuresTitle": "Pourquoi Auditry ?",
+    "featuresSubtitle": "Une plateforme ERP mondiale conçue pour la croissance",
+    "pricingTitle": "Tarification",
+    "pricingTitleHighlight": "Mondiale",
+    "pricingSubtitle": "Prix transparents en plusieurs devises — choisissez ce qui vous convient",
+    "pricingNote": "14 jours d'essai gratuit — sans carte bancaire",
+    "ctaTitle": "Prêt pour la transformation numérique ?",
+    "ctaSubtitle": "Rejoignez des milliers d'entreprises qui font confiance à Auditry ERP",
+    "ctaButton": "Commencez votre essai gratuit",
+    "footerProduct": "Produit",
+    "footerSupport": "Support",
+    "footerLegal": "Légal",
+    "stats": {
+      "businesses": "Entreprises",
+      "modules": "Modules ERP",
+      "uptime": "Disponibilité",
+      "support": "Support"
+    }
+  },
+  "features": {
+    "modular": { "title": "ERP Modulaire", "desc": "Choisissez les modules adaptés : restaurants, construction, juridique, commerce, pharmacies, et plus." },
+    "offline": { "title": "Rapide et Intelligent", "desc": "Fonctionne hors ligne avec synchronisation instantanée au retour de la connexion." },
+    "accounting": { "title": "Comptabilité Professionnelle", "desc": "Écriture en partie double automatique, plan comptable flexible et rapports en temps réel." },
+    "ux": { "title": "Expérience Utilisateur Premium", "desc": "Interfaces modernes supportant le tactile, codes-barres et imprimantes thermiques." },
+    "central": { "title": "Gestion Centralisée", "desc": "Tableau de bord unifié pour gérer toutes vos succursales et entrepôts." },
+    "bi": { "title": "Intelligence d'Affaires", "desc": "Rapports alimentés par l'IA pour prévoir les ventes et optimiser les stocks." }
+  },
+  "sectors": {
+    "construction": { "label": "Construction & BTP", "desc": "Décomptes et gestion de projets" },
+    "realestate": { "label": "Immobilier & Location", "desc": "Contrats et gestion d'unités" },
+    "legal": { "label": "Juridique & Conseil", "desc": "Affaires, rendez-vous et audiences" },
+    "finishing": { "label": "Finition & Décor", "desc": "Devis et coûts des matériaux" },
+    "automotive": { "label": "Maintenance Auto", "desc": "Ordres de travail et pièces détachées" },
+    "medical": { "label": "Services Médicaux", "desc": "Cliniques et centres spécialisés" }
+  },
+  "plans": {
+    "starter": {
+      "name": "Débutant",
+      "badge": "Pour petites entreprises",
+      "features": ["1 Module", "POS de base", "Inventaire simple", "Rapports quotidiens", "Support chat"],
+      "locked": ["Multi-modules", "Comptabilité avancée", "Gestion des succursales"]
+    },
+    "pro": {
+      "name": "Pro",
+      "badge": "Le plus populaire",
+      "features": ["Jusqu'à 3 modules", "Comptabilité complète", "Inventaire avancé", "Rapports financiers", "CRM & Fournisseurs", "Support téléphonique"],
+      "locked": ["Multi-entreprises"]
+    },
+    "enterprise": {
+      "name": "Entreprise",
+      "badge": "Système complet",
+      "features": ["Tous les modules", "Multi-succursales", "Intelligence d'affaires", "API personnalisée", "Gestionnaire dédié", "Formation équipe"],
+      "locked": []
+    }
+  },
+  "superAdmin": {
+    "title": "Auditry ERP Portal",
+    "subtitle": "Centre de contrôle Super Admin mondial",
+    "exitHome": "Retour à l'accueil",
+    "tabs": {
+      "overview": "Aperçu",
+      "restaurants": "Entreprises",
+      "users": "Utilisateurs",
+      "receipts": "Abonnements",
+      "issues": "Problèmes clients",
+      "bans": "Modération",
+      "tabsManagement": "Gestion des onglets",
+      "tracking": "Suivi",
+      "backup": "Système",
+      "notifications": "Notifications globales",
+      "freePlan": "Plan gratuit"
+    },
+    "stats": {
+      "activeCompanies": "Entreprises actives",
+      "todayRevenue": "Revenus du jour",
+      "technicalIssues": "Problèmes techniques",
+      "trialPending": "En essai/en attente",
+      "freePlanCompanies": "Entreprises plan gratuit",
+      "newSignupsToday": "Nouvelles inscriptions",
+      "conversionRate": "Taux de conversion",
+      "globalUsers": "Utilisateurs mondiaux"
+    },
+    "charts": {
+      "revenueGrowth": "Croissance des revenus (7 jours)",
+      "sectorDistribution": "Distribution par secteur",
+      "planDistribution": "Distribution des plans",
+      "signupTrend": "Tendance des inscriptions"
+    },
+    "freePlanAlert": "Nouvelle entreprise inscrite au plan gratuit",
+    "noNotifications": "Aucune nouvelle notification",
+    "markAllRead": "Tout marquer comme lu",
+    "viewCompany": "Voir l'entreprise"
+  },
+  "planGate": {
+    "title": "Fonctionnalité Premium",
+    "description": "Cette fonctionnalité n'est pas disponible sur votre plan actuel. Mettez à niveau pour un accès complet.",
+    "currentPlan": "Votre plan actuel",
+    "upgradeBtn": "Mettre à niveau",
+    "trialWarning": "{{days}} jours restants sur votre essai gratuit"
+  },
+  "chat": {
+    "generalRoom": "Salle générale",
+    "directMessages": "Messages privés",
+    "departments": "Départements",
+    "typeMessage": "Écrire un message...",
+    "online": "En ligne",
+    "offline": "Hors ligne",
+    "typing": "écrit...",
+    "pinned": "Messages épinglés",
+    "attachFile": "Joindre un fichier",
+    "searchStaff": "Rechercher dans l'équipe...",
+    "noMessages": "Pas encore de messages — commencez la conversation !",
+    "teamChat": "Chat d'équipe",
+    "membersOnline": "{{count}} en ligne"
+  },
+  "payment": {
+    "title": "Activer l'abonnement",
+    "subtitle": "Choisissez votre mode de paiement",
+    "methods": "Modes de paiement",
+    "licenseKey": "Clé de licence",
+    "activateKey": "Activer la clé",
+    "uploadReceipt": "Télécharger le reçu de paiement",
+    "uploadHint": "Après le virement, téléchargez votre reçu pour validation",
+    "receiptPending": "Téléchargé — En attente",
+    "receiptUploaded": "Reçu téléchargé avec succès ! L'administration va le vérifier.",
+    "enterKey": "Entrez la clé de licence",
+    "invalidKey": "Clé invalide ou déjà utilisée",
+    "activated": "Activé avec succès pour {{days}} jours",
+    "copied": "{{name}} copié"
+  },
+  "register": {
+    "title": "Créer un compte",
+    "step1": "Choisissez votre type d'activité",
+    "step2": "Détails du compte",
+    "fullName": "Nom complet",
+    "email": "E-mail",
+    "password": "Mot de passe",
+    "businessName": "Nom de l'entreprise",
+    "submit": "Créer le compte",
+    "hasAccount": "Vous avez déjà un compte ?",
+    "fillAll": "Veuillez remplir tous les champs",
+    "passwordMin": "Le mot de passe doit contenir au moins 6 caractères",
+    "success": "Inscription réussie ! Confirmez votre e-mail puis connectez-vous."
+  },
+  "loginPage": {
+    "title": "Connexion",
+    "subtitle": "Entrez vos identifiants pour continuer",
+    "email": "E-mail",
+    "password": "Mot de passe",
+    "submit": "Se connecter",
+    "submitting": "Connexion...",
+    "noAccount": "Pas encore de compte ?",
+    "registerNow": "Inscrivez-vous",
+    "staffLogin": "Employé ?",
+    "staffLoginLink": "Connexion employé",
+    "fillCredentials": "Veuillez entrer l'e-mail et le mot de passe",
+    "welcome": "Bienvenue !"
+  }
+}

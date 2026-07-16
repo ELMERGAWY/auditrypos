@@ -1,7 +1,8 @@
 // @ts-nocheck
-import { useState, useEffect, useRef, useMemo } from 'react';
+import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Send, MessageSquare, Users, Search, Hash, Shield, Smile, Paperclip, Image, FileText, File, Play, Volume2, Building2, UserPlus, Info } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
+import { Send, MessageSquare, Users, Search, Hash, Shield, Smile, Paperclip, Image, FileText, File, Play, Volume2, Building2, UserPlus, Info, Pin, ThumbsUp, Heart, Laugh } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
@@ -26,7 +27,16 @@ interface ChatMessage {
   file_url?: string;
   file_name?: string;
   file_type?: string;
+  is_pinned?: boolean;
+  reactions?: Record<string, string[]>;
+  reply_to_id?: string;
 }
+
+const REACTION_EMOJIS = [
+  { key: '👍', icon: ThumbsUp },
+  { key: '❤️', icon: Heart },
+  { key: '😂', icon: Laugh },
+];
 
 interface ChatRoom {
   id: string;
@@ -38,6 +48,8 @@ interface ChatRoom {
 }
 
 export function EmployeeChat({ restaurantId }: Props) {
+  const { t, i18n } = useTranslation();
+  const locale = i18n.language === 'ar' ? 'ar-EG' : i18n.language === 'fr' ? 'fr-FR' : 'en-US';
   const [staff, setStaff] = useState<any[]>([]);
   const [departments, setDepartments] = useState<any[]>([]);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -45,12 +57,14 @@ export function EmployeeChat({ restaurantId }: Props) {
   const [searchQuery, setSearchQuery] = useState('');
   const [text, setText] = useState('');
   const [currentUser, setCurrentUser] = useState<any>(null);
+  const [typingUsers, setTypingUsers] = useState<string[]>([]);
+  const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   
   // Room State
   const [selectedRoom, setSelectedRoom] = useState<ChatRoom>({
     id: 'general',
     type: 'general',
-    name: 'المجلس العام'
+    name: t('chat.generalRoom')
   });
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -108,7 +122,9 @@ export function EmployeeChat({ restaurantId }: Props) {
     initChat();
   }, [restaurantId]);
 
-  // Real-time subscription
+  const roomKey = selectedRoom.type === 'general' ? 'general' : selectedRoom.id;
+
+  // Real-time subscription: messages + typing
   useEffect(() => {
     if (!restaurantId) return;
 
@@ -124,12 +140,79 @@ export function EmployeeChat({ restaurantId }: Props) {
           });
         }
       )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'chat_typing_status', filter: `restaurant_id=eq.${restaurantId}` },
+        () => { refreshTypingStatus(); }
+      )
       .subscribe();
 
     return () => {
       supabase.removeChannel(channel);
     };
   }, [restaurantId]);
+
+  const refreshTypingStatus = useCallback(async () => {
+    if (!restaurantId || !currentUser) return;
+    const { data } = await supabase
+      .from('chat_typing_status' as any)
+      .select('user_name, user_id, room_id, updated_at')
+      .eq('restaurant_id', restaurantId)
+      .eq('room_id', roomKey);
+    const cutoff = Date.now() - 5000;
+    const active = (data || [])
+      .filter((r: any) => r.user_id !== currentUser.id && new Date(r.updated_at).getTime() > cutoff)
+      .map((r: any) => r.user_name || '...')
+      .filter(Boolean);
+    setTypingUsers(active);
+  }, [restaurantId, currentUser, roomKey]);
+
+  useEffect(() => {
+    refreshTypingStatus();
+    const interval = setInterval(refreshTypingStatus, 3000);
+    return () => clearInterval(interval);
+  }, [refreshTypingStatus, roomKey]);
+
+  const broadcastTyping = useCallback(async () => {
+    if (!restaurantId || !currentUser) return;
+    await supabase.from('chat_typing_status' as any).upsert({
+      restaurant_id: restaurantId,
+      user_id: currentUser.id,
+      user_name: currentUser.name,
+      room_id: roomKey,
+      updated_at: new Date().toISOString(),
+    }, { onConflict: 'restaurant_id,user_id,room_id' });
+    if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+    typingTimeoutRef.current = setTimeout(async () => {
+      await supabase.from('chat_typing_status' as any)
+        .delete()
+        .eq('restaurant_id', restaurantId)
+        .eq('user_id', currentUser.id)
+        .eq('room_id', roomKey);
+    }, 4000);
+  }, [restaurantId, currentUser, roomKey]);
+
+  const handlePinMessage = async (msgId: string, pinned: boolean) => {
+    const { error } = await supabase.from('employee_chat_messages').update({ is_pinned: !pinned }).eq('id', msgId);
+    if (error) toast.error(error.message);
+    else setMessages(prev => prev.map(m => m.id === msgId ? { ...m, is_pinned: !pinned } : m));
+  };
+
+  const handleReaction = async (msgId: string, emoji: string) => {
+    const msg = messages.find(m => m.id === msgId);
+    if (!msg || !currentUser) return;
+    const reactions = { ...(msg.reactions || {}) };
+    const key = emoji;
+    const users: string[] = reactions[key] || [];
+    if (users.includes(currentUser.id)) {
+      reactions[key] = users.filter(u => u !== currentUser.id);
+      if (reactions[key].length === 0) delete reactions[key];
+    } else {
+      reactions[key] = [...users, currentUser.id];
+    }
+    const { error } = await supabase.from('employee_chat_messages').update({ reactions }).eq('id', msgId);
+    if (!error) setMessages(prev => prev.map(m => m.id === msgId ? { ...m, reactions } : m));
+  };
 
   // Auto scroll to bottom
   useEffect(() => {
@@ -142,7 +225,13 @@ export function EmployeeChat({ restaurantId }: Props) {
     if ((!text.trim() && !attachmentUrl) || !currentUser) return;
 
     const content = text.trim();
-    setText(''); // clear input optimistically
+    setText('');
+    if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+    await supabase.from('chat_typing_status' as any)
+      .delete()
+      .eq('restaurant_id', restaurantId)
+      .eq('user_id', currentUser.id)
+      .eq('room_id', roomKey);
 
     try {
       const { error } = await supabase.from('employee_chat_messages').insert({
@@ -200,7 +289,7 @@ export function EmployeeChat({ restaurantId }: Props) {
   // Chat Rooms list grouping (Slack style)
   const chatRooms = useMemo(() => {
     const list: ChatRoom[] = [
-      { id: 'general', type: 'general', name: 'المجلس العام' }
+      { id: 'general', type: 'general', name: t('chat.generalRoom') }
     ];
     
     // Add departments
@@ -216,7 +305,9 @@ export function EmployeeChat({ restaurantId }: Props) {
     });
 
     return list;
-  }, [departments, staff, currentUser]);
+  }, [departments, staff, currentUser, t]);
+
+  const onlineCount = staff.filter(s => s.status === 'active').length;
 
   // Filter messages for current room
   const filteredMessages = useMemo(() => {
@@ -237,6 +328,8 @@ export function EmployeeChat({ restaurantId }: Props) {
       return false;
     });
   }, [messages, selectedRoom, currentUser]);
+
+  const pinnedMessages = useMemo(() => filteredMessages.filter(m => m.is_pinned), [filteredMessages]);
 
   // Search filter for room list
   const filteredRooms = useMemo(() => {
@@ -267,12 +360,12 @@ export function EmployeeChat({ restaurantId }: Props) {
         <div className="p-4 border-b bg-muted/20 space-y-3">
           <div className="flex items-center gap-2 text-primary font-black">
             <MessageSquare className="w-5 h-5 animate-pulse" />
-            <span>مساحة عمل تيم التسويق</span>
+            <span>{t('chat.teamChat')}</span>
           </div>
           <div className="relative">
             <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
             <Input 
-              placeholder="بحث عن قناة أو زميل..." 
+              placeholder={t('chat.searchStaff')} 
               value={searchQuery}
               onChange={e => setSearchQuery(e.target.value)}
               className="pr-9 h-9 text-xs"
@@ -283,7 +376,7 @@ export function EmployeeChat({ restaurantId }: Props) {
         <div className="flex-1 overflow-y-auto p-2 space-y-4 custom-scrollbar">
           {/* Channels Section */}
           <div className="space-y-1">
-            <p className="text-[10px] font-bold text-muted-foreground px-3 py-1 uppercase tracking-wider">القنوات العامة والأقسام</p>
+            <p className="text-[10px] font-bold text-muted-foreground px-3 py-1 uppercase tracking-wider">{t('chat.departments')}</p>
             {filteredRooms.filter(r => r.type === 'general' || r.type === 'department').map((room) => (
               <button
                 key={room.id}
@@ -302,7 +395,7 @@ export function EmployeeChat({ restaurantId }: Props) {
 
           {/* DMs Section */}
           <div className="space-y-1">
-            <p className="text-[10px] font-bold text-muted-foreground px-3 py-1 uppercase tracking-wider">الرسائل المباشرة (DMs)</p>
+            <p className="text-[10px] font-bold text-muted-foreground px-3 py-1 uppercase tracking-wider">{t('chat.directMessages')}</p>
             {filteredRooms.filter(r => r.type === 'dm').map((room) => (
               <button
                 key={room.id}
@@ -358,15 +451,25 @@ export function EmployeeChat({ restaurantId }: Props) {
                 {selectedRoom.type === 'dm' && <Badge variant="outline" className="text-[8px] py-0 px-1">{selectedRoom.role}</Badge>}
               </h3>
               <p className="text-[10px] text-muted-foreground">
-                {selectedRoom.type === 'general' 
-                  ? 'المجلس العام لوكالة التسويق لمناقشة كافة الأمور والمشاريع' 
-                  : selectedRoom.type === 'department'
-                  ? `قناة قسم: ${selectedRoom.name} - للتواصل الخاص بالقسم والمهام`
-                  : `محادثة خاصة ومباشرة مع الزميل(ة) ${selectedRoom.name}`}
+                {t('chat.membersOnline', { count: onlineCount })}
               </p>
             </div>
           </div>
         </div>
+
+        {/* Pinned Messages */}
+        {pinnedMessages.length > 0 && (
+          <div className="px-4 py-2 border-b bg-primary/5 space-y-1">
+            <p className="text-[10px] font-bold text-primary flex items-center gap-1">
+              <Pin className="w-3 h-3" /> {t('chat.pinned')}
+            </p>
+            {pinnedMessages.slice(0, 3).map(msg => (
+              <p key={msg.id} className="text-xs text-muted-foreground truncate">
+                <span className="font-bold text-foreground/80">{msg.sender_name}:</span> {msg.message_content}
+              </p>
+            ))}
+          </div>
+        )}
 
         {/* Message Ledger */}
         <div className="flex-1 p-4 overflow-y-auto space-y-4 bg-secondary/5 custom-scrollbar">
@@ -390,10 +493,15 @@ export function EmployeeChat({ restaurantId }: Props) {
                     <div className={`flex items-center gap-2 text-[9px] text-muted-foreground ${isOwn ? 'justify-end' : ''}`}>
                       <span className="font-bold text-xs text-foreground/80">{msg.sender_name}</span>
                       <Badge variant="outline" className="text-[8px] h-4 py-0 px-1 border-primary/10 text-primary bg-primary/5">{msg.sender_role}</Badge>
-                      <span>{new Date(msg.created_at).toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' })}</span>
+                      <span>{new Date(msg.created_at).toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit' })}</span>
+                      {!isOwn && (
+                        <button type="button" onClick={() => handlePinMessage(msg.id, !!msg.is_pinned)} className="opacity-0 group-hover:opacity-100 transition-opacity">
+                          <Pin className={`w-3 h-3 ${msg.is_pinned ? 'text-primary fill-primary' : ''}`} />
+                        </button>
+                      )}
                     </div>
                     
-                    <div className={`p-3 rounded-2xl text-xs shadow-sm border space-y-2 ${
+                    <div className={`group relative p-3 rounded-2xl text-xs shadow-sm border space-y-2 ${
                       isOwn 
                         ? 'gradient-bg text-white rounded-tl-none border-0' 
                         : 'bg-card border-border/50 text-foreground rounded-tr-none'
@@ -433,6 +541,29 @@ export function EmployeeChat({ restaurantId }: Props) {
                           )}
                         </div>
                       )}
+                      {/* Reactions */}
+                      <div className="flex items-center gap-1 pt-1">
+                        {[
+                          { emoji: '👍', icon: ThumbsUp },
+                          { emoji: '❤️', icon: Heart },
+                          { emoji: '😂', icon: Laugh },
+                        ].map(({ emoji }) => {
+                          const count = msg.reactions?.[emoji]?.length || 0;
+                          const reacted = msg.reactions?.[emoji]?.includes(currentUser?.id);
+                          return (
+                            <button
+                              key={emoji}
+                              type="button"
+                              onClick={() => handleReaction(msg.id, emoji)}
+                              className={`text-[10px] px-1.5 py-0.5 rounded-full border transition-all ${
+                                reacted ? 'bg-primary/20 border-primary/30' : 'border-transparent hover:bg-secondary/50'
+                              }`}
+                            >
+                              {emoji}{count > 0 ? ` ${count}` : ''}
+                            </button>
+                          );
+                        })}
+                      </div>
                     </div>
                   </div>
                 </motion.div>
@@ -442,8 +573,13 @@ export function EmployeeChat({ restaurantId }: Props) {
           {filteredMessages.length === 0 && (
             <div className="text-center py-20 text-muted-foreground space-y-2">
               <Info className="w-8 h-8 mx-auto opacity-30" />
-              <p className="text-xs">بداية هذه المحادثة. أرسل رسالة للبدء!</p>
+              <p className="text-xs">{t('chat.noMessages')}</p>
             </div>
+          )}
+          {typingUsers.length > 0 && (
+            <p className="text-[10px] text-muted-foreground italic px-2 animate-pulse">
+              {typingUsers.join(', ')} {t('chat.typing')}
+            </p>
           )}
           <div ref={messagesEndRef} />
         </div>
@@ -463,20 +599,19 @@ export function EmployeeChat({ restaurantId }: Props) {
             variant="ghost" 
             onClick={triggerFileSelect} 
             className="h-10 w-10 p-0 rounded-xl hover:bg-secondary text-muted-foreground hover:text-primary transition-all"
-            title="إرفاق ملف"
+            title={t('chat.attachFile')}
           >
             <Paperclip className="w-5 h-5" />
           </Button>
 
           <Input 
             value={text} 
-            onChange={e => setText(e.target.value)}
-            placeholder={`اكتب رسالة إلى ${selectedRoom.name}...`} 
+            onChange={e => { setText(e.target.value); broadcastTyping(); }}
+            placeholder={t('chat.typeMessage')}
             className="flex-1 h-10 text-xs rounded-xl pr-4"
           />
           <Button type="submit" disabled={!text.trim()} className="h-10 px-5 rounded-xl gradient-bg border-0 text-white gap-2">
             <Send className="w-4 h-4" />
-            <span>إرسال</span>
           </Button>
         </form>
       </Card>

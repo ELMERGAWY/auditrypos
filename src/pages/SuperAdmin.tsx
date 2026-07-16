@@ -22,12 +22,18 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { BUSINESS_TYPES, type BusinessType } from '@/lib/businessTypes';
 import { StaffAccessApprovals } from './dashboard/StaffAccessApprovals';
+import { GlobalDashboard } from '@/components/superadmin/GlobalDashboard';
+import { AdminNotificationsPanel } from '@/components/superadmin/AdminNotificationsPanel';
+import { LanguageSwitcher } from '@/components/global/LanguageSwitcher';
+import { useTranslation } from 'react-i18next';
+import { getLanguageDir } from '@/lib/i18n';
+import { Bell, Gift } from 'lucide-react';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer, PieChart, Pie, Cell, Area, AreaChart
 } from 'recharts';
 
-type Tab = 'overview' | 'restaurants' | 'users' | 'agents' | 'bans' | 'receipts' | 'backup' | 'tabs_management' | 'tracking_pixels';
+type Tab = 'overview' | 'restaurants' | 'users' | 'agents' | 'bans' | 'receipts' | 'backup' | 'tabs_management' | 'tracking_pixels' | 'notifications' | 'free_plan';
 
 const CHART_COLORS = [
   'hsl(25, 95%, 53%)', 'hsl(38, 92%, 50%)', 'hsl(142, 71%, 45%)',
@@ -91,11 +97,12 @@ const ALL_TABS_CONFIG = {
   service_deliverables: { label: 'متابعة التسليمات', icon: '📦' },
   garment_production: { label: 'إنتاج الملابس', icon: '✂️' },
   marketing_hub: { label: 'مركز التسويق', icon: '📢' },
-  kds: { label: 'شاشة المطبخ (KDS)', icon: '👨‍🍳' },
 };
 
 const SuperAdmin = () => {
   useDarkMode();
+  const { t, i18n } = useTranslation();
+  const dir = getLanguageDir(i18n.language);
   const navigate = useNavigate();
   const { user, isSuperAdmin, adminChecked, loading: authLoading } = useAuth();
   const [tab, setTab] = useState<Tab>('overview');
@@ -122,6 +129,9 @@ const SuperAdmin = () => {
   const [showCreateCustomType, setShowCreateCustomType] = useState(false);
   const [newCustomTypeForm, setNewCustomTypeForm] = useState({ name: '', icon: '🏢', tabs: [] as string[] });
   const [landingPagePixels, setLandingPagePixels] = useState<any>({ facebook: '', google_analytics: '', tiktok: '' });
+  const [adminNotifications, setAdminNotifications] = useState<any[]>([]);
+  const unreadNotifCount = adminNotifications.filter(n => !n.is_read).length;
+  const freePlanCount = restaurants.filter(r => r.plan_id === 'free').length;
 
   useEffect(() => {
     // Only redirect if auth is fully loaded and admin check is complete
@@ -162,6 +172,19 @@ const SuperAdmin = () => {
   };
 
   useEffect(() => { if (isSuperAdmin) load(); }, [isSuperAdmin]);
+
+  useEffect(() => {
+    if (!isSuperAdmin) return;
+    supabase.from('admin_notifications' as any).select('*').order('created_at', { ascending: false }).limit(100)
+      .then(({ data }) => setAdminNotifications(data || []));
+    const channel = supabase
+      .channel('super-admin-notif-badge')
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'admin_notifications' }, (payload) => {
+        setAdminNotifications(prev => [payload.new, ...prev]);
+      })
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [isSuperAdmin]);
 
   const stats = useMemo(() => {
     const activeRests = restaurants.filter(r => r.status === 'active').length;
@@ -234,7 +257,7 @@ const SuperAdmin = () => {
   if (authLoading) return <div className="flex items-center justify-center min-h-screen">جاري التحميل...</div>;
 
   return (
-    <div className="min-h-screen bg-background text-foreground" dir="rtl">
+    <div className="min-h-screen bg-background text-foreground" dir={dir}>
       {/* Mega Header */}
       <header className="border-b border-border bg-card/50 backdrop-blur-md sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-4 py-4 flex items-center justify-between">
@@ -243,13 +266,22 @@ const SuperAdmin = () => {
               <Shield className="w-7 h-7 text-destructive animate-pulse" />
             </div>
             <div>
-              <h1 className="text-xl font-bold font-display tracking-tight">Auditry ERP Portal</h1>
+              <h1 className="text-xl font-bold font-display tracking-tight">{t('superAdmin.title')}</h1>
               <p className="text-xs text-muted-foreground flex items-center gap-1">
-                <Activity className="w-3 h-3 text-green-500" /> لوحة السوبر أدمن المركزية
+                <Activity className="w-3 h-3 text-green-500" /> {t('superAdmin.subtitle')}
               </p>
             </div>
           </div>
-          <Button variant="outline" size="sm" onClick={() => navigate('/')} className="rounded-xl">الخروج للرئيسية</Button>
+          <div className="flex items-center gap-2">
+            <LanguageSwitcher variant="outline" />
+            {unreadNotifCount > 0 && (
+              <Button variant="outline" size="sm" className="relative gap-1" onClick={() => setTab('notifications')}>
+                <Bell className="w-4 h-4" />
+                <span className="absolute -top-1 -right-1 w-4 h-4 bg-destructive text-white text-[10px] rounded-full flex items-center justify-center">{unreadNotifCount}</span>
+              </Button>
+            )}
+            <Button variant="outline" size="sm" onClick={() => navigate('/')} className="rounded-xl">{t('superAdmin.exitHome')}</Button>
+          </div>
         </div>
       </header>
 
@@ -257,86 +289,81 @@ const SuperAdmin = () => {
         {/* Navigation Tabs */}
         <div className="flex gap-2 overflow-x-auto pb-2 no-scrollbar">
           {[
-            { id: 'overview', label: 'نظرة عامة', icon: BarChart3 },
-            { id: 'restaurants', label: 'إدارة الشركات', icon: Store, badge: restaurants.length },
-            { id: 'users', label: 'المستخدمين', icon: Users, badge: globalUsers.length },
-            { id: 'receipts', label: 'الاشتراكات', icon: FileText, badge: stats.pendingReceipts },
-            { id: 'issues', label: 'مشاكل العملاء', icon: AlertTriangle, badge: stats.unresolvedIssues },
-            { id: 'bans', label: 'الرقابة', icon: Ban },
-            { id: 'tabs_management', label: 'إدارة التابات', icon: LayoutGrid },
-            { id: 'tracking_pixels', label: 'التتبع', icon: Globe },
-            { id: 'backup', label: 'النظام', icon: Database },
-          ].map(t => (
-            <button key={t.id} onClick={() => setTab(t.id as Tab)}
+            { id: 'overview', label: t('superAdmin.tabs.overview'), icon: BarChart3 },
+            { id: 'notifications', label: t('superAdmin.tabs.notifications'), icon: Bell, badge: unreadNotifCount || undefined },
+            { id: 'free_plan', label: t('superAdmin.tabs.freePlan'), icon: Gift, badge: freePlanCount || undefined },
+            { id: 'restaurants', label: t('superAdmin.tabs.restaurants'), icon: Store, badge: restaurants.length },
+            { id: 'users', label: t('superAdmin.tabs.users'), icon: Users, badge: globalUsers.length },
+            { id: 'receipts', label: t('superAdmin.tabs.receipts'), icon: FileText, badge: stats.pendingReceipts },
+            { id: 'issues', label: t('superAdmin.tabs.issues'), icon: AlertTriangle, badge: stats.unresolvedIssues },
+            { id: 'bans', label: t('superAdmin.tabs.bans'), icon: Ban },
+            { id: 'tabs_management', label: t('superAdmin.tabs.tabsManagement'), icon: LayoutGrid },
+            { id: 'tracking_pixels', label: t('superAdmin.tabs.tracking'), icon: Globe },
+            { id: 'backup', label: t('superAdmin.tabs.backup'), icon: Database },
+          ].map(t_item => (
+            <button key={t_item.id} onClick={() => setTab(t_item.id as Tab)}
               className={`flex items-center gap-2 px-6 py-3 rounded-2xl text-sm font-medium transition-all ${
-                tab === t.id ? 'gradient-bg text-white shadow-lg shadow-primary/20' : 'bg-card hover:bg-secondary border border-border'
+                tab === t_item.id ? 'gradient-bg text-white shadow-lg shadow-primary/20' : 'bg-card hover:bg-secondary border border-border'
               }`}>
-              <t.icon className="w-4 h-4" />
-              {t.label}
-              {t.badge ? <span className="bg-white/20 px-2 py-0.5 rounded-full text-[10px]">{t.badge}</span> : null}
+              <t_item.icon className="w-4 h-4" />
+              {t_item.label}
+              {t_item.badge ? <span className="bg-white/20 px-2 py-0.5 rounded-full text-[10px]">{t_item.badge}</span> : null}
             </button>
           ))}
         </div>
 
         {tab === 'overview' && (
-          <div className="space-y-6">
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-              <div className="glass-card p-6 border-b-4 border-b-primary">
-                <Users className="w-8 h-8 text-primary mb-2" />
-                <p className="text-3xl font-bold">{stats.activeRests}</p>
-                <p className="text-sm text-muted-foreground">شركة نشطة</p>
-              </div>
-              <div className="glass-card p-6 border-b-4 border-b-success">
-                <DollarSign className="w-8 h-8 text-success mb-2" />
-                <p className="text-3xl font-bold">{stats.todayRevenue.toLocaleString()} ج.م</p>
-                <p className="text-sm text-muted-foreground">إيرادات اليوم</p>
-              </div>
-              <div className="glass-card p-6 border-b-4 border-b-warning">
-                <AlertTriangle className="w-8 h-8 text-warning mb-2" />
-                <p className="text-3xl font-bold">{stats.unresolvedIssues}</p>
-                <p className="text-sm text-muted-foreground">مشاكل تقنية مكتشفة</p>
-              </div>
-              <div className="glass-card p-6 border-b-4 border-b-destructive">
-                <Clock className="w-8 h-8 text-destructive mb-2" />
-                <p className="text-3xl font-bold">{stats.pendingRests}</p>
-                <p className="text-sm text-muted-foreground">في فترة التجربة/انتظار</p>
-              </div>
-            </div>
+          <GlobalDashboard
+            restaurants={restaurants}
+            orders={orders}
+            globalUsers={globalUsers}
+            adminNotifications={adminNotifications}
+          />
+        )}
 
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              <div className="glass-card p-6">
-                <h3 className="font-bold mb-4 flex items-center gap-2"><TrendingUp className="w-5 h-5 text-primary" /> نمو الإيرادات (7 أيام)</h3>
-                <ResponsiveContainer width="100%" height={300}>
-                  <AreaChart data={stats.last7Days}>
-                    <defs>
-                      <linearGradient id="colorRev" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.3}/>
-                        <stop offset="95%" stopColor="hsl(var(--primary))" stopOpacity={0}/>
-                      </linearGradient>
-                    </defs>
-                    <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                    <XAxis dataKey="day" stroke="hsl(var(--muted-foreground))" />
-                    <YAxis stroke="hsl(var(--muted-foreground))" />
-                    <Tooltip contentStyle={{ backgroundColor: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: '12px' }} />
-                    <Area type="monotone" dataKey="revenue" stroke="hsl(var(--primary))" fillOpacity={1} fill="url(#colorRev)" strokeWidth={3} />
-                  </AreaChart>
-                </ResponsiveContainer>
-              </div>
+        {tab === 'notifications' && (
+          <AdminNotificationsPanel
+            onViewCompany={(id, name) => setDrillIn({ id, name })}
+            onNotificationsChange={setAdminNotifications}
+          />
+        )}
 
-              <div className="glass-card p-6">
-                <h3 className="font-bold mb-4 flex items-center gap-2"><LayoutGrid className="w-5 h-5 text-primary" /> توزيع القطاعات</h3>
-                <ResponsiveContainer width="100%" height={300}>
-                  <PieChart>
-                    <Pie data={stats.byBusinessType} innerRadius={60} outerRadius={100} paddingAngle={5} dataKey="value">
-                      {stats.byBusinessType.map((entry, index) => <Cell key={`cell-${index}`} fill={CHART_COLORS[index % CHART_COLORS.length]} />)}
-                    </Pie>
-                    <Tooltip />
-                  </PieChart>
-                </ResponsiveContainer>
-              </div>
+        {tab === 'free_plan' && (
+          <div className="space-y-4">
+            <h2 className="text-2xl font-bold flex items-center gap-2">
+              <Gift className="w-6 h-6 text-destructive" />
+              {t('superAdmin.tabs.freePlan')} ({freePlanCount})
+            </h2>
+            <div className="grid grid-cols-1 gap-3">
+              {restaurants.filter(r => r.plan_id === 'free').map(r => (
+                <div key={r.id} className="glass-card p-5 flex items-center justify-between rounded-2xl hover:border-primary/30 transition-colors">
+                  <div className="flex items-center gap-4">
+                    <div className="w-14 h-14 rounded-2xl bg-destructive/10 flex items-center justify-center text-2xl">🏢</div>
+                    <div>
+                      <h4 className="font-bold">{r.name}</h4>
+                      <p className="text-xs text-muted-foreground">
+                        {r.business_type} · {new Date(r.created_at).toLocaleDateString()}
+                        {r.subscription_end && ` · Trial ends: ${new Date(r.subscription_end).toLocaleDateString()}`}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex gap-2">
+                    <Badge variant="outline" className="text-destructive border-destructive/30">Free</Badge>
+                    <Button size="sm" variant="outline" onClick={() => setDrillIn({ id: r.id, name: r.name })}>
+                      {t('superAdmin.viewCompany')}
+                    </Button>
+                  </div>
+                </div>
+              ))}
+              {freePlanCount === 0 && (
+                <div className="glass-card p-12 text-center text-muted-foreground rounded-2xl">
+                  {t('superAdmin.noNotifications')}
+                </div>
+              )}
             </div>
           </div>
         )}
+
 
         {tab === 'restaurants' && (
           <div className="space-y-6">

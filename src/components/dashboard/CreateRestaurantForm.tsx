@@ -53,15 +53,19 @@ export function CreateRestaurantForm({ userId, onCreated }: Props) {
       const businessType = customType ? 'custom' : bizType;
       const customTabs = customType ? customType.tabs : undefined;
 
+      const preferredLang = localStorage.getItem('auditry_lang') || 'ar';
+
       const { error } = await supabase.from('restaurants').insert({
         owner_id: userId,
         name,
         status: 'active',
         subscription_end: trialEnd.toISOString(),
+        plan_id: 'free',
+        preferred_language: preferredLang,
         business_type: businessType,
         custom_business_type_id: customType ? customType.id : null,
         custom_tabs: customTabs,
-        business_type_locked: true, // Lock business type after creation
+        business_type_locked: true,
       });
 
       if (error) {

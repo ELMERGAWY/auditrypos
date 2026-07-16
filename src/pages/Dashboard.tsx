@@ -93,6 +93,11 @@ const GarmentFactoryHub = lazy(() => import('./dashboard/GarmentFactoryHub').the
 import { BUSINESS_TYPES, BUSINESS_TABS, getBusinessConfig, getDefaultOrderType, isFoodSector, isInventoryDrivenBusiness, type BusinessType } from '@/lib/businessTypes';
 import { useAuth } from '@/lib/AuthContext';
 import { useDarkMode } from '@/lib/useDarkMode';
+import { usePlanFeatures } from '@/hooks/usePlanFeatures';
+import { PlanFeatureGate } from '@/components/global/PlanFeatureGate';
+import { LanguageSwitcher } from '@/components/global/LanguageSwitcher';
+import { getLanguageDir } from '@/lib/i18n';
+import { useTranslation } from 'react-i18next';
 import { checkoutIntegration } from '@/lib/accounting';
 import { auditLogService } from '@/lib/auditLog';
 import type {
@@ -103,6 +108,8 @@ import { STATUS_CONFIG, extractCustomerRef } from './dashboard/types';
 export default function Dashboard() {
   const navigate = useNavigate();
   const { isSuperAdmin } = useAuth();
+  const { i18n } = useTranslation();
+  const dir = getLanguageDir(i18n.language);
   const { isDark, toggleDarkMode } = useDarkMode(true);
   const {
     user, authLoading, isOnline, restaurant, menuItems, setMenuItems,
@@ -111,6 +118,7 @@ export default function Dashboard() {
     currentShift, setCurrentShift, profileName, dataLoaded, loadData, handleLogout,
     soundEnabled, setSoundEnabled, taxes, isSuspended
   } = useDashboardData();
+  const { canAccessTab, isFree, trialDaysLeft, planLabel, lockedTabs } = usePlanFeatures(restaurant);
 
   // Conceptually, `restaurant` acts as the active Branch (branch_id = restaurant.id).
   // The root tenant is the Company (company_id = restaurant.company_id),
@@ -1063,7 +1071,7 @@ export default function Dashboard() {
 
   return (
     <DashboardErrorBoundary>
-      <div className="min-h-screen bg-background flex flex-col" dir="rtl">
+      <div className="min-h-screen bg-background flex flex-col" dir={dir}>
         <ProfessionalSidebar 
           businessType={businessType} 
           activeTab={activeTab} 
@@ -1082,10 +1090,17 @@ export default function Dashboard() {
           onToggleDark={toggleDarkMode}
           isSuperAdmin={isSuperAdmin}
           tabs={sidebarTabs}
+          isTrial={isFree}
+          lockedTabs={isFree ? lockedTabs : []}
+          trialDaysLeft={trialDaysLeft}
+          planLabel={planLabel}
+          onUpgrade={() => navigate('/payment')}
         />
         <main className="flex-1 pt-16 h-[100dvh] overflow-hidden">
           <div className="h-full overflow-auto custom-scrollbar p-2 sm:p-4">
-            {activeTabContent}
+            {!canAccessTab(activeTab) && activeTab !== 'home' && activeTab !== 'settings' ? (
+              <PlanFeatureGate tabId={activeTab} restaurant={restaurant}>{null}</PlanFeatureGate>
+            ) : activeTabContent}
           </div>
         </main>
         {showReceipt && lastReceipt && <ReceiptModalWrapper isOpen={showReceipt} onClose={() => setShowReceipt(false)} order={lastReceipt} restaurant={restaurant} autoPrint={autoPrint} />}

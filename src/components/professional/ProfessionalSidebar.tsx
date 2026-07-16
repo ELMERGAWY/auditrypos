@@ -20,6 +20,8 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { getBusinessConfig, type BusinessType } from '@/lib/businessTypes';
+import { LanguageSwitcher } from '@/components/global/LanguageSwitcher';
+import { Lock } from 'lucide-react';
 
 export type SidebarTab =
   | 'home' | 'pos' | 'orders' | 'menu' | 'delivery' | 'shifts' | 'stats' | 'kds'
@@ -87,6 +89,8 @@ interface ProfessionalSidebarProps {
   syncStatus?: { synced: number; errors: number; lastSync: Date | null };
   onForceSync?: () => void;
   isSuperAdmin?: boolean;
+  lockedTabs?: string[];
+  planLabel?: string;
 }
 
 const SECTIONS: Record<string, { label: string; icon: React.ElementType }> = {
@@ -127,7 +131,9 @@ export const ProfessionalSidebar = memo(function ProfessionalSidebar({
   isSyncing = false,
   syncStatus,
   onForceSync,
-  isSuperAdmin
+  isSuperAdmin,
+  lockedTabs = [],
+  planLabel,
 }: ProfessionalSidebarProps) {
   const config = getBusinessConfig(businessType);
 
@@ -218,11 +224,12 @@ export const ProfessionalSidebar = memo(function ProfessionalSidebar({
           label: item.label!,
           icon: item.icon!,
           badge: item.badge,
+          locked: lockedTabs.includes(tabId),
           section: SECTION_MAP[item.section || 'main'] || 'main',
         } as NavItem;
       })
       .filter(Boolean) as NavItem[];
-  }, [tabs, config.tabs, stats, isSuperAdmin]);
+  }, [tabs, config.tabs, stats, isSuperAdmin, lockedTabs]);
 
   const groupedItems = navItems.reduce((acc, item) => {
     if (!acc[item.section]) acc[item.section] = [];
@@ -253,6 +260,11 @@ export const ProfessionalSidebar = memo(function ProfessionalSidebar({
                 ) : (
                   <span className="flex items-center gap-1 text-[9px] font-bold text-destructive">
                     <WifiOff className="w-2.5 h-2.5" /> أوفلاين
+                  </span>
+                )}
+                {isTrial && trialDaysLeft > 0 && (
+                  <span className="text-[9px] font-bold text-warning">
+                    {planLabel || 'Free'} · {trialDaysLeft}d
                   </span>
                 )}
               </div>
@@ -288,15 +300,17 @@ export const ProfessionalSidebar = memo(function ProfessionalSidebar({
                       return (
                         <DropdownMenuItem
                           key={item.id}
-                          onClick={() => onTabChange(item.id)}
+                          onClick={() => !item.locked && onTabChange(item.id)}
                           className={cn(
                             "flex items-center gap-3 p-3 rounded-xl cursor-pointer transition-colors",
+                            item.locked ? "opacity-50 cursor-not-allowed" : "",
                             isActive ? "bg-primary/10 text-primary font-bold" : "text-muted-foreground hover:bg-muted"
                           )}
                         >
                           <Icon className="w-4 h-4" />
                           <span className="flex-1 text-right">{item.label}</span>
-                          {!!item.badge && item.badge > 0 && (
+                          {item.locked && <Lock className="w-3 h-3 text-muted-foreground shrink-0" />}
+                          {!item.locked && !!item.badge && item.badge > 0 && (
                             <Badge variant="destructive" className="h-5 min-w-5 px-1 text-[10px] flex items-center justify-center">
                               {item.badge}
                             </Badge>
@@ -312,6 +326,12 @@ export const ProfessionalSidebar = memo(function ProfessionalSidebar({
 
           {/* Action Buttons & User Profile */}
           <div className="flex items-center gap-2 shrink-0">
+            <LanguageSwitcher variant="ghost" className="hidden sm:flex" />
+            {onUpgrade && lockedTabs.length > 0 && (
+              <button onClick={onUpgrade} className="hidden md:flex items-center gap-1 px-3 py-1.5 rounded-xl bg-primary/10 text-primary text-[10px] font-bold hover:bg-primary/20 transition-all">
+                <Sparkles className="w-3 h-3" /> Upgrade
+              </button>
+            )}
             <div className="hidden lg:flex items-center gap-1 bg-muted/40 rounded-xl border border-border/50 p-1">
               <button onClick={onToggleSound} className="w-8 h-8 rounded-lg hover:bg-background flex items-center justify-center transition-all">
                 {soundEnabled ? <Volume2 className="w-4 h-4 text-emerald-500" /> : <VolumeX className="w-4 h-4 text-muted-foreground" />}

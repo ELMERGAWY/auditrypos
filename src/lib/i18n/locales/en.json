@@ -1,0 +1,196 @@
+{
+  "common": {
+    "login": "Sign In",
+    "register": "Create Account",
+    "freeTrial": "Free Trial",
+    "getStarted": "Get Started",
+    "learnMore": "Learn More",
+    "month": "month",
+    "year": "year",
+    "upgrade": "Upgrade Plan",
+    "activate": "Activate",
+    "loading": "Loading...",
+    "save": "Save",
+    "cancel": "Cancel",
+    "search": "Search",
+    "notifications": "Notifications",
+    "language": "Language",
+    "currency": "Currency",
+    "backHome": "Back to Home",
+    "contactUs": "Contact Us",
+    "subscribeNow": "Subscribe Now",
+    "startFree": "Start Free",
+    "trustedBy": "Trusted by 1,500+ businesses",
+    "daysLeft": "days left",
+    "lockedFeature": "Locked Feature",
+    "upgradeToUnlock": "Upgrade to unlock this feature"
+  },
+  "landing": {
+    "badge": "The World's First Modular ERP Platform",
+    "heroTitle1": "Transform Your Business Into a",
+    "heroTitle2": "Smart Enterprise",
+    "heroSubtitle": "Auditry ERP is more than a POS — it's the brain of your business. Pick only the modules you need and start your digital transformation today.",
+    "heroCta": "Start Your Journey Free",
+    "modulesTitle": "Specialized Modules",
+    "modulesTitleHighlight": "For Every Sector",
+    "modulesSubtitle": "A system that adapts to your needs, not the other way around.",
+    "viewAllModules": "View All Modules (18+)",
+    "featuresTitle": "Why Auditry?",
+    "featuresSubtitle": "A global ERP platform built for growth",
+    "pricingTitle": "Global",
+    "pricingTitleHighlight": "Pricing Plans",
+    "pricingSubtitle": "Transparent pricing in multiple currencies — choose what fits you",
+    "pricingNote": "14-day free trial — no credit card required",
+    "ctaTitle": "Ready for Digital Transformation?",
+    "ctaSubtitle": "Join thousands of companies that trust Auditry ERP",
+    "ctaButton": "Start Your Free Trial Now",
+    "footerProduct": "Product",
+    "footerSupport": "Support",
+    "footerLegal": "Legal",
+    "stats": {
+      "businesses": "Businesses",
+      "modules": "ERP Modules",
+      "uptime": "Uptime",
+      "support": "Support"
+    }
+  },
+  "features": {
+    "modular": { "title": "Modular ERP System", "desc": "Choose modules that fit your business: restaurants, construction, legal, retail, pharmacies, and more." },
+    "offline": { "title": "Lightning Fast & Smart", "desc": "Works offline with instant sync when connection returns." },
+    "accounting": { "title": "Professional Accounting", "desc": "Automatic double-entry, flexible chart of accounts, and real-time financial reports." },
+    "ux": { "title": "Premium User Experience", "desc": "Modern interfaces supporting touch, barcodes, and thermal printers." },
+    "central": { "title": "Centralized Management", "desc": "Unified dashboard to manage all branches and warehouses from anywhere." },
+    "bi": { "title": "Business Intelligence", "desc": "AI-powered reports for sales forecasting and inventory optimization." }
+  },
+  "sectors": {
+    "construction": { "label": "Construction & Building", "desc": "Progress billing & project management" },
+    "realestate": { "label": "Real Estate & Rental", "desc": "Contracts & unit management" },
+    "legal": { "label": "Legal & Consulting", "desc": "Cases, appointments & sessions" },
+    "finishing": { "label": "Finishing & Decor", "desc": "Estimates & material costs" },
+    "automotive": { "label": "Auto Maintenance", "desc": "Work orders & spare parts" },
+    "medical": { "label": "Medical Services", "desc": "Clinics & specialized centers" }
+  },
+  "plans": {
+    "starter": {
+      "name": "Starter",
+      "badge": "For Small Businesses",
+      "features": ["1 Module", "Basic POS", "Simple Inventory", "Daily Reports", "Chat Support"],
+      "locked": ["Multi-Module", "Advanced Accounting", "Branch Management"]
+    },
+    "pro": {
+      "name": "Pro",
+      "badge": "Most Popular",
+      "features": ["Up to 3 Modules", "Full Accounting", "Advanced Inventory", "Financial Reports", "CRM & Suppliers", "Phone Support"],
+      "locked": ["Multi-Company"]
+    },
+    "enterprise": {
+      "name": "Enterprise",
+      "badge": "Full System",
+      "features": ["All Modules", "Multi-Branch", "Business Intelligence", "Custom API", "Dedicated Account Manager", "Team Training"],
+      "locked": []
+    }
+  },
+  "superAdmin": {
+    "title": "Auditry ERP Portal",
+    "subtitle": "Global Super Admin Control Center",
+    "exitHome": "Exit to Home",
+    "tabs": {
+      "overview": "Overview",
+      "restaurants": "Companies",
+      "users": "Users",
+      "receipts": "Subscriptions",
+      "issues": "Customer Issues",
+      "bans": "Moderation",
+      "tabsManagement": "Tab Management",
+      "tracking": "Tracking",
+      "backup": "System",
+      "notifications": "Global Notifications",
+      "freePlan": "Free Plan"
+    },
+    "stats": {
+      "activeCompanies": "Active Companies",
+      "todayRevenue": "Today's Revenue",
+      "technicalIssues": "Technical Issues",
+      "trialPending": "On Trial/Pending",
+      "freePlanCompanies": "Free Plan Companies",
+      "newSignupsToday": "New Signups Today",
+      "conversionRate": "Conversion Rate",
+      "globalUsers": "Global Users"
+    },
+    "charts": {
+      "revenueGrowth": "Revenue Growth (7 Days)",
+      "sectorDistribution": "Sector Distribution",
+      "planDistribution": "Plan Distribution",
+      "signupTrend": "Signup Trend"
+    },
+    "freePlanAlert": "New company registered on free plan",
+    "noNotifications": "No new notifications",
+    "markAllRead": "Mark All Read",
+    "viewCompany": "View Company"
+  },
+  "planGate": {
+    "title": "Premium Feature",
+    "description": "This feature is not available on your current plan. Upgrade for full access.",
+    "currentPlan": "Your current plan",
+    "upgradeBtn": "Upgrade Now",
+    "trialWarning": "{{days}} days left on your free trial"
+  },
+  "chat": {
+    "generalRoom": "General Room",
+    "directMessages": "Direct Messages",
+    "departments": "Departments",
+    "typeMessage": "Type a message...",
+    "online": "Online",
+    "offline": "Offline",
+    "typing": "typing...",
+    "pinned": "Pinned Messages",
+    "attachFile": "Attach File",
+    "searchStaff": "Search team...",
+    "noMessages": "No messages yet — start the conversation!",
+    "teamChat": "Team Chat",
+    "membersOnline": "{{count}} online"
+  },
+  "payment": {
+    "title": "Activate Subscription",
+    "subtitle": "Choose your preferred payment method",
+    "methods": "Payment Methods",
+    "licenseKey": "License Key",
+    "activateKey": "Activate Key",
+    "uploadReceipt": "Upload Payment Receipt",
+    "uploadHint": "After transfer, upload your receipt for admin review",
+    "receiptPending": "Uploaded — Pending Review",
+    "receiptUploaded": "Receipt uploaded successfully! Admin will review it.",
+    "enterKey": "Enter license key",
+    "invalidKey": "Invalid or already used key",
+    "activated": "Activated successfully for {{days}} days",
+    "copied": "Copied {{name}}"
+  },
+  "register": {
+    "title": "Create Account",
+    "step1": "Choose your business type",
+    "step2": "Account Details",
+    "fullName": "Full Name",
+    "email": "Email",
+    "password": "Password",
+    "businessName": "Business Name",
+    "submit": "Create Account",
+    "hasAccount": "Already have an account?",
+    "fillAll": "Please fill all fields",
+    "passwordMin": "Password must be at least 6 characters",
+    "success": "Registration successful! Please confirm your email then sign in."
+  },
+  "loginPage": {
+    "title": "Sign In",
+    "subtitle": "Enter your credentials to continue",
+    "email": "Email",
+    "password": "Password",
+    "submit": "Sign In",
+    "submitting": "Signing in...",
+    "noAccount": "Don't have an account?",
+    "registerNow": "Register now",
+    "staffLogin": "Staff member?",
+    "staffLoginLink": "Staff login",
+    "fillCredentials": "Please enter email and password",
+    "welcome": "Welcome back!"
+  }
+}
