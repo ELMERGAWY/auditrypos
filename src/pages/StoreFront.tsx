@@ -31,6 +31,15 @@ const StoreFront = () => {
   const [loading, setLoading] = useState(false);
   const [customerForm, setCustomerForm] = useState({ name: '', phone: '', address: '', notes: '' });
   const [trackingPixels, setTrackingPixels] = useState<any[]>([]);
+  const [selectedProduct, setSelectedProduct] = useState<MenuItem | null>(null);
+
+  // Dynamic Google Font Load
+  useEffect(() => {
+    const link = document.createElement('link');
+    link.href = 'https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;600;700;800&display=swap';
+    link.rel = 'stylesheet';
+    document.head.appendChild(link);
+  }, []);
 
   useEffect(() => {
     if (!restaurantId) return;
@@ -97,33 +106,92 @@ const StoreFront = () => {
         p_placement: 'storefront'
       });
       if (pixelsError) console.error('get_tracking_pixels error:', pixelsError);
-      else setTrackingPixels(pixelsData || []);
+      else {
+        setTrackingPixels(pixelsData || []);
+      }
+      
+      // Track PageView & ViewContent
+      trackPixelEvent('PageView');
+      trackPixelEvent('ViewContent', {
+        content_name: rest?.name || 'المتجر',
+        content_type: 'store',
+        currency: rest?.currency || 'ج.م'
+      });
     };
     load();
   }, [restaurantId]);
 
+  // Event tracking helper across all active platforms
+  const trackPixelEvent = (eventName: string, eventData: any = {}) => {
+    try {
+      trackingPixels.forEach(pixel => {
+        if (!pixel.is_active || !pixel.pixel_id) return;
+        const { platform } = pixel;
+
+        if (platform === 'facebook' && typeof window.fbq === 'function') {
+          window.fbq('track', eventName, eventData);
+        }
+        if (platform === 'google_analytics' && typeof window.gtag === 'function') {
+          window.gtag('event', eventName, eventData);
+        }
+        if (platform === 'tiktok' && typeof window.ttq === 'object') {
+          window.ttq.track(eventName, eventData);
+        }
+        if (platform === 'snapchat' && typeof window.snaptr === 'function') {
+          let snapEvent = eventName;
+          if (eventName === 'PageView') snapEvent = 'PAGE_VIEW';
+          else if (eventName === 'AddToCart') snapEvent = 'ADD_CART';
+          else if (eventName === 'InitiateCheckout') snapEvent = 'START_CHECKOUT';
+          else if (eventName === 'Purchase') snapEvent = 'PURCHASE';
+          window.snaptr('track', snapEvent, eventData);
+        }
+        if (platform === 'twitter' && typeof window.twq === 'function') {
+          window.twq('track', eventName, eventData);
+        }
+        if (platform === 'pinterest' && typeof window.pintr === 'function') {
+          window.pintr('track', eventName, eventData);
+        }
+      });
+      console.log(`[Pixel Event] ${eventName}`, eventData);
+    } catch (e) {
+      console.error('[Pixel Event Error]', e);
+    }
+  };
+
   // Inject tracking pixels into DOM
   useEffect(() => {
     trackingPixels.forEach(pixel => {
-      if (pixel.platform === 'facebook' && pixel.pixel_id) {
-        const script = document.createElement('script');
-        script.innerHTML = `
-          !function(f,b,e,v,n,t,s)
-          {if(f.fbq)return;n=f.fbq=function(){n.callMethod?
-          n.callMethod.apply(n,arguments):n.queue.push(arguments)};
-          if(!f._fbq)f._fbq=n;n.push=n;n.loaded=!0;n.version='2.0';
-          n.queue=[];t=b.createElement(e);t.async=!0;
-          t.src=v;s=b.getElementsByTagName(e)[0];
-          s.parentNode.insertBefore(t,s)}(window, document,'script',
-          'https://connect.facebook.net/en_US/fbevents.js');
-          fbq('init', '${pixel.pixel_id}');
-          fbq('track', 'PageView');
-        `;
-        document.head.appendChild(script);
-      } else if (pixel.platform === 'google_analytics' && pixel.pixel_id) {
+      if (!pixel.is_active || !pixel.pixel_id) return;
+
+      const { platform, pixel_id } = pixel;
+
+      // Facebook
+      if (platform === 'facebook') {
+        if (!window.fbq) {
+          const script = document.createElement('script');
+          script.innerHTML = `
+            !function(f,b,e,v,n,t,s)
+            {if(f.fbq)return;n=f.fbq=function(){n.callMethod?
+            n.callMethod.apply(n,arguments):n.queue.push(arguments)};
+            if(!f._fbq)f._fbq=n;n.push=n;n.loaded=!0;n.version='2.0';
+            n.queue=[];t=b.createElement(e);t.async=!0;
+            t.src=v;s=b.getElementsByTagName(e)[0];
+            s.parentNode.insertBefore(t,s)}(window, document,'script',
+            'https://connect.facebook.net/en_US/fbevents.js');
+            fbq('init', '${pixel_id}');
+            fbq('track', 'PageView');
+          `;
+          document.head.appendChild(script);
+        } else {
+          window.fbq('init', pixel_id);
+          window.fbq('track', 'PageView');
+        }
+      } 
+      // Google Analytics
+      else if (platform === 'google_analytics') {
         const script = document.createElement('script');
         script.async = true;
-        script.src = `https://www.googletagmanager.com/gtag/js?id=${pixel.pixel_id}`;
+        script.src = `https://www.googletagmanager.com/gtag/js?id=${pixel_id}`;
         document.head.appendChild(script);
 
         const script2 = document.createElement('script');
@@ -131,19 +199,79 @@ const StoreFront = () => {
           window.dataLayer = window.dataLayer || [];
           function gtag(){dataLayer.push(arguments);}
           gtag('js', new Date());
-          gtag('config', '${pixel.pixel_id}');
+          gtag('config', '${pixel_id}');
         `;
         document.head.appendChild(script2);
-      } else if (pixel.platform === 'tiktok' && pixel.pixel_id) {
+      } 
+      // TikTok
+      else if (platform === 'tiktok') {
         const script = document.createElement('script');
         script.innerHTML = `
           !function (w, d, t) {
             w.TiktokAnalyticsObject=t;var ttq=w[t]=w[t]||[];ttq.methods=["page","track","identify"],ttq.setAndDefer=function(t,e){t[e]=function(){this.push([e].concat(Array.prototype.slice.call(arguments,0)))}};for(var s=0;s<ttq.methods.length;s++)ttq.setAndDefer(ttq,ttq.methods[s]);ttq.instance=function(t){for(var e=ttq._i[t]||[],o=0;o<ttq.methods.length;o++)ttq.setAndDefer(e,ttq.methods[o]);return ttq._i[t]=e},ttq.load=function(e,o){var i="https://analytics.tiktok.com/i18n/pixel/events.js";ttq._i=ttq._i||{},ttq._i[e]=[],ttq._i[e]._u=i,ttq._t=ttq._t||{},ttq._t[e]=+new Date,ttq._o=ttq._o||{},ttq._o[e]=o||{};var n=document.createElement("script");n.type="text/javascript",n.async=!0,n.src=i+"?sdkid="+e+"&lib="+t;var a=document.getElementsByTagName("script")[0];a.parentNode.insertBefore(n,a)};
-          ttq.load('${pixel.pixel_id}', 'Tiktok');
-          ttq.page();
-        }(window, document, 'ttq');
+            ttq.load('${pixel_id}', 'Tiktok');
+            ttq.page();
+          }(window, document, 'ttq');
         `;
         document.head.appendChild(script);
+      }
+      // Twitter/X
+      else if (platform === 'twitter') {
+        const script = document.createElement('script');
+        script.innerHTML = `
+          !function(e,t,n,s,u,a){e.twq||(s=e.twq=function(){s.exe?s.exe.apply(s,arguments):s.queue.push(arguments)
+          },s.version='1.1',a=t.createElement(n),a.async=!0,a.src='https://static.ads-twitter.com/uwt.js',
+          u=t.getElementsByTagName(n)[0],u.parentNode.insertBefore(a,u))}(window,document,'script');
+          twq('config','${pixel_id}');
+        `;
+        document.head.appendChild(script);
+      }
+      // LinkedIn
+      else if (platform === 'linkedin') {
+        const script = document.createElement('script');
+        script.innerHTML = `
+          _linkedin_partner_id = "${pixel_id}";
+          window._linkedin_data_partner_ids = window._linkedin_data_partner_ids || [];
+          window._linkedin_data_partner_ids.push(_linkedin_partner_id);
+          (function(l) {
+          if (!l.nodeType) {return;}
+          var s = document.getElementsByTagName("script")[0];
+          var b = document.createElement("script");
+          b.type = "text/javascript";b.async = true;
+          b.src = "https://snap.licdn.com/li.lms-analytics/insight.min.js";
+          s.parentNode.insertBefore(b, s);})(window.lintrk || {});
+        `;
+        document.head.appendChild(script);
+      }
+      // Snapchat
+      else if (platform === 'snapchat') {
+        const script = document.createElement('script');
+        script.innerHTML = `
+          (function(e,t,n){if(e.snaptr)return;var a=e.snaptr=function()
+          {a.handleRequest?a.handleRequest.apply(a,arguments):a.queue.push(arguments)};
+          a.queue=[];var s=t.createElement(n);s.async=!0;
+          s.src="https://sc-static.net/scevent.min.js";
+          var r=t.getElementsByTagName(n)[0];r.parentNode.insertBefore(s,r)})(window,document,"script");
+          snaptr('init', '${pixel_id}');
+          snaptr('track', 'PAGE_VIEW');
+        `;
+        document.head.appendChild(script);
+      }
+      // Pinterest
+      else if (platform === 'pinterest') {
+        const script = document.createElement('script');
+        script.innerHTML = `
+          !function(e){if(!window.pintr){window.pintr=function(){window.pintr.queue.push(Array.prototype.slice.call(arguments))};var n=window.pintr;n.queue=[],n.version="3.0";var t=document.createElement("script");t.async=!0,t.src="https://s.yjtag.jp/tag.js";var r=document.getElementsByTagName("script")[0];r.parentNode.insertBefore(t,r)}}(window);
+          pintr('load', '${pixel_id}');
+          pintr('page');
+        `;
+        document.head.appendChild(script);
+      }
+      // Custom
+      else if (platform === 'custom') {
+        const div = document.createElement('div');
+        div.innerHTML = pixel_id;
+        document.body.appendChild(div);
       }
     });
   }, [trackingPixels]);
@@ -160,6 +288,16 @@ const StoreFront = () => {
       if (existing) return prev.map(c => c.item.id === item.id ? { ...c, qty: c.qty + 1 } : c);
       return [...prev, { item, qty: 1 }];
     });
+    
+    // Track AddToCart event
+    trackPixelEvent('AddToCart', {
+      content_name: item.name,
+      content_ids: [item.id],
+      content_type: 'product',
+      value: item.price,
+      currency: currency
+    });
+    
     toast.success(`تمت الإضافة: ${item.name}`);
   };
 
@@ -197,6 +335,15 @@ const StoreFront = () => {
       if (error) throw new Error(error.message);
       if (!data || !data.success) throw new Error('فشل إنشاء الطلب');
 
+      // Track Purchase event
+      trackPixelEvent('Purchase', {
+        value: cartTotal,
+        currency: currency,
+        content_type: 'product',
+        num_items: cartCount,
+        order_number: data.order_number
+      });
+
       setOrderPlaced(data.order_number);
       setCart([]);
       setShowCheckout(false);
@@ -230,8 +377,19 @@ const StoreFront = () => {
     );
   }
 
+  // Wrap InitiateCheckout tracking
+  const handleOpenCheckout = () => {
+    setShowCart(false);
+    setShowCheckout(true);
+    trackPixelEvent('InitiateCheckout', {
+      value: cartTotal,
+      currency: currency,
+      num_items: cartCount
+    });
+  };
+
   return (
-    <div className="min-h-screen bg-gradient-to-b from-background to-background/95 pb-24" dir="rtl">
+    <div className="min-h-screen bg-gradient-to-b from-background to-background/95 pb-24 text-right" style={{ fontFamily: "'Cairo', sans-serif" }} dir="rtl">
       {/* Header */}
       <div className="gradient-bg p-6 pb-10 rounded-b-3xl shadow-2xl">
         <div className="flex items-center gap-3 mb-4">
@@ -268,26 +426,35 @@ const StoreFront = () => {
       </div>
 
       {/* Items Grid */}
-      <div className="px-4 mt-4 grid grid-cols-2 gap-3">
+      <div className="px-4 mt-4 grid grid-cols-2 gap-4">
         {filtered.map((item, i) => (
-          <motion.div key={item.id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.03 }}
-            className="glass-card p-3 flex flex-col hover:shadow-lg transition-shadow cursor-pointer">
+          <motion.div key={item.id} initial={{ opacity: 0, y: 15 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.03 }}
+            onClick={() => setSelectedProduct(item)}
+            className="glass-card p-3.5 flex flex-col hover:shadow-2xl hover:scale-[1.02] transition-all duration-300 cursor-pointer relative border border-white/10 rounded-2xl">
+            
+            {/* Stock status badge */}
+            <div className="absolute top-2 right-2 z-10">
+              {item.in_stock === false ? (
+                <Badge variant="destructive" className="text-[9px] px-1.5 py-0.5 font-bold">غير متوفر</Badge>
+              ) : item.quantity !== undefined && item.quantity > 0 ? (
+                <Badge variant="secondary" className="text-[9px] px-1.5 py-0.5 font-bold bg-emerald-500/10 text-emerald-500 hover:bg-emerald-500/15">متوفر: {item.quantity}</Badge>
+              ) : (
+                <Badge variant="secondary" className="text-[9px] px-1.5 py-0.5 font-bold bg-emerald-500/10 text-emerald-500 hover:bg-emerald-500/15">متوفر</Badge>
+              )}
+            </div>
+
             {item.icon_url ? (
-              <img src={item.icon_url} alt={item.name} className="w-full h-24 object-contain rounded-lg bg-secondary mb-2" />
+              <img src={item.icon_url} alt={item.name} className="w-full h-28 object-contain rounded-xl bg-white p-1 mb-3 transition-transform duration-300 hover:scale-105" />
             ) : (
-              <div className="text-5xl w-full h-24 flex items-center justify-center rounded-lg bg-secondary mb-2">{item.image}</div>
+              <div className="text-5xl w-full h-28 flex items-center justify-center rounded-xl bg-primary/5 text-primary mb-3">{item.image || '📦'}</div>
             )}
-            <h3 className="font-medium text-sm truncate">{item.name}</h3>
-            <p className="text-xs text-muted-foreground">{item.category}</p>
-            {item.in_stock === false && (
-              <span className="text-xs text-destructive mt-1">غير متوفر</span>
-            )}
-            {item.quantity !== undefined && item.quantity > 0 && (
-              <p className="text-xs text-muted-foreground mt-1">متوفر: {item.quantity}</p>
-            )}
-            <div className="flex items-center justify-between mt-2">
-              <p className="font-display font-bold text-primary">{item.price} {currency}</p>
-              <Button size="sm" className="gradient-bg text-primary-foreground border-0 h-8 w-8 p-0" onClick={() => addToCart(item)}>
+            <h3 className="font-bold text-sm text-foreground truncate mt-1">{item.name}</h3>
+            <p className="text-[10px] text-muted-foreground mt-0.5">{item.category}</p>
+            
+            <div className="flex items-center justify-between mt-3 pt-2 border-t border-border/40">
+              <p className="font-display font-black text-primary text-base">{item.price} {currency}</p>
+              <Button size="sm" className="gradient-bg text-primary-foreground border-0 h-8 w-8 p-0 rounded-lg shadow-md hover:opacity-90" 
+                onClick={(e) => { e.stopPropagation(); addToCart(item); }}>
                 <Plus className="w-4 h-4" />
               </Button>
             </div>
@@ -348,8 +515,8 @@ const StoreFront = () => {
                 <span className="text-primary">{cartTotal} {currency}</span>
               </div>
 
-              <Button onClick={() => { setShowCart(false); setShowCheckout(true); }}
-                className="w-full gradient-bg text-primary-foreground border-0 h-12 text-base">
+              <Button onClick={handleOpenCheckout}
+                className="w-full gradient-bg text-primary-foreground border-0 h-12 text-base font-bold shadow-lg">
                 <Send className="w-5 h-5 ml-2" /> متابعة الطلب
               </Button>
             </motion.div>
@@ -364,25 +531,44 @@ const StoreFront = () => {
             className="fixed inset-0 z-50 bg-background/80 backdrop-blur-sm flex items-center justify-center p-4"
             onClick={() => setShowCheckout(false)}>
             <motion.div initial={{ scale: 0.9 }} animate={{ scale: 1 }} exit={{ scale: 0.9 }}
-              className="glass-card p-6 max-w-md w-full space-y-4" onClick={e => e.stopPropagation()}>
-              <h3 className="font-display font-bold text-lg">تأكيد الطلب</h3>
+              className="glass-card p-6 max-w-md w-full space-y-4 border border-white/10" onClick={e => e.stopPropagation()}>
+              <h3 className="font-display font-bold text-lg text-primary">تأكيد الطلب 📝</h3>
+
+              {/* Order Type Segment Controller */}
+              <div className="flex p-1 bg-secondary rounded-xl gap-1">
+                <button type="button" onClick={() => setCustomerForm(f => ({ ...f, address: '' }))}
+                  className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all ${!customerForm.address ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground'}`}>
+                  🚶‍♂️ استلام من الفرع
+                </button>
+                <button type="button" onClick={() => setCustomerForm(f => ({ ...f, address: 'العنوان بالتفصيل' }))}
+                  className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all ${customerForm.address ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground'}`}>
+                  🚗 توصيل للمنزل
+                </button>
+              </div>
 
               <div className="space-y-3">
                 <div className="relative">
                   <User className="w-4 h-4 absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
-                  <Input placeholder="الاسم *" value={customerForm.name} onChange={e => setCustomerForm(f => ({ ...f, name: e.target.value }))} className="pr-10" />
+                  <Input placeholder="الاسم *" value={customerForm.name} onChange={e => setCustomerForm(f => ({ ...f, name: e.target.value }))} className="pr-10 h-11" />
                 </div>
                 <div className="relative">
                   <Phone className="w-4 h-4 absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
-                  <Input placeholder="رقم الهاتف *" value={customerForm.phone} onChange={e => setCustomerForm(f => ({ ...f, phone: e.target.value }))} className="pr-10" />
+                  <Input placeholder="رقم الهاتف *" value={customerForm.phone} onChange={e => setCustomerForm(f => ({ ...f, phone: e.target.value }))} className="pr-10 h-11" />
                 </div>
+                
+                <AnimatePresence>
+                  {customerForm.address !== '' && (
+                    <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }}
+                      className="relative overflow-hidden">
+                      <MapPin className="w-4 h-4 absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                      <Input placeholder="عنوان التوصيل بالتفصيل *" value={customerForm.address === 'العنوان بالتفصيل' ? '' : customerForm.address} onChange={e => setCustomerForm(f => ({ ...f, address: e.target.value }))} className="pr-10 h-11" />
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+
                 <div className="relative">
-                  <MapPin className="w-4 h-4 absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
-                  <Input placeholder="عنوان التوصيل (اختياري)" value={customerForm.address} onChange={e => setCustomerForm(f => ({ ...f, address: e.target.value }))} className="pr-10" />
-                </div>
-                <div className="relative">
-                  <StickyNote className="w-4 h-4 absolute right-3 top-2.5 text-muted-foreground" />
-                  <Input placeholder="ملاحظات (اختياري)" value={customerForm.notes} onChange={e => setCustomerForm(f => ({ ...f, notes: e.target.value }))} className="pr-10" />
+                  <StickyNote className="w-4 h-4 absolute right-3 top-3 text-muted-foreground" />
+                  <Input placeholder="ملاحظات إضافية (اختياري)" value={customerForm.notes} onChange={e => setCustomerForm(f => ({ ...f, notes: e.target.value }))} className="pr-10 h-11" />
                 </div>
               </div>
 
@@ -405,6 +591,58 @@ const StoreFront = () => {
                   {loading ? 'جاري الإرسال...' : '✅ تأكيد الطلب'}
                 </Button>
                 <Button variant="outline" onClick={() => setShowCheckout(false)} className="flex-1">إلغاء</Button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Premium Product Details Modal */}
+      <AnimatePresence>
+        {selectedProduct && (
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 bg-background/80 backdrop-blur-sm flex items-center justify-center p-4"
+            onClick={() => setSelectedProduct(null)}>
+            <motion.div initial={{ scale: 0.9, y: 50 }} animate={{ scale: 1, y: 0 }} exit={{ scale: 0.9, y: 50 }}
+              className="glass-card max-w-sm w-full overflow-hidden shadow-2xl relative border border-white/10 rounded-3xl"
+              onClick={e => e.stopPropagation()}>
+              <button onClick={() => setSelectedProduct(null)} className="absolute top-4 left-4 p-2 rounded-full bg-black/40 text-white hover:bg-black/60 transition-colors z-10">
+                <X className="w-5 h-5" />
+              </button>
+              {selectedProduct.icon_url ? (
+                <img src={selectedProduct.icon_url} alt={selectedProduct.name} className="w-full h-56 object-cover bg-white" />
+              ) : (
+                <div className="text-8xl w-full h-56 flex items-center justify-center bg-primary/5 text-primary">{selectedProduct.image || '📦'}</div>
+              )}
+              <div className="p-5 space-y-4">
+                <div>
+                  <span className="text-[10px] uppercase font-bold tracking-wider text-primary bg-primary/10 px-2 py-0.5 rounded-md">{selectedProduct.category}</span>
+                  <h3 className="text-xl font-bold mt-1 text-foreground">{selectedProduct.name}</h3>
+                </div>
+                
+                {/* Stock status inside modal */}
+                <div className="flex gap-2">
+                  {selectedProduct.in_stock !== false ? (
+                    <span className="text-[10px] font-bold text-emerald-500 bg-emerald-500/10 px-2 py-0.5 rounded-md">متوفر</span>
+                  ) : (
+                    <span className="text-[10px] font-bold text-destructive bg-destructive/10 px-2 py-0.5 rounded-md">غير متوفر</span>
+                  )}
+                  {selectedProduct.quantity !== undefined && selectedProduct.quantity > 0 && (
+                    <span className="text-[10px] font-bold text-muted-foreground bg-secondary px-2 py-0.5 rounded-md">المتاح: {selectedProduct.quantity}</span>
+                  )}
+                </div>
+
+                <div className="flex items-center justify-between pt-4 border-t border-border/40">
+                  <div>
+                    <p className="text-xs text-muted-foreground">السعر</p>
+                    <p className="text-2xl font-black text-primary">{selectedProduct.price} {currency}</p>
+                  </div>
+                  <Button onClick={() => { addToCart(selectedProduct); setSelectedProduct(null); }}
+                    disabled={selectedProduct.in_stock === false}
+                    className="gradient-bg text-primary-foreground border-0 h-12 px-6 rounded-xl font-bold shadow-lg flex items-center gap-2">
+                    إضافة للسلة <Plus className="w-4 h-4" />
+                  </Button>
+                </div>
               </div>
             </motion.div>
           </motion.div>
