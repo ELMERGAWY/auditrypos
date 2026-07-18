@@ -93,7 +93,7 @@ function mapOrderDeliveryStatus(
   if (ds === 'delivered' || ds === 'completed') return 'delivered';
   if (ds === 'cancelled') return 'cancelled';
   if (ds === 'partial' || (itemsCount > 0 && deliveredCount > 0 && deliveredCount < itemsCount)) return 'partial';
-  if (ds === 'in_progress' || ds === 'out_for_delivery' || ds === 'preparing') return 'in_progress';
+  if (ds === 'in_progress' || ds === 'out_for_delivery' || ds === 'preparing' || ds === 'contacted' || ds === 'no_answer') return 'in_progress';
   if (daysUntil(expectedDate) < 0) return 'delayed';
   return 'pending';
 }
@@ -103,6 +103,8 @@ function toOrderDeliveryStatus(status: string): string {
   if (status === 'cancelled') return 'cancelled';
   if (status === 'partial') return 'partial';
   if (status === 'in_progress') return 'in_progress';
+  if (status === 'contacted') return 'contacted';
+  if (status === 'no_answer') return 'no_answer';
   return 'pending';
 }
 
