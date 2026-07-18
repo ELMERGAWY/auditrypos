@@ -60,7 +60,7 @@ export function CreateRestaurantForm({ userId, onCreated }: Props) {
         name,
         status: 'active',
         subscription_end: trialEnd.toISOString(),
-        plan_id: 'free',
+        plan_id: null,  // null = legacy (full access during trial); will be set to 'free' only after explicit downgrade
         preferred_language: preferredLang,
         business_type: businessType,
         custom_business_type_id: customType ? customType.id : null,

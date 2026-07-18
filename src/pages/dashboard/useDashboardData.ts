@@ -99,17 +99,39 @@ export function useDashboardData() {
       return;
     }
 
+    // ─── Determine target restaurant ID ───────────────────────────────────────
+    // Priority: 1) saved in localStorage  2) most recently created by this owner
+    const savedBusinessId = localStorage.getItem('current_business_id');
+
     const [profileRes, restsRes] = await Promise.all([
       supabase.from('profiles').select('full_name').eq('user_id', user.id).maybeSingle(),
-      supabase.from('restaurants').select('*').eq('owner_id', user.id).limit(1),
+      savedBusinessId
+        // Try the exact restaurant the user was last working on
+        ? supabase.from('restaurants').select('*').eq('id', savedBusinessId).eq('owner_id', user.id).maybeSingle()
+        // Fall back to most recently created restaurant for this owner
+        : supabase.from('restaurants').select('*').eq('owner_id', user.id).order('created_at', { ascending: false }).limit(1),
     ]);
 
     const pName = profileRes.data?.full_name || '';
     if (pName) setProfileName(pName);
 
-    let rest = restsRes.data?.[0];
+    // Normalise: maybeSingle() returns an object, limit(1) returns an array
+    let rest: any = savedBusinessId
+      ? (restsRes as any).data
+      : (restsRes as any).data?.[0];
 
-    // If no restaurant found as owner, try finding through company_users relationship
+    // If the saved ID no longer belongs to this owner, fall back to most recent
+    if (!rest && savedBusinessId) {
+      const { data: fallbackRests } = await supabase
+        .from('restaurants')
+        .select('*')
+        .eq('owner_id', user.id)
+        .order('created_at', { ascending: false })
+        .limit(1);
+      rest = fallbackRests?.[0] ?? null;
+    }
+
+    // If still no restaurant found as owner, try finding through company_users relationship
     if (!rest) {
       const { data: userCompanies } = await supabase
         .from('company_users')
@@ -124,6 +146,7 @@ export function useDashboardData() {
           .from('restaurants')
           .select('*')
           .eq('company_id', companyId)
+          .order('created_at', { ascending: false })
           .limit(1);
 
         if (companyRestaurants && companyRestaurants.length > 0) {
