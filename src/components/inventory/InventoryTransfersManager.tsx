@@ -80,84 +80,22 @@ export function InventoryTransfersManager({
     if (!qty || qty <= 0) return toast.error('الكمية يجب أن تكون أكبر من صفر');
 
     try {
-      // 1. Check source warehouse stock (warehouse_stock table)
-      const { data: srcStock } = await supabase
-        .from('warehouse_stock')
-        .select('id, quantity')
-        .eq('warehouse_id', form.from_wh)
-        .eq('product_id', form.product_id)
-        .maybeSingle();
-
-      // Fallback: if no warehouse_stock row, use product's total quantity
-      const product = products.find(p => p.id === form.product_id);
-      const currentQty = srcStock?.quantity ?? (product?.quantity ?? 0);
-
-      if (currentQty < qty) {
-        return toast.error(`الكمية المتاحة في المستودع المصدر: ${currentQty} فقط`);
-      }
-
-      // 2. Create Transfer Record
-      const { data: transfer, error: tErr } = await supabase
-        .from('inventory_transfers')
-        .insert({
-          restaurant_id: restaurantId,
-          from_warehouse_id: form.from_wh,
-          to_warehouse_id: form.to_wh,
-          notes: form.notes,
-          status: 'received'
-        })
-        .select()
-        .single();
-      if (tErr) throw tErr;
-
-      // 3. Add Transfer Item
-      const { error: itemErr } = await supabase.from('inventory_transfer_items').insert({
-        transfer_id: transfer.id,
-        restaurant_id: restaurantId,
-        product_id: form.product_id,
-        quantity: qty,
-        cost_price: product?.cost_price || 0
+      // Use SECURITY DEFINER RPC to execute transfer atomically (bypasses RLS)
+      const { data: result, error: rpcError } = await supabase.rpc('execute_inventory_transfer', {
+        p_restaurant_id: restaurantId,
+        p_from_warehouse_id: form.from_wh,
+        p_to_warehouse_id: form.to_wh,
+        p_product_id: form.product_id,
+        p_quantity: qty,
+        p_notes: form.notes || null
       });
-      if (itemErr) throw itemErr;
 
-      // 4. Deduct from source warehouse_stock
-      if (srcStock?.id) {
-        const { error: deductErr } = await supabase
-          .from('warehouse_stock')
-          .update({ quantity: Math.max(0, currentQty - qty) })
-          .eq('id', srcStock.id);
-        if (deductErr) throw deductErr;
-      } else {
-        // No warehouse_stock row yet — create it with result quantity
-        const fallbackQty = (product?.quantity ?? 0) - qty;
-        await supabase.from('warehouse_stock').upsert({
-          restaurant_id: restaurantId,
-          warehouse_id: form.from_wh,
-          product_id: form.product_id,
-          quantity: Math.max(0, fallbackQty)
-        }, { onConflict: 'warehouse_id,product_id' });
-      }
+      if (rpcError) throw rpcError;
 
-      // 5. Add to destination warehouse_stock (upsert)
-      const { data: dstStock } = await supabase
-        .from('warehouse_stock')
-        .select('id, quantity')
-        .eq('warehouse_id', form.to_wh)
-        .eq('product_id', form.product_id)
-        .maybeSingle();
-
-      if (dstStock?.id) {
-        await supabase
-          .from('warehouse_stock')
-          .update({ quantity: (dstStock.quantity ?? 0) + qty })
-          .eq('id', dstStock.id);
-      } else {
-        await supabase.from('warehouse_stock').insert({
-          restaurant_id: restaurantId,
-          warehouse_id: form.to_wh,
-          product_id: form.product_id,
-          quantity: qty
-        });
+      const res = result as { success: boolean; error?: string; transfer_id?: string };
+      if (!res?.success) {
+        toast.error(res?.error || 'فشل التحويل');
+        return;
       }
 
       toast.success('تم تنفيذ التحويل بنجاح وتحديث أرصدة المستودعات');
@@ -166,9 +104,11 @@ export function InventoryTransfersManager({
       loadTransfers();
       onRefresh();
     } catch (error: any) {
-      toast.error('فشل التحويل: ' + error.message);
+      console.error('Transfer error:', error);
+      toast.error('فشل التحويل: ' + (error.message || 'خطأ غير معروف'));
     }
   };
+
 
   const whName = (wh: Warehouse) => wh.name_ar || wh.name;
 
