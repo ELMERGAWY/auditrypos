@@ -103,8 +103,7 @@ BEGIN
   -- 6. Deduct from source warehouse_stock (upsert)
   IF v_src_stock_id IS NOT NULL THEN
     UPDATE public.warehouse_stock
-    SET quantity = GREATEST(0, v_src_qty - p_quantity),
-        updated_at = NOW()
+    SET quantity = GREATEST(0, v_src_qty - p_quantity)
     WHERE id = v_src_stock_id;
   ELSE
     INSERT INTO public.warehouse_stock (
@@ -115,8 +114,7 @@ BEGIN
     )
     ON CONFLICT (warehouse_id, product_id)
     DO UPDATE SET
-      quantity = GREATEST(0, public.warehouse_stock.quantity - p_quantity),
-      updated_at = NOW();
+      quantity = GREATEST(0, public.warehouse_stock.quantity - p_quantity);
   END IF;
 
   -- 7. Add to destination warehouse_stock (upsert)
@@ -129,8 +127,7 @@ BEGIN
 
   IF v_dst_stock_id IS NOT NULL THEN
     UPDATE public.warehouse_stock
-    SET quantity = COALESCE(v_dst_qty, 0) + p_quantity,
-        updated_at = NOW()
+    SET quantity = COALESCE(v_dst_qty, 0) + p_quantity
     WHERE id = v_dst_stock_id;
   ELSE
     INSERT INTO public.warehouse_stock (
@@ -140,8 +137,7 @@ BEGIN
     )
     ON CONFLICT (warehouse_id, product_id)
     DO UPDATE SET
-      quantity = public.warehouse_stock.quantity + p_quantity,
-      updated_at = NOW();
+      quantity = public.warehouse_stock.quantity + p_quantity;
   END IF;
 
   RETURN jsonb_build_object('success', true, 'transfer_id', v_transfer_id);
