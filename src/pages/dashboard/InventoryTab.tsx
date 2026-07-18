@@ -129,8 +129,8 @@ export function InventoryTab({ restaurantId, currency, businessType }: Props) {
     const { data: prodData } = await supabase.from('products').select('*').eq('restaurant_id', restaurantId).order('created_at', { ascending: false });
     setProducts((prodData || []) as Product[]);
     
-    // Load Warehouses
-    const { data: whData } = await supabase.from('warehouses').select('*').is('deleted_at', null).order('name');
+    // Load Warehouses (filtered by restaurant to respect RLS correctly)
+    const { data: whData } = await supabase.from('warehouses').select('*').eq('restaurant_id', restaurantId).is('deleted_at', null).order('name');
     setWarehouses((whData || []) as Warehouse[]);
 
     // Load Item Types
@@ -483,7 +483,7 @@ export function InventoryTab({ restaurantId, currency, businessType }: Props) {
         </TabsContent>
 
         <TabsContent value="warehouses" className="space-y-4">
-          <WarehouseManager restaurantId={restaurantId} warehouses={warehouses} onRefresh={load} />
+          <WarehousesManager restaurantId={restaurantId} warehouses={warehouses} products={products} currency={currency} onRefresh={load} />
         </TabsContent>
 
         <TabsContent value="transfers" className="space-y-4">
@@ -999,10 +999,15 @@ export function InventoryTab({ restaurantId, currency, businessType }: Props) {
 // SUB-COMPONENTS FOR PRO INVENTORY
 // ====================================================================================================
 
-function WarehousesManager({ restaurantId, warehouses, onRefresh }: { restaurantId: string; warehouses: Warehouse[]; onRefresh: () => void }) {
+function WarehousesManager({ restaurantId, warehouses, onRefresh, products, currency }: { restaurantId: string; warehouses: Warehouse[]; onRefresh: () => void; products: Product[]; currency: string }) {
   const [showForm, setShowForm] = useState(false);
   const [editingWarehouse, setEditingWarehouse] = useState<Warehouse | null>(null);
   const [mainWarehouses, setMainWarehouses] = useState<Warehouse[]>([]);
+  const [warehouseStocks, setWarehouseStocks] = useState<any[]>([]);
+  const [loadingStock, setLoadingStock] = useState(false);
+  const [stockSearch, setStockSearch] = useState('');
+  const [stockWhFilter, setStockWhFilter] = useState('');
+  const [stockView, setStockView] = useState<Warehouse | null>(null);
   const [form, setForm] = useState({
     code: '',
     name: '',
@@ -1024,35 +1029,65 @@ function WarehousesManager({ restaurantId, warehouses, onRefresh }: { restaurant
   });
 
   useEffect(() => {
-    setMainWarehouses(warehouses.filter(w => w.type === 'main'));
+    setMainWarehouses(warehouses.filter(w => w.type === 'main' || w.type === 'MAIN'));
   }, [warehouses]);
 
+  useEffect(() => {
+    if (restaurantId && warehouses.length > 0) {
+      loadWarehouseStocks();
+    }
+  }, [restaurantId, warehouses]);
+
+  const loadWarehouseStocks = async () => {
+    setLoadingStock(true);
+    try {
+      const { data, error } = await supabase
+        .from('warehouse_stock')
+        .select('*')
+        .eq('restaurant_id', restaurantId);
+      if (!error) setWarehouseStocks(data || []);
+    } catch { /* silent */ } finally {
+      setLoadingStock(false);
+    }
+  };
+
+  // Build a rich stock matrix: for each warehouse, list products with qty
+  const stockMatrix = warehouses.map(wh => {
+    const whStocks = warehouseStocks.filter(s => s.warehouse_id === wh.id);
+    const items = whStocks.map(s => {
+      const prod = products.find(p => p.id === s.product_id);
+      return { ...s, product: prod };
+    }).filter(s => s.product);
+    const totalQty = items.reduce((sum, s) => sum + Number(s.quantity || 0), 0);
+    const totalValue = items.reduce((sum, s) => sum + Number(s.quantity || 0) * Number(s.product?.cost_price || 0), 0);
+    return { warehouse: wh, items, totalQty, totalValue };
+  });
+
+  // Filter stock for the selected warehouse view
+  const filteredStockItems = stockView
+    ? (stockMatrix.find(m => m.warehouse.id === stockView.id)?.items || []).filter(s => {
+        if (!stockSearch) return true;
+        const q = stockSearch.toLowerCase();
+        return (
+          (s.product?.name || '').toLowerCase().includes(q) ||
+          (s.product?.barcode || '').toLowerCase().includes(q) ||
+          (s.product?.sku || '').toLowerCase().includes(q)
+        );
+      })
+    : [];
+
   const generateAccountingCodes = (warehouseType: string, warehouseCode: string) => {
-    // Generate accounting codes based on warehouse type
     const baseCode = warehouseCode.replace('WH-', '').padStart(4, '0');
-    
-    // Inventory account code (Asset account - 1xxx series)
     const inventoryAccountCode = `13${baseCode}`;
-    
-    // COGS account code (Expense account - 5xxx series)
     const cogsAccountCode = `52${baseCode}`;
-    
-    // General accounting account code (could be same as inventory or different)
     const accountingAccountCode = inventoryAccountCode;
-    
-    return {
-      accounting_account_code: accountingAccountCode,
-      inventory_account_code: inventoryAccountCode,
-      cogs_account_code: cogsAccountCode
-    };
+    return { accounting_account_code: accountingAccountCode, inventory_account_code: inventoryAccountCode, cogs_account_code: cogsAccountCode };
   };
 
   const handleSave = async () => {
     if (!form.code || !form.name || !form.name_ar) {
       return toast.error('يرجى ملء جميع الحقول المطلوبة');
     }
-    
-    // Auto-generate accounting codes if not provided
     const autoCodes = generateAccountingCodes(form.type, form.code);
     const data = {
       ...form,
@@ -1062,44 +1097,36 @@ function WarehousesManager({ restaurantId, warehouses, onRefresh }: { restaurant
       type: form.type.toUpperCase(),
       accounting_standard: form.accounting_standard.toUpperCase()
     };
-    
     try {
       if (editingWarehouse) {
         const { error } = await supabase.from('warehouses').update(data).eq('id', editingWarehouse.id);
         if (error) throw error;
         toast.success('تم تحديث بيانات المخزن');
       } else {
-        const { data: newWarehouse, error } = await supabase.from('warehouses').insert(data).select().single();
+        const { error } = await supabase.from('warehouses').insert(data).select().single();
         if (error) throw error;
-        
         toast.success('تم إنشاء المخزن الجديد');
       }
       setShowForm(false);
       setEditingWarehouse(null);
-      setForm({
-        code: '',
-        name: '',
-        name_ar: '',
-        type: 'main',
-        accounting_standard: 'IFRS',
-        parent_warehouse_id: '',
-        address: '',
-        city: '',
-        country: 'Egypt',
-        phone: '',
-        email: '',
-        manager_name: '',
-        currency: 'EGP',
-        accounting_account_code: '',
-        inventory_account_code: '',
-        cogs_account_code: '',
-        notes: ''
-      });
+      setForm({ code: '', name: '', name_ar: '', type: 'main', accounting_standard: 'IFRS', parent_warehouse_id: '', address: '', city: '', country: 'Egypt', phone: '', email: '', manager_name: '', currency: 'EGP', accounting_account_code: '', inventory_account_code: '', cogs_account_code: '', notes: '' });
       onRefresh();
     } catch (error: any) {
       console.error('Warehouse save error:', error);
       toast.error(`فشل الحفظ: ${error?.message || 'تحقق من الصلاحيات والاتصال'}`);
     }
+  };
+
+  const typeLabel = (type: string) => {
+    const t = type?.toUpperCase();
+    if (t === 'MAIN') return 'رئيسي';
+    if (t === 'SUB') return 'فرعي';
+    if (t === 'RAW_MATERIALS') return 'خامات';
+    if (t === 'FINISHED_GOODS') return 'منتج تام';
+    if (t === 'WORK_IN_PROGRESS') return 'تحت التصنيع';
+    if (t === 'SERVICE') return 'خدمات';
+    if (t === 'PROJECT') return 'مشروع';
+    return type || '—';
   };
 
   return (
@@ -1113,55 +1140,57 @@ function WarehousesManager({ restaurantId, warehouses, onRefresh }: { restaurant
         </Button>
       </div>
 
+      {/* Warehouse Cards Grid with stock summary */}
       <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
-        {warehouses.map(wh => (
+        {warehouses.map(wh => {
+          const matrix = stockMatrix.find(m => m.warehouse.id === wh.id);
+          return (
           <div key={wh.id} className="glass-card p-4 rounded-2xl border border-border/50 hover:shadow-lg transition-all">
             <div className="flex items-center justify-between mb-3">
               <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
                 <Building2 className="w-5 h-5 text-primary" />
               </div>
               <div className="flex gap-1">
-                <Badge variant="outline" className="text-[10px] bg-secondary/30">{wh.type === 'MAIN' ? 'رئيسي' : wh.type === 'SUB' ? 'فرعي' : wh.type}</Badge>
+                <Badge variant="outline" className="text-[10px] bg-secondary/30">{typeLabel(wh.type)}</Badge>
                 {wh.is_default && <Badge variant="outline" className="text-[10px] bg-primary/20 text-primary">افتراضي</Badge>}
               </div>
             </div>
-            <h4 className="font-bold text-sm mb-1">{wh.name}</h4>
-            <p className="text-[10px] text-muted-foreground mb-1">{wh.name_ar || ''}</p>
-            <p className="text-[10px] text-muted-foreground mb-3 flex items-center gap-1">
+            <h4 className="font-bold text-sm mb-0.5">{wh.name_ar || wh.name}</h4>
+            <p className="text-[10px] text-muted-foreground mb-1">{wh.name_ar ? wh.name : ''}</p>
+            <p className="text-[10px] text-muted-foreground mb-2 flex items-center gap-1">
               <Package className="w-3 h-3" /> الكود: {wh.code || '---'}
             </p>
+            {/* Stock summary */}
+            {matrix && (
+              <div className="grid grid-cols-2 gap-2 mb-3">
+                <div className="bg-primary/5 rounded-lg p-2 text-center">
+                  <p className="text-[10px] text-muted-foreground">إجمالي الكمية</p>
+                  <p className="text-sm font-bold text-primary">{matrix.totalQty.toLocaleString()}</p>
+                </div>
+                <div className="bg-success/5 rounded-lg p-2 text-center">
+                  <p className="text-[10px] text-muted-foreground">قيمة المخزون</p>
+                  <p className="text-sm font-bold text-success">{matrix.totalValue.toLocaleString()} <span className="text-[9px]">{currency}</span></p>
+                </div>
+              </div>
+            )}
             {wh.parent_warehouse_id && (
-              <p className="text-[10px] text-muted-foreground mb-3 flex items-center gap-1">
+              <p className="text-[10px] text-muted-foreground mb-2 flex items-center gap-1">
                 <FolderTree className="w-3 h-3" /> تابع: {warehouses.find(w => w.id === wh.parent_warehouse_id)?.name || 'غير معروف'}
               </p>
             )}
             <div className="flex gap-2">
-              <Button size="sm" variant="outline" className="flex-1 h-8 rounded-lg text-xs" onClick={() => { 
-                setEditingWarehouse(wh); 
-                setForm({
-                  code: wh.code,
-                  name: wh.name,
-                  name_ar: wh.name_ar || '',
-                  type: wh.type.toLowerCase(),
-                  accounting_standard: wh.accounting_standard,
-                  parent_warehouse_id: wh.parent_warehouse_id || '',
-                  address: wh.address || '',
-                  city: wh.city || '',
-                  country: wh.country || 'Egypt',
-                  phone: wh.phone || '',
-                  email: wh.email || '',
-                  manager_name: wh.manager_name || '',
-                  currency: wh.currency,
-                  accounting_account_code: wh.accounting_account_code || '',
-                  inventory_account_code: wh.inventory_account_code || '',
-                  cogs_account_code: wh.cogs_account_code || '',
-                  notes: wh.notes || ''
-                });
-                setShowForm(true); 
-              }}>
-                <Edit2 className="w-3 h-3 ml-1" /> تعديل
+              <Button size="sm" variant="outline" className="flex-1 h-8 rounded-lg text-xs"
+                onClick={() => setStockView(wh)}>
+                <Package className="w-3 h-3 ml-1" /> تفاصيل المخزون
               </Button>
-              <Button size="sm" variant="ghost" className="h-8 rounded-lg text-destructive hover:bg-destructive/10" onClick={() => {
+              <Button size="sm" variant="outline" className="h-8 w-8 rounded-lg p-0" onClick={() => {
+                setEditingWarehouse(wh);
+                setForm({ code: wh.code, name: wh.name, name_ar: wh.name_ar || '', type: wh.type.toLowerCase(), accounting_standard: wh.accounting_standard, parent_warehouse_id: wh.parent_warehouse_id || '', address: wh.address || '', city: wh.city || '', country: wh.country || 'Egypt', phone: wh.phone || '', email: wh.email || '', manager_name: wh.manager_name || '', currency: wh.currency, accounting_account_code: wh.accounting_account_code || '', inventory_account_code: wh.inventory_account_code || '', cogs_account_code: wh.cogs_account_code || '', notes: wh.notes || '' });
+                setShowForm(true);
+              }}>
+                <Edit2 className="w-3 h-3" />
+              </Button>
+              <Button size="sm" variant="ghost" className="h-8 w-8 rounded-lg p-0 text-destructive hover:bg-destructive/10" onClick={() => {
                 if (confirm('هل أنت متأكد من حذف هذا المخزن؟')) {
                   supabase.from('warehouses').delete().eq('id', wh.id).then(({ error }) => {
                     if (error) toast.error('فشل الحذف: ' + error.message);
@@ -1173,7 +1202,7 @@ function WarehousesManager({ restaurantId, warehouses, onRefresh }: { restaurant
               </Button>
             </div>
           </div>
-        ))}
+        )})}
         {warehouses.length === 0 && (
           <div className="col-span-full py-20 text-center glass-card rounded-3xl opacity-50">
             <Building2 className="w-12 h-12 mx-auto mb-4 text-muted-foreground" />
@@ -1182,6 +1211,92 @@ function WarehousesManager({ restaurantId, warehouses, onRefresh }: { restaurant
         )}
       </div>
 
+      {/* Stock Details Modal */}
+      <AnimatePresence>
+        {stockView && (
+          <div className="fixed inset-0 z-50 bg-background/80 backdrop-blur-sm flex items-center justify-center p-4">
+            <motion.div initial={{ scale: 0.9 }} animate={{ scale: 1 }} className="glass-card p-6 max-w-2xl w-full max-h-[90vh] flex flex-col rounded-3xl shadow-2xl">
+              <div className="flex items-center justify-between mb-4">
+                <div>
+                  <h3 className="font-display font-bold text-lg flex items-center gap-2">
+                    <Building2 className="w-5 h-5 text-primary" />
+                    {stockView.name_ar || stockView.name}
+                    <Badge variant="outline" className="text-[10px]">{typeLabel(stockView.type)}</Badge>
+                  </h3>
+                  <p className="text-xs text-muted-foreground mt-0.5">كود المخزن: {stockView.code}</p>
+                </div>
+                <Button size="sm" variant="ghost" onClick={() => { setStockView(null); setStockSearch(''); }} className="rounded-xl">✕</Button>
+              </div>
+
+              {/* Search */}
+              <div className="flex gap-2 mb-4">
+                <div className="relative flex-1">
+                  <Search className="w-4 h-4 absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                  <Input
+                    value={stockSearch}
+                    onChange={e => setStockSearch(e.target.value)}
+                    placeholder="بحث باسم الصنف أو باركود أو SKU..."
+                    className="pr-10 h-10 rounded-xl text-xs border-0 bg-secondary/30"
+                  />
+                </div>
+              </div>
+
+              {/* Stock items list */}
+              <div className="overflow-auto flex-1 space-y-2">
+                {filteredStockItems.length === 0 ? (
+                  <div className="py-12 text-center opacity-50">
+                    <Package className="w-10 h-10 mx-auto mb-2 text-muted-foreground" />
+                    <p className="text-sm">{stockSearch ? 'لا توجد نتائج' : 'لا يوجد مخزون في هذا المستودع'}</p>
+                  </div>
+                ) : (
+                  filteredStockItems.map(s => (
+                    <div key={s.id || s.product_id} className="flex items-center gap-3 p-3 rounded-xl bg-secondary/20 hover:bg-secondary/40 transition-all">
+                      <div className="w-9 h-9 rounded-lg bg-secondary/50 flex items-center justify-center text-xl">
+                        {s.product?.image || '📦'}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="font-bold text-sm truncate">{s.product?.name}</p>
+                        <div className="flex items-center gap-2 text-[10px] text-muted-foreground">
+                          {s.product?.barcode && <code className="bg-secondary/50 px-1 rounded">{s.product.barcode}</code>}
+                          {s.product?.sku && <span>SKU: {s.product.sku}</span>}
+                          <span>{s.product?.category}</span>
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <p className={`font-bold text-sm ${Number(s.quantity) <= 0 ? 'text-destructive' : Number(s.quantity) <= (s.product?.min_quantity || 5) ? 'text-warning' : 'text-success'}`}>
+                          {Number(s.quantity).toLocaleString()}
+                          <span className="text-[10px] text-muted-foreground mr-1">{s.product?.unit || 'قطعة'}</span>
+                        </p>
+                        <p className="text-[10px] text-muted-foreground">
+                          قيمة: {(Number(s.quantity) * Number(s.product?.cost_price || 0)).toFixed(2)} {currency}
+                        </p>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+
+              {/* Footer summary */}
+              <div className="mt-4 pt-3 border-t border-border/50 grid grid-cols-3 gap-3">
+                <div className="text-center">
+                  <p className="text-[10px] text-muted-foreground">عدد الأصناف</p>
+                  <p className="font-bold text-sm">{filteredStockItems.length}</p>
+                </div>
+                <div className="text-center">
+                  <p className="text-[10px] text-muted-foreground">إجمالي الكميات</p>
+                  <p className="font-bold text-sm">{filteredStockItems.reduce((s, x) => s + Number(x.quantity || 0), 0).toLocaleString()}</p>
+                </div>
+                <div className="text-center">
+                  <p className="text-[10px] text-muted-foreground">إجمالي القيمة</p>
+                  <p className="font-bold text-sm text-primary">{filteredStockItems.reduce((s, x) => s + Number(x.quantity || 0) * Number(x.product?.cost_price || 0), 0).toFixed(2)} {currency}</p>
+                </div>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Add/Edit Form */}
       <AnimatePresence>
         {showForm && (
           <div className="fixed inset-0 z-50 bg-background/80 backdrop-blur-sm flex items-center justify-center p-4">
@@ -1190,7 +1305,7 @@ function WarehousesManager({ restaurantId, warehouses, onRefresh }: { restaurant
               <div className="space-y-3">
                 <div className="grid grid-cols-2 gap-3">
                   <Input placeholder="الكود" value={form.code} onChange={e => setForm({ ...form, code: e.target.value })} className="h-11 rounded-xl" />
-                  <Input placeholder="اسم المخزن" value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} className="h-11 rounded-xl" />
+                  <Input placeholder="اسم المخزن (إنجليزي)" value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} className="h-11 rounded-xl" />
                 </div>
                 <Input placeholder="الاسم بالعربي" value={form.name_ar} onChange={e => setForm({ ...form, name_ar: e.target.value })} className="h-11 rounded-xl" />
                 <select value={form.type} onChange={e => setForm({ ...form, type: e.target.value })} className="w-full h-11 rounded-xl border border-input bg-background px-3 text-sm">
@@ -1210,7 +1325,7 @@ function WarehousesManager({ restaurantId, warehouses, onRefresh }: { restaurant
                 {form.type === 'sub' && (
                   <select value={form.parent_warehouse_id} onChange={e => setForm({ ...form, parent_warehouse_id: e.target.value })} className="w-full h-11 rounded-xl border border-input bg-background px-3 text-sm">
                     <option value="">اختر المخزن الرئيسي</option>
-                    {mainWarehouses.map(w => <option key={w.id} value={w.id}>{w.name} ({w.code})</option>)}
+                    {mainWarehouses.map(w => <option key={w.id} value={w.id}>{w.name_ar || w.name} ({w.code})</option>)}
                   </select>
                 )}
                 <Input placeholder="العنوان" value={form.address} onChange={e => setForm({ ...form, address: e.target.value })} className="h-11 rounded-xl" />
@@ -1230,11 +1345,6 @@ function WarehousesManager({ restaurantId, warehouses, onRefresh }: { restaurant
                   <option value="SAR">SAR - ريال سعودي</option>
                   <option value="AED">AED - درهم إماراتي</option>
                 </select>
-                <div className="grid grid-cols-3 gap-3">
-                  <Input placeholder="كود حساب المحاسبة" value={form.accounting_account_code} onChange={e => setForm({ ...form, accounting_account_code: e.target.value })} className="h-11 rounded-xl" />
-                  <Input placeholder="كود حساب المخزون" value={form.inventory_account_code} onChange={e => setForm({ ...form, inventory_account_code: e.target.value })} className="h-11 rounded-xl" />
-                  <Input placeholder="كود حساب تكلفة البضاعة" value={form.cogs_account_code} onChange={e => setForm({ ...form, cogs_account_code: e.target.value })} className="h-11 rounded-xl" />
-                </div>
                 <textarea placeholder="ملاحظات" value={form.notes} onChange={e => setForm({ ...form, notes: e.target.value })} className="w-full h-20 rounded-xl border border-input bg-background px-3 text-sm resize-none" />
               </div>
               <div className="flex gap-2">
@@ -1248,6 +1358,9 @@ function WarehousesManager({ restaurantId, warehouses, onRefresh }: { restaurant
     </div>
   );
 }
+
+
+
 
 
 

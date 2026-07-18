@@ -55,20 +55,64 @@ export function InventoryTransfersManager({
   const [form, setForm] = useState({ from_wh: '', to_wh: '', product_id: '', quantity: '', notes: '' });
 
   const loadTransfers = async () => {
-    const { data } = await supabase
-      .from('inventory_transfers')
-      .select(`
-        *,
-        from:from_warehouse_id(name, name_ar),
-        to:to_warehouse_id(name, name_ar),
-        items:inventory_transfer_items(product_id, quantity, product:products(name))
-      `)
-      .eq('restaurant_id', restaurantId)
-      .order('created_at', { ascending: false });
-    setTransfers(data || []);
+    try {
+      const [transfersRes, itemsRes] = await Promise.all([
+        supabase
+          .from('inventory_transfers')
+          .select('*')
+          .eq('restaurant_id', restaurantId)
+          .order('created_at', { ascending: false }),
+        supabase
+          .from('inventory_transfer_items')
+          .select('*')
+          .eq('restaurant_id', restaurantId)
+      ]);
+
+      if (transfersRes.error) throw transfersRes.error;
+
+      const rawTransfers = transfersRes.data || [];
+      const rawItems = itemsRes.data || [];
+
+      const mapped: Transfer[] = rawTransfers.map((t: any) => {
+        const fromWh = warehouses.find(w => w.id === t.from_warehouse_id);
+        const toWh = warehouses.find(w => w.id === t.to_warehouse_id);
+        
+        const matchedItems = rawItems
+          .filter((item: any) => item.transfer_id === t.id)
+          .map((item: any) => {
+            const prod = products.find(p => p.id === item.product_id);
+            return {
+              product_id: item.product_id,
+              quantity: Number(item.quantity || 0),
+              product: prod ? { name: prod.name } : { name: 'صنف غير معروف' }
+            };
+          });
+
+        return {
+          id: t.id,
+          created_at: t.created_at,
+          notes: t.notes,
+          status: t.status,
+          from_warehouse_id: t.from_warehouse_id,
+          to_warehouse_id: t.to_warehouse_id,
+          from: fromWh ? { name: fromWh.name, name_ar: fromWh.name_ar } : undefined,
+          to: toWh ? { name: toWh.name, name_ar: toWh.name_ar } : undefined,
+          items: matchedItems
+        };
+      });
+
+      setTransfers(mapped);
+    } catch (err: any) {
+      console.error('Failed to load transfers:', err);
+      toast.error('حدث خطأ أثناء تحميل التحويلات: ' + err.message);
+    }
   };
 
-  useEffect(() => { loadTransfers(); }, []);
+  useEffect(() => {
+    if (restaurantId && warehouses.length > 0 && products.length > 0) {
+      loadTransfers();
+    }
+  }, [restaurantId, warehouses, products]);
 
   const handleTransfer = async () => {
     if (!form.from_wh || !form.to_wh || !form.product_id || !form.quantity)
