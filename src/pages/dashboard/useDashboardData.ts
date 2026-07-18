@@ -206,7 +206,7 @@ export function useDashboardData() {
       supabase.from('delivery_agents').select('*').eq('restaurant_id', rest.id),
       supabase.from('shifts').select('*').eq('restaurant_id', rest.id).eq('status', 'open').maybeSingle(),
       supabase.from('tax_rates').select('*').eq('restaurant_id', rest.id).eq('is_active', true),
-      usesProductsCatalog ? supabase.from('warehouses').select('id,name_ar,name').eq('restaurant_id', rest.id) : Promise.resolve({ data: [] })
+      usesProductsCatalog ? supabase.from('warehouses').select('id,name_ar,name').or(`restaurant_id.eq.${rest.id},restaurant_id.is.null`) : Promise.resolve({ data: [] })
     ]);
 
     const warehousesMap = new Map((warehousesRes.data || []).map((w: any) => [w.id, w.name_ar || w.name]));
