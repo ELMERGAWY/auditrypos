@@ -62,6 +62,8 @@ interface Props {
 const STATUS_OPTIONS = [
   { value: 'pending', label: 'قيد الانتظار', color: 'bg-slate-500', text: 'text-slate-700', soft: 'bg-slate-500/10 border-slate-500/30' },
   { value: 'in_progress', label: 'قيد التنفيذ', color: 'bg-sky-500', text: 'text-sky-700', soft: 'bg-sky-500/10 border-sky-500/30' },
+  { value: 'contacted', label: 'تم التواصل', color: 'bg-indigo-500', text: 'text-indigo-700', soft: 'bg-indigo-500/10 border-indigo-500/30' },
+  { value: 'no_answer', label: 'بدون رد', color: 'bg-rose-500', text: 'text-rose-700', soft: 'bg-rose-500/10 border-rose-500/30' },
   { value: 'partial', label: 'تسليم جزئي', color: 'bg-amber-500', text: 'text-amber-700', soft: 'bg-amber-500/10 border-amber-500/30' },
   { value: 'delivered', label: 'تم التسليم', color: 'bg-emerald-500', text: 'text-emerald-700', soft: 'bg-emerald-500/10 border-emerald-500/30' },
   { value: 'delayed', label: 'متأخر', color: 'bg-rose-500', text: 'text-rose-700', soft: 'bg-rose-500/10 border-rose-500/30' },
@@ -93,7 +95,9 @@ function mapOrderDeliveryStatus(
   if (ds === 'delivered' || ds === 'completed') return 'delivered';
   if (ds === 'cancelled') return 'cancelled';
   if (ds === 'partial' || (itemsCount > 0 && deliveredCount > 0 && deliveredCount < itemsCount)) return 'partial';
-  if (ds === 'in_progress' || ds === 'out_for_delivery' || ds === 'preparing' || ds === 'contacted' || ds === 'no_answer') return 'in_progress';
+  if (ds === 'contacted') return 'contacted';
+  if (ds === 'no_answer') return 'no_answer';
+  if (ds === 'in_progress' || ds === 'out_for_delivery' || ds === 'preparing') return 'in_progress';
   if (daysUntil(expectedDate) < 0) return 'delayed';
   return 'pending';
 }
@@ -157,7 +161,7 @@ export function ServiceDeliverables({ restaurantId }: Props) {
     if (!restaurantId) return;
     setLoading(true);
     try {
-      const [{ data: marketingDeliverables, error: marketingError }, { data: ordersWithDelivery, error: ordersError }] =
+      const [marketingRes, ordersRes, logsRes] =
         await Promise.all([
           supabase
             .from('marketing_service_deliverables')
@@ -171,11 +175,18 @@ export function ServiceDeliverables({ restaurantId }: Props) {
             .not('delivery_date', 'is', null)
             .neq('status', 'cancelled')
             .order('delivery_date', { ascending: true }),
+          supabase
+            .from('delivery_contact_logs')
+            .select('*')
+            .eq('restaurant_id', restaurantId)
+            .order('created_at', { ascending: false }),
         ]);
 
-      if (marketingError) throw marketingError;
-      let ordersData = ordersWithDelivery;
-      if (ordersError) {
+      if (marketingRes.error) throw marketingRes.error;
+      const logs = logsRes.data || [];
+      let ordersData = ordersRes.data || [];
+
+      if (ordersRes.error) {
         // Fallback if new receipt columns not migrated yet
         const fb = await supabase
           .from('orders')
@@ -188,7 +199,7 @@ export function ServiceDeliverables({ restaurantId }: Props) {
         ordersData = fb.data;
       }
 
-      const fromMarketing: ServiceDeliverable[] = (marketingDeliverables || []).map((d: any) => {
+      const fromMarketing: ServiceDeliverable[] = (marketingRes.data || []).map((d: any) => {
         let status = d.status || 'pending';
         if (status !== 'delivered' && status !== 'cancelled' && d.expected_delivery_date && daysUntil(d.expected_delivery_date) < 0) {
           status = 'delayed';
@@ -201,6 +212,7 @@ export function ServiceDeliverables({ restaurantId }: Props) {
           items: [],
           delivered_count: status === 'delivered' ? 1 : 0,
           items_count: 1,
+          contact_logs: logs.filter((l: any) => l.invoice_id === d.invoice_id),
         };
       });
 
@@ -244,6 +256,7 @@ export function ServiceDeliverables({ restaurantId }: Props) {
           delivery_receipt_note: order.delivery_receipt_note || null,
           delivered_count: deliveredCount,
           items_count: items.length,
+          contact_logs: logs.filter((l: any) => l.order_id === order.id),
         };
       });
 
@@ -305,6 +318,27 @@ export function ServiceDeliverables({ restaurantId }: Props) {
     setShowReceiptModal(true);
   };
 
+  const logContactAttempt = async (deliverable: ServiceDeliverable, status: 'contacted' | 'no_answer') => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      const insertData: any = {
+        restaurant_id: restaurantId,
+        source: deliverable.source,
+        status,
+        created_by: user?.id || null,
+      };
+      if (deliverable.source === 'order') {
+        insertData.order_id = deliverable.id;
+      } else {
+        insertData.invoice_id = deliverable.invoice_id || null;
+      }
+      const { error } = await supabase.from('delivery_contact_logs').insert(insertData);
+      if (error) throw error;
+    } catch (e: any) {
+      console.error('Error logging contact attempt:', e);
+    }
+  };
+
   const updateStatusQuick = async (deliverable: ServiceDeliverable, nextStatus: string) => {
     if (deliverable.status === nextStatus) return;
 
@@ -312,6 +346,10 @@ export function ServiceDeliverables({ restaurantId }: Props) {
     if (nextStatus === 'delivered' || nextStatus === 'partial') {
       openReceiptConfirm(deliverable, nextStatus === 'delivered');
       return;
+    }
+
+    if (nextStatus === 'contacted' || nextStatus === 'no_answer') {
+      await logContactAttempt(deliverable, nextStatus);
     }
 
     setSavingId(deliverable.id);
@@ -580,9 +618,11 @@ export function ServiceDeliverables({ restaurantId }: Props) {
     const delayed = deliverables.filter((d) => d.status === 'delayed').length;
     const pending = deliverables.filter((d) => d.status === 'pending').length;
     const inProgress = deliverables.filter((d) => d.status === 'in_progress').length;
+    const contacted = deliverables.filter((d) => d.status === 'contacted').length;
+    const noAnswer = deliverables.filter((d) => d.status === 'no_answer').length;
     const partial = deliverables.filter((d) => d.status === 'partial').length;
     const delivered = deliverables.filter((d) => d.status === 'delivered').length;
-    return { delayed, pending, inProgress, partial, delivered, total: deliverables.length };
+    return { delayed, pending, inProgress, contacted, noAnswer, partial, delivered, total: deliverables.length };
   }, [deliverables]);
 
   const getStatusInfo = (status: string) =>
@@ -618,11 +658,13 @@ export function ServiceDeliverables({ restaurantId }: Props) {
         </div>
       </div>
 
-      <div className="grid grid-cols-2 md:grid-cols-6 gap-3">
+      <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-3">
         {[
           { label: 'الإجمالي', value: stats.total, className: 'text-primary' },
           { label: 'انتظار', value: stats.pending, className: 'text-slate-600' },
           { label: 'تنفيذ', value: stats.inProgress, className: 'text-sky-600' },
+          { label: 'تم التواصل', value: stats.contacted, className: 'text-indigo-600' },
+          { label: 'بدون رد', value: stats.noAnswer, className: 'text-rose-600' },
           { label: 'جزئي', value: stats.partial, className: 'text-amber-600' },
           { label: 'تم التسليم', value: stats.delivered, className: 'text-emerald-600' },
           { label: 'متأخر', value: stats.delayed, className: 'text-rose-600' },
@@ -756,32 +798,86 @@ export function ServiceDeliverables({ restaurantId }: Props) {
               </div>
 
               {/* Quick status — outside edit modal */}
-              <div onClick={(e) => e.stopPropagation()} onPointerDown={(e) => e.stopPropagation()}>
-                <Label className="text-[10px] text-muted-foreground mb-1 block">تغيير الحالة</Label>
-                <Select
-                  value={deliverable.status}
-                  onValueChange={(v) => updateStatusQuick(deliverable, v)}
-                  disabled={savingId === deliverable.id}
-                >
-                  <SelectTrigger className={`h-9 ${statusInfo.soft} border`}>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {STATUS_OPTIONS.map((s) => (
-                      <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+              <div onClick={(e) => e.stopPropagation()} onPointerDown={(e) => e.stopPropagation()} className="space-y-2">
+                <div>
+                  <Label className="text-[10px] text-muted-foreground mb-1 block">تغيير الحالة</Label>
+                  <Select
+                    value={deliverable.status}
+                    onValueChange={(v) => updateStatusQuick(deliverable, v)}
+                    disabled={savingId === deliverable.id}
+                  >
+                    <SelectTrigger className={`h-9 ${statusInfo.soft} border`}>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {STATUS_OPTIONS.map((s) => (
+                        <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {deliverable.status !== 'delivered' && (
+                  <div className="flex gap-1.5">
+                    <button
+                      onClick={() => updateStatusQuick(deliverable, 'contacted')}
+                      className="flex-1 py-1.5 px-1 rounded-lg text-[10px] font-bold border bg-indigo-500/10 border-indigo-500/30 text-indigo-600 hover:bg-indigo-500/20 transition-all flex items-center justify-center gap-1"
+                      title="تسجيل مكالمة ناجحة (تم التواصل)"
+                    >
+                      📞 تم التواصل
+                    </button>
+                    <button
+                      onClick={() => updateStatusQuick(deliverable, 'no_answer')}
+                      className="flex-1 py-1.5 px-1 rounded-lg text-[10px] font-bold border bg-rose-500/10 border-rose-500/30 text-rose-600 hover:bg-rose-500/20 transition-all flex items-center justify-center gap-1"
+                      title="تسجيل مكالمة غير مجابة (لا يوجد رد)"
+                    >
+                      📵 لا رد
+                    </button>
+                  </div>
+                )}
+
                 <Button
                   size="sm"
                   variant="secondary"
-                  className="w-full mt-2 h-8 text-xs gap-1"
+                  className="w-full h-8 text-xs gap-1"
                   onClick={() => openReceiptConfirm(deliverable, false)}
                 >
                   <ClipboardCheck className="w-3.5 h-3.5" />
                   تسجيل تسليم / اختيار الأصناف
                 </Button>
               </div>
+
+              {/* Contact attempts history list */}
+              {deliverable.contact_logs && deliverable.contact_logs.length > 0 && (
+                <div className="rounded-lg bg-muted/40 border border-border/50 p-2 space-y-1.5">
+                  <p className="text-[10px] font-bold text-muted-foreground flex items-center gap-1">
+                    <Clock className="w-3.5 h-3.5" /> سجل المتابعة والاتصال ({deliverable.contact_logs.length}):
+                  </p>
+                  <div className="max-h-[85px] overflow-y-auto space-y-1 pr-1 custom-scrollbar">
+                    {deliverable.contact_logs.map((log: any) => {
+                      const isContacted = log.status === 'contacted';
+                      return (
+                        <div
+                          key={log.id}
+                          className={`flex items-center justify-between text-[9px] px-1.5 py-0.5 rounded border ${
+                            isContacted
+                              ? 'bg-indigo-500/10 text-indigo-600 border-indigo-500/20'
+                              : 'bg-rose-500/10 text-rose-600 border-rose-500/20'
+                          }`}
+                        >
+                          <span className="font-bold flex items-center gap-1">
+                            {isContacted ? '📞 تم التواصل' : '📵 بدون رد'}
+                          </span>
+                          <span className="opacity-85 text-[8px] font-mono">
+                            {new Date(log.created_at).toLocaleDateString('ar-EG', { month: '2-digit', day: '2-digit' })}{' '}
+                            {new Date(log.created_at).toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit', hour12: true })}
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
 
               {(deliverable.items_count || 0) > 0 && deliverable.source === 'order' && (
                 <div className="rounded-lg bg-muted/40 border border-border/50 p-2 space-y-1.5">
