@@ -35,13 +35,30 @@ export function StaffAccessApprovals({ restaurantId, superAdmin }: Props) {
     try {
       let cid: string | null = null;
 
-      if (restaurantId && !superAdmin) {
-        const { data: rest } = await supabase
-          .from('restaurants')
-          .select('company_id')
-          .eq('id', restaurantId)
-          .maybeSingle();
-        cid = rest?.company_id || null;
+      if (!superAdmin) {
+        if (restaurantId) {
+          const { data: rest } = await supabase
+            .from('restaurants')
+            .select('company_id')
+            .eq('id', restaurantId)
+            .maybeSingle();
+          cid = rest?.company_id || null;
+        }
+
+        if (!cid) {
+          const { data: { user } } = await supabase.auth.getUser();
+          if (user) {
+            const { data: membership } = await supabase
+              .from('company_users')
+              .select('company_id')
+              .eq('user_id', user.id)
+              .eq('is_active', true)
+              .limit(1);
+            if (membership && membership.length > 0) {
+              cid = membership[0].company_id;
+            }
+          }
+        }
         setCompanyId(cid);
       }
 

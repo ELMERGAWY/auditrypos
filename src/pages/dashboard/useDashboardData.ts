@@ -156,6 +156,28 @@ export function useDashboardData() {
     }
 
     if (!rest) {
+      const { data: pendingReq } = await supabase
+        .from('staff_access_requests')
+        .select('status')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false })
+        .limit(1);
+
+      if (pendingReq && pendingReq.length > 0) {
+        const req = pendingReq[0];
+        if (req.status === 'pending') {
+          toast.info('حسابك بانتظار موافقة أدمن الشركة. سيتم توجيهك لصفحة دخول الموظفين.');
+          await signOut();
+          navigate('/staff-login');
+          return;
+        } else if (req.status === 'rejected') {
+          toast.error('تم رفض طلب انضمامك من قبل الإدارة.');
+          await signOut();
+          navigate('/staff-login');
+          return;
+        }
+      }
+
       setRestaurant(prev => {
         if (prev) return prev;
         return null;
