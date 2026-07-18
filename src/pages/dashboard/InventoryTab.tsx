@@ -445,7 +445,7 @@ export function InventoryTab({ restaurantId, currency, businessType }: Props) {
                         return warehouse ? (
                           <Badge variant="outline" className="text-[10px] border-info/30 text-info bg-info/10">
                             <Package className="w-3 h-3 mr-1" />
-                            {warehouse.name_ar || warehouse.name}
+                            {warehouse.name || warehouse.name_ar}
                           </Badge>
                         ) : null;
                       })()}

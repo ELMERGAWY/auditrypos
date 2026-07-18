@@ -209,7 +209,7 @@ export function useDashboardData() {
       usesProductsCatalog ? supabase.from('warehouses').select('id,name_ar,name').eq('restaurant_id', rest.id) : Promise.resolve({ data: [] })
     ]);
 
-    const warehousesMap = new Map((warehousesRes.data || []).map((w: any) => [w.id, w.name_ar || w.name]));
+    const warehousesMap = new Map((warehousesRes.data || []).map((w: any) => [w.id, w.name || w.name_ar]));
 
     const loadedMenuItems = usesProductsCatalog
       ? ((itemsRes.data || []).map((product: any) => ({

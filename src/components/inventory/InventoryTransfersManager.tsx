@@ -153,8 +153,33 @@ export function InventoryTransfersManager({
     }
   };
 
+  const handleDeleteTransfer = async (id: string) => {
+    if (!confirm('هل أنت متأكد من حذف هذا التحويل؟ (لن يتم استرجاع الكميات تلقائياً، هذا الإجراء يحذف السجل فقط)')) return;
+    try {
+      // 1. Delete transfer items
+      const { error: itemsError } = await supabase
+        .from('inventory_transfer_items')
+        .delete()
+        .eq('transfer_id', id);
+      if (itemsError) throw itemsError;
 
-  const whName = (wh: Warehouse) => wh.name_ar || wh.name;
+      // 2. Delete transfer log
+      const { error: transferError } = await supabase
+        .from('inventory_transfers')
+        .delete()
+        .eq('id', id);
+      if (transferError) throw transferError;
+
+      toast.success('تم حذف سجل التحويل بنجاح');
+      loadTransfers();
+      onRefresh();
+    } catch (error: any) {
+      console.error('Delete transfer error:', error);
+      toast.error('فشل الحذف: ' + error.message);
+    }
+  };
+
+  const whName = (wh: Warehouse) => wh.name || wh.name_ar;
 
   return (
     <div className="space-y-4">
@@ -178,14 +203,15 @@ export function InventoryTransfersManager({
                 <th className="p-3 font-bold">الأصناف</th>
                 <th className="p-3 font-bold">الحالة</th>
                 <th className="p-3 font-bold">ملاحظات</th>
+                <th className="p-3 font-bold text-center">العمليات</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-border/50">
               {transfers.map(t => (
                 <tr key={t.id} className="hover:bg-secondary/20 transition-colors">
                   <td className="p-3">{new Date(t.created_at).toLocaleDateString('ar-EG')}</td>
-                  <td className="p-3 font-bold">{t.from?.name_ar || t.from?.name || '---'}</td>
-                  <td className="p-3 font-bold">{t.to?.name_ar || t.to?.name || '---'}</td>
+                  <td className="p-3 font-bold">{t.from?.name || t.from?.name_ar || '---'}</td>
+                  <td className="p-3 font-bold">{t.to?.name || t.to?.name_ar || '---'}</td>
                   <td className="p-3">
                     {(t.items || []).map((item, idx) => (
                       <span key={idx} className="inline-flex items-center gap-1 mr-2">
@@ -198,11 +224,22 @@ export function InventoryTransfersManager({
                     <Badge className="bg-success/10 text-success border-0 text-[10px]">مكتمل</Badge>
                   </td>
                   <td className="p-3 text-muted-foreground truncate max-w-[150px]">{t.notes || '---'}</td>
+                  <td className="p-3 text-center">
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="h-7 w-7 p-0 text-destructive hover:bg-destructive/10 rounded-lg"
+                      onClick={() => handleDeleteTransfer(t.id)}
+                      title="حذف سجل التحويل"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </Button>
+                  </td>
                 </tr>
               ))}
               {transfers.length === 0 && (
                 <tr>
-                  <td colSpan={6} className="p-10 text-center opacity-50">لا توجد تحويلات مسجلة</td>
+                  <td colSpan={7} className="p-10 text-center opacity-50">لا توجد تحويلات مسجلة</td>
                 </tr>
               )}
             </tbody>
