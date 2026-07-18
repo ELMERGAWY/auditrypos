@@ -5,7 +5,8 @@ import {
   Package, Plus, Search, AlertTriangle, Edit2, Trash2, 
   ArrowDown, ArrowUp, BarChart3, X, TrendingUp, DollarSign,
   Truck, Calculator, History, FileSpreadsheet, Layers, Boxes, Save, RefreshCw, Download,
-  Bell, ShoppingCart, RotateCcw, Scale, Zap, CheckCircle, Building2, FolderTree
+  Bell, ShoppingCart, RotateCcw, Scale, Zap, CheckCircle, Building2, FolderTree,
+  ArrowRightLeft, ClipboardList
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -1008,6 +1009,16 @@ function WarehousesManager({ restaurantId, warehouses, onRefresh, products, curr
   const [stockSearch, setStockSearch] = useState('');
   const [stockWhFilter, setStockWhFilter] = useState('');
   const [stockView, setStockView] = useState<Warehouse | null>(null);
+
+  // --- Product Action Dialogs ---
+  type ProductActionTarget = { stockItem: any; warehouse: Warehouse } | null;
+  const [transferTarget, setTransferTarget] = useState<ProductActionTarget>(null);
+  const [addQtyTarget, setAddQtyTarget] = useState<ProductActionTarget>(null);
+  const [transferForm, setTransferForm] = useState({ mode: 'existing' as 'existing' | 'new', toWarehouseId: '', qtyMode: 'all' as 'all' | 'custom', customQty: '', newWhCode: '', newWhName: '', newWhNameAr: '' });
+  const [addQtyMode, setAddQtyMode] = useState<'direct' | 'purchase' | null>(null);
+  const [directQty, setDirectQty] = useState('');
+  const [transferring, setTransferring] = useState(false);
+  const [addingQty, setAddingQty] = useState(false);
   const [form, setForm] = useState({
     code: '',
     name: '',
@@ -1082,6 +1093,101 @@ function WarehousesManager({ restaurantId, warehouses, onRefresh, products, curr
     const cogsAccountCode = `52${baseCode}`;
     const accountingAccountCode = inventoryAccountCode;
     return { accounting_account_code: accountingAccountCode, inventory_account_code: inventoryAccountCode, cogs_account_code: cogsAccountCode };
+  };
+
+  // --- Transfer product to another warehouse ---
+  const handleProductTransfer = async () => {
+    if (!transferTarget) return;
+    const { stockItem, warehouse: fromWh } = transferTarget;
+    const prodId = stockItem.product_id;
+    const srcQty = Number(stockItem.quantity || 0);
+    const qty = transferForm.qtyMode === 'all' ? srcQty : Number(transferForm.customQty);
+
+    if (!qty || qty <= 0) return toast.error('الكمية يجب أن تكون أكبر من صفر');
+    if (qty > srcQty) return toast.error(`الكمية المتاحة: ${srcQty} فقط`);
+
+    setTransferring(true);
+    try {
+      let toWarehouseId = transferForm.toWarehouseId;
+
+      if (transferForm.mode === 'new') {
+        if (!transferForm.newWhCode || !transferForm.newWhName || !transferForm.newWhNameAr)
+          { toast.error('يرجى ملء بيانات المخزن الجديد'); setTransferring(false); return; }
+        const { data: newWh, error: whErr } = await supabase.from('warehouses').insert({
+          restaurant_id: restaurantId,
+          code: transferForm.newWhCode,
+          name: transferForm.newWhName,
+          name_ar: transferForm.newWhNameAr,
+          type: 'SUB',
+          accounting_standard: 'IFRS',
+          currency: 'EGP',
+        }).select().single();
+        if (whErr) throw whErr;
+        toWarehouseId = newWh.id;
+      }
+
+      if (!toWarehouseId) { toast.error('اختر المخزن الوجهة'); setTransferring(false); return; }
+      if (toWarehouseId === fromWh.id) { toast.error('لا يمكن التحويل لنفس المخزن'); setTransferring(false); return; }
+
+      const { data: result, error: rpcError } = await supabase.rpc('execute_inventory_transfer', {
+        p_restaurant_id: restaurantId,
+        p_from_warehouse_id: fromWh.id,
+        p_to_warehouse_id: toWarehouseId,
+        p_product_id: prodId,
+        p_quantity: qty,
+        p_notes: `تحويل من تفاصيل المخزن: ${fromWh.name || fromWh.name_ar}`
+      });
+      if (rpcError) throw rpcError;
+      const res = result as { success: boolean; error?: string };
+      if (!res?.success) { toast.error(res?.error || 'فشل التحويل'); setTransferring(false); return; }
+
+      toast.success('✅ تم التحويل بنجاح وتحديث الأرصدة');
+      setTransferTarget(null);
+      setTransferForm({ mode: 'existing', toWarehouseId: '', qtyMode: 'all', customQty: '', newWhCode: '', newWhName: '', newWhNameAr: '' });
+      await loadWarehouseStocks();
+      onRefresh();
+    } catch (err: any) {
+      toast.error('فشل التحويل: ' + err.message);
+    } finally {
+      setTransferring(false);
+    }
+  };
+
+  // --- Add quantity directly (inventory count) ---
+  const handleDirectQtyAdd = async () => {
+    if (!addQtyTarget) return;
+    const { stockItem } = addQtyTarget;
+    const addAmt = Number(directQty);
+    if (!addAmt || addAmt <= 0) return toast.error('الكمية يجب أن تكون أكبر من صفر');
+    setAddingQty(true);
+    try {
+      if (stockItem.id) {
+        await supabase.from('warehouse_stock')
+          .update({ quantity: Number(stockItem.quantity || 0) + addAmt })
+          .eq('id', stockItem.id);
+      } else {
+        await supabase.from('warehouse_stock').upsert({
+          restaurant_id: restaurantId,
+          warehouse_id: addQtyTarget.warehouse.id,
+          product_id: stockItem.product_id,
+          quantity: Number(stockItem.quantity || 0) + addAmt,
+        }, { onConflict: 'warehouse_id,product_id' });
+      }
+      await supabase.from('products')
+        .update({ quantity: (Number(stockItem.product?.quantity || 0)) + addAmt })
+        .eq('id', stockItem.product_id);
+
+      toast.success(`تم إضافة ${addAmt} ${stockItem.product?.unit || 'وحدة'} من الجرد الفعلي`);
+      setAddQtyTarget(null);
+      setAddQtyMode(null);
+      setDirectQty('');
+      await loadWarehouseStocks();
+      onRefresh();
+    } catch (err: any) {
+      toast.error('فشل الإضافة: ' + err.message);
+    } finally {
+      setAddingQty(false);
+    }
   };
 
   const handleSave = async () => {
@@ -1271,6 +1377,32 @@ function WarehousesManager({ restaurantId, warehouses, onRefresh, products, curr
                           قيمة: {(Number(s.quantity) * Number(s.product?.cost_price || 0)).toFixed(2)} {currency}
                         </p>
                       </div>
+                      {/* Action buttons */}
+                      <div className="flex flex-col gap-1 mr-1">
+                        <Button
+                          size="sm" variant="outline"
+                          className="h-7 w-7 p-0 rounded-lg border-primary/30 text-primary hover:bg-primary/10"
+                          title="تحويل لمخزن آخر"
+                          onClick={() => {
+                            setTransferTarget({ stockItem: s, warehouse: stockView! });
+                            setTransferForm({ mode: 'existing', toWarehouseId: '', qtyMode: 'all', customQty: '', newWhCode: '', newWhName: '', newWhNameAr: '' });
+                          }}
+                        >
+                          <ArrowRightLeft className="w-3 h-3" />
+                        </Button>
+                        <Button
+                          size="sm" variant="outline"
+                          className="h-7 w-7 p-0 rounded-lg border-success/30 text-success hover:bg-success/10"
+                          title="إضافة كميات"
+                          onClick={() => {
+                            setAddQtyTarget({ stockItem: s, warehouse: stockView! });
+                            setAddQtyMode(null);
+                            setDirectQty('');
+                          }}
+                        >
+                          <Plus className="w-3 h-3" />
+                        </Button>
+                      </div>
                     </div>
                   ))
                 )}
@@ -1291,6 +1423,211 @@ function WarehousesManager({ restaurantId, warehouses, onRefresh, products, curr
                   <p className="font-bold text-sm text-primary">{filteredStockItems.reduce((s, x) => s + Number(x.quantity || 0) * Number(x.product?.cost_price || 0), 0).toFixed(2)} {currency}</p>
                 </div>
               </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* ===================== TRANSFER PRODUCT DIALOG ===================== */}
+      <AnimatePresence>
+        {transferTarget && (
+          <div className="fixed inset-0 z-[60] bg-background/80 backdrop-blur-sm flex items-center justify-center p-4">
+            <motion.div initial={{ scale: 0.9 }} animate={{ scale: 1 }} exit={{ scale: 0.9 }}
+              className="glass-card p-6 max-w-md w-full rounded-3xl shadow-2xl space-y-4">
+              <div className="flex items-center justify-between">
+                <h3 className="font-bold text-base flex items-center gap-2">
+                  <ArrowRightLeft className="w-4 h-4 text-primary" />
+                  تحويل صنف لمخزن آخر
+                </h3>
+                <Button size="sm" variant="ghost" className="rounded-full h-7 w-7 p-0" onClick={() => setTransferTarget(null)}>✕</Button>
+              </div>
+
+              <div className="bg-secondary/20 rounded-xl p-3">
+                <p className="font-bold text-sm">{transferTarget.stockItem.product?.name}</p>
+                <p className="text-[11px] text-muted-foreground mt-0.5">
+                  الكمية المتاحة: <span className="font-bold text-primary">{transferTarget.stockItem.quantity} {transferTarget.stockItem.product?.unit || 'وحدة'}</span>
+                  &nbsp;·&nbsp; المخزن المصدر: <span className="font-bold">{transferTarget.warehouse.name || transferTarget.warehouse.name_ar}</span>
+                </p>
+              </div>
+
+              {/* Mode: existing or new warehouse */}
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  onClick={() => setTransferForm(f => ({ ...f, mode: 'existing' }))}
+                  className={`p-3 rounded-xl border text-sm font-bold transition-all ${
+                    transferForm.mode === 'existing' ? 'border-primary bg-primary/10 text-primary' : 'border-border bg-secondary/20 text-muted-foreground'
+                  }`}
+                >
+                  📦 مخزن حالي
+                </button>
+                <button
+                  onClick={() => setTransferForm(f => ({ ...f, mode: 'new' }))}
+                  className={`p-3 rounded-xl border text-sm font-bold transition-all ${
+                    transferForm.mode === 'new' ? 'border-primary bg-primary/10 text-primary' : 'border-border bg-secondary/20 text-muted-foreground'
+                  }`}
+                >
+                  ➕ مخزن جديد
+                </button>
+              </div>
+
+              {transferForm.mode === 'existing' ? (
+                <select
+                  value={transferForm.toWarehouseId}
+                  onChange={e => setTransferForm(f => ({ ...f, toWarehouseId: e.target.value }))}
+                  className="w-full h-11 rounded-xl border border-input bg-background px-3 text-sm"
+                >
+                  <option value="">-- اختر المخزن الوجهة --</option>
+                  {warehouses.filter(w => w.id !== transferTarget.warehouse.id).map(w => (
+                    <option key={w.id} value={w.id}>{w.name || w.name_ar} ({w.code})</option>
+                  ))}
+                </select>
+              ) : (
+                <div className="space-y-2">
+                  <Input placeholder="كود المخزن الجديد" value={transferForm.newWhCode}
+                    onChange={e => setTransferForm(f => ({ ...f, newWhCode: e.target.value }))}
+                    className="h-10 rounded-xl text-sm" />
+                  <Input placeholder="اسم المخزن (انجليزي)" value={transferForm.newWhName}
+                    onChange={e => setTransferForm(f => ({ ...f, newWhName: e.target.value }))}
+                    className="h-10 rounded-xl text-sm" />
+                  <Input placeholder="اسم المخزن (عربي)" value={transferForm.newWhNameAr}
+                    onChange={e => setTransferForm(f => ({ ...f, newWhNameAr: e.target.value }))}
+                    className="h-10 rounded-xl text-sm" />
+                </div>
+              )}
+
+              {/* Quantity mode */}
+              <div className="space-y-2">
+                <p className="text-[11px] text-muted-foreground font-bold">الكمية المراد تحويلها:</p>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    onClick={() => setTransferForm(f => ({ ...f, qtyMode: 'all' }))}
+                    className={`p-2.5 rounded-xl border text-xs font-bold transition-all ${
+                      transferForm.qtyMode === 'all' ? 'border-success bg-success/10 text-success' : 'border-border bg-secondary/20 text-muted-foreground'
+                    }`}
+                  >
+                    كل الكمية ({transferTarget.stockItem.quantity})
+                  </button>
+                  <button
+                    onClick={() => setTransferForm(f => ({ ...f, qtyMode: 'custom' }))}
+                    className={`p-2.5 rounded-xl border text-xs font-bold transition-all ${
+                      transferForm.qtyMode === 'custom' ? 'border-warning bg-warning/10 text-warning' : 'border-border bg-secondary/20 text-muted-foreground'
+                    }`}
+                  >
+                    كمية مخصصة
+                  </button>
+                </div>
+                {transferForm.qtyMode === 'custom' && (
+                  <Input
+                    type="number" placeholder="أدخل الكمية"
+                    value={transferForm.customQty}
+                    onChange={e => setTransferForm(f => ({ ...f, customQty: e.target.value }))}
+                    className="h-10 rounded-xl text-sm"
+                    max={transferTarget.stockItem.quantity}
+                  />
+                )}
+              </div>
+
+              <div className="flex gap-2">
+                <Button
+                  onClick={handleProductTransfer}
+                  disabled={transferring}
+                  className="flex-1 h-11 gradient-bg text-primary-foreground border-0 rounded-xl font-bold"
+                >
+                  {transferring ? 'جاري التحويل...' : '✅ تنفيذ التحويل'}
+                </Button>
+                <Button onClick={() => setTransferTarget(null)} variant="outline" className="flex-1 h-11 rounded-xl">
+                  إلغاء
+                </Button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* ===================== ADD QUANTITY DIALOG ===================== */}
+      <AnimatePresence>
+        {addQtyTarget && (
+          <div className="fixed inset-0 z-[60] bg-background/80 backdrop-blur-sm flex items-center justify-center p-4">
+            <motion.div initial={{ scale: 0.9 }} animate={{ scale: 1 }} exit={{ scale: 0.9 }}
+              className="glass-card p-6 max-w-md w-full rounded-3xl shadow-2xl space-y-4">
+              <div className="flex items-center justify-between">
+                <h3 className="font-bold text-base flex items-center gap-2">
+                  <ClipboardList className="w-4 h-4 text-success" />
+                  إضافة كميات للصنف
+                </h3>
+                <Button size="sm" variant="ghost" className="rounded-full h-7 w-7 p-0" onClick={() => { setAddQtyTarget(null); setAddQtyMode(null); }}>✕</Button>
+              </div>
+
+              <div className="bg-secondary/20 rounded-xl p-3">
+                <p className="font-bold text-sm">{addQtyTarget.stockItem.product?.name}</p>
+                <p className="text-[11px] text-muted-foreground mt-0.5">
+                  الكمية الحالية: <span className="font-bold text-primary">{addQtyTarget.stockItem.quantity} {addQtyTarget.stockItem.product?.unit || 'وحدة'}</span>
+                  &nbsp;·&nbsp; المخزن: <span className="font-bold">{addQtyTarget.warehouse.name || addQtyTarget.warehouse.name_ar}</span>
+                </p>
+              </div>
+
+              {!addQtyMode ? (
+                <div className="grid grid-cols-1 gap-3">
+                  <button
+                    onClick={() => setAddQtyMode('direct')}
+                    className="p-4 rounded-xl border border-success/40 bg-success/5 hover:bg-success/10 text-right transition-all"
+                  >
+                    <p className="font-bold text-sm text-success">📊 جرد فعلي (إدخال مباشر)</p>
+                    <p className="text-[11px] text-muted-foreground mt-1">إضافة كميات من الجرد الفعلي مباشرةً إلى المخزن دون دورة محاسبية</p>
+                  </button>
+                  <button
+                    onClick={() => {
+                      setAddQtyTarget(null);
+                      setAddQtyMode(null);
+                      // Switch to purchase invoices tab and pass data via localStorage for pre-fill
+                      try {
+                        localStorage.setItem('prefill_purchase_product', JSON.stringify({
+                          product_id: addQtyTarget.stockItem.product_id,
+                          product_name: addQtyTarget.stockItem.product?.name,
+                          warehouse_id: addQtyTarget.warehouse.id,
+                          warehouse_name: addQtyTarget.warehouse.name || addQtyTarget.warehouse.name_ar,
+                          unit: addQtyTarget.stockItem.product?.unit,
+                          cost_price: addQtyTarget.stockItem.product?.cost_price,
+                        }));
+                      } catch {}
+                      // Dispatch a custom event to navigate to purchase invoices
+                      window.dispatchEvent(new CustomEvent('navigate-to-purchase-invoices', {
+                        detail: { product_id: addQtyTarget.stockItem.product_id }
+                      }));
+                      toast.info('📄 انتقل لتبويب فواتير المشتريات لإتمام الدورة المحاسبية');
+                    }}
+                    className="p-4 rounded-xl border border-primary/40 bg-primary/5 hover:bg-primary/10 text-right transition-all"
+                  >
+                    <p className="font-bold text-sm text-primary">🧾 فاتورة مشتريات (دورة محاسبية كاملة)</p>
+                    <p className="text-[11px] text-muted-foreground mt-1">إنشاء فاتورة مشتريات مع مورد، تسجيل القيود المحاسبية، وتحديث المخزن تلقائياً بعد الحفظ</p>
+                  </button>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  <p className="text-sm font-bold">أدخل الكمية المضافة من الجرد الفعلي:</p>
+                  <Input
+                    type="number" placeholder="الكمية المضافة"
+                    value={directQty}
+                    onChange={e => setDirectQty(e.target.value)}
+                    className="h-11 rounded-xl text-sm"
+                    min="1"
+                    autoFocus
+                  />
+                  <p className="text-[11px] text-muted-foreground">
+                    بعد الإضافة: <span className="font-bold text-success">{Number(addQtyTarget.stockItem.quantity || 0) + Number(directQty || 0)} {addQtyTarget.stockItem.product?.unit || 'وحدة'}</span>
+                  </p>
+                  <div className="flex gap-2">
+                    <Button
+                      onClick={handleDirectQtyAdd}
+                      disabled={addingQty || !directQty || Number(directQty) <= 0}
+                      className="flex-1 h-11 gradient-bg text-primary-foreground border-0 rounded-xl font-bold"
+                    >
+                      {addingQty ? 'جاري الإضافة...' : '✅ تأكيد الإضافة'}
+                    </Button>
+                    <Button onClick={() => setAddQtyMode(null)} variant="outline" className="h-11 rounded-xl">رجوع</Button>
+                  </div>
+                </div>
+              )}
             </motion.div>
           </div>
         )}
