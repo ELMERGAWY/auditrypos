@@ -1256,7 +1256,7 @@ function InventoryTransfersManager({ restaurantId, warehouses, products, onRefre
 
   const loadTransfers = async () => {
     const { data } = await supabase.from('inventory_transfers')
-      .select('*, from:warehouses!from_warehouse_id(name), to:warehouses!to_warehouse_id(name)')
+      .select('*, from:warehouses!from_warehouse_id(name,name_ar), to:warehouses!to_warehouse_id(name,name_ar), items:inventory_transfer_items(product_id, quantity, cost_price)')
       .eq('restaurant_id', restaurantId)
       .order('created_at', { ascending: false });
     setTransfers(data || []);
@@ -1268,29 +1268,90 @@ function InventoryTransfersManager({ restaurantId, warehouses, products, onRefre
     if (!form.from_wh || !form.to_wh || !form.product_id || !form.quantity) return toast.error('يرجى ملء كافة الحقول');
     if (form.from_wh === form.to_wh) return toast.error('لا يمكن التحويل لنفس المخزن');
 
+    const qty = Number(form.quantity);
+    if (!qty || qty <= 0) return toast.error('الكمية يجب أن تكون أكبر من صفر');
+
     try {
-      // 1. Create Transfer Record
+      // 1. Check source warehouse stock
+      const { data: srcStock } = await supabase
+        .from('warehouse_stock')
+        .select('id, quantity')
+        .eq('warehouse_id', form.from_wh)
+        .eq('product_id', form.product_id)
+        .maybeSingle();
+
+      const currentQty = srcStock?.quantity ?? 0;
+      if (currentQty < qty) {
+        return toast.error(`الكمية المتاحة في المستودع المصدر: ${currentQty} فقط`);
+      }
+
+      // 2. Create Transfer Record
       const { data: transfer, error: tErr } = await supabase.from('inventory_transfers').insert({
         restaurant_id: restaurantId,
         from_warehouse_id: form.from_wh,
         to_warehouse_id: form.to_wh,
         notes: form.notes,
-        status: 'received' // For simplicity in this demo, we mark it as received immediately
+        status: 'received'
       }).select().single();
 
       if (tErr) throw tErr;
 
-      // 2. Add Transfer Item
+      // 3. Add Transfer Item
       const product = products.find(p => p.id === form.product_id);
-      await supabase.from('inventory_transfer_items').insert({
+      const { error: itemErr } = await supabase.from('inventory_transfer_items').insert({
         transfer_id: transfer.id,
+        restaurant_id: restaurantId,
         product_id: form.product_id,
-        quantity: Number(form.quantity),
+        quantity: qty,
         cost_price: product?.cost_price || 0
       });
+      if (itemErr) throw itemErr;
 
-      toast.success('تم تسجيل حركة التحويل بنجاح');
+      // 4. Deduct from source warehouse_stock
+      if (srcStock?.id) {
+        const { error: deductErr } = await supabase
+          .from('warehouse_stock')
+          .update({ quantity: Math.max(0, currentQty - qty) })
+          .eq('id', srcStock.id);
+        if (deductErr) throw deductErr;
+      } else {
+        // Row doesn't exist - insert with negative guard
+        await supabase.from('warehouse_stock').insert({
+          restaurant_id: restaurantId,
+          warehouse_id: form.from_wh,
+          product_id: form.product_id,
+          quantity: 0
+        }).onConflict('warehouse_id,product_id').merge();
+      }
+
+      // 5. Add to destination warehouse_stock (upsert)
+      const { data: dstStock } = await supabase
+        .from('warehouse_stock')
+        .select('id, quantity')
+        .eq('warehouse_id', form.to_wh)
+        .eq('product_id', form.product_id)
+        .maybeSingle();
+
+      if (dstStock?.id) {
+        await supabase
+          .from('warehouse_stock')
+          .update({ quantity: (dstStock.quantity ?? 0) + qty })
+          .eq('id', dstStock.id);
+      } else {
+        await supabase.from('warehouse_stock').insert({
+          restaurant_id: restaurantId,
+          warehouse_id: form.to_wh,
+          product_id: form.product_id,
+          quantity: qty
+        });
+      }
+
+      // 6. Update products.quantity → products.quantity stays the same (internal transfer)
+      // No net change to total quantity, skip products update
+
+      toast.success('تم تنفيذ التحويل بنجاح وتحديث أرصدة المستودعات');
       setShowTransfer(false);
+      setForm({ from_wh: '', to_wh: '', product_id: '', quantity: '', notes: '' });
       loadTransfers();
       onRefresh();
     } catch (error: any) {
@@ -1325,8 +1386,8 @@ function InventoryTransfersManager({ restaurantId, warehouses, products, onRefre
               {transfers.map(t => (
                 <tr key={t.id} className="hover:bg-secondary/20 transition-colors">
                   <td className="p-3">{new Date(t.created_at).toLocaleDateString('ar-EG')}</td>
-                  <td className="p-3 font-bold">{t.from?.name}</td>
-                  <td className="p-3 font-bold">{t.to?.name}</td>
+                  <td className="p-3 font-bold">{t.from?.name_ar || t.from?.name || '---'}</td>
+                  <td className="p-3 font-bold">{t.to?.name_ar || t.to?.name || '---'}</td>
                   <td className="p-3"><Badge className="bg-success/10 text-success border-0 text-[10px]">مكتمل</Badge></td>
                   <td className="p-3 text-muted-foreground truncate max-w-[150px]">{t.notes || '---'}</td>
                 </tr>

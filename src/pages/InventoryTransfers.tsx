@@ -192,7 +192,15 @@ export default function InventoryTransfers() {
     }
 
     try {
-      // Create transfer record
+      // Get restaurant_id from first product (or fetch from warehouses)
+      const { data: wh } = await supabase
+        .from('warehouses')
+        .select('restaurant_id')
+        .eq('id', fromWarehouseId)
+        .maybeSingle();
+      const restaurantId = wh?.restaurant_id;
+
+      // Create transfer header record
       const { data: transferData, error: transferError } = await supabase
         .from('inventory_transfers')
         .insert({
@@ -200,6 +208,7 @@ export default function InventoryTransfers() {
           from_sub_warehouse_id: fromSubWarehouseId || null,
           to_warehouse_id: toWarehouseId,
           to_sub_warehouse_id: toSubWarehouseId || null,
+          restaurant_id: restaurantId || null,
           items: transferItems,
           status: 'COMPLETED'
         })
@@ -208,40 +217,64 @@ export default function InventoryTransfers() {
 
       if (transferError) throw transferError;
 
-      // Create inventory movements for each item
+      // Process each item: update warehouse_stock
       for (const item of transferItems) {
-        // TRANSFER_OUT movement
-        await supabase.from('inventory_movements').insert({
-          product_id: item.product_id,
-          warehouse_id: fromWarehouseId,
-          sub_warehouse_id: fromSubWarehouseId || null,
-          movement_type: 'TRANSFER_OUT',
-          quantity: item.quantity,
-          reference_type: 'TRANSFER',
-          reference_id: transferData.id,
-          created_at: new Date().toISOString()
-        });
+        const qty = item.quantity;
 
-        // TRANSFER_IN movement
-        await supabase.from('inventory_movements').insert({
+        // Deduct from source warehouse
+        const { data: srcStock } = await supabase
+          .from('warehouse_stock')
+          .select('id, quantity')
+          .eq('warehouse_id', fromWarehouseId)
+          .eq('product_id', item.product_id)
+          .maybeSingle();
+
+        if (srcStock?.id) {
+          await supabase
+            .from('warehouse_stock')
+            .update({ quantity: Math.max(0, (srcStock.quantity ?? 0) - qty) })
+            .eq('id', srcStock.id);
+        }
+
+        // Add to destination warehouse
+        const { data: dstStock } = await supabase
+          .from('warehouse_stock')
+          .select('id, quantity')
+          .eq('warehouse_id', toWarehouseId)
+          .eq('product_id', item.product_id)
+          .maybeSingle();
+
+        if (dstStock?.id) {
+          await supabase
+            .from('warehouse_stock')
+            .update({ quantity: (dstStock.quantity ?? 0) + qty })
+            .eq('id', dstStock.id);
+        } else {
+          await supabase.from('warehouse_stock').insert({
+            restaurant_id: restaurantId || null,
+            warehouse_id: toWarehouseId,
+            product_id: item.product_id,
+            quantity: qty
+          });
+        }
+
+        // Insert transfer items in separate table
+        await supabase.from('inventory_transfer_items').insert({
+          transfer_id: transferData.id,
+          restaurant_id: restaurantId || null,
           product_id: item.product_id,
-          warehouse_id: toWarehouseId,
-          sub_warehouse_id: toSubWarehouseId || null,
-          movement_type: 'TRANSFER_IN',
-          quantity: item.quantity,
-          reference_type: 'TRANSFER',
-          reference_id: transferData.id,
-          created_at: new Date().toISOString()
+          quantity: qty,
+          cost_price: 0
         });
       }
 
-      toast.success('تم إضافة التحويل بنجاح');
+      toast.success('تم تنفيذ التحويل بنجاح وتحديث أرصدة المستودعات');
       setDialogOpen(false);
       resetForm();
       fetchTransfers();
     } catch (error) {
       console.error('Error saving transfer:', error);
-      toast.error('فشل في إضافة التحويل');
+      toast.error('فشل في تنفيذ التحويل');
     }
   };
 
