@@ -153,6 +153,11 @@ export function ServiceDeliverables({ restaurantId }: Props) {
   });
   const [savingReceipt, setSavingReceipt] = useState(false);
 
+  // Note mini-dialog for contact attempts
+  const [showNoteDialog, setShowNoteDialog] = useState(false);
+  const [noteDialogTarget, setNoteDialogTarget] = useState<{ deliverable: ServiceDeliverable; status: 'contacted' | 'no_answer' } | null>(null);
+  const [noteDialogText, setNoteDialogText] = useState('');
+
   const safeContracts = Array.isArray(contracts) ? contracts : [];
   const safeQuotes = Array.isArray(quotes) ? quotes : [];
   const safeServices = Array.isArray(services) ? services : [];
@@ -318,7 +323,7 @@ export function ServiceDeliverables({ restaurantId }: Props) {
     setShowReceiptModal(true);
   };
 
-  const logContactAttempt = async (deliverable: ServiceDeliverable, status: 'contacted' | 'no_answer') => {
+  const logContactAttempt = async (deliverable: ServiceDeliverable, status: 'contacted' | 'no_answer', note?: string) => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       const insertData: any = {
@@ -327,6 +332,7 @@ export function ServiceDeliverables({ restaurantId }: Props) {
         status,
         created_by: user?.id || null,
       };
+      if (note && note.trim()) insertData.notes = note.trim();
       if (deliverable.source === 'order') {
         insertData.order_id = deliverable.id;
       } else {
@@ -339,19 +345,25 @@ export function ServiceDeliverables({ restaurantId }: Props) {
     }
   };
 
-  const updateStatusQuick = async (deliverable: ServiceDeliverable, nextStatus: string) => {
-    if (deliverable.status === nextStatus) return;
+  // Opens the note mini-dialog instead of logging immediately
+  const openNoteDialog = (deliverable: ServiceDeliverable, status: 'contacted' | 'no_answer') => {
+    setNoteDialogTarget({ deliverable, status });
+    setNoteDialogText('');
+    setShowNoteDialog(true);
+  };
 
-    // تسليم كامل / جزئي → نافذة اختيار الأصناف + المستلم + التاريخ
-    if (nextStatus === 'delivered' || nextStatus === 'partial') {
-      openReceiptConfirm(deliverable, nextStatus === 'delivered');
-      return;
-    }
+  const confirmNoteDialog = async () => {
+    if (!noteDialogTarget) return;
+    const { deliverable, status } = noteDialogTarget;
+    setShowNoteDialog(false);
+    await logContactAttempt(deliverable, status, noteDialogText);
+    await updateStatusQuickInternal(deliverable, status);
+    setNoteDialogTarget(null);
+    setNoteDialogText('');
+  };
 
-    if (nextStatus === 'contacted' || nextStatus === 'no_answer') {
-      await logContactAttempt(deliverable, nextStatus);
-    }
-
+  // Internal: update status in DB without logging contact (logging handled separately)
+  const updateStatusQuickInternal = async (deliverable: ServiceDeliverable, nextStatus: string) => {
     setSavingId(deliverable.id);
     const prev = deliverable.status;
     setDeliverables((list) =>
@@ -386,6 +398,24 @@ export function ServiceDeliverables({ restaurantId }: Props) {
     } finally {
       setSavingId(null);
     }
+  };
+
+  const updateStatusQuick = async (deliverable: ServiceDeliverable, nextStatus: string) => {
+    if (deliverable.status === nextStatus) return;
+
+    // تسليم كامل / جزئي → نافذة اختيار الأصناف + المستلم + التاريخ
+    if (nextStatus === 'delivered' || nextStatus === 'partial') {
+      openReceiptConfirm(deliverable, nextStatus === 'delivered');
+      return;
+    }
+
+    // تواصل / لا رد → نافذة ملاحظة صغيرة أولاً
+    if (nextStatus === 'contacted' || nextStatus === 'no_answer') {
+      openNoteDialog(deliverable, nextStatus as 'contacted' | 'no_answer');
+      return;
+    }
+
+    await updateStatusQuickInternal(deliverable, nextStatus);
   };
 
   const saveReceiptConfirm = async () => {
@@ -853,25 +883,30 @@ export function ServiceDeliverables({ restaurantId }: Props) {
                   <p className="text-[10px] font-bold text-muted-foreground flex items-center gap-1">
                     <Clock className="w-3.5 h-3.5" /> سجل المتابعة والاتصال ({deliverable.contact_logs.length}):
                   </p>
-                  <div className="max-h-[85px] overflow-y-auto space-y-1 pr-1 custom-scrollbar">
+                  <div className="max-h-[120px] overflow-y-auto space-y-1 pr-1 custom-scrollbar">
                     {deliverable.contact_logs.map((log: any) => {
                       const isContacted = log.status === 'contacted';
                       return (
                         <div
                           key={log.id}
-                          className={`flex items-center justify-between text-[9px] px-1.5 py-0.5 rounded border ${
+                          className={`flex flex-col gap-0.5 text-[9px] px-1.5 py-1 rounded border ${
                             isContacted
                               ? 'bg-indigo-500/10 text-indigo-600 border-indigo-500/20'
                               : 'bg-rose-500/10 text-rose-600 border-rose-500/20'
                           }`}
                         >
-                          <span className="font-bold flex items-center gap-1">
-                            {isContacted ? '📞 تم التواصل' : '📵 بدون رد'}
-                          </span>
-                          <span className="opacity-85 text-[8px] font-mono">
-                            {new Date(log.created_at).toLocaleDateString('ar-EG', { month: '2-digit', day: '2-digit' })}{' '}
-                            {new Date(log.created_at).toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit', hour12: true })}
-                          </span>
+                          <div className="flex items-center justify-between">
+                            <span className="font-bold flex items-center gap-1">
+                              {isContacted ? '📞 تم التواصل' : '📵 بدون رد'}
+                            </span>
+                            <span className="opacity-85 text-[8px] font-mono">
+                              {new Date(log.created_at).toLocaleDateString('ar-EG', { month: '2-digit', day: '2-digit' })}{' '}
+                              {new Date(log.created_at).toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit', hour12: true })}
+                            </span>
+                          </div>
+                          {log.notes && (
+                            <p className="text-[8px] opacity-80 leading-relaxed pr-1 border-r border-current/30">{log.notes}</p>
+                          )}
                         </div>
                       );
                     })}
@@ -1304,6 +1339,48 @@ export function ServiceDeliverables({ restaurantId }: Props) {
             <Button variant="outline" onClick={() => setShowReceiptModal(false)}>إلغاء</Button>
             <Button onClick={saveReceiptConfirm} disabled={savingReceipt}>
               {savingReceipt ? 'جاري الحفظ...' : 'تأكيد التسليم'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ───── Note mini-dialog for contact/no-answer ───── */}
+      <Dialog open={showNoteDialog} onOpenChange={(open) => { if (!open) { setShowNoteDialog(false); setNoteDialogTarget(null); setNoteDialogText(''); } }}>
+        <DialogContent className="max-w-sm" dir="rtl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-base">
+              {noteDialogTarget?.status === 'contacted' ? '📞 تم التواصل' : '📵 لا رد'}
+              <span className="text-muted-foreground text-sm font-normal">— أضف ملاحظة</span>
+            </DialogTitle>
+          </DialogHeader>
+          <div className="px-1 py-2 space-y-3">
+            <p className="text-xs text-muted-foreground">
+              اكتب ملخصاً للمكالمة أو سبب عدم الرد (اختياري)
+            </p>
+            <Textarea
+              value={noteDialogText}
+              onChange={(e) => setNoteDialogText(e.target.value)}
+              placeholder={
+                noteDialogTarget?.status === 'contacted'
+                  ? 'مثال: العميل أكد الطلب وطلب التسليم يوم السبت...'
+                  : 'مثال: لا يرد على الهاتف، سيتم المحاولة لاحقاً...'
+              }
+              rows={3}
+              autoFocus
+              onKeyDown={(e) => { if (e.key === 'Enter' && e.ctrlKey) confirmNoteDialog(); }}
+            />
+            <p className="text-[10px] text-muted-foreground">Ctrl+Enter للتأكيد السريع</p>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" size="sm" onClick={() => { setShowNoteDialog(false); setNoteDialogTarget(null); setNoteDialogText(''); }}>
+              إلغاء
+            </Button>
+            <Button
+              size="sm"
+              className={noteDialogTarget?.status === 'contacted' ? 'bg-indigo-600 hover:bg-indigo-700' : 'bg-rose-600 hover:bg-rose-700'}
+              onClick={confirmNoteDialog}
+            >
+              {noteDialogTarget?.status === 'contacted' ? '📞 تأكيد التواصل' : '📵 تأكيد لا رد'}
             </Button>
           </DialogFooter>
         </DialogContent>

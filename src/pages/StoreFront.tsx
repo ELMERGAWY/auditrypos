@@ -96,9 +96,14 @@ const StoreFront = () => {
       setCurrency(rest.currency || 'ج.م');
 
       const bizType = (rest as any).business_type || 'restaurant';
-      const isFoodType = bizType === 'restaurant' || bizType === 'cafe';
+      // Inventory-driven businesses (retail/wholesale/grocery/warehouse/pharmacy/other) use products table.
+      // All other businesses (restaurants, cafes, service businesses, gyms, salons, hospitals, etc.)
+      // use menu_items table. This allows service businesses to also show items in the storefront.
+      const INVENTORY_TYPES = ['retail', 'wholesale', 'grocery', 'warehouse', 'pharmacy', 'other'];
+      const usesProductsCatalog = INVENTORY_TYPES.includes(bizType);
 
-      if (isFoodType) {
+      if (!usesProductsCatalog) {
+        // Food & service businesses → menu_items
         const { data: menuData, error: mErr } = await supabase.from('public_menu_items' as any).select('*').eq('restaurant_id', restaurantId).order('sort_order');
         if (mErr) console.error('public_menu_items error:', mErr);
         const menuItems = (menuData || []).map((m: any) => ({
@@ -116,6 +121,7 @@ const StoreFront = () => {
         setItems(menuItems);
         setCategories([...new Set(menuItems.map(i => i.category).filter(Boolean))]);
       } else {
+        // Inventory-driven businesses → products
         const { data: prodData, error: pErr } = await supabase.from('public_products' as any).select('*').eq('restaurant_id', restaurantId).order('sort_order');
         if (pErr) console.error('public_products error:', pErr);
         const prods = (prodData || []).map((p: any) => ({

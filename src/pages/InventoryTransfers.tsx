@@ -200,72 +200,20 @@ export default function InventoryTransfers() {
         .maybeSingle();
       const restaurantId = wh?.restaurant_id;
 
-      // Create transfer header record
-      const { data: transferData, error: transferError } = await supabase
-        .from('inventory_transfers')
-        .insert({
-          from_warehouse_id: fromWarehouseId,
-          from_sub_warehouse_id: fromSubWarehouseId || null,
-          to_warehouse_id: toWarehouseId,
-          to_sub_warehouse_id: toSubWarehouseId || null,
-          restaurant_id: restaurantId || null,
-          items: transferItems,
-          status: 'COMPLETED'
-        })
-        .select()
-        .single();
-
-      if (transferError) throw transferError;
-
-      // Process each item: update warehouse_stock
+      // Process each item using the atomic execute_inventory_transfer RPC
       for (const item of transferItems) {
-        const qty = item.quantity;
-
-        // Deduct from source warehouse
-        const { data: srcStock } = await supabase
-          .from('warehouse_stock')
-          .select('id, quantity')
-          .eq('warehouse_id', fromWarehouseId)
-          .eq('product_id', item.product_id)
-          .maybeSingle();
-
-        if (srcStock?.id) {
-          await supabase
-            .from('warehouse_stock')
-            .update({ quantity: Math.max(0, (srcStock.quantity ?? 0) - qty) })
-            .eq('id', srcStock.id);
-        }
-
-        // Add to destination warehouse
-        const { data: dstStock } = await supabase
-          .from('warehouse_stock')
-          .select('id, quantity')
-          .eq('warehouse_id', toWarehouseId)
-          .eq('product_id', item.product_id)
-          .maybeSingle();
-
-        if (dstStock?.id) {
-          await supabase
-            .from('warehouse_stock')
-            .update({ quantity: (dstStock.quantity ?? 0) + qty })
-            .eq('id', dstStock.id);
-        } else {
-          await supabase.from('warehouse_stock').insert({
-            restaurant_id: restaurantId || null,
-            warehouse_id: toWarehouseId,
-            product_id: item.product_id,
-            quantity: qty
-          });
-        }
-
-        // Insert transfer items in separate table
-        await supabase.from('inventory_transfer_items').insert({
-          transfer_id: transferData.id,
-          restaurant_id: restaurantId || null,
-          product_id: item.product_id,
-          quantity: qty,
-          cost_price: 0
+        const { data: rpcRes, error: rpcErr } = await supabase.rpc('execute_inventory_transfer', {
+          p_restaurant_id: restaurantId,
+          p_from_warehouse_id: fromWarehouseId,
+          p_to_warehouse_id: toWarehouseId,
+          p_product_id: item.product_id,
+          p_quantity: Number(item.quantity),
+          p_notes: `تحويل مخزون: من مستودع ${fromWarehouseId} إلى مستودع ${toWarehouseId}`
         });
+
+        if (rpcErr) throw rpcErr;
+        const res = rpcRes as { success: boolean; error?: string };
+        if (!res?.success) throw new Error(res?.error || 'فشل التحويل');
       }
 
       toast.success('تم تنفيذ التحويل بنجاح وتحديث أرصدة المستودعات');

@@ -128,6 +128,37 @@ export function PurchaseInvoices({ restaurantId, currency }: Props) {
     });
   }, [restaurantId]);
 
+  // Auto-open the add modal when navigated from Inventory with a pre-selected product
+  useEffect(() => {
+    try {
+      const prefillStr = localStorage.getItem('prefill_purchase_product');
+      if (prefillStr) {
+        const prefill = JSON.parse(prefillStr);
+        localStorage.removeItem('prefill_purchase_product');
+        if (prefill?.product_id) {
+          // Pre-fill the invoice lines with the product from inventory
+          setLines([{
+            line_type: 'inventory',
+            product_id: prefill.product_id,
+            warehouse_id: prefill.warehouse_id || '',
+            description: prefill.product_name || '',
+            quantity: 1,
+            unit_cost: Number(prefill.cost_price || 0),
+            tax_amount: 0,
+          }]);
+          // Set a flag so we know to redirect back after saving
+          localStorage.setItem('redirect_after_purchase_save', 'inventory');
+          // Open the modal
+          setShowAddModal(true);
+        }
+      }
+    } catch (e) {
+      console.error('prefill parse error:', e);
+    }
+  // Run after master data (products/warehouses) is loaded
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [products.length, warehouses.length]);
+
   const loadInvoices = async () => {
     setLoading(true);
     try {
@@ -297,6 +328,13 @@ export function PurchaseInvoices({ restaurantId, currency }: Props) {
 
       toast.success('تم حفظ الفاتورة');
       setShowAddModal(false);
+      // If we were navigated here from Inventory, redirect back and let InventoryTab reload stock
+      const redirectTarget = localStorage.getItem('redirect_after_purchase_save');
+      if (redirectTarget === 'inventory') {
+        localStorage.removeItem('redirect_after_purchase_save');
+        window.dispatchEvent(new CustomEvent('navigate-to-inventory'));
+        return;
+      }
       setForm({
         supplier_id: '',
         supplier_contract_id: '',

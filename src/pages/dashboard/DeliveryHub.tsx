@@ -12,6 +12,8 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Card } from '@/components/ui/card';
 import { DeliveryTab } from './DeliveryTab';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { Textarea } from '@/components/ui/textarea';
 
 type DeliveryStatus = 'pending' | 'in_progress' | 'contacted' | 'no_answer' | 'delivered' | 'cancelled';
 
@@ -47,6 +49,11 @@ export function DeliveryHub(props: any) {
   const [loading, setLoading] = useState(true);
   const [q, setQ] = useState('');
   const [dragging, setDragging] = useState<DeliveryItem | null>(null);
+
+  // Note mini-dialog for contact attempts
+  const [showNoteDialog, setShowNoteDialog] = useState(false);
+  const [noteDialogTarget, setNoteDialogTarget] = useState<{ item: DeliveryItem; status: 'contacted' | 'no_answer' } | null>(null);
+  const [noteDialogText, setNoteDialogText] = useState('');
 
   const load = useCallback(async () => {
     if (!restaurantId) return;
@@ -142,7 +149,7 @@ export function DeliveryHub(props: any) {
     delivered: filtered.filter(i => i.delivery_status === 'delivered'),
   }), [filtered]);
 
-  const logContactAttempt = async (item: DeliveryItem, status: 'contacted' | 'no_answer') => {
+  const logContactAttempt = async (item: DeliveryItem, status: 'contacted' | 'no_answer', note?: string) => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       const insertData: any = {
@@ -151,6 +158,7 @@ export function DeliveryHub(props: any) {
         status,
         created_by: user?.id || null,
       };
+      if (note && note.trim()) insertData.notes = note.trim();
       if (item.source === 'order') {
         insertData.order_id = item.id;
       } else {
@@ -163,12 +171,23 @@ export function DeliveryHub(props: any) {
     }
   };
 
-  const updateStatus = async (item: DeliveryItem, status: DeliveryStatus) => {
-    // If transitioning to contacted or no_answer, log it first
-    if (status === 'contacted' || status === 'no_answer') {
-      await logContactAttempt(item, status);
-    }
+  const openNoteDialog = (item: DeliveryItem, status: 'contacted' | 'no_answer') => {
+    setNoteDialogTarget({ item, status });
+    setNoteDialogText('');
+    setShowNoteDialog(true);
+  };
 
+  const confirmNoteDialog = async () => {
+    if (!noteDialogTarget) return;
+    const { item, status } = noteDialogTarget;
+    setShowNoteDialog(false);
+    await logContactAttempt(item, status, noteDialogText);
+    await updateStatusInternal(item, status);
+    setNoteDialogTarget(null);
+    setNoteDialogText('');
+  };
+
+  const updateStatusInternal = async (item: DeliveryItem, status: DeliveryStatus) => {
     // optimistic
     setItems(prev => prev.map(x => x.id === item.id && x.source === item.source ? { ...x, delivery_status: status } : x));
     const table = item.source === 'order' ? 'orders' : 'service_invoices';
@@ -179,6 +198,14 @@ export function DeliveryHub(props: any) {
     } else {
       toast.success(`تم النقل إلى: ${STATUS_META[status].label}`);
     }
+  };
+
+  const updateStatus = async (item: DeliveryItem, status: DeliveryStatus) => {
+    if (status === 'contacted' || status === 'no_answer') {
+      openNoteDialog(item, status);
+      return;
+    }
+    await updateStatusInternal(item, status);
   };
 
   const onDrop = (status: DeliveryStatus) => {
@@ -347,25 +374,30 @@ export function DeliveryHub(props: any) {
                           <p className="text-[9px] font-bold text-muted-foreground flex items-center gap-1">
                             <Clock className="w-2.5 h-2.5" /> سجل المتابعة والاتصال ({it.contact_logs.length}):
                           </p>
-                          <div className="max-h-[80px] overflow-y-auto space-y-1 pr-1 custom-scrollbar">
+                          <div className="max-h-[120px] overflow-y-auto space-y-1 pr-1 custom-scrollbar">
                             {it.contact_logs.map((log: any) => {
                               const isContacted = log.status === 'contacted';
                               return (
                                 <div
                                   key={log.id}
-                                  className={`flex items-center justify-between text-[9px] px-1.5 py-0.5 rounded border ${
+                                  className={`flex flex-col gap-0.5 text-[9px] px-1.5 py-1 rounded border ${
                                     isContacted
                                       ? 'bg-indigo-500/10 text-indigo-600 border-indigo-500/20'
                                       : 'bg-rose-500/10 text-rose-600 border-rose-500/20'
                                   }`}
                                 >
-                                  <span className="font-bold flex items-center gap-1">
-                                    {isContacted ? '📞 تم التواصل' : '📵 بدون رد'}
-                                  </span>
-                                  <span className="opacity-85 text-[8px] font-mono">
-                                    {new Date(log.created_at).toLocaleDateString('ar-EG', { month: '2-digit', day: '2-digit' })}{' '}
-                                    {new Date(log.created_at).toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit', hour12: true })}
-                                  </span>
+                                  <div className="flex items-center justify-between">
+                                    <span className="font-bold flex items-center gap-1">
+                                      {isContacted ? '📞 تم التواصل' : '📵 بدون رد'}
+                                    </span>
+                                    <span className="opacity-85 text-[8px] font-mono">
+                                      {new Date(log.created_at).toLocaleDateString('ar-EG', { month: '2-digit', day: '2-digit' })}{' '}
+                                      {new Date(log.created_at).toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit', hour12: true })}
+                                    </span>
+                                  </div>
+                                  {log.notes && (
+                                    <p className="text-[8px] opacity-80 leading-relaxed pr-1 border-r border-current/30">{log.notes}</p>
+                                  )}
                                 </div>
                               );
                             })}
@@ -463,9 +495,10 @@ export function DeliveryHub(props: any) {
                                   ? 'bg-indigo-500/10 border-indigo-500/30 text-indigo-600'
                                   : 'bg-rose-500/10 border-rose-500/30 text-rose-600'
                               }`}
+                              title={log.notes || undefined}
                             >
                               {log.status === 'contacted' ? 'تم التواصل' : 'لا رد'} (
-                              {new Date(log.created_at).toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' })})
+                              {new Date(log.created_at).toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' })}){log.notes ? ' 💬' : ''}
                             </Badge>
                           ))}
                         </div>
@@ -495,6 +528,47 @@ export function DeliveryHub(props: any) {
           </table>
         </Card>
       )}
+      {/* ───── Note mini-dialog for contact/no-answer ───── */}
+      <Dialog open={showNoteDialog} onOpenChange={(open) => { if (!open) { setShowNoteDialog(false); setNoteDialogTarget(null); setNoteDialogText(''); } }}>
+        <DialogContent className="max-w-sm" dir="rtl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-base">
+              {noteDialogTarget?.status === 'contacted' ? '📞 تم التواصل' : '📵 لا رد'}
+              <span className="text-muted-foreground text-sm font-normal">— أضف ملاحظة</span>
+            </DialogTitle>
+          </DialogHeader>
+          <div className="px-1 py-2 space-y-3">
+            <p className="text-xs text-muted-foreground">
+              اكتب ملخصاً للمكالمة أو سبب عدم الرد (اختياري)
+            </p>
+            <Textarea
+              value={noteDialogText}
+              onChange={(e) => setNoteDialogText(e.target.value)}
+              placeholder={
+                noteDialogTarget?.status === 'contacted'
+                  ? 'مثال: العميل أكد الطلب وطلب التسليم يوم السبت...'
+                  : 'مثال: لا يرد على الهاتف، سيتم المحاولة لاحقاً...'
+              }
+              rows={3}
+              autoFocus
+              onKeyDown={(e) => { if (e.key === 'Enter' && e.ctrlKey) confirmNoteDialog(); }}
+            />
+            <p className="text-[10px] text-muted-foreground">Ctrl+Enter للتأكيد السريع</p>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" size="sm" onClick={() => { setShowNoteDialog(false); setNoteDialogTarget(null); setNoteDialogText(''); }}>
+              إلغاء
+            </Button>
+            <Button
+              size="sm"
+              className={noteDialogTarget?.status === 'contacted' ? 'bg-indigo-600 hover:bg-indigo-700' : 'bg-rose-600 hover:bg-rose-700'}
+              onClick={confirmNoteDialog}
+            >
+              {noteDialogTarget?.status === 'contacted' ? '📞 تأكيد التواصل' : '📵 تأكيد لا رد'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

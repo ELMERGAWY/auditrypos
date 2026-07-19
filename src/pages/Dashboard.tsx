@@ -223,6 +223,22 @@ export default function Dashboard() {
     setAutoPrint(false);
   }, [activeTab]);
 
+  // Listen for navigation events to switch tabs automatically
+  useEffect(() => {
+    const handleNavPI = () => {
+      setActiveTab('purchase_invoices');
+    };
+    const handleNavInv = () => {
+      setActiveTab('inventory');
+    };
+    window.addEventListener('navigate-to-purchase-invoices', handleNavPI);
+    window.addEventListener('navigate-to-inventory', handleNavInv);
+    return () => {
+      window.removeEventListener('navigate-to-purchase-invoices', handleNavPI);
+      window.removeEventListener('navigate-to-inventory', handleNavInv);
+    };
+  }, []);
+
   // Load receipt vouchers for all customers
   useEffect(() => {
     if (restaurant?.id) {

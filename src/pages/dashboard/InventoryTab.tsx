@@ -128,7 +128,20 @@ export function InventoryTab({ restaurantId, currency, businessType }: Props) {
   const load = async () => {
     // Load Products
     const { data: prodData } = await supabase.from('products').select('*').eq('restaurant_id', restaurantId).order('created_at', { ascending: false });
-    setProducts((prodData || []) as Product[]);
+    
+    // Load Warehouse Stocks to aggregate quantities
+    const { data: stockData } = await supabase.from('warehouse_stock').select('product_id, quantity').eq('restaurant_id', restaurantId);
+    
+    const aggregatedProducts = ((prodData || []) as Product[]).map(p => {
+      const pStocks = (stockData || []).filter(s => s.product_id === p.id);
+      const totalQty = pStocks.reduce((sum, s) => sum + Number(s.quantity || 0), 0);
+      return {
+        ...p,
+        quantity: totalQty // dynamically aggregated quantity strictly based on real-time stock levels
+      };
+    });
+
+    setProducts(aggregatedProducts);
     
     // Load Warehouses (filtered by restaurant to respect RLS correctly)
     const { data: whData } = await supabase.from('warehouses').select('*').eq('restaurant_id', restaurantId).is('deleted_at', null).order('name');
