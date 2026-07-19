@@ -1,7 +1,8 @@
 export type DashboardTab = 'home' | 'pos' | 'orders' | 'menu' | 'delivery' | 'shifts' | 'qr' | 'waiter' | 'stats' | 'settings' | 'inventory' | 'customers' | 'suppliers' | 'expenses' | 'staff' | 'payroll' | 'notifications' | 'financials' | 'overheads' | 'customer_accounts' | 'sales_returns' | 'supplier_accounts' | 'inventory_receipts' | 'manual_journal' | 'projects' | 'chart_of_accounts' | 'treasury' | 'accounting_mapping' | 'fixed_assets' | 'crm' | 'kds';
 
 /** استخراج الرقم المرجعي من العمود أو من notes */
-export function extractCustomerRef(order: { customer_ref?: string | null; notes?: string | null }): string {
+export function extractCustomerRef(order: { customer_ref?: string | null; notes?: string | null } | null | undefined): string {
+  if (!order) return '';
   if (order.customer_ref?.trim()) return order.customer_ref.trim();
   if (order.notes?.includes('المرجع:')) {
     return order.notes.split('المرجع:')[1]?.split('|')[0]?.trim() || '';
