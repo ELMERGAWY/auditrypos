@@ -129,6 +129,7 @@ CREATE POLICY "sales_invoices_access"
 
 -- B6. Also fix sales_invoice_lines RLS
 DROP POLICY IF EXISTS "users access their sales_invoice_lines" ON public.sales_invoice_lines;
+DROP POLICY IF EXISTS "sales_invoice_lines_access"             ON public.sales_invoice_lines;
 CREATE POLICY "sales_invoice_lines_access"
   ON public.sales_invoice_lines
   FOR ALL
