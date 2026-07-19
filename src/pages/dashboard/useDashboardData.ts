@@ -100,8 +100,8 @@ export function useDashboardData() {
     }
 
     // ─── Determine target restaurant ID ───────────────────────────────────────
-    // Priority: 1) saved in localStorage  2) most recently created by this owner
-    //           3) company the user is an approved member of (employee flow)
+    // Priority: 1) employee company restaurant  2) saved in localStorage  3) owner's restaurant
+    // NOTE: Employee check is done FIRST to avoid falling back to wrong restaurant
     const savedBusinessId = localStorage.getItem('current_business_id');
 
     const profileRes = await supabase.from('profiles').select('full_name').eq('user_id', user.id).maybeSingle();
@@ -111,38 +111,22 @@ export function useDashboardData() {
 
     let rest: any = null;
 
-    // Step 1: Try the exact restaurant by savedBusinessId (no owner filter — employees need this too)
-    if (savedBusinessId) {
-      const { data: savedRest } = await supabase
-        .from('restaurants')
-        .select('*')
-        .eq('id', savedBusinessId)
-        .maybeSingle();
-      rest = savedRest ?? null;
-    }
-
-    // Step 2: If no result yet (or savedBusinessId was stale), look for owner's most recent restaurant
-    if (!rest) {
-      const { data: ownerRests } = await supabase
-        .from('restaurants')
-        .select('*')
-        .eq('owner_id', user.id)
-        .order('created_at', { ascending: false })
-        .limit(1);
-      rest = ownerRests?.[0] ?? null;
-    }
-
-    // Step 3: If still not found, check if user is an approved company member (employee)
-    if (!rest) {
+    // ─── Step 1: Check if user is an approved company member (employee) ────────
+    // This MUST come first so employees always land in their assigned company,
+    // not in a restaurant they happen to have cached from a previous session.
+    {
       const { data: userCompanies } = await supabase
         .from('company_users')
-        .select('company_id')
+        .select('company_id, role, is_active')
         .eq('user_id', user.id)
         .eq('is_active', true)
         .limit(1);
 
       if (userCompanies && userCompanies.length > 0) {
         const companyId = userCompanies[0].company_id;
+
+        // Try to get the restaurant linked to this company
+        // We use the company_id directly — this doesn't rely on owner_id
         const { data: companyRestaurants } = await supabase
           .from('restaurants')
           .select('*')
@@ -152,10 +136,33 @@ export function useDashboardData() {
 
         if (companyRestaurants && companyRestaurants.length > 0) {
           rest = companyRestaurants[0];
-          // Persist so next login goes straight to this restaurant
+          // Persist so next login goes straight here
           localStorage.setItem('current_business_id', rest.id);
         }
       }
+    }
+
+    // ─── Step 2: Try exact restaurant by savedBusinessId (fallback for owners) ──
+    // Only use this if employee check found nothing (avoids old cached IDs polluting employee session)
+    if (!rest && savedBusinessId) {
+      const { data: savedRest } = await supabase
+        .from('restaurants')
+        .select('*')
+        .eq('id', savedBusinessId)
+        .eq('owner_id', user.id)          // MUST be the owner — not just any cached ID
+        .maybeSingle();
+      rest = savedRest ?? null;
+    }
+
+    // ─── Step 3: Owner's most recent restaurant ────────────────────────────────
+    if (!rest) {
+      const { data: ownerRests } = await supabase
+        .from('restaurants')
+        .select('*')
+        .eq('owner_id', user.id)
+        .order('created_at', { ascending: false })
+        .limit(1);
+      rest = ownerRests?.[0] ?? null;
     }
 
     if (!rest) {
