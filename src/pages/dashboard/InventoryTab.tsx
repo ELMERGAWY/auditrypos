@@ -134,11 +134,14 @@ export function InventoryTab({ restaurantId, currency, businessType }: Props) {
     
     const aggregatedProducts = ((prodData || []) as Product[]).map(p => {
       const pStocks = (stockData || []).filter(s => s.product_id === p.id);
-      const totalQty = pStocks.reduce((sum, s) => sum + Number(s.quantity || 0), 0);
-      return {
-        ...p,
-        quantity: totalQty // dynamically aggregated quantity strictly based on real-time stock levels
-      };
+      if (pStocks.length > 0) {
+        // Has warehouse_stock records → use the real-time sum from all warehouses
+        const totalQty = pStocks.reduce((sum, s) => sum + Number(s.quantity || 0), 0);
+        return { ...p, quantity: totalQty };
+      }
+      // No warehouse_stock records yet → fall back to the stored products.quantity
+      // (product not assigned to a warehouse yet, or warehouse_stock not populated)
+      return p;
     });
 
     setProducts(aggregatedProducts);
