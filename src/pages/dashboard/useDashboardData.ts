@@ -100,61 +100,28 @@ export function useDashboardData() {
     }
 
     // ─── Determine target restaurant ID ───────────────────────────────────────
-    // Priority: 1) employee company restaurant  2) saved in localStorage  3) owner's restaurant
-    // NOTE: Employee check is done FIRST to avoid falling back to wrong restaurant
+    // Priority: 1) saved in localStorage  2) owner's most recent  3) employee company
     const savedBusinessId = localStorage.getItem('current_business_id');
 
     const profileRes = await supabase.from('profiles').select('full_name').eq('user_id', user.id).maybeSingle();
-
     const pName = profileRes.data?.full_name || '';
     if (pName) setProfileName(pName);
 
     let rest: any = null;
 
-    // ─── Step 1: Check if user is an approved company member (employee) ────────
-    // This MUST come first so employees always land in their assigned company,
-    // not in a restaurant they happen to have cached from a previous session.
-    {
-      const { data: userCompanies } = await supabase
-        .from('company_users')
-        .select('company_id, role, is_active')
-        .eq('user_id', user.id)
-        .eq('is_active', true)
-        .limit(1);
-
-      if (userCompanies && userCompanies.length > 0) {
-        const companyId = userCompanies[0].company_id;
-
-        // Try to get the restaurant linked to this company
-        // We use the company_id directly — this doesn't rely on owner_id
-        const { data: companyRestaurants } = await supabase
-          .from('restaurants')
-          .select('*')
-          .eq('company_id', companyId)
-          .order('created_at', { ascending: false })
-          .limit(1);
-
-        if (companyRestaurants && companyRestaurants.length > 0) {
-          rest = companyRestaurants[0];
-          // Persist so next login goes straight here
-          localStorage.setItem('current_business_id', rest.id);
-        }
-      }
-    }
-
-    // ─── Step 2: Try exact restaurant by savedBusinessId (fallback for owners) ──
-    // Only use this if employee check found nothing (avoids old cached IDs polluting employee session)
-    if (!rest && savedBusinessId) {
+    // ─── Step 1: Try exact restaurant by savedBusinessId (works for both owners AND employees) ──
+    // Do NOT add owner_id filter here — RLS handles access control.
+    // Employees have their company restaurant ID saved here from a previous session.
+    if (savedBusinessId) {
       const { data: savedRest } = await supabase
         .from('restaurants')
         .select('*')
         .eq('id', savedBusinessId)
-        .eq('owner_id', user.id)          // MUST be the owner — not just any cached ID
         .maybeSingle();
       rest = savedRest ?? null;
     }
 
-    // ─── Step 3: Owner's most recent restaurant ────────────────────────────────
+    // ─── Step 2: Owner's most recent restaurant ────────────────────────────────
     if (!rest) {
       const { data: ownerRests } = await supabase
         .from('restaurants')
@@ -164,6 +131,33 @@ export function useDashboardData() {
         .limit(1);
       rest = ownerRests?.[0] ?? null;
     }
+
+    // ─── Step 3: Employee — check company membership ───────────────────────────
+    // Only runs if Steps 1 & 2 found nothing (i.e. pure employee with no owned restaurant)
+    if (!rest) {
+      const { data: userCompanies } = await supabase
+        .from('company_users')
+        .select('company_id')
+        .eq('user_id', user.id)
+        .eq('is_active', true)
+        .limit(1);
+
+      if (userCompanies && userCompanies.length > 0) {
+        const companyId = userCompanies[0].company_id;
+        const { data: companyRestaurants } = await supabase
+          .from('restaurants')
+          .select('*')
+          .eq('company_id', companyId)
+          .order('created_at', { ascending: false })
+          .limit(1);
+
+        if (companyRestaurants && companyRestaurants.length > 0) {
+          rest = companyRestaurants[0];
+          localStorage.setItem('current_business_id', rest.id);
+        }
+      }
+    }
+
 
     if (!rest) {
       const { data: pendingReq } = await supabase
