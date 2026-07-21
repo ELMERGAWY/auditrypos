@@ -21,8 +21,14 @@ BEGIN
                ('vouchers'), ('voucher_lines'), ('journal_entries'), 
                ('journal_lines'), ('accounts'), ('staff_access_requests')
     LOOP
-        EXECUTE format('DROP POLICY IF EXISTS emergency_superadmin_full_access_%s ON public.%I', 
-                      table_name, table_name);
+        -- Check if table exists before dropping policy
+        IF EXISTS (
+            SELECT 1 FROM information_schema.tables 
+            WHERE table_schema = 'public' AND table_name = table_name
+        ) THEN
+            EXECUTE format('DROP POLICY IF EXISTS emergency_superadmin_full_access_%s ON public.%I', 
+                          table_name, table_name);
+        END IF;
     END LOOP;
 END $$;
 
