@@ -48,6 +48,9 @@ export function useDashboardData() {
   const [isSuspended, setIsSuspended] = useState(false);
   const lastSyncRunAtRef = useRef(0);
 
+  // Helper functions for user-specific localStorage keys
+  const getUserKey = useCallback((baseKey: string, userId: string) => `${baseKey}_${userId}`, []);
+
   // Load cached data first for instant display
   const loadCachedData = useCallback(async (userId: string) => {
     const cached = await getCachedData<{
@@ -65,9 +68,9 @@ export function useDashboardData() {
     if (cached) {
       if (cached.restaurant) {
         setRestaurant(cached.restaurant);
-        // Restore business_id to localStorage from cache
-        localStorage.setItem('current_business_id', cached.restaurant.id);
-        localStorage.setItem('current_business_name', cached.restaurant.name);
+        // Restore business_id to localStorage from cache (user-specific)
+        localStorage.setItem(getUserKey('current_business_id', userId), cached.restaurant.id);
+        localStorage.setItem(getUserKey('current_business_name', userId), cached.restaurant.name);
       }
       if ('menuItems' in cached) setMenuItems(cached.menuItems || []);
       if ('servicePackages' in cached) setServicePackages(cached.servicePackages || []);
@@ -82,7 +85,7 @@ export function useDashboardData() {
       return true;
     }
     return false;
-  }, []);
+  }, [getUserKey]);
 
   const loadData = useCallback(async () => {
     if (!user) return;
@@ -100,8 +103,8 @@ export function useDashboardData() {
     }
 
     // ─── Determine target restaurant ID ───────────────────────────────────────
-    // Priority: 1) saved in localStorage  2) owner's most recent  3) employee company
-    const savedBusinessId = localStorage.getItem('current_business_id');
+    // Priority: 1) saved in localStorage (user-specific)  2) owner's most recent  3) employee company
+    const savedBusinessId = localStorage.getItem(getUserKey('current_business_id', user.id));
 
     const profileRes = await supabase.from('profiles').select('full_name').eq('user_id', user.id).maybeSingle();
     const pName = profileRes.data?.full_name || '';
@@ -153,7 +156,7 @@ export function useDashboardData() {
 
         if (companyRestaurants && companyRestaurants.length > 0) {
           rest = companyRestaurants[0];
-          localStorage.setItem('current_business_id', rest.id);
+          localStorage.setItem(getUserKey('current_business_id', user.id), rest.id);
         }
       }
     }
@@ -192,8 +195,8 @@ export function useDashboardData() {
     
     // Set restaurant immediately to unlock UI
     setRestaurant(rest as unknown as Restaurant);
-    localStorage.setItem('current_business_id', rest.id);
-    localStorage.setItem('current_business_name', rest.name);
+    localStorage.setItem(getUserKey('current_business_id', user.id), rest.id);
+    localStorage.setItem(getUserKey('current_business_name', user.id), rest.name);
 
     const suspended = rest.status === 'suspended' || (rest.subscription_end && new Date(rest.subscription_end) < new Date());
     setIsSuspended(!!suspended);
@@ -243,7 +246,7 @@ export function useDashboardData() {
     // Load service packages from localStorage
     let loadedServicePackages: any[] = [];
     try {
-      const savedPackages = localStorage.getItem(`service_packages_${rest.id}`);
+      const savedPackages = localStorage.getItem(getUserKey(`service_packages_${rest.id}`, user.id));
       loadedServicePackages = savedPackages ? JSON.parse(savedPackages) : [];
     } catch {
       loadedServicePackages = [];
@@ -322,7 +325,7 @@ export function useDashboardData() {
     });
 
     return !!suspended;
-  }, [user, loadCachedData]);
+  }, [user, loadCachedData, getUserKey]);
 
   const runPendingSync = useCallback(async (shouldReload: boolean) => {
     if (!user) return;

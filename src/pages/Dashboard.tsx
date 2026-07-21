@@ -107,7 +107,7 @@ import { STATUS_CONFIG, extractCustomerRef } from './dashboard/types';
 
 export default function Dashboard() {
   const navigate = useNavigate();
-  const { isSuperAdmin } = useAuth();
+  const { isSuperAdmin, adminChecked } = useAuth();
   const { i18n } = useTranslation();
   const dir = getLanguageDir(i18n.language);
   const { isDark, toggleDarkMode } = useDarkMode(true);
@@ -1082,7 +1082,12 @@ export default function Dashboard() {
     return (customTabs ?? baseTabs) as SidebarTab[];
   }, [restaurant, config?.tabs]);
 
-  if (authLoading || !user || !dataLoaded) return <div className="min-h-screen flex items-center justify-center"><RefreshCcw className="w-10 h-10 animate-spin text-primary" /></div>;
+  if (authLoading || !user || !dataLoaded || !adminChecked) return <div className="min-h-screen flex items-center justify-center"><RefreshCcw className="w-10 h-10 animate-spin text-primary" /></div>;
+  // If user is super admin, redirect to SuperAdmin page instead of showing CreateRestaurantForm
+  if (isSuperAdmin) {
+    navigate('/super-admin-portal');
+    return null;
+  }
   if (!restaurant) return <div className="min-h-screen flex items-center justify-center p-4"><Suspense fallback={null}><CreateRestaurantForm userId={user.id} onCreated={loadData} /></Suspense></div>;
 
   return (
