@@ -9,7 +9,7 @@ BEGIN;
 -- Drop emergency superadmin function
 DROP FUNCTION IF EXISTS public.emergency_superadmin_check();
 
--- Drop emergency superadmin policies safely (only if table exists)
+-- Drop emergency superadmin policies safely (ignore errors for non-existent tables)
 DO $$
 DECLARE
     table_name TEXT;
@@ -21,14 +21,13 @@ BEGIN
                ('vouchers'), ('voucher_lines'), ('journal_entries'), 
                ('journal_lines'), ('accounts'), ('staff_access_requests')
     LOOP
-        -- Check if table exists before dropping policy
-        IF EXISTS (
-            SELECT 1 FROM information_schema.tables 
-            WHERE table_schema = 'public' AND table_name = table_name
-        ) THEN
+        BEGIN
             EXECUTE format('DROP POLICY IF EXISTS emergency_superadmin_full_access_%s ON public.%I', 
                           table_name, table_name);
-        END IF;
+        EXCEPTION WHEN undefined_table THEN
+            -- Ignore error if table doesn't exist
+            NULL;
+        END;
     END LOOP;
 END $$;
 
