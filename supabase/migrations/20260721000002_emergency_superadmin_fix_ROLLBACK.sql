@@ -6,14 +6,12 @@
 
 BEGIN;
 
--- Drop emergency superadmin policies
+-- Drop emergency superadmin policies (only for tables that exist)
 DROP POLICY IF EXISTS emergency_superadmin_full_access_companies ON public.companies;
 DROP POLICY IF EXISTS emergency_superadmin_full_access_company_users ON public.company_users;
 DROP POLICY IF EXISTS emergency_superadmin_full_access_restaurants ON public.restaurants;
 DROP POLICY IF EXISTS emergency_superadmin_full_access_orders ON public.orders;
 DROP POLICY IF EXISTS emergency_superadmin_full_access_order_items ON public.order_items;
-DROP POLICY IF EXISTS emergency_superadmin_full_access_sales_orders ON public.sales_orders;
-DROP POLICY IF EXISTS emergency_superadmin_full_access_sales_order_items ON public.sales_order_items;
 DROP POLICY IF EXISTS emergency_superadmin_full_access_customers ON public.customers;
 DROP POLICY IF EXISTS emergency_superadmin_full_access_suppliers ON public.suppliers;
 DROP POLICY IF EXISTS emergency_superadmin_full_access_products ON public.products;
