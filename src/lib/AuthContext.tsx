@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState, useMemo, type ReactNode } from 'react';
+import { createContext, useContext, useEffect, useState, useMemo, useCallback, type ReactNode } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import type { User, Session } from '@supabase/supabase-js';
 
@@ -32,6 +32,29 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   });
 
+  // Reusable function to check admin status
+  const checkAdminStatus = useCallback(async (userId: string) => {
+    try {
+      const { data, error } = await supabase
+        .from('user_roles')
+        .select('role')
+        .eq('user_id', userId)
+        .eq('role', 'super_admin')
+        .maybeSingle();
+      
+      console.log('Admin check result:', { data, error, userId });
+      
+      setIsSuperAdmin(!!data);
+      setAdminChecked(true);
+      setLoading(false);
+    } catch (err) {
+      console.error("Error checking admin status:", err);
+      setIsSuperAdmin(false);
+      setAdminChecked(true);
+      setLoading(false);
+    }
+  }, []);
+
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       console.log(`Auth Event: ${event}`);
@@ -53,32 +76,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setLastKnownUser(session.user);
         localStorage.setItem('last_known_user', JSON.stringify(session.user));
         setAdminChecked(false);
-        // Check admin role asynchronously - use async IIFE to avoid race condition
-        // where adminChecked becomes false while loading is also false
-        (async () => {
-          try {
-            const { data, error } = await supabase
-              .from('user_roles')
-              .select('role')
-              .eq('user_id', session.user.id)
-              .eq('role', 'super_admin')
-              .maybeSingle();
-            
-            console.log('Admin check result:', { data, error, userId: session.user.id });
-            
-            setIsSuperAdmin(!!data);
-            // IMPORTANT: setAdminChecked AFTER setIsSuperAdmin to prevent
-            // premature redirect in SuperAdmin.tsx while role is still loading
-            // Also ensure loading is set to false after admin check completes
-            setAdminChecked(true);
-            setLoading(false);
-          } catch (err) {
-            console.error("Error checking admin status:", err);
-            setIsSuperAdmin(false);
-            setAdminChecked(true);
-            setLoading(false);
-          }
-        })();
+        checkAdminStatus(session.user.id);
       } else {
         // Fallback for INITIAL_SESSION with no user
         setAdminChecked(true);
@@ -86,7 +84,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
     });
 
-    supabase.auth.getSession().then(({ data: { session }, error }) => {
+    supabase.auth.getSession().then(async ({ data: { session }, error }) => {
       if (error) {
         console.error("Session fetch error:", error);
       }
@@ -95,12 +93,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setUser(session.user);
         setLastKnownUser(session.user);
         localStorage.setItem('last_known_user', JSON.stringify(session.user));
+        setAdminChecked(false);
+        await checkAdminStatus(session.user.id);
+      } else {
+        setLoading(false);
+        setAdminChecked(true);
       }
-      setLoading(false);
     });
 
     return () => subscription.unsubscribe();
-  }, []);
+  }, [checkAdminStatus]);
 
   const signUp = async (email: string, password: string, fullName: string) => {
     const { error } = await supabase.auth.signUp({
