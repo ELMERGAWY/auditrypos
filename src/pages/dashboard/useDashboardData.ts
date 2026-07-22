@@ -144,16 +144,43 @@ export function useDashboardData() {
 
     let rest: any = null;
 
-    // ─── Step 1: Try exact restaurant by savedBusinessId (works for both owners AND employees) ──
-    // Do NOT add owner_id filter here — RLS handles access control.
-    // Employees have their company restaurant ID saved here from a previous session.
+    // ─── Step 1: Try exact restaurant by savedBusinessId WITH PERMISSION CHECK ──
     if (savedBusinessId) {
-      const { data: savedRest } = await supabase
+      // First check if user is owner
+      const { data: ownerRest } = await supabase
         .from('restaurants')
         .select('*')
         .eq('id', savedBusinessId)
+        .eq('owner_id', user.id)
         .maybeSingle();
-      rest = savedRest ?? null;
+      
+      if (ownerRest) {
+        rest = ownerRest;
+      } else {
+        // If not owner, check if user is active employee in the company
+        const { data: companyUsers } = await supabase
+          .from('company_users')
+          .select('company_id')
+          .eq('user_id', user.id)
+          .eq('is_active', true)
+          .maybeSingle();
+        
+        if (companyUsers) {
+          const { data: empRest } = await supabase
+            .from('restaurants')
+            .select('*')
+            .eq('id', savedBusinessId)
+            .eq('company_id', companyUsers.company_id)
+            .maybeSingle();
+          rest = empRest ?? null;
+        }
+      }
+      
+      // If no access to saved restaurant, clear it
+      if (!rest) {
+        localStorage.removeItem(getUserKey('current_business_id', user.id));
+        localStorage.removeItem(getUserKey('current_business_name', user.id));
+      }
     }
 
     // ─── Step 2: Owner's most recent restaurant ────────────────────────────────

@@ -126,11 +126,29 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(null);
     setSession(null);
     setLastKnownUser(null);
-    localStorage.removeItem('last_known_user');
+    
+    // Clean up ALL localStorage items related to the app
     try {
-      localStorage.removeItem('active_staff_name');
-      localStorage.removeItem('active_staff_email');
-    } catch {}
+      const keysToRemove: string[] = [];
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (key && (
+          key.includes('current_business') || 
+          key.includes('service_packages') ||
+          key.includes('dashboard_') ||
+          key === 'last_known_user' ||
+          key === 'active_staff_name' ||
+          key === 'active_staff_email' ||
+          key === 'pending_business'
+        )) {
+          keysToRemove.push(key);
+        }
+      }
+      // Remove them after collecting to avoid index issues
+      keysToRemove.forEach(key => localStorage.removeItem(key));
+    } catch (e) {
+      console.error('Error cleaning up localStorage:', e);
+    }
   };
 
   const value = useMemo(() => ({

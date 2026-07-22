@@ -5,7 +5,8 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { BUSINESS_TYPES, type BusinessType } from '@/lib/businessTypes';
 import { motion, AnimatePresence } from 'framer-motion';
-import { CheckCircle2, ArrowLeft, ArrowRight, Sparkles, Building2 } from 'lucide-react';
+import { CheckCircle2, ArrowLeft, ArrowRight, Sparkles, Building2, AlertCircle } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 
 interface Props {
   userId: string;
@@ -13,11 +14,37 @@ interface Props {
 }
 
 export function CreateRestaurantForm({ userId, onCreated }: Props) {
+  const navigate = useNavigate();
   const [name, setName] = useState('');
   const [bizType, setBizType] = useState<BusinessType>('restaurant');
   const [loading, setLoading] = useState(false);
+  const [checking, setChecking] = useState(true);
+  const [isEmployee, setIsEmployee] = useState(false);
   const [step, setStep] = useState<1 | 2>(1);
   const [customBusinessTypes, setCustomBusinessTypes] = useState<any[]>([]);
+
+  // Check if user is an employee first
+  useEffect(() => {
+    const checkIfEmployee = async () => {
+      try {
+        const { data } = await supabase
+          .from('company_users')
+          .select('*')
+          .eq('user_id', userId)
+          .eq('is_active', true)
+          .maybeSingle();
+        
+        if (data) {
+          setIsEmployee(true);
+        }
+      } catch (e) {
+        console.error('Error checking employee status:', e);
+      } finally {
+        setChecking(false);
+      }
+    };
+    checkIfEmployee();
+  }, [userId]);
 
   // Check localStorage for pending business from registration
   useEffect(() => {
@@ -43,6 +70,14 @@ export function CreateRestaurantForm({ userId, onCreated }: Props) {
 
   const handleCreate = async () => {
     if (!name.trim()) { toast.error('يرجى إدخال اسم النشاط'); return; }
+    
+    // Double-check employee status before creating
+    if (isEmployee) {
+      toast.error('الموظفين لا يمكنهم إنشاء شركات جديدة');
+      navigate('/staff-login');
+      return;
+    }
+    
     setLoading(true);
     try {
       const trialEnd = new Date();
@@ -82,6 +117,39 @@ export function CreateRestaurantForm({ userId, onCreated }: Props) {
       setLoading(false);
     }
   };
+  
+  if (checking) {
+    return (
+      <div className="min-h-screen w-full flex items-center justify-center bg-background p-4">
+        <div className="text-center">
+          <div className="w-16 h-16 rounded-2xl gradient-bg flex items-center justify-center mx-auto mb-4 animate-pulse">
+            <Sparkles className="w-8 h-8 text-white" />
+          </div>
+          <p className="text-muted-foreground">جاري التحقق...</p>
+        </div>
+      </div>
+    );
+  }
+  
+  if (isEmployee) {
+    return (
+      <div className="min-h-screen w-full flex items-center justify-center bg-background p-4">
+        <div className="glass-card p-8 max-w-md text-center">
+          <div className="w-16 h-16 rounded-2xl bg-red-100 flex items-center justify-center mx-auto mb-4">
+            <AlertCircle className="w-8 h-8 text-red-500" />
+          </div>
+          <h2 className="text-xl font-bold mb-2">لا يمكن إنشاء شركة</h2>
+          <p className="text-muted-foreground mb-6">حسابك مسجل كموظف. لا يمكن للموظفين إنشاء شركات جديدة.</p>
+          <Button 
+            onClick={() => navigate('/staff-login')}
+            className="w-full gradient-bg text-primary-foreground border-0"
+          >
+            الذهاب لصفحة دخول الموظفين
+          </Button>
+        </div>
+      </div>
+    );
+  }
 
   const selectedBT = customBusinessTypes.find(ct => ct.id === bizType) || BUSINESS_TYPES[bizType];
   const bizEntries = [
