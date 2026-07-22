@@ -5,14 +5,15 @@
 
 BEGIN;
 
--- 1. First, fix the restaurants table RLS completely
+-- 1. First, fix the restaurants table RLS completely (DROP ALL existing policies!)
 DROP POLICY IF EXISTS "Public can view basic info" ON public.restaurants;
 DROP POLICY IF EXISTS "Company members can view their company restaurant" ON public.restaurants;
 DROP POLICY IF EXISTS "Restrict restaurant access to owners and employees" ON public.restaurants;
 DROP POLICY IF EXISTS "Owners and super admins can manage restaurants" ON public.restaurants;
+DROP POLICY IF EXISTS "Owners can manage restaurants" ON public.restaurants;
 
 -- Create proper RLS policies for restaurants table (WITHOUT relying on missing has_role function)
-CREATE POLICY "Restrict restaurant access to owners and employees"
+CREATE POLICY "Company members can view their company restaurant"
   ON public.restaurants
   FOR SELECT
   TO authenticated
@@ -35,7 +36,7 @@ CREATE POLICY "Owners can manage restaurants"
   USING (owner_id = auth.uid())
   WITH CHECK (owner_id = auth.uid());
 
--- 2. Fix company_users RLS to be stricter (matching the existing working fix)
+-- 2. Fix company_users RLS (DROP ALL existing policies first!)
 DROP POLICY IF EXISTS "Users can view their own company memberships" ON public.company_users;
 DROP POLICY IF EXISTS "Admins can view company members" ON public.company_users;
 DROP POLICY IF EXISTS "Company admins can manage members" ON public.company_users;

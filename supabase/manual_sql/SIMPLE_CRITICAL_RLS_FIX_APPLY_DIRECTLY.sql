@@ -3,10 +3,18 @@
 -- URL: https://supabase.com/dashboard/project/nmkjyweoagbblkbqavdz/sql
 -- ================================================================
 
--- STEP 1: Remove the bad policy that allows everyone to see all restaurants
+-- STEP 0: FIRST, REMOVE ALL EXISTING POLICIES on both tables!
 DROP POLICY IF EXISTS "Public can view basic info" ON public.restaurants;
+DROP POLICY IF EXISTS "Company members can view their company restaurant" ON public.restaurants;
+DROP POLICY IF EXISTS "Owners can manage restaurants" ON public.restaurants;
+DROP POLICY IF EXISTS "Restrict restaurant access to owners and employees" ON public.restaurants;
+DROP POLICY IF EXISTS "Owners and super admins can manage restaurants" ON public.restaurants;
+-- Also drop ALL policies for company_users
+DROP POLICY IF EXISTS "Users can view their own company memberships" ON public.company_users;
+DROP POLICY IF EXISTS "Admins can view company members" ON public.company_users;
+DROP POLICY IF EXISTS "Company admins can manage members" ON public.company_users;
 
--- STEP 2: Apply the WORKING policy from fix_employee_access_rls.sql (that we know works)
+-- STEP 1: Apply the WORKING SELECT policy for restaurants
 CREATE POLICY "Company members can view their company restaurant"
   ON public.restaurants
   FOR SELECT
@@ -23,15 +31,21 @@ CREATE POLICY "Company members can view their company restaurant"
     )
   );
 
--- STEP 3: Also make sure company_users RLS is correct
-DROP POLICY IF EXISTS "Users can view their own company memberships" ON public.company_users;
+-- STEP 2: Apply policy for owners to manage restaurants
+CREATE POLICY "Owners can manage restaurants"
+  ON public.restaurants
+  FOR ALL
+  TO authenticated
+  USING (owner_id = auth.uid())
+  WITH CHECK (owner_id = auth.uid());
+
+-- STEP 3: Fix company_users RLS
 CREATE POLICY "Users can view their own company memberships"
   ON public.company_users
   FOR SELECT
   TO authenticated
   USING (user_id = auth.uid());
 
-DROP POLICY IF EXISTS "Admins can view company members" ON public.company_users;
 CREATE POLICY "Admins can view company members"
   ON public.company_users
   FOR SELECT
@@ -49,13 +63,4 @@ CREATE POLICY "Admins can view company members"
     )
   );
 
--- STEP 4: Allow owners to manage their restaurants
-DROP POLICY IF EXISTS "Owners can manage restaurants" ON public.restaurants;
-CREATE POLICY "Owners can manage restaurants"
-  ON public.restaurants
-  FOR ALL
-  TO authenticated
-  USING (owner_id = auth.uid())
-  WITH CHECK (owner_id = auth.uid());
-
-SELECT '✅ SIMPLE & WORKING RLS FIX APPLIED! Now try logging in again!' AS status;
+SELECT '✅ ALL RLS POLICIES RESET & FIXED SUCCESSFULLY! Now try logging in again!' AS status;
