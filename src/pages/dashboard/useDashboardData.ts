@@ -119,6 +119,8 @@ export function useDashboardData() {
   const loadData = useCallback(async () => {
     if (!user) return;
 
+    console.log('🔍 [loadData] Starting for user:', user.id, user.email);
+
     // Migrate old keys first
     migrateLocalStorageKeys(user.id);
 
@@ -137,6 +139,7 @@ export function useDashboardData() {
     // ─── Determine target restaurant ID ───────────────────────────────────────
     // Priority: 1) saved in localStorage (user-specific)  2) owner's most recent  3) employee company
     const savedBusinessId = localStorage.getItem(getUserKey('current_business_id', user.id));
+    console.log('🔍 [loadData] Saved business ID from localStorage:', savedBusinessId);
 
     const profileRes = await supabase.from('profiles').select('full_name').eq('user_id', user.id).maybeSingle();
     const pName = profileRes.data?.full_name || '';
@@ -144,40 +147,21 @@ export function useDashboardData() {
 
     let rest: any = null;
 
-    // ─── Step 1: Try exact restaurant by savedBusinessId WITH PERMISSION CHECK ──
+    // ─── Step 1: Try exact restaurant by savedBusinessId (RLS handles security!) ──
     if (savedBusinessId) {
-      // First check if user is owner
-      const { data: ownerRest } = await supabase
+      console.log('🔍 [loadData] Step 1: Trying saved business ID...');
+      const { data: savedRest, error: savedRestError } = await supabase
         .from('restaurants')
         .select('*')
         .eq('id', savedBusinessId)
-        .eq('owner_id', user.id)
         .maybeSingle();
       
-      if (ownerRest) {
-        rest = ownerRest;
+      console.log('🔍 [loadData] Step 1 result:', { savedRest, savedRestError });
+      if (savedRest) {
+        rest = savedRest;
       } else {
-        // If not owner, check if user is active employee in the company
-        const { data: companyUsers } = await supabase
-          .from('company_users')
-          .select('company_id')
-          .eq('user_id', user.id)
-          .eq('is_active', true)
-          .maybeSingle();
-        
-        if (companyUsers) {
-          const { data: empRest } = await supabase
-            .from('restaurants')
-            .select('*')
-            .eq('id', savedBusinessId)
-            .eq('company_id', companyUsers.company_id)
-            .maybeSingle();
-          rest = empRest ?? null;
-        }
-      }
-      
-      // If no access to saved restaurant, clear it
-      if (!rest) {
+        // Clear invalid saved ID
+        console.warn('⚠️ [loadData] Clearing invalid saved business ID');
         localStorage.removeItem(getUserKey('current_business_id', user.id));
         localStorage.removeItem(getUserKey('current_business_name', user.id));
       }
@@ -185,33 +169,43 @@ export function useDashboardData() {
 
     // ─── Step 2: Owner's most recent restaurant ────────────────────────────────
     if (!rest) {
-      const { data: ownerRests } = await supabase
+      console.log('🔍 [loadData] Step 2: Trying owner restaurants...');
+      const { data: ownerRests, error: ownerRestError } = await supabase
         .from('restaurants')
         .select('*')
         .eq('owner_id', user.id)
         .order('created_at', { ascending: false })
         .limit(1);
+      
+      console.log('🔍 [loadData] Step 2 result:', { ownerRests, ownerRestError });
       rest = ownerRests?.[0] ?? null;
     }
 
     // ─── Step 3: Employee — check company membership ───────────────────────────
     // Only runs if Steps 1 & 2 found nothing (i.e. pure employee with no owned restaurant)
     if (!rest) {
-      const { data: userCompanies } = await supabase
+      console.log('🔍 [loadData] Step 3: Checking employee companies...');
+      const { data: userCompanies, error: userCompaniesError } = await supabase
         .from('company_users')
         .select('company_id')
         .eq('user_id', user.id)
         .eq('is_active', true)
         .limit(1);
 
+      console.log('🔍 [loadData] Step 3 userCompanies:', { userCompanies, userCompaniesError });
+
       if (userCompanies && userCompanies.length > 0) {
         const companyId = userCompanies[0].company_id;
-        const { data: companyRestaurants } = await supabase
+        console.log('🔍 [loadData] Step 3: Found company ID:', companyId);
+        
+        const { data: companyRestaurants, error: companyRestError } = await supabase
           .from('restaurants')
           .select('*')
           .eq('company_id', companyId)
           .order('created_at', { ascending: false })
           .limit(1);
+
+        console.log('🔍 [loadData] Step 3 companyRestaurants:', { companyRestaurants, companyRestError });
 
         if (companyRestaurants && companyRestaurants.length > 0) {
           rest = companyRestaurants[0];
@@ -220,8 +214,10 @@ export function useDashboardData() {
       }
     }
 
+    console.log('🔍 [loadData] Final restaurant found:', rest);
 
     if (!rest) {
+      console.warn('⚠️ [loadData] No restaurant found! Checking pending requests...');
       const { data: pendingReq } = await supabase
         .from('staff_access_requests')
         .select('status')
@@ -253,6 +249,7 @@ export function useDashboardData() {
     }
     
     // Set restaurant immediately to unlock UI
+    console.log('✅ [loadData] Setting restaurant:', rest.id, rest.name);
     setRestaurant(rest as unknown as Restaurant);
     localStorage.setItem(getUserKey('current_business_id', user.id), rest.id);
     localStorage.setItem(getUserKey('current_business_name', user.id), rest.name);
