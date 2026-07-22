@@ -51,8 +51,37 @@ export function useDashboardData() {
   // Helper functions for user-specific localStorage keys
   const getUserKey = useCallback((baseKey: string, userId: string) => `${baseKey}_${userId}`, []);
 
+  // Migration helper: move old non-user-specific keys to user-specific ones
+  const migrateLocalStorageKeys = useCallback((userId: string) => {
+    // Migrate current_business_id
+    const oldBusinessId = localStorage.getItem('current_business_id');
+    if (oldBusinessId && !localStorage.getItem(getUserKey('current_business_id', userId))) {
+      localStorage.setItem(getUserKey('current_business_id', userId), oldBusinessId);
+    }
+    // Migrate current_business_name
+    const oldBusinessName = localStorage.getItem('current_business_name');
+    if (oldBusinessName && !localStorage.getItem(getUserKey('current_business_name', userId))) {
+      localStorage.setItem(getUserKey('current_business_name', userId), oldBusinessName);
+    }
+    // Also check for any service_packages_<id> keys to migrate
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key && key.startsWith('service_packages_')) {
+        if (!localStorage.getItem(getUserKey(key, userId))) {
+          const value = localStorage.getItem(key);
+          if (value) {
+            localStorage.setItem(getUserKey(key, userId), value);
+          }
+        }
+      }
+    }
+  }, [getUserKey]);
+
   // Load cached data first for instant display
   const loadCachedData = useCallback(async (userId: string) => {
+    // Migrate old keys first
+    migrateLocalStorageKeys(userId);
+
     const cached = await getCachedData<{
       restaurant: Restaurant | null;
       menuItems: MenuItem[];
@@ -85,10 +114,13 @@ export function useDashboardData() {
       return true;
     }
     return false;
-  }, [getUserKey]);
+  }, [getUserKey, migrateLocalStorageKeys]);
 
   const loadData = useCallback(async () => {
     if (!user) return;
+
+    // Migrate old keys first
+    migrateLocalStorageKeys(user.id);
 
     // If offline, try cached data
     if (!navigator.onLine) {
@@ -325,7 +357,7 @@ export function useDashboardData() {
     });
 
     return !!suspended;
-  }, [user, loadCachedData, getUserKey]);
+  }, [user, loadCachedData, getUserKey, migrateLocalStorageKeys]);
 
   const runPendingSync = useCallback(async (shouldReload: boolean) => {
     if (!user) return;
