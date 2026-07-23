@@ -397,6 +397,7 @@ export function PurchaseInvoices({ restaurantId, currency }: Props) {
               await supabase.from('purchase_invoices').update({ journal_entry_id: journalData.id }).eq('id', inv.id);
 
               // Post the entry by directly updating is_posted flag (bypass RPC to avoid errors)
+              console.log('Attempting to post journal entry:', journalData.id);
               const { error: postError } = await supabase
                 .from('journal_entries')
                 .update({ is_posted: true, posted_at: new Date().toISOString() })
@@ -404,8 +405,9 @@ export function PurchaseInvoices({ restaurantId, currency }: Props) {
 
               if (postError) {
                 console.error('Failed to post journal entry:', postError);
-                toast.warning(`تم حفظ القيد ${entryNumber} لكن لم يتم ترحيله`);
+                toast.error(`فشل ترحيل القيد: ${postError.message}`);
               } else {
+                console.log('Successfully posted journal entry:', journalData.id);
                 toast.success(`تم إنشاء وترحيل القيد المحاسبي ${entryNumber}`);
               }
             }
