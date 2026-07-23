@@ -1047,7 +1047,7 @@ function WarehousesManager({ restaurantId, warehouses, onRefresh, products, curr
   const [transferForm, setTransferForm] = useState({ mode: 'existing' as 'existing' | 'new', toWarehouseId: '', qtyMode: 'all' as 'all' | 'custom', customQty: '', newWhCode: '', newWhName: '', newWhNameAr: '' });
   const [addQtyMode, setAddQtyMode] = useState<'direct' | 'purchase' | null>(null);
   const [directQty, setDirectQty] = useState('');
-  const [directQtyCost, setDirectQtyCost] = useState('');
+  const [directQtyCost, setDirectQtyCost] = useState(''); // Cost per unit for actual inventory
   const [transferring, setTransferring] = useState(false);
   const [addingQty, setAddingQty] = useState(false);
   const [form, setForm] = useState({
