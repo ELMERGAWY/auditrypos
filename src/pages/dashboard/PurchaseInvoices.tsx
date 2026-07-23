@@ -99,8 +99,8 @@ export function PurchaseInvoices({ restaurantId, currency }: Props) {
       supabase.from('suppliers').select('id,name').eq('restaurant_id', restaurantId),
       supabase.from('supplier_contracts').select('*').eq('restaurant_id', restaurantId).eq('status', 'active'),
       supabase.from('projects').select('id,name').eq('restaurant_id', restaurantId),
-      supabase.from('products').select('id,name,cost_price,unit,item_type_id').eq('restaurant_id', restaurantId).eq('available', true),
-      supabase.from('chart_of_accounts').select('id,code,name,account_type').eq('restaurant_id', restaurantId).eq('is_active', true).eq('posting_allowed', true),
+      supabase.from('products').select('id,name,cost_price,unit,item_type_id,barcode,sku').eq('restaurant_id', restaurantId),
+      supabase.from('chart_of_accounts').select('id,code,name,account_type').eq('restaurant_id', restaurantId),
       supabase.from('warehouses').select('id,name').eq('restaurant_id', restaurantId),
       supabase.from('sub_warehouses').select('id,name,main_warehouse_id').eq('restaurant_id', restaurantId),
       supabase.from('item_types').select('id,code,name_ar').eq('is_active', true),
@@ -115,7 +115,7 @@ export function PurchaseInvoices({ restaurantId, currency }: Props) {
       setWarehouses(w.data || []);
       setSubWarehouses(sw.data || []);
       setItemTypes(it.data || []);
-      
+
       // Get costing method from restaurant settings first, then fallback to old settings
       let method = 'fifo';
       if (rest?.data?.inventory_method) {
