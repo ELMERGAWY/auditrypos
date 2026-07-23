@@ -1039,6 +1039,7 @@ function WarehousesManager({ restaurantId, warehouses, onRefresh, products, curr
   const [stockSearch, setStockSearch] = useState('');
   const [stockWhFilter, setStockWhFilter] = useState('');
   const [stockView, setStockView] = useState<Warehouse | null>(null);
+  const [costingMethod, setCostingMethod] = useState<'fifo' | 'lifo' | 'wac' | 'specific'>('fifo');
 
   // --- Product Action Dialogs ---
   type ProductActionTarget = { stockItem: any; warehouse: Warehouse } | null;
@@ -1079,6 +1080,24 @@ function WarehousesManager({ restaurantId, warehouses, onRefresh, products, curr
       loadWarehouseStocks();
     }
   }, [restaurantId, warehouses]);
+
+  // Load costing method from restaurant settings
+  useEffect(() => {
+    const loadCostingMethod = async () => {
+      const { data: restaurantData } = await supabase.from('restaurants').select('inventory_method').eq('id', restaurantId).maybeSingle();
+      const { data: settingsData } = await supabase.from('inventory_settings').select('costing_method').eq('restaurant_id', restaurantId).maybeSingle();
+
+      let method = 'fifo';
+      if (restaurantData?.inventory_method) {
+        const m = restaurantData.inventory_method.toLowerCase();
+        method = m === 'weighted_avg' ? 'wac' : m;
+      } else if (settingsData?.costing_method) {
+        method = settingsData.costing_method;
+      }
+      setCostingMethod(method as any);
+    };
+    loadCostingMethod();
+  }, [restaurantId]);
 
   const loadWarehouseStocks = async () => {
     setLoadingStock(true);
