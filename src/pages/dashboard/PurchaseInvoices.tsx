@@ -777,25 +777,17 @@ export function PurchaseInvoices({ restaurantId, currency }: Props) {
                       </td>
                       <td className="px-2 py-1">
                         {l.line_type === 'inventory' ? (
-                          <div className="relative group">
-                            <Input
-                              placeholder="بحث بالاسم أو الكود..."
-                              defaultValue={products.find(p => p.id === l.product_id)?.name || ''}
-                              className="h-8 text-xs pr-7"
-                              list={`product-list-${i}`}
-                              onChange={e => {
-                                const val = e.target.value;
-                                const p = products.find(pr => pr.name === val || pr.barcode === val || pr.sku === val);
-                                if (p) {
-                                  updateLine(i, { product_id: p.id, unit_cost: l.unit_cost || (p?.cost_price ?? 0), description: l.description || p?.name || '' });
-                                }
-                              }}
-                            />
-                            <Search className="w-3.5 h-3.5 absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground" />
-                            <datalist id={`product-list-${i}`}>
-                              {products.map(p => <option key={p.id} value={p.name}>{p.barcode ? `[${p.barcode}] ` : ''}{p.sku ? `[${p.sku}] ` : ''}{p.category || ''}</option>)}
-                            </datalist>
-                          </div>
+                          <select
+                            value={l.product_id || ''}
+                            onChange={e => {
+                              const p = products.find(pr => pr.id === e.target.value);
+                              updateLine(i, { product_id: e.target.value, unit_cost: l.unit_cost || (p?.cost_price ?? 0), description: l.description || p?.name || '' });
+                            }}
+                            className="w-full px-2 py-1 rounded bg-background border border-input h-8 text-xs"
+                          >
+                            <option value="">— اختر منتج —</option>
+                            {products.map(p => <option key={p.id} value={p.id}>{p.name} {p.barcode ? `[${p.barcode}]` : ''} {p.sku ? `[${p.sku}]` : ''}</option>)}
+                          </select>
                         ) : (
                           <select
                             value={l.gl_account_id || ''}
