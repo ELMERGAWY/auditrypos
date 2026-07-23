@@ -114,6 +114,8 @@ export function InventoryTab({ restaurantId, currency, businessType }: Props) {
   const [productMovements, setProductMovements] = useState<StockMovement[]>([]);
   const [pricingMode, setPricingMode] = useState<'fixed' | 'markup_percent' | 'markup_fixed'>('fixed');
   const [markupValue, setMarkupValue] = useState('');
+  const [directQtyCost, setDirectQtyCost] = useState('');
+  const [costingMethod, setCostingMethod] = useState<'fifo' | 'lifo' | 'wac' | 'specific'>('fifo');
   const [form, setForm] = useState({
     name: '', barcode: '', sku: '', category: 'عام', price: '', cost_price: '',
     quantity: '', min_quantity: '5', unit: 'قطعة', image: '📦', expiry_date: '',
@@ -128,10 +130,10 @@ export function InventoryTab({ restaurantId, currency, businessType }: Props) {
   const load = async () => {
     // Load Products
     const { data: prodData } = await supabase.from('products').select('*').eq('restaurant_id', restaurantId).order('created_at', { ascending: false });
-    
+
     // Load Warehouse Stocks to aggregate quantities
     const { data: stockData } = await supabase.from('warehouse_stock').select('product_id, quantity').eq('restaurant_id', restaurantId);
-    
+
     const aggregatedProducts = ((prodData || []) as Product[]).map(p => {
       const pStocks = (stockData || []).filter(s => s.product_id === p.id);
       if (pStocks.length > 0) {
@@ -145,7 +147,7 @@ export function InventoryTab({ restaurantId, currency, businessType }: Props) {
     });
 
     setProducts(aggregatedProducts);
-    
+
     // Load Warehouses (filtered by restaurant to respect RLS correctly)
     const { data: whData } = await supabase.from('warehouses').select('*').eq('restaurant_id', restaurantId).is('deleted_at', null).order('name');
     setWarehouses((whData || []) as Warehouse[]);
@@ -153,6 +155,19 @@ export function InventoryTab({ restaurantId, currency, businessType }: Props) {
     // Load Item Types
     const { data: itemTypeData } = await supabase.from('item_types').select('*').eq('is_active', true);
     setItemTypes((itemTypeData || []) as ItemType[]);
+
+    // Load costing method from restaurant settings
+    const { data: restaurantData } = await supabase.from('restaurants').select('inventory_method').eq('id', restaurantId).maybeSingle();
+    const { data: settingsData } = await supabase.from('inventory_settings').select('costing_method').eq('restaurant_id', restaurantId).maybeSingle();
+
+    let method = 'fifo';
+    if (restaurantData?.inventory_method) {
+      const m = restaurantData.inventory_method.toLowerCase();
+      method = m === 'weighted_avg' ? 'wac' : m;
+    } else if (settingsData?.costing_method) {
+      method = settingsData.costing_method;
+    }
+    setCostingMethod(method as any);
 
     if (businessType === 'contracting' || hasFeature(businessType, 'projects')) {
       const { data: projData } = await supabase.from('projects').select('id, name').eq('restaurant_id', restaurantId);
@@ -1174,9 +1189,12 @@ function WarehousesManager({ restaurantId, warehouses, onRefresh, products, curr
     if (!addQtyTarget) return;
     const { stockItem } = addQtyTarget;
     const addAmt = Number(directQty);
+    const addCost = Number(directQtyCost);
     if (!addAmt || addAmt <= 0) return toast.error('الكمية يجب أن تكون أكبر من صفر');
+    if (addCost < 0) return toast.error('التكلفة يجب أن تكون رقم صحيح');
     setAddingQty(true);
     try {
+      // Update warehouse stock quantity
       if (stockItem.id) {
         await supabase.from('warehouse_stock')
           .update({ quantity: Number(stockItem.quantity || 0) + addAmt })
@@ -1189,14 +1207,41 @@ function WarehousesManager({ restaurantId, warehouses, onRefresh, products, curr
           quantity: Number(stockItem.quantity || 0) + addAmt,
         }, { onConflict: 'warehouse_id,product_id' });
       }
+
+      // Calculate new average cost based on costing method
+      const curQty = Number(stockItem.product?.quantity || 0);
+      const curCost = Number(stockItem.product?.cost_price || 0);
+      const newQty = curQty + addAmt;
+      let newCost = curCost;
+
+      if (addCost > 0) {
+        if (costingMethod === 'wac' || costingMethod === 'average') {
+          // Weighted Average Cost: (old total + new total) / new quantity
+          const oldTotal = curQty * curCost;
+          const newTotal = addAmt * addCost;
+          newCost = newQty > 0 ? (oldTotal + newTotal) / newQty : addCost;
+        } else if (costingMethod === 'fifo' || costingMethod === 'lifo') {
+          // FIFO/LIFO: update to the new cost as reference (layers handled separately)
+          newCost = addCost;
+        } else {
+          // Specific or other: use the new cost
+          newCost = addCost;
+        }
+      }
+
+      // Update product with new quantity and cost
       await supabase.from('products')
-        .update({ quantity: (Number(stockItem.product?.quantity || 0)) + addAmt })
+        .update({
+          quantity: newQty,
+          cost_price: newCost
+        })
         .eq('id', stockItem.product_id);
 
-      toast.success(`تم إضافة ${addAmt} ${stockItem.product?.unit || 'وحدة'} من الجرد الفعلي`);
+      toast.success(`تم إضافة ${addAmt} ${stockItem.product?.unit || 'وحدة'} من الجرد الفعلي${addCost > 0 ? ` بتكلفة ${addCost} ${currency}` : ''}`);
       setAddQtyTarget(null);
       setAddQtyMode(null);
       setDirectQty('');
+      setDirectQtyCost('');
       await loadWarehouseStocks();
       onRefresh();
     } catch (err: any) {
@@ -1627,8 +1672,23 @@ function WarehousesManager({ restaurantId, warehouses, onRefresh, products, curr
                     onChange={e => setDirectQty(e.target.value)}
                     className="h-11 rounded-xl text-sm"
                     min="1"
-                    autoFocus
                   />
+                  <p className="text-sm font-bold">تكلفة الوحدة (اختياري):</p>
+                  <Input
+                    type="number" placeholder={`التكلفة بالـ ${currency}`}
+                    value={directQtyCost}
+                    onChange={e => setDirectQtyCost(e.target.value)}
+                    className="h-11 rounded-xl text-sm"
+                    min="0"
+                    step="0.01"
+                  />
+                  <p className="text-[11px] text-muted-foreground">
+                    طريقة التسعير الحالية: <span className="font-bold text-primary">
+                      {costingMethod === 'wac' ? 'المتوسط المرجح (WAC)' :
+                       costingMethod === 'fifo' ? 'الوارد أولاً يصرف أولاً (FIFO)' :
+                       costingMethod === 'lifo' ? 'الوارد أخيراً يصرف أولاً (LIFO)' : costingMethod}
+                    </span>
+                  </p>
                   <p className="text-[11px] text-muted-foreground">
                     بعد الإضافة: <span className="font-bold text-success">{Number(addQtyTarget.stockItem.quantity || 0) + Number(directQty || 0)} {addQtyTarget.stockItem.product?.unit || 'وحدة'}</span>
                   </p>
