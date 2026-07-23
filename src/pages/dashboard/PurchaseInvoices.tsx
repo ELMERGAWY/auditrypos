@@ -445,10 +445,17 @@ export function PurchaseInvoices({ restaurantId, currency }: Props) {
   const openView = async (inv: PurchaseInvoice) => {
     setViewInvoice(inv);
     setShowViewModal(true);
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from('purchase_invoice_items')
-      .select('*, products(name), chart_of_accounts(code,name), warehouses(name)')
+      .select('*')
       .eq('invoice_id', inv.id);
+    
+    if (error) {
+      console.error('Failed to load invoice items:', error);
+      toast.error('فشل تحميل بنود الفاتورة');
+    }
+    
+    console.log('Invoice items:', data);
     setViewLines(data || []);
   };
 
