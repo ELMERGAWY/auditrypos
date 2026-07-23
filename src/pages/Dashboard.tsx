@@ -1084,10 +1084,12 @@ export default function Dashboard() {
 
   if (authLoading || !user || !dataLoaded || !adminChecked) return <div className="min-h-screen flex items-center justify-center"><RefreshCcw className="w-10 h-10 animate-spin text-primary" /></div>;
   // If user is super admin, redirect to SuperAdmin page instead of showing CreateRestaurantForm
+  // This check must happen BEFORE the restaurant check to avoid showing CreateRestaurantForm to Super Admins
   if (isSuperAdmin) {
     navigate('/super-admin-portal');
     return null;
   }
+  // Only show CreateRestaurantForm if user is NOT Super Admin and has no restaurant
   if (!restaurant) return <div className="min-h-screen flex items-center justify-center p-4"><Suspense fallback={null}><CreateRestaurantForm userId={user.id} onCreated={loadData} /></Suspense></div>;
 
   return (

@@ -41,14 +41,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         .eq('user_id', userId)
         .eq('role', 'super_admin')
         .maybeSingle();
-      
-      console.log('Admin check result:', { data, error, userId });
-      
+
+      console.log('🔍 [AuthContext] Admin check result:', { data, error, userId, isSuperAdmin: !!data });
+
       setIsSuperAdmin(!!data);
       setAdminChecked(true);
       setLoading(false);
     } catch (err) {
-      console.error("Error checking admin status:", err);
+      console.error("❌ [AuthContext] Error checking admin status:", err);
       setIsSuperAdmin(false);
       setAdminChecked(true);
       setLoading(false);
