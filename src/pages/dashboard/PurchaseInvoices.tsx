@@ -107,6 +107,7 @@ export function PurchaseInvoices({ restaurantId, currency }: Props) {
       supabase.from('restaurants').select('inventory_method').eq('id', restaurantId).single(),
       supabase.from('inventory_settings').select('costing_method').eq('restaurant_id', restaurantId).maybeSingle(),
     ]).then(([s, sc, prj, p, a, w, sw, it, rest, settings]: any) => {
+      console.log('Products query result:', p);
       setSuppliers(s.data || []);
       setSupplierContracts(sc.data || []);
       setProjects(prj.data || []);
