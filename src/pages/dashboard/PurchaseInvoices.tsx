@@ -299,7 +299,12 @@ export function PurchaseInvoices({ restaurantId, currency }: Props) {
         total: Number(l.quantity) * Number(l.unit_cost),
         tax_amount: Number(l.tax_amount || 0),
       }));
-      await supabase.from('purchase_invoice_items').insert(linesData as any);
+      console.log('Saving invoice lines:', linesData);
+      const { error: linesError } = await supabase.from('purchase_invoice_items').insert(linesData as any);
+      if (linesError) {
+        console.error('Failed to save invoice lines:', linesError);
+        throw new Error('فشل حفظ بنود الفاتورة: ' + linesError.message);
+      }
 
       // Create inventory movements for inventory items
       for (const l of lines) {
