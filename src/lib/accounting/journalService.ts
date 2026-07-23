@@ -212,10 +212,11 @@ class JournalService {
         throw new Error(`Failed to create journal lines: ${linesError.message}`);
       }
 
-      // Update account balances IN PARALLEL
-      await Promise.all(entry.lines.map(line => 
-        this.updateAccountBalance(line.account_id, line.debit || 0, line.credit || 0)
-      ));
+      // Update account balances - skip RPC call to avoid stack depth error
+      // Triggers in database will handle balance updates automatically
+      // await Promise.all(entry.lines.map(line =>
+      //   this.updateAccountBalance(line.account_id, line.debit || 0, line.credit || 0)
+      // ));
 
       toast.success(`تم إنشاء قيد يومية ${entryNumber}`);
       
