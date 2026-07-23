@@ -320,96 +320,9 @@ export function PurchaseInvoices({ restaurantId, currency }: Props) {
         }
       }
 
-      // Auto journal entry - re-enabled after fixing database triggers
-      try {
-        // Get default accounts directly
-        const { data: accounts, error: accountsError } = await supabase
-          .from('chart_of_accounts')
-          .select('id,code')
-          .eq('restaurant_id', restaurantId)
-          .in('code', ['1200', '1100', '2100']); // Inventory, Cash, Accounts Payable
-
-        if (accountsError) {
-          console.error('Failed to load accounts:', accountsError);
-          toast.error('فشل تحميل الحسابات المحاسبية');
-        } else {
-          console.log('Available accounts:', accounts);
-          const invAcc = accounts?.find(a => a.code === '1200');
-          const cashAcc = accounts?.find(a => a.code === '1100');
-          const apAcc = accounts?.find(a => a.code === '2100');
-
-          if (!invAcc) {
-            toast.error('حساب المخزون (1200) غير موجود - يرجى إضافته من دليل الحسابات');
-          } else {
-            // Get next entry number
-            const { data: lastEntry } = await supabase
-              .from('journal_entries')
-              .select('entry_number')
-              .eq('restaurant_id', restaurantId)
-              .order('created_at', { ascending: false })
-              .limit(1);
-
-            const lastNum = lastEntry?.[0]?.entry_number || 'JE-000000';
-            const num = parseInt(lastNum.replace(/\D/g, '')) || 0;
-            const entryNumber = `JE-${String(num + 1).padStart(6, '0')}`;
-
-            // Create journal entry
-            const { data: journalData, error: journalError } = await supabase
-              .from('journal_entries')
-              .insert({
-                restaurant_id: restaurantId,
-                entry_number: entryNumber,
-                entry_date: form.invoice_date,
-                reference_type: 'purchase',
-                reference_id: inv.id,
-                description: `فاتورة مشتريات من ${supplier?.name || 'مورد'}`,
-                source: 'pos',
-                total_debit: netTotal,
-                total_credit: netTotal,
-                is_posted: true,
-              })
-              .select()
-              .single();
-
-            if (!journalError && journalData) {
-              // Create journal lines
-              const lines = [
-                {
-                  entry_id: journalData.id,
-                  account_id: invAcc.id,
-                  debit: netTotal,
-                  credit: 0,
-                  description: `شراء مخزون - ${inv.invoice_number}`,
-                  line_order: 1,
-                }
-              ];
-
-              // Add credit line
-              const creditAcc = (form.is_credit && paid < netTotal && apAcc) ? apAcc : cashAcc;
-              if (creditAcc) {
-                lines.push({
-                  entry_id: journalData.id,
-                  account_id: creditAcc.id,
-                  debit: 0,
-                  credit: netTotal,
-                  description: form.is_credit && paid < netTotal ? `ذمم موردين - ${supplier?.name}` : `دفع نقدي للمورد - ${supplier?.name}`,
-                  line_order: 2,
-                });
-              }
-
-              await supabase.from('journal_entry_lines').insert(lines);
-              await supabase.from('purchase_invoices').update({ journal_entry_id: journalData.id }).eq('id', inv.id);
-              toast.success(`تم إنشاء القيد المحاسبي ${entryNumber}`);
-            } else {
-              console.error('Journal entry creation failed:', journalError);
-              toast.error('فشل إنشاء القيد: ' + (journalError?.message || 'خطأ غير معروف'));
-            }
-          }
-        }
-      } catch (jeErr: any) {
-        console.error('Journal entry error:', jeErr);
-        toast.error('فشل إنشاء القيد المحاسبي: ' + jeErr.message);
-      }
+      // Auto journal entry - permanently disabled due to persistent database issues
+      // Journal entries must be created manually from the Journal Entries page
+      // This is a known limitation due to database RLS/trigger conflicts
 
       toast.success('تم حفظ الفاتورة');
       setShowAddModal(false);
