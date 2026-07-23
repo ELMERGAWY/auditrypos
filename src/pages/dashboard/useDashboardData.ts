@@ -187,17 +187,17 @@ export function useDashboardData() {
       console.log('🔍 [loadData] Step 3: Checking employee companies...');
       const { data: userCompanies, error: userCompaniesError } = await supabase
         .from('company_users')
-        .select('company_id')
+        .select('company_id, role, is_active')
         .eq('user_id', user.id)
         .eq('is_active', true)
         .limit(1);
 
-      console.log('🔍 [loadData] Step 3 userCompanies:', { userCompanies, userCompaniesError });
+      console.log('🔍 [loadData] Step 3 userCompanies:', { userCompanies, userCompaniesError, userId: user.id });
 
       if (userCompanies && userCompanies.length > 0) {
         const companyId = userCompanies[0].company_id;
         console.log('🔍 [loadData] Step 3: Found company ID:', companyId);
-        
+
         const { data: companyRestaurants, error: companyRestError } = await supabase
           .from('restaurants')
           .select('*')
@@ -205,12 +205,17 @@ export function useDashboardData() {
           .order('created_at', { ascending: false })
           .limit(1);
 
-        console.log('🔍 [loadData] Step 3 companyRestaurants:', { companyRestaurants, companyRestError });
+        console.log('🔍 [loadData] Step 3 companyRestaurants:', { companyRestaurants, companyRestError, companyId });
 
         if (companyRestaurants && companyRestaurants.length > 0) {
           rest = companyRestaurants[0];
           localStorage.setItem(getUserKey('current_business_id', user.id), rest.id);
+          console.log('🔍 [loadData] Step 3: Employee restaurant set:', rest.id);
+        } else {
+          console.warn('⚠️ [loadData] Step 3: No restaurants found for company:', companyId);
         }
+      } else {
+        console.warn('⚠️ [loadData] Step 3: No active company membership found for user:', user.id);
       }
     }
 
