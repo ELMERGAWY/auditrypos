@@ -152,18 +152,24 @@ const SuperAdmin = () => {
 
   const load = async () => {
     console.log('🔍 [SuperAdmin] Loading data...');
-    const [restsRes, rcptsRes, ordersRes, agentsRes, bansRes, issuesRes, usersRes, customTypesRes] = await Promise.all([
+    const [restsRes, rcptsRes, ordersRes, agentsRes, bansRes, usersRes, customTypesRes] = await Promise.all([
       supabase.from('restaurants').select('*').order('created_at', { ascending: false }),
       supabase.from('payment_receipts').select('*, restaurants(name)').order('uploaded_at', { ascending: false }),
       supabase.from('orders').select('*, order_items(*)').order('created_at', { ascending: false }).limit(500),
       supabase.from('delivery_agents').select('*').order('created_at', { ascending: false }),
       supabase.from('bans').select('*, restaurants(name)').order('created_at', { ascending: false }),
-      // Try to fetch failures if the table exists
-      supabase.from('accounting_post_failures' as any).select('*, restaurants(name)').order('created_at', { ascending: false }).limit(50),
       // Fix users query - use separate queries instead of relationships
       supabase.from('profiles').select('*').limit(1000),
       supabase.from('custom_business_types').select('*').order('created_at', { ascending: false })
     ]);
+
+    // Try to fetch failures if the table exists (optional)
+    let issuesRes = { data: null, error: null };
+    try {
+      issuesRes = await supabase.from('accounting_post_failures' as any).select('*, restaurants(name)').order('created_at', { ascending: false }).limit(50);
+    } catch (e) {
+      console.log('accounting_post_failures table does not exist, skipping');
+    }
 
     // Fetch user_roles and company_users separately
     const [userRolesRes, companyUsersRes] = await Promise.all([
