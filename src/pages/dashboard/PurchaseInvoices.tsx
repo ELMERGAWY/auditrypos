@@ -108,6 +108,14 @@ export function PurchaseInvoices({ restaurantId, currency }: Props) {
       supabase.from('inventory_settings').select('costing_method').eq('restaurant_id', restaurantId).maybeSingle(),
     ]).then(([s, sc, prj, p, a, w, sw, it, rest, settings]: any) => {
       console.log('Products query:', { data: p.data, error: p.error, restaurantId });
+      // Show toast with query result for debugging
+      if (p.error) {
+        toast.error(`خطأ في تحميل المنتجات: ${p.error.message}`);
+      } else if (!p.data || p.data.length === 0) {
+        toast.warning(`لا توجد منتجات (${p.data?.length || 0}) للمطعم`);
+      } else {
+        toast.success(`تم تحميل ${p.data.length} منتج`);
+      }
       setSuppliers(s.data || []);
       setSupplierContracts(sc.data || []);
       setProjects(prj.data || []);
