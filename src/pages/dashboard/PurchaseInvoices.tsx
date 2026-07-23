@@ -460,13 +460,25 @@ export function PurchaseInvoices({ restaurantId, currency }: Props) {
 
   const handleReceiveGoods = async (inv: PurchaseInvoice) => {
     if (inv.goods_received_at) { toast.info('تم استلام البضاعة بالفعل'); return; }
-    const { data: items } = await supabase
+    const { data: items, error: itemsError } = await supabase
       .from('purchase_invoice_items')
       .select('*')
       .eq('invoice_id', inv.id)
       .eq('line_type', 'inventory');
+    
+    if (itemsError) {
+      console.error('Failed to load invoice items:', itemsError);
+      toast.error('فشل تحميل بنود الفاتورة');
+      return;
+    }
+    
     const invItems = (items || []) as any[];
-    if (invItems.length === 0) { toast.info('لا توجد بنود مخزون في هذه الفاتورة'); return; }
+    console.log('Invoice items for receiving:', invItems);
+    
+    if (invItems.length === 0) {
+      toast.info('لا توجد بنود مخزون في هذه الفاتورة - تأكد من اختيار نوع "مخزون" عند إضافة البنود');
+      return;
+    }
 
     if (!confirm(`استلام البضاعة وإضافتها للمخزون باستخدام طريقة ${costingMethod.toUpperCase()}؟`)) return;
     setProcessing(true);
