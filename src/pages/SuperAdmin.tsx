@@ -133,6 +133,8 @@ const SuperAdmin = () => {
   const unreadNotifCount = adminNotifications.filter(n => !n.is_read).length;
   const freePlanCount = restaurants.filter(r => r.plan_id === 'free').length;
   const [debugInfo, setDebugInfo] = useState<any>(null);
+  const [editingUser, setEditingUser] = useState<any | null>(null);
+  const [editUserForm, setEditUserForm] = useState({ isSuperAdmin: false, companyId: '', role: '' });
 
   useEffect(() => {
     // Only redirect if auth is fully loaded and admin check is complete
@@ -322,10 +324,75 @@ const SuperAdmin = () => {
     const index = modules.indexOf(moduleKey);
     if (index > -1) modules.splice(index, 1);
     else modules.push(moduleKey);
-    
+
     const { error } = await supabase.from('restaurants').update({ enabled_modules: modules }).eq('id', restaurantId);
     if (error) toast.error('فشل تحديث الموديولات');
     else { load(); toast.success('تم تحديث موديولات النشاط'); }
+  };
+
+  const handleEditUser = (user: any) => {
+    const isSuperAdmin = user.user_roles?.some((r: any) => r.role === 'super_admin') || false;
+    const companyUser = user.company_users?.[0];
+    setEditingUser(user);
+    setEditUserForm({
+      isSuperAdmin,
+      companyId: companyUser?.company_id || '',
+      role: companyUser?.role || ''
+    });
+  };
+
+  const handleSaveUserEdit = async () => {
+    if (!editingUser) return;
+
+    try {
+      // Update Super Admin status
+      if (editUserForm.isSuperAdmin) {
+        const { error: roleError } = await supabase
+          .from('user_roles')
+          .upsert({ user_id: editingUser.user_id, role: 'super_admin' }, { onConflict: 'user_id,role' });
+        if (roleError) throw roleError;
+      } else {
+        const { error: roleError } = await supabase
+          .from('user_roles')
+          .delete()
+          .eq('user_id', editingUser.user_id)
+          .eq('role', 'super_admin');
+        if (roleError && roleError.code !== 'PGRST116') throw roleError; // Ignore if not found
+      }
+
+      // Update company membership
+      if (editUserForm.companyId && editUserForm.role) {
+        // Remove existing company memberships
+        await supabase
+          .from('company_users')
+          .delete()
+          .eq('user_id', editingUser.user_id);
+
+        // Add new company membership
+        const { error: companyError } = await supabase
+          .from('company_users')
+          .insert({
+            user_id: editingUser.user_id,
+            company_id: editUserForm.companyId,
+            role: editUserForm.role,
+            is_active: true
+          });
+        if (companyError) throw companyError;
+      } else {
+        // Remove all company memberships if no company selected
+        await supabase
+          .from('company_users')
+          .delete()
+          .eq('user_id', editingUser.user_id);
+      }
+
+      load();
+      setEditingUser(null);
+      toast.success('تم تحديث بيانات المستخدم بنجاح');
+    } catch (error) {
+      console.error('Error updating user:', error);
+      toast.error('فشل تحديث بيانات المستخدم');
+    }
   };
 
   if (authLoading) return <div className="flex items-center justify-center min-h-screen">جاري التحميل...</div>;
@@ -627,14 +694,19 @@ const SuperAdmin = () => {
                     })}
                   </div>
 
-                  <Button size="sm" variant="ghost" className="text-destructive hover:bg-destructive/10" onClick={async () => {
-                    if (confirm('حذف المستخدم نهائياً؟')) {
-                      await supabase.from('profiles').delete().eq('user_id', u.user_id);
-                      load();
-                    }
-                  }}>
-                    <Trash2 className="w-4 h-4" />
-                  </Button>
+                  <div className="flex items-center gap-2">
+                    <Button size="sm" variant="outline" onClick={() => handleEditUser(u)} className="gap-1">
+                      <Edit className="w-4 h-4" /> تعديل
+                    </Button>
+                    <Button size="sm" variant="ghost" className="text-destructive hover:bg-destructive/10" onClick={async () => {
+                      if (confirm('حذف المستخدم نهائياً؟')) {
+                        await supabase.from('profiles').delete().eq('user_id', u.user_id);
+                        load();
+                      }
+                    }}>
+                      <Trash2 className="w-4 h-4" />
+                    </Button>
+                  </div>
                 </div>
               ))}
             </div>
@@ -676,6 +748,80 @@ const SuperAdmin = () => {
         open={!!drillIn}
         onClose={() => setDrillIn(null)}
       />
+
+      {/* Edit User Dialog */}
+      <Dialog open={!!editingUser} onOpenChange={(open) => !open && setEditingUser(null)}>
+        <DialogContent className="max-w-md" dir="rtl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 font-display text-lg font-bold">
+              <Edit className="w-5 h-5 text-primary" />
+              تعديل بيانات المستخدم
+            </DialogTitle>
+          </DialogHeader>
+
+          {editingUser && (
+            <div className="space-y-4">
+              <div className="bg-secondary/50 p-3 rounded-lg">
+                <p className="text-sm font-bold">{editingUser.full_name || 'بدون اسم'}</p>
+                <p className="text-xs text-muted-foreground">{editingUser.email}</p>
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-sm font-bold">حالة Super Admin</label>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    id="isSuperAdmin"
+                    checked={editUserForm.isSuperAdmin}
+                    onChange={(e) => setEditUserForm({ ...editUserForm, isSuperAdmin: e.target.checked })}
+                    className="w-4 h-4 rounded"
+                  />
+                  <label htmlFor="isSuperAdmin" className="text-sm">تفعيل صلاحيات Super Admin</label>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-sm font-bold">الشركة</label>
+                <select
+                  value={editUserForm.companyId}
+                  onChange={(e) => setEditUserForm({ ...editUserForm, companyId: e.target.value })}
+                  className="w-full px-3 py-2 rounded-lg border border-border bg-background"
+                >
+                  <option value="">بدون شركة</option>
+                  {restaurants.map((r: any) => (
+                    <option key={r.id} value={r.company_id || r.id}>{r.name}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-sm font-bold">الدور في الشركة</label>
+                <select
+                  value={editUserForm.role}
+                  onChange={(e) => setEditUserForm({ ...editUserForm, role: e.target.value })}
+                  className="w-full px-3 py-2 rounded-lg border border-border bg-background"
+                  disabled={!editUserForm.companyId}
+                >
+                  <option value="">اختر الدور</option>
+                  <option value="owner">مالك</option>
+                  <option value="admin">مدير</option>
+                  <option value="manager">مشرف</option>
+                  <option value="employee">موظف</option>
+                </select>
+              </div>
+
+              <div className="flex gap-2 pt-4">
+                <Button onClick={handleSaveUserEdit} className="flex-1 gradient-bg text-white">
+                  حفظ التغييرات
+                </Button>
+                <Button variant="outline" onClick={() => setEditingUser(null)} className="flex-1">
+                  إلغاء
+                </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
 
       {/* Custom Tabs Customization Dialog - Full Control */}
       <Dialog open={!!selectedRestForTabs} onOpenChange={(open) => !open && setSelectedRestForTabs(null)}>
