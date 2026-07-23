@@ -76,7 +76,6 @@ export function PurchaseInvoices({ restaurantId, currency }: Props) {
   const [form, setForm] = useState({
     supplier_id: '',
     supplier_contract_id: '',
-    project_id: '',
     invoice_number: '',
     invoice_date: new Date().toISOString().split('T')[0],
     paid_amount: '',
@@ -268,7 +267,6 @@ export function PurchaseInvoices({ restaurantId, currency }: Props) {
           restaurant_id: restaurantId,
           supplier_id: form.supplier_id,
           supplier_contract_id: form.supplier_contract_id || null,
-          project_id: form.project_id || null,
           supplier_name: supplier?.name,
           invoice_number: form.invoice_number || `PI-${Date.now()}`,
           invoice_date: form.invoice_date,
@@ -347,7 +345,6 @@ export function PurchaseInvoices({ restaurantId, currency }: Props) {
       setForm({
         supplier_id: '',
         supplier_contract_id: '',
-        project_id: '',
         invoice_number: '',
         invoice_date: new Date().toISOString().split('T')[0],
         paid_amount: '',
@@ -678,15 +675,6 @@ export function PurchaseInvoices({ restaurantId, currency }: Props) {
                   {supplierContracts.filter(sc => sc.supplier_id === form.supplier_id).map(sc => 
                     <SelectItem key={sc.id} value={sc.id}>{sc.name} ({new Date(sc.start_date).toLocaleDateString('ar-EG')} - {new Date(sc.end_date).toLocaleDateString('ar-EG')})</SelectItem>
                   )}
-                </SelectContent>
-              </Select>
-            </div>
-            <div>
-              <Label>المشروع (اختياري)</Label>
-              <Select value={form.project_id} onValueChange={v => setForm({ ...form, project_id: v })}>
-                <SelectTrigger><SelectValue placeholder="اختر المشروع" /></SelectTrigger>
-                <SelectContent>
-                  {projects.map(p => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>
