@@ -127,7 +127,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setSession(null);
     setLastKnownUser(null);
 
-    // Clean up localStorage items but KEEP business selection and last_known_user for next login
+    // Clean up localStorage items but KEEP business selection to remember account choice
     try {
       const keysToRemove: string[] = [];
       for (let i = 0; i < localStorage.length; i++) {
