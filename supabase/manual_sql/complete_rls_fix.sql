@@ -5,40 +5,46 @@
 
 -- Drop ALL existing policies for user_roles
 DO $$
+DECLARE
+  policy_record RECORD;
 BEGIN
-  FOR policy IN (
-    SELECT policyname 
-    FROM pg_policies 
+  FOR policy_record IN (
+    SELECT policyname
+    FROM pg_policies
     WHERE schemaname = 'public' AND tablename = 'user_roles'
   )
   LOOP
-    EXECUTE format('DROP POLICY IF EXISTS %I ON public.user_roles', policy.policyname);
+    EXECUTE format('DROP POLICY IF EXISTS %I ON public.user_roles', policy_record.policyname);
   END LOOP;
 END $$;
 
 -- Drop ALL existing policies for company_users
 DO $$
+DECLARE
+  policy_record RECORD;
 BEGIN
-  FOR policy IN (
-    SELECT policyname 
-    FROM pg_policies 
+  FOR policy_record IN (
+    SELECT policyname
+    FROM pg_policies
     WHERE schemaname = 'public' AND tablename = 'company_users'
   )
   LOOP
-    EXECUTE format('DROP POLICY IF EXISTS %I ON public.company_users', policy.policyname);
+    EXECUTE format('DROP POLICY IF EXISTS %I ON public.company_users', policy_record.policyname);
   END LOOP;
 END $$;
 
 -- Drop ALL existing policies for restaurants
 DO $$
+DECLARE
+  policy_record RECORD;
 BEGIN
-  FOR policy IN (
-    SELECT policyname 
-    FROM pg_policies 
+  FOR policy_record IN (
+    SELECT policyname
+    FROM pg_policies
     WHERE schemaname = 'public' AND tablename = 'restaurants'
   )
   LOOP
-    EXECUTE format('DROP POLICY IF EXISTS %I ON public.restaurants', policy.policyname);
+    EXECUTE format('DROP POLICY IF EXISTS %I ON public.restaurants', policy_record.policyname);
   END LOOP;
 END $$;
 
