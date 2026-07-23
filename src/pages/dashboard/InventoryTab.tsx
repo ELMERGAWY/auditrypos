@@ -1268,7 +1268,7 @@ function WarehousesManager({ restaurantId, warehouses, onRefresh, products, curr
     } finally {
       setAddingQty(false);
     }
-  };
+  }; // Force rebuild
 
   const handleSave = async () => {
     if (!form.code || !form.name || !form.name_ar) {
