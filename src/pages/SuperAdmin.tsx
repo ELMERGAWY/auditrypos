@@ -150,6 +150,7 @@ const SuperAdmin = () => {
   }, [authLoading, adminChecked, isSuperAdmin, user]);
 
   const load = async () => {
+    console.log('🔍 [SuperAdmin] Loading data...');
     const [restsRes, rcptsRes, ordersRes, agentsRes, bansRes, issuesRes, usersRes, customTypesRes] = await Promise.all([
       supabase.from('restaurants').select('*').order('created_at', { ascending: false }),
       supabase.from('payment_receipts').select('*, restaurants(name)').order('uploaded_at', { ascending: false }),
@@ -161,6 +162,28 @@ const SuperAdmin = () => {
       supabase.from('profiles').select('*, user_roles(role), company_users(company_id, role)').limit(1000),
       supabase.from('custom_business_types').select('*').order('created_at', { ascending: false })
     ]);
+
+    console.log('🔍 [SuperAdmin] Load results:', {
+      restaurants: restsRes.data?.length,
+      receipts: rcptsRes.data?.length,
+      orders: ordersRes.data?.length,
+      agents: agentsRes.data?.length,
+      bans: bansRes.data?.length,
+      issues: issuesRes.data?.length,
+      users: usersRes.data?.length,
+      customTypes: customTypesRes.data?.length,
+      errors: {
+        restaurants: restsRes.error,
+        receipts: rcptsRes.error,
+        orders: ordersRes.error,
+        agents: agentsRes.error,
+        bans: bansRes.error,
+        issues: issuesRes.error,
+        users: usersRes.error,
+        customTypes: customTypesRes.error
+      }
+    });
+
     setRestaurants(restsRes.data || []);
     setReceipts(rcptsRes.data || []);
     setOrders(ordersRes.data || []);
