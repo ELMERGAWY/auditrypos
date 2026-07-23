@@ -25,7 +25,7 @@ const CACHE_KEY_PREFIX = 'dashboard_';
 export function useDashboardData() {
   useDarkMode();
   const navigate = useNavigate();
-  const { user: supabaseUser, lastKnownUser, signOut, loading: authLoading } = useAuth();
+  const { user: supabaseUser, lastKnownUser, signOut, loading: authLoading, isSuperAdmin } = useAuth();
   const user = supabaseUser || lastKnownUser;
   const { isOnline, wasOffline, justBack } = useOnlineStatus();
   const playOrderSound = useOrderNotificationSound();
@@ -211,6 +211,24 @@ export function useDashboardData() {
           rest = companyRestaurants[0];
           localStorage.setItem(getUserKey('current_business_id', user.id), rest.id);
         }
+      }
+    }
+
+    // ─── Step 4: Super Admin — fallback to any restaurant if no other access ─────────
+    // Only runs if Steps 1-3 found nothing AND user is Super Admin
+    if (!rest && isSuperAdmin) {
+      console.log('🔍 [loadData] Step 4: Super Admin fallback - loading any restaurant...');
+      const { data: anyRestaurant, error: anyRestError } = await supabase
+        .from('restaurants')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .limit(1);
+
+      console.log('🔍 [loadData] Step 4 Super Admin result:', { anyRestaurant, anyRestError });
+
+      if (anyRestaurant && anyRestaurant.length > 0) {
+        rest = anyRestaurant[0];
+        localStorage.setItem(getUserKey('current_business_id', user.id), rest.id);
       }
     }
 

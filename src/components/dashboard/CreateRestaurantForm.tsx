@@ -7,6 +7,7 @@ import { BUSINESS_TYPES, type BusinessType } from '@/lib/businessTypes';
 import { motion, AnimatePresence } from 'framer-motion';
 import { CheckCircle2, ArrowLeft, ArrowRight, Sparkles, Building2, AlertCircle } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { useAuth } from '@/lib/AuthContext';
 
 interface Props {
   userId: string;
@@ -15,6 +16,7 @@ interface Props {
 
 export function CreateRestaurantForm({ userId, onCreated }: Props) {
   const navigate = useNavigate();
+  const { isSuperAdmin } = useAuth();
   const [name, setName] = useState('');
   const [bizType, setBizType] = useState<BusinessType>('restaurant');
   const [loading, setLoading] = useState(false);
@@ -23,9 +25,15 @@ export function CreateRestaurantForm({ userId, onCreated }: Props) {
   const [step, setStep] = useState<1 | 2>(1);
   const [customBusinessTypes, setCustomBusinessTypes] = useState<any[]>([]);
 
-  // Check if user is an employee first
+  // Check if user is an employee first (skip for Super Admin)
   useEffect(() => {
     const checkIfEmployee = async () => {
+      // Super Admin bypasses employee check
+      if (isSuperAdmin) {
+        setChecking(false);
+        return;
+      }
+
       try {
         const { data } = await supabase
           .from('company_users')
@@ -44,7 +52,7 @@ export function CreateRestaurantForm({ userId, onCreated }: Props) {
       }
     };
     checkIfEmployee();
-  }, [userId]);
+  }, [userId, isSuperAdmin]);
 
   // Check localStorage for pending business from registration
   useEffect(() => {
@@ -71,8 +79,8 @@ export function CreateRestaurantForm({ userId, onCreated }: Props) {
   const handleCreate = async () => {
     if (!name.trim()) { toast.error('يرجى إدخال اسم النشاط'); return; }
     
-    // Double-check employee status before creating
-    if (isEmployee) {
+    // Double-check employee status before creating (Super Admin bypasses this)
+    if (isEmployee && !isSuperAdmin) {
       toast.error('الموظفين لا يمكنهم إنشاء شركات جديدة');
       navigate('/staff-login');
       return;
