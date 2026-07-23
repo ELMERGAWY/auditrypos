@@ -114,7 +114,6 @@ export function InventoryTab({ restaurantId, currency, businessType }: Props) {
   const [productMovements, setProductMovements] = useState<StockMovement[]>([]);
   const [pricingMode, setPricingMode] = useState<'fixed' | 'markup_percent' | 'markup_fixed'>('fixed');
   const [markupValue, setMarkupValue] = useState('');
-  const [directQtyCost, setDirectQtyCost] = useState('');
   const [costingMethod, setCostingMethod] = useState<'fifo' | 'lifo' | 'wac' | 'specific'>('fifo');
   const [form, setForm] = useState({
     name: '', barcode: '', sku: '', category: 'عام', price: '', cost_price: '',
@@ -1048,6 +1047,7 @@ function WarehousesManager({ restaurantId, warehouses, onRefresh, products, curr
   const [transferForm, setTransferForm] = useState({ mode: 'existing' as 'existing' | 'new', toWarehouseId: '', qtyMode: 'all' as 'all' | 'custom', customQty: '', newWhCode: '', newWhName: '', newWhNameAr: '' });
   const [addQtyMode, setAddQtyMode] = useState<'direct' | 'purchase' | null>(null);
   const [directQty, setDirectQty] = useState('');
+  const [directQtyCost, setDirectQtyCost] = useState('');
   const [transferring, setTransferring] = useState(false);
   const [addingQty, setAddingQty] = useState(false);
   const [form, setForm] = useState({
