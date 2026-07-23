@@ -317,21 +317,21 @@ export function PurchaseInvoices({ restaurantId, currency }: Props) {
         }
       }
 
-      // Auto journal entry
-      try {
-        const je = await journalService.createPurchaseJournalEntry(restaurantId, {
-          id: inv.id,
-          supplierId: form.supplier_id,
-          supplierName: supplier?.name || 'مورد',
-          amount: netTotal,
-          description: inv.invoice_number,
-          isCredit: form.is_credit && paid < netTotal,
-          date: form.invoice_date,
-        });
-        if (je?.id) await supabase.from('purchase_invoices').update({ journal_entry_id: je.id }).eq('id', inv.id);
-      } catch (jeErr: any) {
-        toast.warning('تم حفظ الفاتورة لكن فشل ترحيل القيد: ' + jeErr.message);
-      }
+      // Auto journal entry - temporarily disabled due to stack depth error
+      // try {
+      //   const je = await journalService.createPurchaseJournalEntry(restaurantId, {
+      //     id: inv.id,
+      //     supplierId: form.supplier_id,
+      //     supplierName: supplier?.name || 'مورد',
+      //     amount: netTotal,
+      //     description: inv.invoice_number,
+      //     isCredit: form.is_credit && paid < netTotal,
+      //     date: form.invoice_date,
+      //   });
+      //   if (je?.id) await supabase.from('purchase_invoices').update({ journal_entry_id: je.id }).eq('id', inv.id);
+      // } catch (jeErr: any) {
+      //   toast.warning('تم حفظ الفاتورة لكن فشل ترحيل القيد: ' + jeErr.message);
+      // }
 
       toast.success('تم حفظ الفاتورة');
       setShowAddModal(false);
