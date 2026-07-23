@@ -320,9 +320,98 @@ export function PurchaseInvoices({ restaurantId, currency }: Props) {
         }
       }
 
-      // Auto journal entry - permanently disabled due to persistent database issues
-      // Journal entries must be created manually from the Journal Entries page
-      // This is a known limitation due to database RLS/trigger conflicts
+      // Auto journal entry - use RPC function to avoid stack depth error
+      try {
+        // Get default accounts directly
+        const { data: accounts, error: accountsError } = await supabase
+          .from('chart_of_accounts')
+          .select('id,code')
+          .eq('restaurant_id', restaurantId)
+          .in('code', ['1200', '1100', '2100']); // Inventory, Cash, Accounts Payable
+
+        if (accountsError) {
+          console.error('Failed to load accounts:', accountsError);
+        } else {
+          const invAcc = accounts?.find(a => a.code === '1200');
+          const cashAcc = accounts?.find(a => a.code === '1100');
+          const apAcc = accounts?.find(a => a.code === '2100');
+
+          if (invAcc) {
+            // Get next entry number
+            const { data: lastEntry } = await supabase
+              .from('journal_entries')
+              .select('entry_number')
+              .eq('restaurant_id', restaurantId)
+              .order('created_at', { ascending: false })
+              .limit(1);
+
+            const lastNum = lastEntry?.[0]?.entry_number || 'JE-000000';
+            const num = parseInt(lastNum.replace(/\D/g, '')) || 0;
+            const entryNumber = `JE-${String(num + 1).padStart(6, '0')}`;
+
+            // Create journal entry with is_posted=false to avoid trigger execution
+            const { data: journalData, error: journalError } = await supabase
+              .from('journal_entries')
+              .insert({
+                restaurant_id: restaurantId,
+                entry_number: entryNumber,
+                entry_date: form.invoice_date,
+                reference_type: 'purchase',
+                reference_id: inv.id,
+                description: `فاتورة مشتريات من ${supplier?.name || 'مورد'}`,
+                source: 'pos',
+                total_debit: netTotal,
+                total_credit: netTotal,
+                is_posted: false, // Create as draft first
+              })
+              .select()
+              .single();
+
+            if (!journalError && journalData) {
+              // Create journal lines
+              const lines = [
+                {
+                  entry_id: journalData.id,
+                  account_id: invAcc.id,
+                  debit: netTotal,
+                  credit: 0,
+                  description: `شراء مخزون - ${inv.invoice_number}`,
+                  line_order: 1,
+                }
+              ];
+
+              // Add credit line
+              const creditAcc = (form.is_credit && paid < netTotal && apAcc) ? apAcc : cashAcc;
+              if (creditAcc) {
+                lines.push({
+                  entry_id: journalData.id,
+                  account_id: creditAcc.id,
+                  debit: 0,
+                  credit: netTotal,
+                  description: form.is_credit && paid < netTotal ? `ذمم موردين - ${supplier?.name}` : `دفع نقدي للمورد - ${supplier?.name}`,
+                  line_order: 2,
+                });
+              }
+
+              await supabase.from('journal_entry_lines').insert(lines);
+              await supabase.from('purchase_invoices').update({ journal_entry_id: journalData.id }).eq('id', inv.id);
+
+              // Now post the entry using RPC function
+              const { error: postError } = await supabase.rpc('post_journal_entry', { p_entry_id: journalData.id });
+              if (postError) {
+                console.error('Failed to post journal entry:', postError);
+                // Entry is saved but not posted - user can post manually
+                toast.warning(`تم حفظ القيد ${entryNumber} لكن لم يتم ترحيله`);
+              } else {
+                toast.success(`تم إنشاء وترحيل القيد المحاسبي ${entryNumber}`);
+              }
+            }
+          }
+        }
+      } catch (jeErr: any) {
+        console.error('Journal entry error:', jeErr);
+        // Don't show error - invoice is saved successfully
+      }
 
       toast.success('تم حفظ الفاتورة');
       setShowAddModal(false);
