@@ -167,10 +167,9 @@ const SuperAdmin = () => {
 
     // Try to fetch failures if the table exists (optional)
     let issuesRes = { data: null, error: null };
-    try {
-      issuesRes = await supabase.from('accounting_post_failures' as any).select('*, restaurants(name)').order('created_at', { ascending: false }).limit(50);
-    } catch (e) {
-      console.log('accounting_post_failures table does not exist, skipping');
+    const issuesQuery = await supabase.from('accounting_post_failures' as any).select('*, restaurants(name)').order('created_at', { ascending: false }).limit(50);
+    if (!issuesQuery.error || !issuesQuery.error.message?.includes('does not exist')) {
+      issuesRes = issuesQuery;
     }
 
     // Fetch user_roles and company_users separately
@@ -211,7 +210,13 @@ const SuperAdmin = () => {
       company_users: (companyUsersRes.data || []).filter((cu: any) => cu.user_id === user.user_id)
     }));
 
-    // Store debug info on screen
+    // Store debug info on screen (filter out table not found errors)
+    const filterError = (error: any) => {
+      if (!error) return null;
+      if (error.message?.includes('does not exist') || error.message?.includes('Could not find')) return null;
+      return error.message;
+    };
+
     setDebugInfo({
       restaurants: restsRes.data?.length,
       receipts: rcptsRes.data?.length,
@@ -224,16 +229,16 @@ const SuperAdmin = () => {
       companyUsers: companyUsersRes.data?.length,
       customTypes: customTypesRes.data?.length,
       errors: {
-        restaurants: restsRes.error?.message,
-        receipts: rcptsRes.error?.message,
-        orders: ordersRes.error?.message,
-        agents: agentsRes.error?.message,
-        bans: bansRes.error?.message,
-        issues: issuesRes.error?.message,
-        users: usersRes.error?.message,
-        userRoles: userRolesRes.error?.message,
-        companyUsers: companyUsersRes.error?.message,
-        customTypes: customTypesRes.error?.message
+        restaurants: filterError(restsRes.error),
+        receipts: filterError(rcptsRes.error),
+        orders: filterError(ordersRes.error),
+        agents: filterError(agentsRes.error),
+        bans: filterError(bansRes.error),
+        issues: filterError(issuesRes.error),
+        users: filterError(usersRes.error),
+        userRoles: filterError(userRolesRes.error),
+        companyUsers: filterError(companyUsersRes.error),
+        customTypes: filterError(customTypesRes.error)
       }
     });
 
