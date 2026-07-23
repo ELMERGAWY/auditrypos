@@ -64,6 +64,41 @@ BEGIN
 END;
 $$;
 
+-- Create SECURITY DEFINER function to check company admin status
+CREATE OR REPLACE FUNCTION public.is_company_admin(user_id UUID)
+RETURNS BOOLEAN
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+BEGIN
+  RETURN EXISTS (
+    SELECT 1 FROM public.company_users
+    WHERE company_users.user_id = is_company_admin.user_id
+      AND company_users.role IN ('owner', 'admin', 'manager')
+      AND company_users.is_active = true
+  );
+END;
+$$;
+
+-- Create SECURITY DEFINER function to check if user can manage company
+CREATE OR REPLACE FUNCTION public.can_manage_company(user_id UUID, company_id UUID)
+RETURNS BOOLEAN
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+BEGIN
+  RETURN EXISTS (
+    SELECT 1 FROM public.company_users
+    WHERE company_users.user_id = can_manage_company.user_id
+      AND company_users.company_id = can_manage_company.company_id
+      AND company_users.role IN ('owner', 'admin')
+      AND company_users.is_active = true
+  );
+END;
+$$;
+
 -- Create user_roles RLS policies
 CREATE POLICY "Users read own roles"
   ON public.user_roles
@@ -106,7 +141,7 @@ CREATE POLICY "Owners and Super Admin can manage restaurants"
     OR owner_id = auth.uid()
   );
 
--- Create company_users RLS policies
+-- Create company_users RLS policies using functions to avoid recursion
 CREATE POLICY "Users and Super Admin can view company memberships"
   ON public.company_users
   FOR SELECT
@@ -114,13 +149,7 @@ CREATE POLICY "Users and Super Admin can view company memberships"
   USING (
     public.is_super_admin(auth.uid())
     OR user_id = auth.uid()
-    OR company_id IN (
-      SELECT cu2.company_id
-      FROM public.company_users cu2
-      WHERE cu2.user_id = auth.uid()
-        AND cu2.role IN ('owner', 'admin', 'manager')
-        AND cu2.is_active = true
-    )
+    OR public.is_company_admin(auth.uid())
   );
 
 CREATE POLICY "Super Admin and Company Admins can manage memberships"
@@ -129,23 +158,11 @@ CREATE POLICY "Super Admin and Company Admins can manage memberships"
   TO authenticated
   USING (
     public.is_super_admin(auth.uid())
-    OR company_id IN (
-      SELECT cu2.company_id
-      FROM public.company_users cu2
-      WHERE cu2.user_id = auth.uid()
-        AND cu2.role IN ('owner', 'admin')
-        AND cu2.is_active = true
-    )
+    OR public.can_manage_company(auth.uid(), company_id)
   )
   WITH CHECK (
     public.is_super_admin(auth.uid())
-    OR company_id IN (
-      SELECT cu2.company_id
-      FROM public.company_users cu2
-      WHERE cu2.user_id = auth.uid()
-        AND cu2.role IN ('owner', 'admin')
-        AND cu2.is_active = true
-    )
+    OR public.can_manage_company(auth.uid(), company_id)
   );
 
 SELECT 'Complete RLS fix applied successfully!' AS status;
