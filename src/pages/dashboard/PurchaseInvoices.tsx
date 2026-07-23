@@ -66,7 +66,7 @@ export function PurchaseInvoices({ restaurantId, currency }: Props) {
   const [suppliers, setSuppliers] = useState<{ id: string; name: string }[]>([]);
   const [supplierContracts, setSupplierContracts] = useState<any[]>([]);
   const [projects, setProjects] = useState<any[]>([]);
-  const [products, setProducts] = useState<{ id: string; name: string; cost_price: number; unit: string; item_type_id?: string }[]>([]);
+  const [products, setProducts] = useState<{ id: string; name: string; cost_price: number; unit: string; item_type_id?: string; barcode?: string; sku?: string; category?: string }[]>([]);
   const [glAccounts, setGlAccounts] = useState<{ id: string; code: string; name: string; account_type: string }[]>([]);
   const [warehouses, setWarehouses] = useState<{ id: string; name: string }[]>([]);
   const [subWarehouses, setSubWarehouses] = useState<{ id: string; name: string; main_warehouse_id: string }[]>([]);
@@ -99,7 +99,7 @@ export function PurchaseInvoices({ restaurantId, currency }: Props) {
       supabase.from('suppliers').select('id,name').eq('restaurant_id', restaurantId),
       supabase.from('supplier_contracts').select('*').eq('restaurant_id', restaurantId).eq('status', 'active'),
       supabase.from('projects').select('id,name').eq('restaurant_id', restaurantId),
-      supabase.from('products').select('id,name,cost_price,unit,item_type_id,barcode,sku').eq('restaurant_id', restaurantId),
+      supabase.from('products').select('id,name,cost_price,unit,item_type_id,barcode,sku,category').eq('restaurant_id', restaurantId),
       supabase.from('chart_of_accounts').select('id,code,name,account_type').eq('restaurant_id', restaurantId),
       supabase.from('warehouses').select('id,name').eq('restaurant_id', restaurantId),
       supabase.from('sub_warehouses').select('id,name,main_warehouse_id').eq('restaurant_id', restaurantId),
@@ -792,7 +792,7 @@ export function PurchaseInvoices({ restaurantId, currency }: Props) {
                             />
                             <Search className="w-3.5 h-3.5 absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground" />
                             <datalist id={`product-list-${i}`}>
-                              {products.map(p => <option key={p.id} value={p.name}>{p.barcode ? `[${p.barcode}] ` : ''}{p.category}</option>)}
+                              {products.map(p => <option key={p.id} value={p.name}>{p.barcode ? `[${p.barcode}] ` : ''}{p.sku ? `[${p.sku}] ` : ''}{p.category || ''}</option>)}
                             </datalist>
                           </div>
                         ) : (
