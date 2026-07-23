@@ -160,8 +160,15 @@ const SuperAdmin = () => {
       supabase.from('bans').select('*, restaurants(name)').order('created_at', { ascending: false }),
       // Try to fetch failures if the table exists
       supabase.from('accounting_post_failures' as any).select('*, restaurants(name)').order('created_at', { ascending: false }).limit(50),
-      supabase.from('profiles').select('*, user_roles(role), company_users(company_id, role)').limit(1000),
+      // Fix users query - use separate queries instead of relationships
+      supabase.from('profiles').select('*').limit(1000),
       supabase.from('custom_business_types').select('*').order('created_at', { ascending: false })
+    ]);
+
+    // Fetch user_roles and company_users separately
+    const [userRolesRes, companyUsersRes] = await Promise.all([
+      supabase.from('user_roles').select('*'),
+      supabase.from('company_users').select('*')
     ]);
 
     console.log('🔍 [SuperAdmin] Load results:', {
@@ -172,6 +179,8 @@ const SuperAdmin = () => {
       bans: bansRes.data?.length,
       issues: issuesRes.data?.length,
       users: usersRes.data?.length,
+      userRoles: userRolesRes.data?.length,
+      companyUsers: companyUsersRes.data?.length,
       customTypes: customTypesRes.data?.length,
       errors: {
         restaurants: restsRes.error,
@@ -181,9 +190,18 @@ const SuperAdmin = () => {
         bans: bansRes.error,
         issues: issuesRes.error,
         users: usersRes.error,
+        userRoles: userRolesRes.error,
+        companyUsers: companyUsersRes.error,
         customTypes: customTypesRes.error
       }
     });
+
+    // Merge user data manually
+    const usersWithRoles = (usersRes.data || []).map((user: any) => ({
+      ...user,
+      user_roles: (userRolesRes.data || []).filter((ur: any) => ur.user_id === user.user_id),
+      company_users: (companyUsersRes.data || []).filter((cu: any) => cu.user_id === user.user_id)
+    }));
 
     // Store debug info on screen
     setDebugInfo({
@@ -193,7 +211,9 @@ const SuperAdmin = () => {
       agents: agentsRes.data?.length,
       bans: bansRes.data?.length,
       issues: issuesRes.data?.length,
-      users: usersRes.data?.length,
+      users: usersWithRoles.length,
+      userRoles: userRolesRes.data?.length,
+      companyUsers: companyUsersRes.data?.length,
       customTypes: customTypesRes.data?.length,
       errors: {
         restaurants: restsRes.error?.message,
@@ -203,6 +223,8 @@ const SuperAdmin = () => {
         bans: bansRes.error?.message,
         issues: issuesRes.error?.message,
         users: usersRes.error?.message,
+        userRoles: userRolesRes.error?.message,
+        companyUsers: companyUsersRes.error?.message,
         customTypes: customTypesRes.error?.message
       }
     });
@@ -213,7 +235,7 @@ const SuperAdmin = () => {
     setAgents(agentsRes.data || []);
     setBans(bansRes.data || []);
     setIssues(issuesRes.data || []);
-    setGlobalUsers(usersRes.data || []);
+    setGlobalUsers(usersWithRoles);
     setCustomBusinessTypes(customTypesRes.data || []);
   };
 
@@ -316,6 +338,8 @@ const SuperAdmin = () => {
             <div>Bans: {debugInfo.bans}</div>
             <div>Issues: {debugInfo.issues}</div>
             <div>Users: {debugInfo.users}</div>
+            <div>User Roles: {debugInfo.userRoles}</div>
+            <div>Company Users: {debugInfo.companyUsers}</div>
             <div>Custom Types: {debugInfo.customTypes}</div>
             {Object.values(debugInfo.errors).some(e => e) && (
               <div className="mt-2 pt-2 border-t border-white/20">
