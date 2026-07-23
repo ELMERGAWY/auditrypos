@@ -132,6 +132,7 @@ const SuperAdmin = () => {
   const [adminNotifications, setAdminNotifications] = useState<any[]>([]);
   const unreadNotifCount = adminNotifications.filter(n => !n.is_read).length;
   const freePlanCount = restaurants.filter(r => r.plan_id === 'free').length;
+  const [debugInfo, setDebugInfo] = useState<any>(null);
 
   useEffect(() => {
     // Only redirect if auth is fully loaded and admin check is complete
@@ -181,6 +182,28 @@ const SuperAdmin = () => {
         issues: issuesRes.error,
         users: usersRes.error,
         customTypes: customTypesRes.error
+      }
+    });
+
+    // Store debug info on screen
+    setDebugInfo({
+      restaurants: restsRes.data?.length,
+      receipts: rcptsRes.data?.length,
+      orders: ordersRes.data?.length,
+      agents: agentsRes.data?.length,
+      bans: bansRes.data?.length,
+      issues: issuesRes.data?.length,
+      users: usersRes.data?.length,
+      customTypes: customTypesRes.data?.length,
+      errors: {
+        restaurants: restsRes.error?.message,
+        receipts: rcptsRes.error?.message,
+        orders: ordersRes.error?.message,
+        agents: agentsRes.error?.message,
+        bans: bansRes.error?.message,
+        issues: issuesRes.error?.message,
+        users: usersRes.error?.message,
+        customTypes: customTypesRes.error?.message
       }
     });
 
@@ -281,6 +304,31 @@ const SuperAdmin = () => {
 
   return (
     <div className="min-h-screen bg-background text-foreground" dir={dir}>
+      {/* Debug Info Panel */}
+      {debugInfo && (
+        <div className="fixed bottom-4 right-4 bg-black/90 text-white p-4 rounded-lg text-xs font-mono max-w-md z-50 border border-white/20">
+          <div className="font-bold mb-2 text-yellow-400">🔍 Debug Info:</div>
+          <div className="space-y-1">
+            <div>Restaurants: {debugInfo.restaurants}</div>
+            <div>Receipts: {debugInfo.receipts}</div>
+            <div>Orders: {debugInfo.orders}</div>
+            <div>Agents: {debugInfo.agents}</div>
+            <div>Bans: {debugInfo.bans}</div>
+            <div>Issues: {debugInfo.issues}</div>
+            <div>Users: {debugInfo.users}</div>
+            <div>Custom Types: {debugInfo.customTypes}</div>
+            {Object.values(debugInfo.errors).some(e => e) && (
+              <div className="mt-2 pt-2 border-t border-white/20">
+                <div className="text-red-400 font-bold">Errors:</div>
+                {Object.entries(debugInfo.errors).map(([key, error]) => (
+                  error && <div key={key} className="text-red-300">{key}: {error}</div>
+                ))}
+              </div>
+            )}
+          </div>
+          <button onClick={() => setDebugInfo(null)} className="mt-2 text-gray-400 hover:text-white">Close</button>
+        </div>
+      )}
       {/* Mega Header */}
       <header className="border-b border-border bg-card/50 backdrop-blur-md sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-4 py-4 flex items-center justify-between">
