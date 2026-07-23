@@ -389,11 +389,16 @@ export function PurchaseInvoices({ restaurantId, currency }: Props) {
 
             await supabase.from('journal_entry_lines').insert(lines);
             await supabase.from('purchase_invoices').update({ journal_entry_id: journalData.id }).eq('id', inv.id);
+            toast.success(`تم إنشاء القيد المحاسبي ${entryNumber}`);
+          } else {
+            console.error('Journal entry creation failed:', journalError);
           }
+        } else {
+          console.error('Inventory account (1200) not found');
         }
       } catch (jeErr: any) {
         console.error('Journal entry error:', jeErr);
-        // Don't show warning - invoice is saved successfully
+        toast.error('فشل إنشاء القيد المحاسبي: ' + jeErr.message);
       }
 
       toast.success('تم حفظ الفاتورة');
