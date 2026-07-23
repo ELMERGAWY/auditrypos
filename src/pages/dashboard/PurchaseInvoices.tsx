@@ -292,7 +292,6 @@ export function PurchaseInvoices({ restaurantId, currency }: Props) {
         product_id: l.line_type === 'inventory' ? l.product_id : null,
         gl_account_id: l.line_type === 'gl' ? l.gl_account_id : null,
         warehouse_id: l.line_type === 'inventory' ? (l.warehouse_id || null) : null,
-        sub_warehouse_id: l.line_type === 'inventory' ? (l.sub_warehouse_id || null) : null,
         description: l.description || '',
         quantity: Number(l.quantity),
         unit_cost: Number(l.unit_cost),
@@ -312,7 +311,6 @@ export function PurchaseInvoices({ restaurantId, currency }: Props) {
           await supabase.from('inventory_movements').insert({
             product_id: l.product_id,
             warehouse_id: l.warehouse_id,
-            sub_warehouse_id: l.sub_warehouse_id || null,
             movement_type: 'IN',
             quantity: Number(l.quantity),
             reference_type: 'PURCHASE',
