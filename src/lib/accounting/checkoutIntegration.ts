@@ -87,6 +87,26 @@ class CheckoutIntegration {
         : `المرجع: ${orderData.customerRef}`;
     }
 
+    // Find existing customer by name and phone to prevent duplicates
+    let existingCustomerId = orderData.customerId || null;
+    if (!existingCustomerId && orderData.customerName && orderData.customerPhone) {
+      try {
+        const { data: existingCustomer } = await supabase
+          .from('customers')
+          .select('id')
+          .eq('restaurant_id', context.restaurantId)
+          .eq('name', orderData.customerName)
+          .eq('phone', orderData.customerPhone)
+          .limit(1)
+          .maybeSingle();
+        if (existingCustomer?.id) {
+          existingCustomerId = existingCustomer.id;
+        }
+      } catch (e) {
+        console.warn('[checkout] Failed to find existing customer:', e);
+      }
+    }
+
     let orderPayload: Record<string, unknown> = {
       restaurant_id: context.restaurantId,
       order_number: orderNum,
@@ -105,7 +125,7 @@ class CheckoutIntegration {
       paid_amount: paidAmount,
       notes: finalNotes,
       client_order_id: clientOrderId,
-      customer_id: orderData.customerId || null, // Use existing customer_id if provided
+      customer_id: existingCustomerId, // Use existing customer_id if found
     };
 
     try {
