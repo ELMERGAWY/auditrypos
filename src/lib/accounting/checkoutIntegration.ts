@@ -105,7 +105,7 @@ class CheckoutIntegration {
       paid_amount: paidAmount,
       notes: finalNotes,
       client_order_id: clientOrderId,
-      customer_id: null,
+      customer_id: orderData.customerId || null, // Use existing customer_id if provided
     };
 
     try {

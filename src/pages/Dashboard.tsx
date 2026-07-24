@@ -155,6 +155,7 @@ export default function Dashboard() {
   const [customerName, setCustomerName] = useState('');
   const [customerPhone, setCustomerPhone] = useState('');
   const [customerRef, setCustomerRef] = useState('');
+  const [customerId, setCustomerId] = useState<string | null>(null);
   const [deliveryAddress, setDeliveryAddress] = useState('');
   const [deliveryDate, setDeliveryDate] = useState('');
   const [orderNotes, setOrderNotes] = useState('');
@@ -360,8 +361,9 @@ export default function Dashboard() {
   const avgOrderValue = useMemo(() => todayOrdersList.length > 0 ? Number((todayRevenue / todayOrdersList.length).toFixed(2)) : 0, [todayRevenue, todayOrdersList.length]);
 
   // Handlers
-  const selectCustomerFromSearch = useCallback((name: string, phone?: string, address?: string) => {
+  const selectCustomerFromSearch = useCallback((name: string, phone?: string, address?: string, id?: string) => {
     setCustomerName(name);
+    setCustomerId(id || null); // Set customer_id if provided
     if (phone) setCustomerPhone(phone);
     if (address) setDeliveryAddress(address);
     if (!customerRef) setCustomerRef(String(Date.now().toString().slice(-6)));
@@ -370,7 +372,7 @@ export default function Dashboard() {
   const clearCart = useCallback(() => {
     setCart([]); setTableNumber(''); setCustomerName(''); setCustomerPhone('');
     setOrderNotes(''); setDiscount(''); setDeliveryAddress(''); setSelectedDeliveryAgent('');
-    setPaymentMethod('cash'); setPaidAmount(''); setCustomerRef('');
+    setPaymentMethod('cash'); setPaidAmount(''); setCustomerRef(''); setCustomerId(null);
     setOrderType(getDefaultOrderType(businessType) as OrderType); setActiveInvoiceId(null);
     resetNewInvoiceClientOrderId();
   }, [businessType, resetNewInvoiceClientOrderId]);
@@ -737,7 +739,7 @@ export default function Dashboard() {
             service_details: c.service_details,
             variables: c.variables || null
           })),
-          customerName, customerPhone, customerRef, orderType: orderType as any, deliveryAddress, deliveryDate, deliveryAgentId: selectedDeliveryAgent, paymentMethod: paymentMethod as any, paidAmount: paidNum, discount: discountAmount, discountType: discountType === 'percent' ? 'percentage' : 'fixed', notes: orderNotes, destinationAccountId: selectedAccountId, customOrderNumber: customOrderNumber || undefined,
+          customerName, customerPhone, customerRef, customerId, orderType: orderType as any, deliveryAddress, deliveryDate, deliveryAgentId: selectedDeliveryAgent, paymentMethod: paymentMethod as any, paidAmount: paidNum, discount: discountAmount, discountType: discountType === 'percent' ? 'percentage' : 'fixed', notes: orderNotes, destinationAccountId: selectedAccountId, customOrderNumber: customOrderNumber || undefined,
           clientOrderId: checkoutClientOrderId
         }
       );
