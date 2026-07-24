@@ -181,9 +181,12 @@ export const POSCart = memo(function POSCart({
             value={customerName}
             onChange={(name, phone, address, id) => {
               setCustomerName(name);
-              if (id !== undefined) setCustomerId(id);
-              if (phone) setCustomerPhone(phone);
-              if (address) setDeliveryAddress(address);
+              // Only update customerId, phone, and address when selecting from list (when id is provided)
+              if (id !== undefined) {
+                setCustomerId(id);
+                if (phone) setCustomerPhone(phone);
+                if (address) setDeliveryAddress(address);
+              }
             }}
             placeholder={getCustomerPlaceholder(businessType)}
           />
