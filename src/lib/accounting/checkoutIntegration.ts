@@ -168,12 +168,14 @@ class CheckoutIntegration {
           return { totalCOGS: 0, itemsWithCost: [] as any[] };
         });
 
-      const safeCustomer = orderData.customerName?.trim()
-        ? this.findOrCreateCustomer(context.restaurantId, orderData.customerName.trim(), orderData.customerPhone, orderData.customerRef)
-            .catch((e) => { console.warn('[checkout] customer upsert failed:', e); return null; })
-        : Promise.resolve(null);
+      // Use existingCustomerId if found, otherwise find or create customer
+      let customerId = existingCustomerId;
+      if (!customerId && orderData.customerName?.trim()) {
+        customerId = await this.findOrCreateCustomer(context.restaurantId, orderData.customerName.trim(), orderData.customerPhone, orderData.customerRef)
+          .catch((e) => { console.warn('[checkout] customer upsert failed:', e); return null; });
+      }
 
-      const [taxCalculation, cogsResult, customerId] = await Promise.all([safeTax, safeCogs, safeCustomer]);
+      const [taxCalculation, cogsResult] = await Promise.all([safeTax, safeCogs]);
 
       const deliveryFee = isDelivery ? await this.getDeliveryFee(context.restaurantId).catch(() => 0) : 0;
       const cogs = cogsResult.totalCOGS;
