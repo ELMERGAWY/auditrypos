@@ -28,8 +28,6 @@ interface POSCartProps {
   restaurant: Restaurant;
   customerName: string;
   setCustomerName: (val: string) => void;
-  customerId: string | null;
-  setCustomerId: (val: string | null) => void;
   customerPhone: string;
   setCustomerPhone: (val: string) => void;
   deliveryAddress: string;
@@ -179,15 +177,7 @@ export const POSCart = memo(function POSCart({
           <CustomerSearch
             restaurantId={restaurant.id}
             value={customerName}
-            onChange={(name, phone, address, id) => {
-              setCustomerName(name);
-              // Only update customerId, phone, and address when selecting from list (when id is provided)
-              if (id !== undefined) {
-                setCustomerId(id);
-                if (phone) setCustomerPhone(phone);
-                if (address) setDeliveryAddress(address);
-              }
-            }}
+            onChange={setCustomerName}
             placeholder={getCustomerPlaceholder(businessType)}
           />
           <div className="relative">
