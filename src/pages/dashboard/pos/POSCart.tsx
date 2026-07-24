@@ -27,7 +27,7 @@ interface POSCartProps {
   setCustomOrderNumber: (val: string) => void;
   restaurant: Restaurant;
   customerName: string;
-  setCustomerName: (val: string) => void;
+  setCustomerName: (name: string, phone?: string, address?: string, id?: string) => void;
   customerId: string | null;
   setCustomerId: (val: string | null) => void;
   customerPhone: string;
