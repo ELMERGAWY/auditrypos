@@ -274,7 +274,8 @@ export function InvoiceViewer({
   const discount = Number(record?.discount_amount ?? record?.discount ?? 0);
   // paid_amount represents direct payments only (at order creation)
   // We do NOT include receipt_voucher_total to avoid auto-attaching old payments
-  const totalPaid = Number(record?.paid_amount || 0);
+  const directPaidAmount = Number(record?.paid_amount || 0);
+  const totalPaid = directPaidAmount;
   const remaining = total - totalPaid;
   const change = totalPaid > total ? totalPaid - total : 0;
   const customerRef = extractCustomerRef(record) || record?.customer_ref || '';
