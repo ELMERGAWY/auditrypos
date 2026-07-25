@@ -30,14 +30,8 @@ ALTER TABLE public.receipt_vouchers
 ADD CONSTRAINT receipt_vouchers_actor_type_check 
 CHECK (actor_type IN ('customer', 'supplier'));
 
--- Add foreign key constraints based on actor_type
-ALTER TABLE public.receipt_vouchers 
-ADD CONSTRAINT receipt_vouchers_actor_customer_fk 
-FOREIGN KEY (actor_id) REFERENCES public.customers(id) ON DELETE RESTRICT;
-
-ALTER TABLE public.receipt_vouchers 
-ADD CONSTRAINT receipt_vouchers_actor_supplier_fk 
-FOREIGN KEY (actor_id) REFERENCES public.suppliers(id) ON DELETE RESTRICT;
+-- Note: We cannot add foreign key constraints that depend on actor_type
+-- Foreign key validation will be handled at application level or via triggers
 
 -- Add actor_type and actor_id columns to payment_vouchers
 ALTER TABLE public.payment_vouchers 
@@ -62,14 +56,8 @@ ALTER TABLE public.payment_vouchers
 ADD CONSTRAINT payment_vouchers_actor_type_check 
 CHECK (actor_type IN ('customer', 'supplier'));
 
--- Add foreign key constraints based on actor_type
-ALTER TABLE public.payment_vouchers 
-ADD CONSTRAINT payment_vouchers_actor_customer_fk 
-FOREIGN KEY (actor_id) REFERENCES public.customers(id) ON DELETE RESTRICT;
-
-ALTER TABLE public.payment_vouchers 
-ADD CONSTRAINT payment_vouchers_actor_supplier_fk 
-FOREIGN KEY (actor_id) REFERENCES public.suppliers(id) ON DELETE RESTRICT;
+-- Note: We cannot add foreign key constraints that depend on actor_type
+-- Foreign key validation will be handled at application level or via triggers
 
 -- Update indexes
 DROP INDEX IF EXISTS idx_receipt_vouchers_restaurant;
