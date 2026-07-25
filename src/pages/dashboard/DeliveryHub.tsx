@@ -506,10 +506,10 @@ export function DeliveryHub(props: any) {
                                   ? 'bg-indigo-500/10 border-indigo-500/30 text-indigo-600'
                                   : 'bg-rose-500/10 border-rose-500/30 text-rose-600'
                               }`}
-                              title={log.notes || undefined}
                             >
-                              {log.status === 'contacted' ? 'تم التواصل' : 'لا رد'} (
-                              {new Date(log.created_at).toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit'})})
+                              {log.status === 'contacted' ? '📞 تم التواصل' : '📵 لا رد'} (
+                              {new Date(log.created_at).toLocaleDateString('ar-EG', { month: '2-digit', day: '2-digit' })}{' '}
+                              {new Date(log.created_at).toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit', hour12: true })})
                               {log.notes && (
                                 <span className="mr-1 text-[8px] opacity-75">- {log.notes}</span>
                               )}

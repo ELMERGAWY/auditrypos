@@ -860,6 +860,28 @@ export function ServiceDeliverables({ restaurantId }: Props) {
                   </Select>
                 </div>
 
+                {/* Show current contact status with note and date if applicable */}
+                {(deliverable.status === 'contacted' || deliverable.status === 'no_answer') && deliverable.contact_logs && deliverable.contact_logs.length > 0 && (
+                  <div className={`rounded-lg p-2 border ${
+                    deliverable.status === 'contacted'
+                      ? 'bg-indigo-500/10 text-indigo-600 border-indigo-500/20'
+                      : 'bg-rose-500/10 text-rose-600 border-rose-500/20'
+                  }`}>
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="font-bold text-[10px] flex items-center gap-1">
+                        {deliverable.status === 'contacted' ? '📞 تم التواصل' : '📵 لا رد'}
+                      </span>
+                      <span className="opacity-85 text-[8px] font-mono">
+                        {new Date(deliverable.contact_logs[0].created_at).toLocaleDateString('ar-EG', { month: '2-digit', day: '2-digit' })}{' '}
+                        {new Date(deliverable.contact_logs[0].created_at).toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit', hour12: true })}
+                      </span>
+                    </div>
+                    {deliverable.contact_logs[0].notes && (
+                      <p className="text-[8px] opacity-80 leading-relaxed">{deliverable.contact_logs[0].notes}</p>
+                    )}
+                  </div>
+                )}
+
                 {deliverable.status !== 'delivered' && (
                   <div className="flex gap-1.5">
                     <button
