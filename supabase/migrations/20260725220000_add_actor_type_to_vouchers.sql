@@ -106,8 +106,8 @@ CREATE INDEX idx_payment_vouchers_restaurant ON public.payment_vouchers(restaura
 CREATE OR REPLACE FUNCTION public.save_receipt_voucher(
   p_restaurant_id UUID,
   p_actor_id UUID,
-  p_actor_type TEXT DEFAULT 'customer',
   p_amount NUMERIC,
+  p_actor_type TEXT DEFAULT 'customer',
   p_payment_method TEXT DEFAULT 'cash',
   p_voucher_date DATE DEFAULT CURRENT_DATE,
   p_notes TEXT DEFAULT NULL,
@@ -178,8 +178,8 @@ $$;
 CREATE OR REPLACE FUNCTION public.save_payment_voucher(
   p_restaurant_id UUID,
   p_actor_id UUID,
-  p_actor_type TEXT DEFAULT 'supplier',
   p_amount NUMERIC,
+  p_actor_type TEXT DEFAULT 'supplier',
   p_payment_method TEXT DEFAULT 'cash',
   p_voucher_date DATE DEFAULT CURRENT_DATE,
   p_notes TEXT DEFAULT NULL,
