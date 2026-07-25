@@ -4,6 +4,9 @@
 
 BEGIN;
 
+-- Drop dependent view first
+DROP VIEW IF EXISTS public.v_order_payments;
+
 -- Add actor_type and actor_id columns to receipt_vouchers
 ALTER TABLE public.receipt_vouchers 
 ADD COLUMN IF NOT EXISTS actor_type TEXT NOT NULL DEFAULT 'customer',
@@ -188,6 +191,23 @@ BEGIN
   RETURN v_voucher_id;
 END;
 $$;
+
+-- Recreate the v_order_payments view with new column names
+CREATE OR REPLACE VIEW public.v_order_payments AS
+SELECT 
+  o.id as order_id,
+  o.order_number,
+  o.total as order_total,
+  o.paid_amount as direct_paid,
+  COALESCE(SUM(rv.amount), 0) as receipt_voucher_total,
+  COALESCE(o.paid_amount, 0) + COALESCE(SUM(rv.amount), 0) as total_paid,
+  o.total - (COALESCE(o.paid_amount, 0) + COALESCE(SUM(rv.amount), 0)) as remaining_balance
+FROM public.orders o
+LEFT JOIN public.receipt_vouchers rv ON rv.actor_id = o.customer_id
+  AND rv.restaurant_id = o.restaurant_id
+  AND rv.voucher_date >= o.created_at
+  AND rv.actor_type = 'customer'
+GROUP BY o.id, o.order_number, o.total, o.paid_amount;
 
 COMMIT;
 
