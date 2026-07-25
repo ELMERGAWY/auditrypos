@@ -1,11 +1,11 @@
 -- Fix floating receipt vouchers that are incorrectly linked to old orders
 -- This prevents old payments from being auto-attached to new invoices
 
--- 1. Unlink receipt vouchers that don't have explicit order_id or are older than 1 hour
+-- 1. Clear receipt_voucher_ids from orders that have old associations
 -- This removes incorrect associations between vouchers and orders
-UPDATE public.receipt_vouchers
-SET order_id = NULL
-WHERE order_id IS NOT NULL 
+UPDATE public.orders
+SET receipt_voucher_ids = NULL
+WHERE receipt_voucher_ids IS NOT NULL 
   AND created_at < NOW() - INTERVAL '1 hour';
 
 -- 2. Create function to calculate invoice total paid amount correctly
@@ -16,9 +16,11 @@ DECLARE
     v_direct_paid NUMERIC := 0;
     v_receipts_paid NUMERIC := 0;
     v_order_created_at TIMESTAMP WITH TIME ZONE;
+    v_voucher_ids UUID[];
 BEGIN
-    -- Get the order creation date and direct paid amount
-    SELECT COALESCE(paid_amount, 0), created_at INTO v_direct_paid, v_order_created_at
+    -- Get the order creation date, direct paid amount, and linked voucher IDs
+    SELECT COALESCE(paid_amount, 0), created_at, COALESCE(receipt_voucher_ids, ARRAY[]::UUID[])
+    INTO v_direct_paid, v_order_created_at, v_voucher_ids
     FROM public.orders
     WHERE id = p_order_id;
 
@@ -26,11 +28,14 @@ BEGIN
         RETURN v_direct_paid;
     END IF;
 
-    -- Get receipt vouchers explicitly linked to this order AND created AFTER the order date
-    SELECT COALESCE(SUM(amount), 0) INTO v_receipts_paid
-    FROM public.receipt_vouchers
-    WHERE order_id = p_order_id
-      AND created_at > v_order_created_at;
+    -- Get receipt vouchers explicitly linked to this order via receipt_voucher_ids array
+    -- AND created AFTER the order date
+    IF array_length(v_voucher_ids, 1) > 0 THEN
+        SELECT COALESCE(SUM(amount), 0) INTO v_receipts_paid
+        FROM public.receipt_vouchers
+        WHERE id = ANY(v_voucher_ids)
+          AND created_at > v_order_created_at;
+    END IF;
 
     RETURN v_direct_paid + v_receipts_paid;
 END;
@@ -51,7 +56,7 @@ SELECT
     public.get_invoice_total_paid(o.id) as total_paid,
     o.total - public.get_invoice_total_paid(o.id) as remaining_balance
 FROM public.orders o
-LEFT JOIN public.receipt_vouchers rv ON rv.order_id = o.id 
+LEFT JOIN public.receipt_vouchers rv ON rv.id = ANY(o.receipt_voucher_ids)
     AND rv.created_at > o.created_at
 WHERE o.status != 'cancelled'
 GROUP BY o.id, o.order_number, o.total, o.paid_amount, o.created_at;
