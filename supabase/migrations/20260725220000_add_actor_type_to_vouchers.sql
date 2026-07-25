@@ -248,6 +248,64 @@ BEGIN
 END;
 $$;
 
+-- Update delete_payment_voucher to use actor_id and actor_type
+CREATE OR REPLACE FUNCTION public.delete_payment_voucher(p_voucher_id UUID)
+RETURNS VOID
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v RECORD;
+BEGIN
+  SELECT * INTO v FROM public.payment_vouchers WHERE id = p_voucher_id;
+  IF NOT FOUND THEN RAISE EXCEPTION 'إذن الدفع غير موجود'; END IF;
+
+  -- Update balance based on actor_type
+  IF v.actor_type = 'supplier' THEN
+    UPDATE public.suppliers SET balance = COALESCE(balance, 0) + v.amount WHERE id = v.actor_id;
+  ELSIF v.actor_type = 'customer' THEN
+    UPDATE public.customers SET balance = COALESCE(balance, 0) + v.amount WHERE id = v.actor_id;
+  END IF;
+
+  IF v.journal_entry_id IS NOT NULL THEN
+    DELETE FROM public.journal_entry_lines WHERE entry_id = v.journal_entry_id;
+    DELETE FROM public.journal_entries WHERE id = v.journal_entry_id;
+  END IF;
+
+  DELETE FROM public.payment_vouchers WHERE id = p_voucher_id;
+END;
+$$;
+
+-- Update delete_receipt_voucher to use actor_id and actor_type
+CREATE OR REPLACE FUNCTION public.delete_receipt_voucher(p_voucher_id UUID)
+RETURNS VOID
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v RECORD;
+BEGIN
+  SELECT * INTO v FROM public.receipt_vouchers WHERE id = p_voucher_id;
+  IF NOT FOUND THEN RAISE EXCEPTION 'سند القبض غير موجود'; END IF;
+
+  -- Update balance based on actor_type
+  IF v.actor_type = 'customer' THEN
+    UPDATE public.customers SET balance = COALESCE(balance, 0) + v.amount WHERE id = v.actor_id;
+  ELSIF v.actor_type = 'supplier' THEN
+    UPDATE public.suppliers SET balance = COALESCE(balance, 0) + v.amount WHERE id = v.actor_id;
+  END IF;
+
+  IF v.journal_entry_id IS NOT NULL THEN
+    DELETE FROM public.journal_entry_lines WHERE entry_id = v.journal_entry_id;
+    DELETE FROM public.journal_entries WHERE id = v.journal_entry_id;
+  END IF;
+
+  DELETE FROM public.receipt_vouchers WHERE id = p_voucher_id;
+END;
+$$;
+
 -- Recreate the v_order_payments view with new column names
 CREATE OR REPLACE VIEW public.v_order_payments AS
 SELECT 
