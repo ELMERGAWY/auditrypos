@@ -92,32 +92,42 @@ export function DeliveryHub(props: any) {
       ]);
 
       const logs = logsRes.data || [];
+      console.log('Loaded contact logs:', logs.length);
       const merged: DeliveryItem[] = [];
-      (ordersRes.data || []).forEach((o: any) => merged.push({
-        id: o.id,
-        source: 'order',
-        number: o.order_number,
-        customer_name: o.customer_name,
-        customer_phone: o.customer_phone,
-        address: o.delivery_address,
-        total: Number(o.total || 0),
-        created_at: o.created_at,
-        delivery_status: (o.delivery_status || 'pending') as DeliveryStatus,
-        agent_id: o.delivery_agent_id,
-        contact_logs: logs.filter((l: any) => l.order_id === o.id),
-      }));
-      (invRes.data || []).forEach((i: any) => merged.push({
-        id: i.id,
-        source: 'invoice',
-        number: i.invoice_number,
-        customer_name: i.customer_name,
-        customer_phone: i.customer_phone,
-        service_desc: i.service_description,
-        total: Number(i.total_amount || 0),
-        created_at: i.created_at || i.invoice_date,
-        delivery_status: (i.delivery_status || 'pending') as DeliveryStatus,
-        contact_logs: logs.filter((l: any) => l.invoice_id === i.id),
-      }));
+      (ordersRes.data || []).forEach((o: any) => {
+        const orderLogs = logs.filter((l: any) => l.order_id === o.id);
+        console.log(`Order ${o.id} has ${orderLogs.length} contact logs`);
+        merged.push({
+          id: o.id,
+          source: 'order',
+          number: o.order_number,
+          customer_name: o.customer_name,
+          customer_phone: o.customer_phone,
+          address: o.delivery_address,
+          total: Number(o.total || 0),
+          created_at: o.created_at,
+          delivery_status: (o.delivery_status || 'pending') as DeliveryStatus,
+          agent_id: o.delivery_agent_id,
+          contact_logs: orderLogs,
+        });
+      });
+      (invRes.data || []).forEach((i: any) => {
+        const invoiceLogs = logs.filter((l: any) => l.invoice_id === i.id);
+        console.log(`Invoice ${i.id} has ${invoiceLogs.length} contact logs`);
+        merged.push({
+          id: i.id,
+          source: 'invoice',
+          number: i.invoice_number,
+          customer_name: i.customer_name,
+          customer_phone: i.customer_phone,
+          service_desc: i.service_description,
+          total: Number(i.total_amount || 0),
+          created_at: i.created_at || i.invoice_date,
+          delivery_status: (i.delivery_status || 'pending') as DeliveryStatus,
+          contact_logs: invoiceLogs,
+        });
+      });
+      console.log('Total merged items:', merged.length);
       setItems(merged);
     } catch (e: any) {
       toast.error('فشل تحميل قائمة التسليم');
@@ -380,6 +390,13 @@ export function DeliveryHub(props: any) {
                       )}
 
                       {/* Show current contact status prominently - show for all users regardless of current status */}
+                      {(() => {
+                        console.log(`Card ${it.id} has contact_logs:`, it.contact_logs?.length);
+                        if (it.contact_logs && it.contact_logs.length > 0) {
+                          console.log(`First log:`, it.contact_logs[0]);
+                        }
+                        return null;
+                      })()}
                       {it.contact_logs && it.contact_logs.length > 0 && (
                         <div className={`mt-2 p-2 rounded-lg border ${
                           it.contact_logs[0].status === 'contacted'
