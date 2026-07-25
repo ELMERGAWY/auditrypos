@@ -884,7 +884,7 @@ export function CustomerManager({ restaurantId, currency }: Props) {
     if (!confirm('حذف سند القبض هذا؟')) return;
     try {
       if (voucher.isLegacy && voucher.transaction_id) {
-        const customer = customers.find(c => c.id === voucher.customer_id);
+        const customer = customers.find(c => c.id === voucher.actor_id);
         await supabase.from('customer_transactions').delete().eq('id', voucher.transaction_id);
         if (customer) {
           await supabase.from('customers').update({ balance: customer.balance + voucher.amount }).eq('id', customer.id);
@@ -895,6 +895,83 @@ export function CustomerManager({ restaurantId, currency }: Props) {
       }
       toast.success('تم حذف سند القبض');
       loadReceiptVouchers();
+      loadCustomers();
+    } catch (error: any) {
+      toast.error('فشل الحذف: ' + error.message);
+    }
+  };
+
+  const handleSavePaymentVoucher = async () => {
+    const amount = Number(paymentVoucherForm.amount);
+    if (!amount || amount <= 0) {
+      toast.error('المبلغ يجب أن يكون أكبر من صفر');
+      return;
+    }
+    if (!paymentVoucherForm.actor_id) {
+      toast.error('يجب اختيار عميل');
+      return;
+    }
+
+    try {
+      const { data: voucherId, error } = await supabase.rpc('save_payment_voucher', {
+        p_restaurant_id: restaurantId,
+        p_supplier_id: paymentVoucherForm.actor_id,
+        p_amount: amount,
+        p_payment_method: paymentVoucherForm.payment_method,
+        p_voucher_date: paymentVoucherForm.voucher_date,
+        p_notes: paymentVoucherForm.notes || null,
+        p_account_id: paymentVoucherForm.account_id || null,
+        p_counter_account_id: paymentVoucherForm.counter_account_id || null,
+        p_voucher_id: editingPaymentVoucher?.id || null
+      });
+      if (error) throw error;
+
+      // Update customer balance (subtract refund amount)
+      const customer = customers.find(c => c.id === paymentVoucherForm.actor_id);
+      if (customer) {
+        await supabase.from('customers').update({
+          balance: customer.balance - amount
+        }).eq('id', customer.id);
+      }
+
+      toast.success(editingPaymentVoucher ? 'تم تحديث إذن الدفع' : 'تم إضافة إذن الدفع');
+
+      setShowPaymentVoucherModal(false);
+      setEditingPaymentVoucher(null);
+      setPaymentVoucherForm({
+        actor_id: '',
+        actor_type: 'customer',
+        customer_name: '',
+        amount: '',
+        payment_method: 'cash',
+        notes: '',
+        voucher_date: new Date().toISOString().split('T')[0],
+        account_id: '',
+        counter_account_id: ''
+      });
+      loadPaymentVouchers();
+      loadCustomers();
+    } catch (error: any) {
+      toast.error('فشل حفظ إذن الدفع: ' + error.message);
+    }
+  };
+
+  const handleDeletePaymentVoucher = async (voucher: PaymentVoucher) => {
+    if (!confirm('حذف إذن الدفع هذا؟')) return;
+    try {
+      const { error } = await supabase.rpc('delete_payment_voucher', { p_voucher_id: voucher.id });
+      if (error) throw error;
+
+      // Restore customer balance
+      const customer = customers.find(c => c.id === voucher.actor_id);
+      if (customer) {
+        await supabase.from('customers').update({
+          balance: customer.balance + voucher.amount
+        }).eq('id', customer.id);
+      }
+
+      toast.success('تم حذف إذن الدفع');
+      loadPaymentVouchers();
       loadCustomers();
     } catch (error: any) {
       toast.error('فشل الحذف: ' + error.message);
@@ -1190,6 +1267,7 @@ export function CustomerManager({ restaurantId, currency }: Props) {
         <TabsList>
           <TabsTrigger value="customers">العملاء</TabsTrigger>
           <TabsTrigger value="receipt-vouchers">سندات القبض</TabsTrigger>
+          <TabsTrigger value="payment-vouchers">أذون الدفع</TabsTrigger>
         </TabsList>
 
         <TabsContent value="customers" className="space-y-4 mt-4">
@@ -1687,7 +1765,8 @@ export function CustomerManager({ restaurantId, currency }: Props) {
             <Button onClick={() => {
               setEditingReceiptVoucher(null);
               setReceiptVoucherForm({
-                customer_id: '',
+                actor_id: '',
+                actor_type: 'customer',
                 customer_name: '',
                 amount: '',
                 payment_method: 'cash',
@@ -1758,7 +1837,8 @@ export function CustomerManager({ restaurantId, currency }: Props) {
                               onClick={() => {
                                 setEditingReceiptVoucher(voucher);
                                 setReceiptVoucherForm({
-                                  customer_id: voucher.customer_id,
+                                  actor_id: voucher.actor_id,
+                                  actor_type: voucher.actor_type,
                                   customer_name: voucher.customer_name,
                                   amount: voucher.amount.toString(),
                                   payment_method: voucher.payment_method,
@@ -1778,6 +1858,124 @@ export function CustomerManager({ restaurantId, currency }: Props) {
                               size="sm"
                               className="text-destructive"
                               onClick={() => handleDeleteReceiptVoucher(voucher)}
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </Button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </TabsContent>
+
+        <TabsContent value="payment-vouchers" className="space-y-4 mt-4">
+          {/* Header */}
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
+                <Banknote className="w-5 h-5 text-primary" />
+              </div>
+              <div>
+                <h2 className="font-display font-bold text-lg">أذون الدفع</h2>
+                <p className="text-xs text-muted-foreground">{paymentVouchers.length} إذن</p>
+              </div>
+            </div>
+            <Button onClick={() => {
+              setEditingPaymentVoucher(null);
+              setPaymentVoucherForm({
+                actor_id: '',
+                actor_type: 'customer',
+                customer_name: '',
+                amount: '',
+                payment_method: 'cash',
+                notes: '',
+                voucher_date: new Date().toISOString().split('T')[0],
+                account_id: '',
+                counter_account_id: ''
+              });
+              setShowPaymentVoucherModal(true);
+            }}>
+              <Plus className="w-4 h-4 ml-1" /> إذن جديد
+            </Button>
+          </div>
+
+          {/* Search */}
+          <div className="relative">
+            <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+            <Input
+              placeholder="بحث برقم الإذن، اسم العميل، الملاحظات..."
+              value={paymentVoucherSearch}
+              onChange={(e) => setPaymentVoucherSearch(e.target.value)}
+              className="pr-10"
+            />
+          </div>
+
+          {/* Payment Vouchers Table */}
+          <div className="glass-card overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead className="bg-primary/5 border-b border-border">
+                  <tr>
+                    <th className="px-4 py-3 text-right text-sm font-medium">رقم الإذن</th>
+                    <th className="px-4 py-3 text-right text-sm font-medium">التاريخ</th>
+                    <th className="px-4 py-3 text-right text-sm font-medium">العميل</th>
+                    <th className="px-4 py-3 text-right text-sm font-medium">المبلغ</th>
+                    <th className="px-4 py-3 text-right text-sm font-medium">طريقة الدفع</th>
+                    <th className="px-4 py-3 text-right text-sm font-medium">الملاحظات</th>
+                    <th className="px-4 py-3 text-right text-sm font-medium">الإجراءات</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {paymentVouchers.length === 0 ? (
+                    <tr>
+                      <td colSpan={7} className="px-4 py-12 text-center text-muted-foreground">لا توجد أذون دفع</td>
+                    </tr>
+                  ) : (
+                    paymentVouchers.map((voucher) => (
+                      <tr key={voucher.id} className="border-b border-border/50 hover:bg-primary/5">
+                        <td className="px-4 py-3 font-medium">{voucher.voucher_number}</td>
+                        <td className="px-4 py-3">{new Date(voucher.voucher_date).toLocaleDateString('ar-EG')}</td>
+                        <td className="px-4 py-3">{voucher.customer_name}</td>
+                        <td className="px-4 py-3 font-bold text-destructive">{voucher.amount.toFixed(2)} {currency}</td>
+                        <td className="px-4 py-3">
+                          {voucher.payment_method === 'cash' ? '💵 نقدي' :
+                           voucher.payment_method === 'instapay' ? '📱 إنستاباي' :
+                           voucher.payment_method === 'vodafone_cash' ? '📲 فودافون كاش' :
+                           '🏦 تحويل بنكي'}
+                        </td>
+                        <td className="px-4 py-3 text-xs text-muted-foreground">{voucher.notes || '-'}</td>
+                        <td className="px-4 py-3">
+                          <div className="flex gap-1">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => {
+                                setEditingPaymentVoucher(voucher);
+                                setPaymentVoucherForm({
+                                  actor_id: voucher.actor_id,
+                                  actor_type: voucher.actor_type,
+                                  customer_name: voucher.customer_name,
+                                  amount: voucher.amount.toString(),
+                                  payment_method: voucher.payment_method,
+                                  notes: voucher.notes || '',
+                                  voucher_date: voucher.voucher_date.split('T')[0],
+                                  account_id: voucher.account_id || '',
+                                  counter_account_id: voucher.counter_account_id || ''
+                                });
+                                setShowPaymentVoucherModal(true);
+                              }}
+                            >
+                              <Edit className="w-4 h-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="text-destructive"
+                              onClick={() => handleDeletePaymentVoucher(voucher)}
                             >
                               <Trash2 className="w-4 h-4" />
                             </Button>
@@ -1856,15 +2054,15 @@ export function CustomerManager({ restaurantId, currency }: Props) {
                 </select>
               </div>
             </div>
-            {isReceivableAccount(receiptVoucherForm.account_id) && receiptVoucherForm.customer_id && (
+            {isReceivableAccount(receiptVoucherForm.account_id) && receiptVoucherForm.actor_id && (
               <p className="text-xs text-primary bg-primary/5 p-2 rounded">
                 تم ربط حساب العملاء بالعميل المختار أعلاه تلقائياً
               </p>
             )}
-            {receiptVoucherForm.customer_id && (
+            {receiptVoucherForm.actor_id && (
               <PaymentAllocations
                 restaurantId={restaurantId}
-                customerId={receiptVoucherForm.customer_id}
+                customerId={receiptVoucherForm.actor_id}
                 totalAmount={Number(receiptVoucherForm.amount) || 0}
                 currency={currency}
                 onChange={(allocs) => setVoucherAllocations(allocs)}
@@ -1890,6 +2088,106 @@ export function CustomerManager({ restaurantId, currency }: Props) {
                 <Settings className="w-4 h-4 ml-1" />
               </Button>
               <Button variant="outline" onClick={() => setShowReceiptVoucherModal(false)}>إلغاء</Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Payment Voucher Modal */}
+      <Dialog open={showPaymentVoucherModal} onOpenChange={setShowPaymentVoucherModal}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>{editingPaymentVoucher ? 'تعديل إذن دفع' : 'إذن دفع جديد'}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 mt-4">
+            <div>
+              <Label>العميل *</Label>
+              <CustomerSearch
+                restaurantId={restaurantId}
+                value={paymentVoucherForm.customer_name}
+                onChange={(name, phone, address, customerId) => {
+                  const recAcc = accounts.find(acc => acc.code?.startsWith('12') || acc.name?.includes('عملاء') || acc.name?.includes('مدينة'));
+                  if (customerId) {
+                    const customer = customers.find(c => c.id === customerId);
+                    setPaymentVoucherForm(prev => ({
+                      ...prev,
+                      actor_id: customerId,
+                      actor_type: 'customer',
+                      customer_name: customer?.name || name,
+                      account_id: recAcc ? recAcc.id : prev.account_id,
+                      counter_account_id: recAcc ? recAcc.id : prev.counter_account_id
+                    }));
+                  } else {
+                    setPaymentVoucherForm(prev => ({
+                      ...prev,
+                      customer_name: name
+                    }));
+                  }
+                }}
+                placeholder="ابحث عن عميل أو أدخل اسم جديد"
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label>المبلغ *</Label>
+                <Input
+                  type="number"
+                  value={paymentVoucherForm.amount}
+                  onChange={(e) => setPaymentVoucherForm({ ...paymentVoucherForm, amount: e.target.value })}
+                  placeholder="0.00"
+                />
+              </div>
+              <div>
+                <Label>التاريخ</Label>
+                <Input
+                  type="date"
+                  value={paymentVoucherForm.voucher_date}
+                  onChange={(e) => setPaymentVoucherForm({ ...paymentVoucherForm, voucher_date: e.target.value })}
+                />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label>طريقة الدفع</Label>
+                <select
+                  value={paymentVoucherForm.payment_method}
+                  onChange={(e) => setPaymentVoucherForm({ ...paymentVoucherForm, payment_method: e.target.value })}
+                  className="w-full px-3 py-2 rounded-md bg-background border border-input text-sm"
+                >
+                  <option value="cash">💵 نقدي</option>
+                  <option value="instapay">📱 إنستاباي</option>
+                  <option value="vodafone_cash">📲 فودافون كاش</option>
+                  <option value="bank">🏦 تحويل بنكي</option>
+                </select>
+              </div>
+              <div>
+                <Label>توجيه على حساب</Label>
+                <select
+                  value={paymentVoucherForm.account_id}
+                  onChange={(e) => setPaymentVoucherForm({ ...paymentVoucherForm, account_id: e.target.value })}
+                  className="w-full px-3 py-2 rounded-md bg-background border border-input text-sm"
+                >
+                  <option value="">تلقائي (نقدية/بنك)</option>
+                  {accounts.map(acc => (
+                    <option key={acc.id} value={acc.id}>{acc.code} - {acc.name}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            <div>
+              <Label>ملاحظات</Label>
+              <Input
+                value={paymentVoucherForm.notes}
+                onChange={(e) => setPaymentVoucherForm({ ...paymentVoucherForm, notes: e.target.value })}
+                placeholder="اختياري"
+              />
+            </div>
+            <div className="flex gap-2">
+              <Button className="flex-1 gradient-bg text-primary-foreground border-0" onClick={handleSavePaymentVoucher}>
+                {editingPaymentVoucher ? 'تحديث' : 'إضافة'}
+              </Button>
+              <Button variant="outline" onClick={() => setShowPaymentVoucherModal(false)}>إلغاء</Button>
             </div>
           </div>
         </DialogContent>
