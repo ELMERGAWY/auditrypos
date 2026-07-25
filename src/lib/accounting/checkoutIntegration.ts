@@ -45,6 +45,7 @@ class CheckoutIntegration {
       customerName?: string;
       customerPhone?: string;
       customerRef?: string;
+      customerId?: string;
       tableNumber?: number;
       orderType: 'dine_in' | 'takeaway' | 'delivery' | 'pickup';
       deliveryAddress?: string;
@@ -89,7 +90,7 @@ class CheckoutIntegration {
     }
 
     // Find existing customer by name and phone to prevent duplicates
-    let existingCustomerId = orderData.customerId || null;
+    let existingCustomerId: string | null = orderData.customerId || null;
     if (!existingCustomerId && orderData.customerName && orderData.customerPhone) {
       try {
         const { data: existingCustomer } = await supabase
