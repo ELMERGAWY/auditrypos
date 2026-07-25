@@ -697,7 +697,7 @@ export function CustomerManager({ restaurantId, currency }: Props) {
         });
       });
 
-      // Add payment vouchers (refunds) as credit transactions
+      // Add payment vouchers (refunds) as debit transactions (increase customer balance)
       paymentVouchersData?.forEach((voucher: any) => {
         const amount = Number(voucher.amount);
         statement.push({
@@ -706,8 +706,8 @@ export function CustomerManager({ restaurantId, currency }: Props) {
           type: 'refund',
           reference: voucher.voucher_number,
           description: `إذن دفع - ${voucher.notes || 'استرداد'}`,
-          debit: 0,
-          credit: amount,
+          debit: amount,
+          credit: 0,
           balance: 0
         });
       });

@@ -229,17 +229,17 @@ BEGIN
       p_amount, p_payment_method, p_notes, p_account_id, p_counter_account_id, p_reference_number
     ) RETURNING id INTO v_voucher_id;
     
-    -- Update customer balance if actor_type is 'customer' (refund reduces balance)
+    -- Update customer balance if actor_type is 'customer' (refund increases balance)
     IF p_actor_type = 'customer' THEN
       UPDATE public.customers
-      SET balance = balance - p_amount
+      SET balance = balance + p_amount
       WHERE id = p_actor_id;
     END IF;
     
-    -- Update supplier balance if actor_type is 'supplier' (refund reduces balance)
+    -- Update supplier balance if actor_type is 'supplier' (refund increases balance)
     IF p_actor_type = 'supplier' THEN
       UPDATE public.suppliers
-      SET balance = balance - p_amount
+      SET balance = balance + p_amount
       WHERE id = p_actor_id;
     END IF;
   END IF;
@@ -263,9 +263,9 @@ BEGIN
 
   -- Update balance based on actor_type
   IF v.actor_type = 'supplier' THEN
-    UPDATE public.suppliers SET balance = COALESCE(balance, 0) + v.amount WHERE id = v.actor_id;
+    UPDATE public.suppliers SET balance = COALESCE(balance, 0) - v.amount WHERE id = v.actor_id;
   ELSIF v.actor_type = 'customer' THEN
-    UPDATE public.customers SET balance = COALESCE(balance, 0) + v.amount WHERE id = v.actor_id;
+    UPDATE public.customers SET balance = COALESCE(balance, 0) - v.amount WHERE id = v.actor_id;
   END IF;
 
   IF v.journal_entry_id IS NOT NULL THEN
