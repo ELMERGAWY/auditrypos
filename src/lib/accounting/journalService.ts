@@ -227,7 +227,7 @@ class JournalService {
     destinationAccountId?: string | null
   ): Promise<JournalEntry | null> {
     const mapping = this.getBusinessMapping(businessType);
-    const lines: Omit<JournalEntryLine, 'id' | 'entry_id'>[] = [];
+    let lines: Omit<JournalEntryLine, 'id' | 'entry_id'>[] = [];
 
     // Determine target revenue account based on business type mapping
     let targetRevenueAccount = mapping.salesRevenue;
@@ -272,13 +272,13 @@ class JournalService {
     const arAcc = await this.getAccountByCode(restaurantId, mapping.accountsReceivable);
     const taxAcc = await this.getAccountByCode(restaurantId, mapping.taxPayable);
 
-    const paidAmount = order.paid_amount || order.total;
+    const paidAmount = order.paid_amount || 0;
     const remaining = order.total - paidAmount;
 
     // STANDARD DOUBLE-ENTRY STRUCTURE FOR SALES INVOICES:
     // Debit: Cash/Bank Account (paid_amount only)
     // Debit: Customer Account (remaining_amount) - with customerId
-    // Credit: Sales Revenue Account (total_amount - tax is included in revenue)
+    // Credit: Sales Revenue Account (total_amount)
 
     // 1. Debit: Cash/Bank for paid amount only
     if (paidAmount > 0) {
@@ -303,7 +303,7 @@ class JournalService {
       });
     }
 
-    // 3. Credit: Revenue Account (total amount - tax included)
+    // 3. Credit: Revenue Account (total amount)
     lines.push({
       account_id: salesAcc.id,
       debit: 0,
@@ -311,6 +311,9 @@ class JournalService {
       description: `إيرادات ${businessType} - ${order.order_number}`,
       line_order: 3,
     });
+
+    // Remove any lines with zero values (debit == 0 && credit == 0)
+    lines = lines.filter(line => (line.debit || 0) > 0 || (line.credit || 0) > 0);
 
     // VALIDATION: Ensure total debit equals total credit
     const totalDebit = lines.reduce((sum, line) => sum + (line.debit || 0), 0);
