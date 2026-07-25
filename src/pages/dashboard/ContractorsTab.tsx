@@ -62,6 +62,7 @@ export function ContractorsTab({ restaurant }: Props) {
   const [selectedOrders, setSelectedOrders] = useState<string[]>([]);
   const [invoiceSearch, setInvoiceSearch] = useState('');
   const [orderSearch, setOrderSearch] = useState('');
+  const [dateFilter, setDateFilter] = useState('');
   const [selectedService, setSelectedService] = useState<any>(null);
   const [selectedServices, setSelectedServices] = useState<any[]>([]);
   const [serviceForm, setServiceForm] = useState({
@@ -122,12 +123,16 @@ export function ContractorsTab({ restaurant }: Props) {
 
   const loadInvoices = async () => {
     const companyId = restaurant.company_id || restaurant.id;
-    const { data, error } = await supabase
+    let query = supabase
       .from('sales_invoices')
       .select('id, invoice_number, total_amount, created_at, orders(order_items(id, menu_item_name, quantity, price, variables)), sales_invoice_lines(id, description, quantity, unit_price, line_total)')
-      .eq('company_id', companyId)
-      .order('created_at', { ascending: false })
-      .limit(50);
+      .eq('company_id', companyId);
+    
+    if (dateFilter) {
+      query = query.gte('created_at', dateFilter).lte('created_at', `${dateFilter}T23:59:59`);
+    }
+    
+    const { data, error } = await query.order('created_at', { ascending: false }).limit(50);
     if (error) {
       console.error('Error loading invoices:', error);
       toast.error('خطأ في تحميل الفواتير: ' + error.message);
@@ -137,12 +142,16 @@ export function ContractorsTab({ restaurant }: Props) {
   };
 
   const loadOrders = async () => {
-    const { data, error } = await supabase
+    let query = supabase
       .from('orders')
       .select('id, order_number, total, created_at, order_items(id, menu_item_name, quantity, price, variables)')
-      .eq('restaurant_id', restaurant.id)
-      .order('created_at', { ascending: false })
-      .limit(50);
+      .eq('restaurant_id', restaurant.id);
+    
+    if (dateFilter) {
+      query = query.gte('created_at', dateFilter).lte('created_at', `${dateFilter}T23:59:59`);
+    }
+    
+    const { data, error } = await query.order('created_at', { ascending: false }).limit(50);
     if (error) {
       console.error('Error loading orders:', error);
       toast.error('خطأ في تحميل الطلبات: ' + error.message);
@@ -662,7 +671,20 @@ export function ContractorsTab({ restaurant }: Props) {
                 </div>
                 <div>
                   <Label>المصدر (اختياري)</Label>
-                  <div className="grid grid-cols-2 gap-2">
+                  <div className="space-y-2">
+                    <div className="flex gap-2">
+                      <Input
+                        type="date"
+                        value={dateFilter}
+                        onChange={(e) => setDateFilter(e.target.value)}
+                        className="h-8 text-xs flex-1"
+                      />
+                      <Button size="sm" variant="outline" onClick={() => { loadInvoices(); loadOrders(); }} className="h-8">
+                        تحميل
+                      </Button>
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2 mt-2">
                     <div>
                       <Label className="text-xs">فاتورة</Label>
                       <div className="space-y-2">

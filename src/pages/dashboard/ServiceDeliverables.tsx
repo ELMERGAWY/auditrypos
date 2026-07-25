@@ -105,7 +105,7 @@ function mapOrderDeliveryStatus(
 function toOrderDeliveryStatus(status: string): string {
   if (status === 'delivered') return 'delivered';
   if (status === 'cancelled') return 'cancelled';
-  if (status === 'partial') return 'partial';
+  if (status === 'partial') return 'delivered'; // Map partial to delivered since partial is not in orders table constraint
   if (status === 'in_progress') return 'in_progress';
   if (status === 'contacted') return 'contacted';
   if (status === 'no_answer') return 'no_answer';
