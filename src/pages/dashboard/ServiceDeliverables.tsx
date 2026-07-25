@@ -840,16 +840,16 @@ export function ServiceDeliverables({ restaurantId }: Props) {
                 </div>
               </div>
 
-              {/* Show current contact status prominently at top of card */}
-              {(deliverable.status === 'contacted' || deliverable.status === 'no_answer') && deliverable.contact_logs && deliverable.contact_logs.length > 0 && (
+              {/* Show current contact status prominently at top of card - show for all users regardless of current status */}
+              {deliverable.contact_logs && deliverable.contact_logs.length > 0 && (
                 <div className={`rounded-lg p-2 border mt-2 ${
-                  deliverable.status === 'contacted'
+                  deliverable.contact_logs[0].status === 'contacted'
                     ? 'bg-indigo-500/10 text-indigo-600 border-indigo-500/20'
                     : 'bg-rose-500/10 text-rose-600 border-rose-500/20'
                 }`}>
                   <div className="flex items-center justify-between mb-1">
                     <span className="font-bold text-[10px] flex items-center gap-1">
-                      {deliverable.status === 'contacted' ? '📞 تم التواصل' : '📵 لا رد'}
+                      {deliverable.contact_logs[0].status === 'contacted' ? '📞 تم التواصل' : '📵 لا رد'}
                     </span>
                     <span className="opacity-85 text-[8px] font-mono">
                       {new Date(deliverable.contact_logs[0].created_at).toLocaleDateString('ar-EG', { month: '2-digit', day: '2-digit' })}{' '}
