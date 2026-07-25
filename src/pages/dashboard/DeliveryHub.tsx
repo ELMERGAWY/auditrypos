@@ -379,6 +379,28 @@ export function DeliveryHub(props: any) {
                         <p className="text-[10px] text-muted-foreground mt-1 line-clamp-2">{it.service_desc}</p>
                       )}
 
+                      {/* Show current contact status prominently */}
+                      {(s === 'contacted' || s === 'no_answer') && it.contact_logs && it.contact_logs.length > 0 && (
+                        <div className={`mt-2 p-2 rounded-lg border ${
+                          s === 'contacted'
+                            ? 'bg-indigo-500/10 text-indigo-600 border-indigo-500/30'
+                            : 'bg-rose-500/10 text-rose-600 border-rose-500/30'
+                        }`}>
+                          <div className="flex items-center justify-between mb-1">
+                            <span className="font-bold text-[10px] flex items-center gap-1">
+                              {s === 'contacted' ? '📞 تم التواصل' : '📵 بدون رد'}
+                            </span>
+                            <span className="opacity-85 text-[8px] font-mono">
+                              {new Date(it.contact_logs[0].created_at).toLocaleDateString('ar-EG', { month: '2-digit', day: '2-digit' })}{' '}
+                              {new Date(it.contact_logs[0].created_at).toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit', hour12: true })}
+                            </span>
+                          </div>
+                          {it.contact_logs[0].notes && (
+                            <p className="text-[8px] opacity-80 leading-relaxed">{it.contact_logs[0].notes}</p>
+                          )}
+                        </div>
+                      )}
+
                       {/* Contact attempts history list */}
                       {it.contact_logs && it.contact_logs.length > 0 && (
                         <div className="mt-2 pt-2 border-t border-border/40 space-y-1">
