@@ -178,7 +178,7 @@ class JournalService {
       // Fetch the created entry with its lines
       const { data: entryData, error: fetchError } = await supabase
         .from('journal_entries')
-        .select('*, lines(*)')
+        .select('*, journal_entry_lines(*)')
         .eq('id', result.entry_id)
         .single();
 
@@ -188,7 +188,11 @@ class JournalService {
 
       toast.success(`تم إنشاء قيد يومية ${result.entry_number}`);
       
-      return entryData as JournalEntry;
+      // Map journal_entry_lines to lines for compatibility with existing type
+      return {
+        ...entryData,
+        lines: entryData.journal_entry_lines || [],
+      } as JournalEntry;
 
     } catch (error: any) {
       console.error('Journal entry creation failed:', error);
@@ -928,7 +932,7 @@ class JournalService {
     // Fetch the original journal entry with its lines
     const { data: originalEntry, error: fetchError } = await supabase
       .from('journal_entries')
-      .select('*, lines(*)')
+      .select('*, journal_entry_lines(*)')
       .eq('id', originalEntryId)
       .single();
 
@@ -945,7 +949,8 @@ class JournalService {
     }
 
     // Create reversal lines (swap debit and credit)
-    const reversalLines: Omit<JournalEntryLine, 'id' | 'entry_id'>[] = originalEntry.lines.map((line: any) => ({
+    const originalLines = originalEntry.journal_entry_lines || originalEntry.lines || [];
+    const reversalLines: Omit<JournalEntryLine, 'id' | 'entry_id'>[] = originalLines.map((line: any) => ({
       account_id: line.account_id,
       debit: line.credit, // Swap: original credit becomes debit
       credit: line.debit, // Swap: original debit becomes credit
