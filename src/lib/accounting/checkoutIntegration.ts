@@ -93,6 +93,7 @@ class CheckoutIntegration {
     // 1. If customerId is provided from UI (selected from autocomplete), use it directly
     if (orderData.customerId) {
       customerId = orderData.customerId;
+      console.log('[checkout] Using customerId from UI:', customerId);
     }
     // 2. Otherwise, search for existing customer by name and phone
     else if (orderData.customerName && orderData.customerPhone) {
@@ -107,11 +108,14 @@ class CheckoutIntegration {
           .maybeSingle();
         if (existingCustomer?.id) {
           customerId = existingCustomer.id;
+          console.log('[checkout] Found existing customer by name+phone:', customerId);
         }
       } catch (e) {
         console.warn('[checkout] Failed to find existing customer:', e);
       }
     }
+
+    console.log('[checkout] Customer ID after search:', customerId);
 
     let orderPayload: Record<string, unknown> = {
       restaurant_id: context.restaurantId,
@@ -176,9 +180,24 @@ class CheckoutIntegration {
 
       // If customerId is still null, create new customer
       if (!customerId && orderData.customerName?.trim()) {
+        console.log('[checkout] Creating new customer...');
         customerId = await this.findOrCreateCustomer(context.restaurantId, orderData.customerName.trim(), orderData.customerPhone, orderData.customerRef)
           .catch((e) => { console.warn('[checkout] customer upsert failed:', e); return null; });
+        console.log('[checkout] Customer ID after creation:', customerId);
       }
+
+      // Fallback validation: if customerId is still null after creation, show error
+      if (!customerId && orderData.customerName?.trim()) {
+        console.error('[checkout] customerId is still null after creation, cannot proceed');
+        toast.error('برجاء اختيار أو إدخال بيانات العميل بشكل صحيح');
+        return {
+          success: false,
+          error: 'برجاء اختيار أو إدخال بيانات العميل بشكل صحيح',
+          errorCode: 'CUSTOMER_REQUIRED',
+        };
+      }
+
+      console.log('[checkout] Final Customer ID before order creation:', customerId);
 
       const [taxCalculation, cogsResult] = await Promise.all([safeTax, safeCogs]);
 
