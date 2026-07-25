@@ -17,6 +17,16 @@ import { Textarea } from '@/components/ui/textarea';
 
 type DeliveryStatus = 'pending' | 'in_progress' | 'contacted' | 'no_answer' | 'delivered' | 'cancelled';
 
+// Helper function to map status to valid database values
+const toValidDeliveryStatus = (status: DeliveryStatus): string => {
+  if (status === 'delivered') return 'delivered';
+  if (status === 'cancelled') return 'cancelled';
+  if (status === 'in_progress') return 'in_progress';
+  if (status === 'contacted') return 'contacted';
+  if (status === 'no_answer') return 'no_answer';
+  return 'pending';
+};
+
 const STATUS_META: Record<DeliveryStatus, { label: string; color: string; icon: any; bg: string }> = {
   pending: { label: 'قيد الانتظار', color: 'text-amber-600', bg: 'bg-amber-500/10 border-amber-500/30', icon: Clock },
   in_progress: { label: 'قيد التنفيذ', color: 'text-blue-600', bg: 'bg-blue-500/10 border-blue-500/30', icon: PlayCircle },
@@ -191,7 +201,8 @@ export function DeliveryHub(props: any) {
     // optimistic
     setItems(prev => prev.map(x => x.id === item.id && x.source === item.source ? { ...x, delivery_status: status } : x));
     const table = item.source === 'order' ? 'orders' : 'service_invoices';
-    const { error } = await supabase.from(table).update({ delivery_status: status }).eq('id', item.id);
+    const validStatus = toValidDeliveryStatus(status);
+    const { error } = await supabase.from(table).update({ delivery_status: validStatus }).eq('id', item.id);
     if (error) {
       toast.error('فشل تحديث الحالة');
       load();

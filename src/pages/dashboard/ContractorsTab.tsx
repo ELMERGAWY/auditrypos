@@ -62,7 +62,8 @@ export function ContractorsTab({ restaurant }: Props) {
   const [selectedOrders, setSelectedOrders] = useState<string[]>([]);
   const [invoiceSearch, setInvoiceSearch] = useState('');
   const [orderSearch, setOrderSearch] = useState('');
-  const [dateFilter, setDateFilter] = useState('');
+  const [dateFilterStart, setDateFilterStart] = useState('');
+  const [dateFilterEnd, setDateFilterEnd] = useState('');
   const [selectedService, setSelectedService] = useState<any>(null);
   const [selectedServices, setSelectedServices] = useState<any[]>([]);
   const [serviceForm, setServiceForm] = useState({
@@ -128,8 +129,11 @@ export function ContractorsTab({ restaurant }: Props) {
       .select('id, invoice_number, total_amount, created_at, orders(order_items(id, menu_item_name, quantity, price, variables)), sales_invoice_lines(id, description, quantity, unit_price, line_total)')
       .eq('company_id', companyId);
     
-    if (dateFilter) {
-      query = query.gte('created_at', dateFilter).lte('created_at', `${dateFilter}T23:59:59`);
+    if (dateFilterStart) {
+      query = query.gte('created_at', dateFilterStart);
+    }
+    if (dateFilterEnd) {
+      query = query.lte('created_at', `${dateFilterEnd}T23:59:59`);
     }
     
     const { data, error } = await query.order('created_at', { ascending: false }).limit(50);
@@ -147,8 +151,11 @@ export function ContractorsTab({ restaurant }: Props) {
       .select('id, order_number, total, created_at, order_items(id, menu_item_name, quantity, price, variables)')
       .eq('restaurant_id', restaurant.id);
     
-    if (dateFilter) {
-      query = query.gte('created_at', dateFilter).lte('created_at', `${dateFilter}T23:59:59`);
+    if (dateFilterStart) {
+      query = query.gte('created_at', dateFilterStart);
+    }
+    if (dateFilterEnd) {
+      query = query.lte('created_at', `${dateFilterEnd}T23:59:59`);
     }
     
     const { data, error } = await query.order('created_at', { ascending: false }).limit(50);
@@ -673,16 +680,28 @@ export function ContractorsTab({ restaurant }: Props) {
                   <Label>المصدر (اختياري)</Label>
                   <div className="space-y-2">
                     <div className="flex gap-2">
-                      <Input
-                        type="date"
-                        value={dateFilter}
-                        onChange={(e) => setDateFilter(e.target.value)}
-                        className="h-8 text-xs flex-1"
-                      />
-                      <Button size="sm" variant="outline" onClick={() => { loadInvoices(); loadOrders(); }} className="h-8">
-                        تحميل
-                      </Button>
+                      <div className="flex-1">
+                        <Label className="text-xs">من تاريخ</Label>
+                        <Input
+                          type="date"
+                          value={dateFilterStart}
+                          onChange={(e) => setDateFilterStart(e.target.value)}
+                          className="h-8 text-xs"
+                        />
+                      </div>
+                      <div className="flex-1">
+                        <Label className="text-xs">إلى تاريخ</Label>
+                        <Input
+                          type="date"
+                          value={dateFilterEnd}
+                          onChange={(e) => setDateFilterEnd(e.target.value)}
+                          className="h-8 text-xs"
+                        />
+                      </div>
                     </div>
+                    <Button size="sm" variant="outline" onClick={() => { loadInvoices(); loadOrders(); }} className="w-full">
+                      تحميل الفواتير والطلبات
+                    </Button>
                   </div>
                   <div className="grid grid-cols-2 gap-2 mt-2">
                     <div>
