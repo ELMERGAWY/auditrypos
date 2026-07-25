@@ -84,7 +84,8 @@ interface ReceiptVoucher {
   id: string;
   voucher_number: string;
   voucher_date: string;
-  customer_id: string;
+  actor_id: string;
+  actor_type: string;
   customer_name: string;
   amount: number;
   payment_method: string;
@@ -94,6 +95,22 @@ interface ReceiptVoucher {
   created_at: string;
   isLegacy?: boolean;
   transaction_id?: string;
+}
+
+interface PaymentVoucher {
+  id: string;
+  voucher_number: string;
+  voucher_date: string;
+  actor_id: string;
+  actor_type: string;
+  customer_name: string;
+  amount: number;
+  payment_method: string;
+  notes: string | null;
+  account_id: string | null;
+  counter_account_id: string | null;
+  created_at: string;
+  isLegacy?: boolean;
 }
 
 interface Props {
@@ -124,8 +141,27 @@ export function CustomerManager({ restaurantId, currency }: Props) {
   const [voucherAllocations, setVoucherAllocations] = useState<Allocation[]>([]);
   const [editingReceiptVoucher, setEditingReceiptVoucher] = useState<ReceiptVoucher | null>(null);
 
+  // Payment Vouchers (for customer refunds)
+  const [paymentVouchers, setPaymentVouchers] = useState<PaymentVoucher[]>([]);
+  const [paymentVoucherSearch, setPaymentVoucherSearch] = useState('');
+  const [showPaymentVoucherModal, setShowPaymentVoucherModal] = useState(false);
+  const [editingPaymentVoucher, setEditingPaymentVoucher] = useState<PaymentVoucher | null>(null);
+
   const [receiptVoucherForm, setReceiptVoucherForm] = useState({
-    customer_id: '',
+    actor_id: '',
+    actor_type: 'customer',
+    customer_name: '',
+    amount: '',
+    payment_method: 'cash',
+    notes: '',
+    voucher_date: new Date().toISOString().split('T')[0],
+    account_id: '',
+    counter_account_id: ''
+  });
+
+  const [paymentVoucherForm, setPaymentVoucherForm] = useState({
+    actor_id: '',
+    actor_type: 'customer',
     customer_name: '',
     amount: '',
     payment_method: 'cash',
@@ -159,6 +195,7 @@ export function CustomerManager({ restaurantId, currency }: Props) {
   useEffect(() => {
     loadCustomers();
     loadReceiptVouchers();
+    loadPaymentVouchers();
     loadAccounts();
   }, [restaurantId]);
 
@@ -202,7 +239,16 @@ export function CustomerManager({ restaurantId, currency }: Props) {
     const recAcc = accounts.find(acc => acc.code?.startsWith('12') || acc.name?.includes('عملاء') || acc.name?.includes('مدينة'));
     setReceiptVoucherForm(prev => ({
       ...prev,
-      customer_id: customerId,
+      actor_id: customerId,
+      actor_type: 'customer',
+      customer_name: customer?.name || '',
+      account_id: recAcc ? recAcc.id : prev.account_id,
+      counter_account_id: recAcc ? recAcc.id : prev.counter_account_id
+    }));
+    setPaymentVoucherForm(prev => ({
+      ...prev,
+      actor_id: customerId,
+      actor_type: 'customer',
       customer_name: customer?.name || '',
       account_id: recAcc ? recAcc.id : prev.account_id,
       counter_account_id: recAcc ? recAcc.id : prev.counter_account_id
@@ -215,7 +261,16 @@ export function CustomerManager({ restaurantId, currency }: Props) {
       const customer = customers.find(c => c.id === customerId);
       setReceiptVoucherForm(prev => ({
         ...prev,
-        customer_id: customerId,
+        actor_id: customerId,
+        actor_type: 'customer',
+        customer_name: customer?.name || name,
+        account_id: recAcc ? recAcc.id : prev.account_id,
+        counter_account_id: recAcc ? recAcc.id : prev.counter_account_id
+      }));
+      setPaymentVoucherForm(prev => ({
+        ...prev,
+        actor_id: customerId,
+        actor_type: 'customer',
         customer_name: customer?.name || name,
         account_id: recAcc ? recAcc.id : prev.account_id,
         counter_account_id: recAcc ? recAcc.id : prev.counter_account_id
@@ -225,11 +280,15 @@ export function CustomerManager({ restaurantId, currency }: Props) {
         ...prev,
         customer_name: name
       }));
+      setPaymentVoucherForm(prev => ({
+        ...prev,
+        customer_name: name
+      }));
     }
   };
 
   const handlePrintReceiptVoucher = () => {
-    const customer = customers.find(c => c.id === receiptVoucherForm.customer_id);
+    const customer = customers.find(c => c.id === receiptVoucherForm.actor_id);
     const amount = Number(receiptVoucherForm.amount);
     const newBalance = customer ? customer.balance - amount : 0;
     const receiptDate = new Date(receiptVoucherForm.voucher_date).toLocaleDateString('ar-EG');
@@ -330,9 +389,10 @@ export function CustomerManager({ restaurantId, currency }: Props) {
       const { data, error } = await supabase
         .from('receipt_vouchers')
         .select(`
-          id, voucher_number, voucher_date, customer_id, amount, payment_method, notes,
+          id, voucher_number, voucher_date, actor_id, actor_type, amount, payment_method, notes,
           account_id, counter_account_id, created_at,
-          customers(name)
+          customers(name),
+          suppliers(name)
         `)
         .eq('restaurant_id', restaurantId)
         .order('voucher_date', { ascending: false });
@@ -342,8 +402,9 @@ export function CustomerManager({ restaurantId, currency }: Props) {
           id: rv.id,
           voucher_number: rv.voucher_number,
           voucher_date: rv.voucher_date,
-          customer_id: rv.customer_id,
-          customer_name: rv.customers?.name || 'غير معروف',
+          actor_id: rv.actor_id,
+          actor_type: rv.actor_type || 'customer',
+          customer_name: rv.actor_type === 'supplier' ? (rv.suppliers?.name || 'غير معروف') : (rv.customers?.name || 'غير معروف'),
           amount: Number(rv.amount),
           payment_method: rv.payment_method,
           notes: rv.notes,
@@ -362,12 +423,13 @@ export function CustomerManager({ restaurantId, currency }: Props) {
         .order('created_at', { ascending: false });
 
       const legacyVouchers: ReceiptVoucher[] = (legacyTxs || [])
-        .filter((tx: any) => !vouchers.some(v => v.customer_id === tx.customer_id && v.amount === Math.abs(Number(tx.amount)) && v.created_at === tx.created_at))
+        .filter((tx: any) => !vouchers.some(v => v.actor_id === tx.customer_id && v.amount === Math.abs(Number(tx.amount)) && v.created_at === tx.created_at))
         .map((tx: any) => ({
           id: `legacy-${tx.id}`,
           voucher_number: `RV-LEG-${String(tx.id).slice(0, 6)}`,
           voucher_date: tx.created_at,
-          customer_id: tx.customer_id,
+          actor_id: tx.customer_id,
+          actor_type: 'customer',
           customer_name: tx.customers?.name || 'غير معروف',
           amount: Math.abs(Number(tx.amount)),
           payment_method: tx.payment_method || 'cash',
@@ -382,6 +444,44 @@ export function CustomerManager({ restaurantId, currency }: Props) {
       setReceiptVouchers([...vouchers, ...legacyVouchers]);
     } catch (error: any) {
       toast.error('فشل تحميل سندات القبض: ' + error.message);
+    }
+  };
+
+  const loadPaymentVouchers = async () => {
+    try {
+      const vouchers: PaymentVoucher[] = [];
+
+      const { data, error } = await supabase
+        .from('payment_vouchers')
+        .select(`
+          id, voucher_number, voucher_date, actor_id, actor_type, amount, payment_method, notes,
+          account_id, counter_account_id, created_at,
+          customers(name),
+          suppliers(name)
+        `)
+        .eq('restaurant_id', restaurantId)
+        .order('voucher_date', { ascending: false });
+
+      if (!error && data) {
+        vouchers.push(...(data || []).map((pv: any) => ({
+          id: pv.id,
+          voucher_number: pv.voucher_number,
+          voucher_date: pv.voucher_date,
+          actor_id: pv.actor_id,
+          actor_type: pv.actor_type || 'supplier',
+          customer_name: pv.actor_type === 'customer' ? (pv.customers?.name || 'غير معروف') : (pv.suppliers?.name || 'غير معروف'),
+          amount: Number(pv.amount),
+          payment_method: pv.payment_method,
+          notes: pv.notes,
+          account_id: pv.account_id,
+          counter_account_id: pv.counter_account_id,
+          created_at: pv.created_at
+        })));
+      }
+
+      setPaymentVouchers(vouchers);
+    } catch (error: any) {
+      toast.error('فشل تحميل أذون الدفع: ' + error.message);
     }
   };
 
@@ -729,7 +829,7 @@ export function CustomerManager({ restaurantId, currency }: Props) {
       } else {
         const { data: voucherId, error } = await supabase.rpc('save_receipt_voucher', {
           p_restaurant_id: restaurantId,
-          p_customer_id: receiptVoucherForm.customer_id,
+          p_customer_id: receiptVoucherForm.actor_id,
           p_amount: amount,
           p_payment_method: receiptVoucherForm.payment_method,
           p_voucher_date: receiptVoucherForm.voucher_date,
@@ -745,7 +845,7 @@ export function CustomerManager({ restaurantId, currency }: Props) {
         if (!editingReceiptVoucher?.id) {
           await allocatePaymentToUnpaidOrders({
             restaurantId,
-            customerId: receiptVoucherForm.customer_id,
+            customerId: receiptVoucherForm.actor_id,
             amount,
             voucherId: voucherId || null,
             allocations: voucherAllocations.map((a) => ({
@@ -762,7 +862,8 @@ export function CustomerManager({ restaurantId, currency }: Props) {
       setEditingReceiptVoucher(null);
       setVoucherAllocations([]);
       setReceiptVoucherForm({
-        customer_id: '',
+        actor_id: '',
+        actor_type: 'customer',
         customer_name: '',
         amount: '',
         payment_method: 'cash',

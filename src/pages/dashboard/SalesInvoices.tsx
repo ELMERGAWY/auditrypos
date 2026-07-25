@@ -61,7 +61,8 @@ export function SalesInvoices({ restaurantId, currency, restaurant, isSuperAdmin
     paid_amount: '',
     discount: '',
     notes: '',
-    delivery_date: ''
+    delivery_date: '',
+    invoice_date: new Date().toISOString().split('T')[0] // Default to today
   });
   const [editItems, setEditItems] = useState<any[]>([]);
   const [menuItems, setMenuItems] = useState<any[]>([]);
@@ -202,7 +203,7 @@ export function SalesInvoices({ restaurantId, currency, restaurant, isSuperAdmin
 
       toast.success('تم إنشاء الفاتورة وترحيلها محاسبياً ✅');
       setShowManualForm(false);
-      setForm({ customer_name: '', amount: '', description: '', payment_method: 'cash', customer_ref: '', paid_amount: '', discount: '', notes: '', delivery_date: '' });
+      setForm({ customer_name: '', amount: '', description: '', payment_method: 'cash', customer_ref: '', paid_amount: '', discount: '', notes: '', delivery_date: '', invoice_date: new Date().toISOString().split('T')[0] });
       setEditItems([]);
       loadInvoices();
     } catch (e: any) {
@@ -427,7 +428,7 @@ export function SalesInvoices({ restaurantId, currency, restaurant, isSuperAdmin
       setShowManualForm(false);
       setEditingInvoice(null);
       setEditItems([]);
-      setForm({ customer_name: '', amount: '', description: '', payment_method: 'cash', customer_ref: '', paid_amount: '', discount: '', notes: '', delivery_date: '' });
+      setForm({ customer_name: '', amount: '', description: '', payment_method: 'cash', customer_ref: '', paid_amount: '', discount: '', notes: '', delivery_date: '', invoice_date: new Date().toISOString().split('T')[0] });
       await loadInvoices();
     } catch (e: any) {
       console.error('Error updating invoice:', e);
@@ -512,7 +513,7 @@ export function SalesInvoices({ restaurantId, currency, restaurant, isSuperAdmin
       setShowManualForm(false);
       setEditingInvoice(null);
       setEditItems([]);
-      setForm({ customer_name: '', amount: '', description: '', payment_method: 'cash', customer_ref: '', paid_amount: '', discount: '', notes: '' });
+      setForm({ customer_name: '', amount: '', description: '', payment_method: 'cash', customer_ref: '', paid_amount: '', discount: '', notes: '', invoice_date: new Date().toISOString().split('T')[0] });
       loadInvoices();
     } catch (e: any) {
       toast.error('فشل إعادة إنشاء الفاتورة: ' + e.message);
@@ -678,6 +679,16 @@ export function SalesInvoices({ restaurantId, currency, restaurant, isSuperAdmin
               <h3 className="text-2xl font-black mb-6">{editingInvoice ? 'تعديل الفاتورة' : 'إنشاء فاتورة يدوية'}</h3>
 
               <div className="space-y-4">
+                <div>
+                  <Label className="mb-2 block">تاريخ الفاتورة</Label>
+                  <Input 
+                    type="date" 
+                    value={form.invoice_date} 
+                    onChange={e => setForm({ ...form, invoice_date: e.target.value })} 
+                    className="w-full"
+                  />
+                </div>
+
                 <div>
                   <Label className="mb-2 block">اسم العميل</Label>
                   <CustomerSearch
