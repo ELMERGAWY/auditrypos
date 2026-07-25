@@ -12,18 +12,28 @@ ALTER TABLE public.receipt_vouchers
 ADD COLUMN IF NOT EXISTS actor_type TEXT NOT NULL DEFAULT 'customer',
 ADD COLUMN IF NOT EXISTS actor_id UUID;
 
--- Migrate existing customer_id to actor_id
-UPDATE public.receipt_vouchers 
-SET actor_id = customer_id, actor_type = 'customer'
-WHERE customer_id IS NOT NULL;
-
--- Make actor_id NOT NULL after migration
-ALTER TABLE public.receipt_vouchers 
-ALTER COLUMN actor_id SET NOT NULL;
-
--- Drop the old customer_id column (after migration)
-ALTER TABLE public.receipt_vouchers 
-DROP COLUMN IF EXISTS customer_id;
+-- Migrate existing customer_id to actor_id (only if customer_id still exists)
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM information_schema.columns 
+    WHERE table_name = 'receipt_vouchers' 
+    AND column_name = 'customer_id'
+    AND table_schema = 'public'
+  ) THEN
+    UPDATE public.receipt_vouchers 
+    SET actor_id = customer_id, actor_type = 'customer'
+    WHERE customer_id IS NOT NULL;
+    
+    -- Make actor_id NOT NULL after migration
+    ALTER TABLE public.receipt_vouchers 
+    ALTER COLUMN actor_id SET NOT NULL;
+    
+    -- Drop the old customer_id column (after migration)
+    ALTER TABLE public.receipt_vouchers 
+    DROP COLUMN IF EXISTS customer_id;
+  END IF;
+END $$;
 
 -- Add constraint to ensure actor_type is valid
 ALTER TABLE public.receipt_vouchers 
@@ -38,18 +48,28 @@ ALTER TABLE public.payment_vouchers
 ADD COLUMN IF NOT EXISTS actor_type TEXT NOT NULL DEFAULT 'supplier',
 ADD COLUMN IF NOT EXISTS actor_id UUID;
 
--- Migrate existing supplier_id to actor_id
-UPDATE public.payment_vouchers 
-SET actor_id = supplier_id, actor_type = 'supplier'
-WHERE supplier_id IS NOT NULL;
-
--- Make actor_id NOT NULL after migration
-ALTER TABLE public.payment_vouchers 
-ALTER COLUMN actor_id SET NOT NULL;
-
--- Drop the old supplier_id column (after migration)
-ALTER TABLE public.payment_vouchers 
-DROP COLUMN IF EXISTS supplier_id;
+-- Migrate existing supplier_id to actor_id (only if supplier_id still exists)
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM information_schema.columns 
+    WHERE table_name = 'payment_vouchers' 
+    AND column_name = 'supplier_id'
+    AND table_schema = 'public'
+  ) THEN
+    UPDATE public.payment_vouchers 
+    SET actor_id = supplier_id, actor_type = 'supplier'
+    WHERE supplier_id IS NOT NULL;
+    
+    -- Make actor_id NOT NULL after migration
+    ALTER TABLE public.payment_vouchers 
+    ALTER COLUMN actor_id SET NOT NULL;
+    
+    -- Drop the old supplier_id column (after migration)
+    ALTER TABLE public.payment_vouchers 
+    DROP COLUMN IF EXISTS supplier_id;
+  END IF;
+END $$;
 
 -- Add constraint to ensure actor_type is valid
 ALTER TABLE public.payment_vouchers 
