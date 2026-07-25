@@ -10,8 +10,13 @@ ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW();
 ALTER TABLE public.journal_entry_lines 
 ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW();
 
--- Create or replace the handle_updated_at function
-CREATE OR REPLACE FUNCTION public.handle_updated_at()
+-- 1. Drop old triggers that might cause loops
+DROP TRIGGER IF EXISTS set_journal_entries_updated_at ON public.journal_entries;
+DROP TRIGGER IF EXISTS handle_journal_entries_updated_at ON public.journal_entries;
+DROP TRIGGER IF EXISTS journal_entries_updated_at ON public.journal_entries;
+
+-- 2. Create a simple and safe trigger function (BEFORE UPDATE)
+CREATE OR REPLACE FUNCTION public.update_updated_at_column()
 RETURNS TRIGGER
 LANGUAGE plpgsql
 AS $$
@@ -21,19 +26,21 @@ BEGIN
 END;
 $$;
 
--- Create triggers for journal_entries
-DROP TRIGGER IF EXISTS journal_entries_updated_at ON public.journal_entries;
-CREATE TRIGGER journal_entries_updated_at
-    BEFORE UPDATE ON public.journal_entries
-    FOR EACH ROW
-    EXECUTE FUNCTION public.handle_updated_at();
+-- 3. Attach the safe trigger to journal_entries table
+CREATE TRIGGER update_journal_entries_updated_at
+BEFORE UPDATE ON public.journal_entries
+FOR EACH ROW
+EXECUTE FUNCTION public.update_updated_at_column();
 
--- Create triggers for journal_entry_lines
+-- 4. Attach the same trigger to journal_entry_lines table
+DROP TRIGGER IF EXISTS set_journal_entry_lines_updated_at ON public.journal_entry_lines;
+DROP TRIGGER IF EXISTS handle_journal_entry_lines_updated_at ON public.journal_entry_lines;
 DROP TRIGGER IF EXISTS journal_entry_lines_updated_at ON public.journal_entry_lines;
-CREATE TRIGGER journal_entry_lines_updated_at
-    BEFORE UPDATE ON public.journal_entry_lines
-    FOR EACH ROW
-    EXECUTE FUNCTION public.handle_updated_at();
+
+CREATE TRIGGER update_journal_entry_lines_updated_at
+BEFORE UPDATE ON public.journal_entry_lines
+FOR EACH ROW
+EXECUTE FUNCTION public.update_updated_at_column();
 
 -- Add comment to document the fix
 COMMENT ON COLUMN public.journal_entries.updated_at IS 'Timestamp for last update, required for trigger functionality';
