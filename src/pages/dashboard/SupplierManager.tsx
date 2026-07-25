@@ -60,7 +60,8 @@ interface PaymentVoucher {
   id: string;
   voucher_number: string;
   voucher_date: string;
-  supplier_id: string;
+  actor_id: string;
+  actor_type: string;
   supplier_name: string;
   amount: number;
   payment_method: string;
@@ -94,7 +95,8 @@ export function SupplierManager({ restaurantId, currency }: Props) {
   const [showVoucherModal, setShowVoucherModal] = useState(false);
   const [editingVoucher, setEditingVoucher] = useState<PaymentVoucher | null>(null);
   const [voucherForm, setVoucherForm] = useState({
-    supplier_id: '',
+    actor_id: '',
+    actor_type: 'supplier',
     amount: '',
     payment_method: 'cash',
     reference_number: '',
@@ -165,7 +167,8 @@ export function SupplierManager({ restaurantId, currency }: Props) {
     const payAcc = accounts.find(acc => acc.code?.startsWith('21') || acc.name?.includes('مورد') || acc.name?.includes('دائنة'));
     setVoucherForm(prev => ({
       ...prev,
-      supplier_id: supplierId,
+      actor_id: supplierId,
+      actor_type: 'supplier',
       account_id: payAcc ? payAcc.id : prev.account_id,
       counter_account_id: payAcc ? payAcc.id : prev.counter_account_id
     }));
@@ -176,9 +179,10 @@ export function SupplierManager({ restaurantId, currency }: Props) {
       const { data, error } = await supabase
         .from('payment_vouchers')
         .select(`
-          id, voucher_number, voucher_date, supplier_id, amount, payment_method, 
+          id, voucher_number, voucher_date, actor_id, actor_type, amount, payment_method, 
           reference_number, notes, account_id, created_at,
-          suppliers(name)
+          suppliers(name),
+          customers(name)
         `)
         .eq('restaurant_id', restaurantId)
         .order('voucher_date', { ascending: false });
@@ -188,8 +192,9 @@ export function SupplierManager({ restaurantId, currency }: Props) {
         id: v.id,
         voucher_number: v.voucher_number,
         voucher_date: v.voucher_date,
-        supplier_id: v.supplier_id,
-        supplier_name: v.suppliers?.name || 'غير معروف',
+        actor_id: v.actor_id,
+        actor_type: v.actor_type || 'supplier',
+        supplier_name: v.actor_type === 'customer' ? (v.customers?.name || 'غير معروف') : (v.suppliers?.name || 'غير معروف'),
         amount: Number(v.amount),
         payment_method: v.payment_method,
         reference_number: v.reference_number,
@@ -434,7 +439,7 @@ export function SupplierManager({ restaurantId, currency }: Props) {
   };
 
   const handleSaveVoucher = async () => {
-    if (!voucherForm.supplier_id) {
+    if (!voucherForm.actor_id) {
       toast.error('يرجى اختيار المورد');
       return;
     }
@@ -447,7 +452,7 @@ export function SupplierManager({ restaurantId, currency }: Props) {
     try {
       const { error } = await supabase.rpc('save_payment_voucher', {
         p_restaurant_id: restaurantId,
-        p_supplier_id: voucherForm.supplier_id,
+        p_supplier_id: voucherForm.actor_id,
         p_amount: amount,
         p_payment_method: voucherForm.payment_method,
         p_voucher_date: voucherForm.voucher_date,
@@ -464,7 +469,8 @@ export function SupplierManager({ restaurantId, currency }: Props) {
       setShowVoucherModal(false);
       setEditingVoucher(null);
       setVoucherForm({
-        supplier_id: '',
+        actor_id: '',
+        actor_type: 'supplier',
         amount: '',
         payment_method: 'cash',
         reference_number: '',
@@ -1176,7 +1182,8 @@ export function SupplierManager({ restaurantId, currency }: Props) {
             <Button onClick={() => {
               setEditingVoucher(null);
               setVoucherForm({
-                supplier_id: '',
+                actor_id: '',
+                actor_type: 'supplier',
                 amount: '',
                 payment_method: 'cash',
                 reference_number: '',
@@ -1232,7 +1239,8 @@ export function SupplierManager({ restaurantId, currency }: Props) {
                               onClick={() => {
                                 setEditingVoucher(voucher);
                                 setVoucherForm({
-                                  supplier_id: voucher.supplier_id,
+                                  actor_id: voucher.actor_id,
+                                  actor_type: voucher.actor_type,
                                   amount: voucher.amount.toString(),
                                   payment_method: voucher.payment_method,
                                   reference_number: voucher.reference_number || '',
@@ -1277,7 +1285,7 @@ export function SupplierManager({ restaurantId, currency }: Props) {
             <div>
               <Label>المورد *</Label>
               <select
-                value={voucherForm.supplier_id}
+                value={voucherForm.actor_id}
                 onChange={(e) => handleSupplierChange(e.target.value)}
                 className="w-full h-10 rounded-md border border-input bg-background px-3"
               >
@@ -1337,7 +1345,7 @@ export function SupplierManager({ restaurantId, currency }: Props) {
                 </select>
               </div>
             </div>
-            {isPayableAccount(voucherForm.account_id) && voucherForm.supplier_id && (
+            {isPayableAccount(voucherForm.account_id) && voucherForm.actor_id && (
               <p className="text-xs text-primary bg-primary/5 p-2 rounded">
                 تم ربط حساب الموردين بالمورد المختار أعلاه تلقائياً
               </p>
