@@ -108,6 +108,10 @@ export function InventoryTab({ restaurantId, currency, businessType }: Props) {
   const [movementQty, setMovementQty] = useState('');
   const [movementType, setMovementType] = useState<'in' | 'out'>('in');
   const [movementReason, setMovementReason] = useState('');
+  const [showDeductionModal, setShowDeductionModal] = useState<Product | null>(null);
+  const [deductionQty, setDeductionQty] = useState('');
+  const [deductionType, setDeductionType] = useState<'direct' | 'cogs'>('direct');
+  const [deductionReason, setDeductionReason] = useState('');
   const [showReports, setShowReports] = useState(false);
   const [movements, setMovements] = useState<(StockMovement & { product_name?: string })[]>([]);
   const [showProductHistory, setShowProductHistory] = useState<Product | null>(null);
@@ -298,6 +302,64 @@ export function InventoryTab({ restaurantId, currency, businessType }: Props) {
       load();
     } catch (e: any) {
       console.error('Movement error:', e);
+      toast.error(`فشل: ${e?.message || 'تحقق من الصلاحيات'}`);
+    }
+  };
+
+  const handleDeduction = async () => {
+    if (!showDeductionModal || !deductionQty) return;
+    const qty = Number(deductionQty);
+    if (qty <= 0) return toast.error('الكمية يجب أن تكون أكبر من صفر');
+    if (qty > showDeductionModal.quantity) return toast.error('الكمية أكبر من الرصيد المتاح');
+
+    const newQty = Math.max(0, showDeductionModal.quantity - qty);
+    const totalCost = qty * showDeductionModal.cost_price;
+
+    try {
+      // Update product quantity
+      const { error: updErr } = await supabase.from('products').update({ quantity: newQty }).eq('id', showDeductionModal.id);
+      if (updErr) throw updErr;
+
+      // Log stock movement
+      const { error: mvErr } = await supabase.from('stock_movements').insert({
+        product_id: showDeductionModal.id,
+        restaurant_id: restaurantId,
+        type: 'out',
+        quantity: qty,
+        reason: deductionType === 'direct' ? `خصم مباشر: ${deductionReason}` : `هلاك/تلف (COGS): ${deductionReason}`,
+      });
+      if (mvErr) console.warn('stock_movements log failed:', mvErr.message);
+
+      // If COGS expense, create expense record
+      if (deductionType === 'cogs' && hasFeature(businessType, 'advanced_accounting')) {
+        try {
+          const { journalService } = await import('@/lib/accounting/journalService');
+          const cogsAcc = (await journalService.getAccountByCode(restaurantId, '5200'))?.id;
+          const inventoryAcc = (await journalService.getAccountByCode(restaurantId, '1300'))?.id;
+          
+          if (cogsAcc && inventoryAcc) {
+            await journalService.createJournalEntry(restaurantId, {
+              entry_date: new Date(),
+              description: `هلاك/تلف مخزون - ${showDeductionModal.name}: ${deductionReason}`,
+              source: 'inventory',
+              lines: [
+                { account_id: cogsAcc, debit: totalCost, credit: 0, description: 'تكلفة البضاعة المباعة - هلاك' },
+                { account_id: inventoryAcc, debit: 0, credit: totalCost, description: 'تخفيض المخزون - هلاك' }
+              ]
+            });
+          }
+        } catch (je: any) {
+          console.warn('Journal posting for COGS skipped:', je.message);
+        }
+      }
+
+      toast.success(deductionType === 'direct' ? 'تم الخصم المباشر' : 'تم تسجيل الهلاك كمصروف COGS');
+      setShowDeductionModal(null);
+      setDeductionQty('');
+      setDeductionReason('');
+      load();
+    } catch (e: any) {
+      console.error('Deduction error:', e);
       toast.error(`فشل: ${e?.message || 'تحقق من الصلاحيات'}`);
     }
   };
@@ -495,6 +557,7 @@ export function InventoryTab({ restaurantId, currency, businessType }: Props) {
                   <div className="flex gap-1">
                     <Button size="sm" variant="ghost" className="rounded-lg h-8 w-8 p-0" onClick={() => loadProductHistory(p)} title="سجل الحركة"><BarChart3 className="w-4 h-4" /></Button>
                     <Button size="sm" variant="ghost" className="rounded-lg h-8 w-8 p-0" onClick={() => setShowMovement(p)} title="حركة مخزون"><Package className="w-4 h-4" /></Button>
+                    <Button size="sm" variant="ghost" className="rounded-lg h-8 w-8 p-0 text-destructive hover:bg-destructive/10" onClick={() => setShowDeductionModal(p)} title="خصم مخزون"><ArrowUp className="w-4 h-4" /></Button>
                     <Button size="sm" variant="ghost" className="rounded-lg h-8 w-8 p-0" onClick={() => startEdit(p)}><Edit2 className="w-4 h-4" /></Button>
                     <Button size="sm" variant="ghost" className="rounded-lg h-8 w-8 p-0 text-destructive hover:bg-destructive/10" onClick={() => handleDelete(p.id)}><Trash2 className="w-4 h-4" /></Button>
                   </div>
@@ -1017,6 +1080,62 @@ export function InventoryTab({ restaurantId, currency, businessType }: Props) {
 
               <Button onClick={handleMovement} className="w-full h-12 rounded-2xl gradient-bg text-primary-foreground border-0 text-sm font-bold shadow-lg shadow-primary/20">
                 تأكيد وتنفيذ الحركة
+              </Button>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Stock Deduction Modal */}
+      <AnimatePresence>
+        {showDeductionModal && (
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 bg-background/80 backdrop-blur-sm flex items-center justify-center p-4"
+            onClick={() => setShowDeductionModal(null)}>
+            <motion.div initial={{ scale: 0.9, y: 20 }} animate={{ scale: 1, y: 0 }} exit={{ scale: 0.9, y: 20 }}
+              className="glass-card p-6 max-w-md w-full space-y-5 rounded-3xl shadow-2xl" onClick={e => e.stopPropagation()}>
+              <div className="flex items-center justify-between">
+                <h3 className="font-display font-bold text-lg text-destructive">خصم مخزون</h3>
+                <Button variant="ghost" size="sm" onClick={() => setShowDeductionModal(null)} className="rounded-full"><X className="w-5 h-5" /></Button>
+              </div>
+              
+              <div className="p-4 bg-destructive/10 rounded-2xl flex items-center gap-4">
+                <div className="w-12 h-12 rounded-xl bg-white flex items-center justify-center text-2xl shadow-sm">{showDeductionModal.image}</div>
+                <div>
+                  <p className="font-bold text-sm">{showDeductionModal.name}</p>
+                  <p className="text-xs text-muted-foreground">الرصيد: {showDeductionModal.quantity} {showDeductionModal.unit}</p>
+                </div>
+              </div>
+
+              <div className="flex rounded-xl bg-secondary/50 p-1">
+                <button onClick={() => setDeductionType('direct')} className={`flex-1 py-2.5 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1 ${deductionType === 'direct' ? 'bg-primary text-white shadow-md' : 'text-muted-foreground hover:bg-white/50'}`}>
+                  <ArrowUp className="w-4 h-4" /> خصم مباشر
+                </button>
+                <button onClick={() => setDeductionType('cogs')} className={`flex-1 py-2.5 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1 ${deductionType === 'cogs' ? 'bg-destructive text-white shadow-md' : 'text-muted-foreground hover:bg-white/50'}`}>
+                  <DollarSign className="w-4 h-4" /> هلاك (COGS)
+                </button>
+              </div>
+
+              <div className="space-y-3">
+                <div>
+                  <Label className="text-xs mb-1 block mr-1">الكمية</Label>
+                  <Input placeholder="0.00" type="number" step="0.01" value={deductionQty} onChange={e => setDeductionQty(e.target.value)} className="h-11 rounded-xl" />
+                </div>
+
+                <div>
+                  <Label className="text-xs mb-1 block mr-1">السبب / ملاحظات</Label>
+                  <Input placeholder={deductionType === 'direct' ? 'مثال: خطأ في الجرد، تلف' : 'مثال: تلف، انتهاء صلاحية'} value={deductionReason} onChange={e => setDeductionReason(e.target.value)} className="h-11 rounded-xl" />
+                </div>
+
+                {deductionType === 'cogs' && (
+                  <div className="p-3 bg-amber-500/10 rounded-xl text-xs text-amber-700">
+                    <p>سيتم تسجيل هذا الخصم كمصروف تكلفة البضاعة المباعة (COGS) في القيود المحاسبية.</p>
+                  </div>
+                )}
+              </div>
+
+              <Button onClick={handleDeduction} className="w-full h-12 rounded-2xl bg-destructive text-white border-0 text-sm font-bold shadow-lg shadow-destructive/20">
+                تأكيد الخصم
               </Button>
             </motion.div>
           </motion.div>
