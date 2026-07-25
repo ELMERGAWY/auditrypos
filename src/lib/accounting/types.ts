@@ -59,6 +59,8 @@ export interface JournalEntryLine {
   description?: string;
   cost_center_id?: string;
   line_order: number;
+  customer_id?: string; // Sub-ledger linking for customer transactions
+  vendor_id?: string; // Sub-ledger linking for vendor transactions
 }
 
 export interface CostCenter {

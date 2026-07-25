@@ -159,71 +159,36 @@ class JournalService {
     entry: any
   ): Promise<JournalEntry | null> {
     try {
-      const entryNumber = await this.getNextEntryNumber(restaurantId);
-      
-      // Validate balance
-      const totalDebit = entry.lines.reduce((sum, l) => sum + (l.debit || 0), 0);
-      const totalCredit = entry.lines.reduce((sum, l) => sum + (l.credit || 0), 0);
-      
-      if (Math.abs(totalDebit - totalCredit) > 0.001) {
-        throw new Error(`Journal entry must balance: Debit ${totalDebit} ≠ Credit ${totalCredit}`);
+      // Use the transaction RPC function for atomic journal entry creation
+      const { data: result, error: rpcError } = await supabase.rpc('create_journal_entry_with_transaction', {
+        p_restaurant_id: restaurantId,
+        p_entry_date: entry.entry_date.toISOString(),
+        p_reference_type: entry.reference_type,
+        p_reference_id: entry.reference_id || null,
+        p_description: entry.description,
+        p_source: entry.source,
+        p_is_posted: entry.is_posted ?? false,
+        p_lines: JSON.stringify(entry.lines),
+      });
+
+      if (rpcError || !result?.success) {
+        throw new Error(result?.error || rpcError?.message || 'فشل في إنشاء القيد المحاسبي');
       }
 
-      // Insert journal entry
-      const { data: journalData, error: journalError } = await supabase
+      // Fetch the created entry with its lines
+      const { data: entryData, error: fetchError } = await supabase
         .from('journal_entries')
-        .insert({
-          restaurant_id: restaurantId,
-          entry_number: entryNumber,
-          entry_date: entry.entry_date,
-          reference_type: entry.reference_type,
-          reference_id: entry.reference_id,
-          description: entry.description,
-          source: entry.source,
-          total_debit: totalDebit,
-          total_credit: totalCredit,
-          is_posted: entry.is_posted ?? false,
-          created_by: entry.created_by,
-        })
-        .select()
+        .select('*, lines(*)')
+        .eq('id', result.entry_id)
         .single();
 
-      if (journalError || !journalData) {
-        throw new Error(`Failed to create journal entry: ${journalError?.message}`);
+      if (fetchError) {
+        throw new Error(`Failed to fetch created journal entry: ${fetchError.message}`);
       }
 
-      // Insert journal lines
-      const linesWithEntryId = entry.lines.map((line, index) => ({
-        entry_id: journalData.id,
-        account_id: line.account_id,
-        debit: line.debit || 0,
-        credit: line.credit || 0,
-        description: line.description,
-        line_order: index,
-      }));
-
-      const { error: linesError } = await supabase
-        .from('journal_entry_lines')
-        .insert(linesWithEntryId);
-
-      if (linesError) {
-        // Rollback - delete the journal entry
-        await supabase.from('journal_entries').delete().eq('id', journalData.id);
-        throw new Error(`Failed to create journal lines: ${linesError.message}`);
-      }
-
-      // Update account balances - skip RPC call to avoid stack depth error
-      // Triggers in database will handle balance updates automatically
-      // await Promise.all(entry.lines.map(line =>
-      //   this.updateAccountBalance(line.account_id, line.debit || 0, line.credit || 0)
-      // ));
-
-      toast.success(`تم إنشاء قيد يومية ${entryNumber}`);
+      toast.success(`تم إنشاء قيد يومية ${result.entry_number}`);
       
-      return {
-        ...journalData,
-        lines: [], // Will be loaded separately if needed
-      } as JournalEntry;
+      return entryData as JournalEntry;
 
     } catch (error: any) {
       console.error('Journal entry creation failed:', error);
@@ -307,7 +272,13 @@ class JournalService {
     const remaining = order.total - paidAmount;
     const totalWithDiscount = order.total + (order.discount || 0);
 
-    // 1. Debit: Cash/Bank for paid amount
+    // STANDARD DOUBLE-ENTRY STRUCTURE FOR SALES INVOICES:
+    // Debit: Cash/Bank Account (paid_amount only)
+    // Debit: Customer Account (remaining_amount) - with customerId
+    // Credit: Sales Revenue Account (total_amount including tax)
+    // Credit: Tax Payable Account (tax_amount only)
+
+    // 1. Debit: Cash/Bank for paid amount only
     if (paidAmount > 0) {
       lines.push({
         account_id: cashAcc.id,
@@ -318,7 +289,7 @@ class JournalService {
       });
     }
 
-    // 2. Debit: Accounts Receivable for remaining
+    // 2. Debit: Accounts Receivable for remaining amount - WITH CUSTOMER LINK
     if (remaining > 0 && arAcc) {
       lines.push({
         account_id: arAcc.id,
@@ -326,19 +297,20 @@ class JournalService {
         credit: 0,
         description: `ذمم مدينة - فاتورة ${order.order_number}`,
         line_order: 2,
+        customer_id: order.customer_id || null, // Sub-ledger linking
       });
     }
 
-    // 3. Credit: Revenue Account
+    // 3. Credit: Revenue Account (total amount including tax)
     lines.push({
       account_id: salesAcc.id,
       debit: 0,
-      credit: totalWithDiscount - taxAmount,
+      credit: totalWithDiscount,
       description: `إيرادات ${businessType} - ${order.order_number}`,
       line_order: 3,
     });
 
-    // 4. Credit: Tax Payable
+    // 4. Credit: Tax Payable (tax amount only)
     if (taxAmount > 0 && taxAcc) {
       lines.push({
         account_id: taxAcc.id,
@@ -349,16 +321,19 @@ class JournalService {
       });
     }
 
-    // 5. Debit: Sales Discount (if any)
-    if (order.discount > 0) {
-      const discountAcc = await this.getAccountByCode(restaurantId, '4120') || salesAcc;
-      lines.push({
-        account_id: discountAcc.id,
-        debit: order.discount,
-        credit: 0,
-        description: `خصم مبيعات - ${order.order_number}`,
-        line_order: 5,
+    // VALIDATION: Ensure total debit equals total credit
+    const totalDebit = lines.reduce((sum, line) => sum + (line.debit || 0), 0);
+    const totalCredit = lines.reduce((sum, line) => sum + (line.credit || 0), 0);
+    
+    if (Math.abs(totalDebit - totalCredit) > 0.01) {
+      console.error('Journal entry validation failed: Debit != Credit', {
+        totalDebit,
+        totalCredit,
+        difference: totalDebit - totalCredit,
+        orderNumber: order.order_number,
       });
+      toast.error(`خطأ في التوازن المحاسبي للفاتورة ${order.order_number}: المدين=${totalDebit.toFixed(2)}، الدائن=${totalCredit.toFixed(2)}`);
+      return null;
     }
 
     // Create the journal entry
@@ -392,6 +367,7 @@ class JournalService {
       taxAmount: number;
       cogs?: number;
       customerId?: string;
+      refundAmount: number; // Amount refunded in cash
       reason: string;
     },
     businessType: string
@@ -404,7 +380,15 @@ class JournalService {
     const salesAcc = await this.getAccountByCode(restaurantId, mapping.salesRevenue);
     const taxAcc = await this.getAccountByCode(restaurantId, mapping.taxPayable);
 
-    // Debit: Sales (Return)
+    const remainingCredit = returnData.amount - returnData.refundAmount;
+
+    // STANDARD DOUBLE-ENTRY STRUCTURE FOR SALES RETURNS:
+    // Debit: Sales Revenue Account (amount excluding tax)
+    // Debit: Tax Payable Account (tax amount)
+    // Credit: Cash/Bank Account (refund_amount only)
+    // Credit: Customer Account (remaining_credit) - with customerId
+
+    // 1. Debit: Sales Revenue (amount excluding tax)
     lines.push({
       account_id: salesAcc?.id || '',
       debit: returnData.amount - returnData.taxAmount,
@@ -413,7 +397,7 @@ class JournalService {
       line_order: 1,
     });
 
-    // Debit: Tax Payable (Reverse)
+    // 2. Debit: Tax Payable (Reverse tax)
     if (returnData.taxAmount > 0 && taxAcc) {
       lines.push({
         account_id: taxAcc.id,
@@ -424,23 +408,42 @@ class JournalService {
       });
     }
 
-    // Credit: Cash or AR
-    if (returnData.customerId && arAcc) {
-      lines.push({
-        account_id: arAcc.id,
-        debit: 0,
-        credit: returnData.amount,
-        description: `تخفيض مديونية عميل - مردودات ${returnData.orderNumber}`,
-        line_order: 3,
-      });
-    } else if (cashAcc) {
+    // 3. Credit: Cash/Bank for refund amount only
+    if (returnData.refundAmount > 0 && cashAcc) {
       lines.push({
         account_id: cashAcc.id,
         debit: 0,
-        credit: returnData.amount,
+        credit: returnData.refundAmount,
         description: `رد نقدية - مردودات ${returnData.orderNumber}`,
         line_order: 3,
       });
+    }
+
+    // 4. Credit: Accounts Receivable for remaining credit - WITH CUSTOMER LINK
+    if (remainingCredit > 0 && returnData.customerId && arAcc) {
+      lines.push({
+        account_id: arAcc.id,
+        debit: 0,
+        credit: remainingCredit,
+        description: `تخفيض مديونية عميل - مردودات ${returnData.orderNumber}`,
+        line_order: 4,
+        customer_id: returnData.customerId, // Sub-ledger linking
+      });
+    }
+
+    // VALIDATION: Ensure total debit equals total credit
+    const totalDebit = lines.reduce((sum, line) => sum + (line.debit || 0), 0);
+    const totalCredit = lines.reduce((sum, line) => sum + (line.credit || 0), 0);
+    
+    if (Math.abs(totalDebit - totalCredit) > 0.01) {
+      console.error('Sales return journal entry validation failed: Debit != Credit', {
+        totalDebit,
+        totalCredit,
+        difference: totalDebit - totalCredit,
+        orderNumber: returnData.orderNumber,
+      });
+      toast.error(`خطأ في التوازن المحاسبي لمردودات المبيعات: المدين=${totalDebit.toFixed(2)}، الدائن=${totalCredit.toFixed(2)}`);
+      return null;
     }
 
     const entry = await this.createJournalEntry(restaurantId, {
@@ -483,7 +486,8 @@ class JournalService {
       supplierId: string;
       supplierName: string;
       amount: number;
-      isCredit: boolean;
+      paidAmount: number;
+      taxAmount: number;
       description: string;
     },
     businessType: string
@@ -494,10 +498,20 @@ class JournalService {
     const invAcc = await this.getAccountByCode(restaurantId, mapping.inventoryAccount);
     const cashAcc = await this.getAccountByCode(restaurantId, mapping.cashAccount);
     const apAcc = await this.getAccountByCode(restaurantId, mapping.accountsPayable);
+    const taxAcc = await this.getAccountByCode(restaurantId, mapping.taxPayable);
 
     if (!invAcc) return null;
 
-    // Debit: Inventory
+    const paidAmount = purchase.paidAmount || 0;
+    const remaining = purchase.amount - paidAmount;
+
+    // STANDARD DOUBLE-ENTRY STRUCTURE FOR PURCHASE INVOICES:
+    // Debit: Inventory/Purchases Account (total_amount)
+    // Credit: Cash/Bank Account (paid_amount only)
+    // Credit: Vendor Account (remaining_amount) - with vendorId
+    // Credit: Tax Payable Account (tax_amount only)
+
+    // 1. Debit: Inventory/Purchases Account (total amount)
     lines.push({
       account_id: invAcc.id,
       debit: purchase.amount,
@@ -506,23 +520,53 @@ class JournalService {
       line_order: 1,
     });
 
-    // Credit: Cash or Accounts Payable
-    if (purchase.isCredit && apAcc) {
-      lines.push({
-        account_id: apAcc.id,
-        debit: 0,
-        credit: purchase.amount,
-        description: `ذمم موردين - ${purchase.supplierName}`,
-        line_order: 2,
-      });
-    } else if (cashAcc) {
+    // 2. Credit: Cash/Bank for paid amount only
+    if (paidAmount > 0 && cashAcc) {
       lines.push({
         account_id: cashAcc.id,
         debit: 0,
-        credit: purchase.amount,
+        credit: paidAmount,
         description: `دفع نقدي للمورد - ${purchase.supplierName}`,
         line_order: 2,
       });
+    }
+
+    // 3. Credit: Accounts Payable for remaining amount - WITH VENDOR LINK
+    if (remaining > 0 && apAcc) {
+      lines.push({
+        account_id: apAcc.id,
+        debit: 0,
+        credit: remaining,
+        description: `ذمم موردين - ${purchase.supplierName}`,
+        line_order: 3,
+        vendor_id: purchase.supplierId || null, // Sub-ledger linking
+      });
+    }
+
+    // 4. Credit: Tax Payable (tax amount only)
+    if (purchase.taxAmount > 0 && taxAcc) {
+      lines.push({
+        account_id: taxAcc.id,
+        debit: 0,
+        credit: purchase.taxAmount,
+        description: `ضريبة القيمة المضافة على المشتريات`,
+        line_order: 4,
+      });
+    }
+
+    // VALIDATION: Ensure total debit equals total credit
+    const totalDebit = lines.reduce((sum, line) => sum + (line.debit || 0), 0);
+    const totalCredit = lines.reduce((sum, line) => sum + (line.credit || 0), 0);
+    
+    if (Math.abs(totalDebit - totalCredit) > 0.01) {
+      console.error('Purchase journal entry validation failed: Debit != Credit', {
+        totalDebit,
+        totalCredit,
+        difference: totalDebit - totalCredit,
+        purchaseId: purchase.id,
+      });
+      toast.error(`خطأ في التوازن المحاسبي لفاتورة المشتريات: المدين=${totalDebit.toFixed(2)}، الدائن=${totalCredit.toFixed(2)}`);
+      return null;
     }
 
     return this.createJournalEntry(restaurantId, {
@@ -574,55 +618,156 @@ class JournalService {
           account_id: inventoryAcc.id,
           debit: 0,
           credit: cogs,
-          description: `إنقاص مخزون - ${order.order_number}`,
+          description: `تخفيض المخزون - ${order.order_number}`,
           line_order: 2,
         },
       ],
     });
   }
 
-  async createDeliveryJournalEntry(
+  async createReceiptVoucherJournalEntry(
     restaurantId: string,
-    order: Order,
-    deliveryFee: number,
-    businessType: string
+    businessType: string,
+    voucher: {
+      id: string;
+      voucherNumber: string;
+      amount: number;
+      customerId: string;
+      customerName: string;
+      paymentMethod: string;
+      description: string;
+    }
   ): Promise<JournalEntry | null> {
-    if (deliveryFee <= 0) return null;
-
     const mapping = this.getBusinessMapping(businessType);
-    const cashAcc = await this.getAccountByCode(restaurantId, mapping.cashAccount);
-    const deliveryRevAcc = await this.getAccountByCode(restaurantId, mapping.deliveryRevenue || '4300');
+    const lines: Omit<JournalEntryLine, 'id' | 'entry_id'>[] = [];
 
-    if (!cashAcc || !deliveryRevAcc) return null;
+    const cashAcc = await this.getAccountByCode(restaurantId, mapping.cashAccount);
+    const arAcc = await this.getAccountByCode(restaurantId, mapping.accountsReceivable);
+
+    if (!cashAcc || !arAcc) return null;
+
+    // STANDARD DOUBLE-ENTRY STRUCTURE FOR RECEIPT VOUCHERS:
+    // Debit: Cash/Bank Account (amount)
+    // Credit: Customer Account (amount) - with customerId
+
+    // 1. Debit: Cash/Bank Account
+    lines.push({
+      account_id: cashAcc.id,
+      debit: voucher.amount,
+      credit: 0,
+      description: `سند قبض #${voucher.voucherNumber} - ${voucher.customerName}`,
+      line_order: 1,
+    });
+
+    // 2. Credit: Accounts Receivable - WITH CUSTOMER LINK
+    lines.push({
+      account_id: arAcc.id,
+      debit: 0,
+      credit: voucher.amount,
+      description: `تحصيل من عميل - سند قبض #${voucher.voucherNumber}`,
+      line_order: 2,
+      customer_id: voucher.customerId, // Sub-ledger linking
+    });
+
+    // VALIDATION: Ensure total debit equals total credit
+    const totalDebit = lines.reduce((sum, line) => sum + (line.debit || 0), 0);
+    const totalCredit = lines.reduce((sum, line) => sum + (line.credit || 0), 0);
+    
+    if (Math.abs(totalDebit - totalCredit) > 0.01) {
+      console.error('Receipt voucher journal entry validation failed: Debit != Credit', {
+        totalDebit,
+        totalCredit,
+        difference: totalDebit - totalCredit,
+        voucherNumber: voucher.voucherNumber,
+      });
+      toast.error(`خطأ في التوازن المحاسبي لسند القبض: المدين=${totalDebit.toFixed(2)}، الدائن=${totalCredit.toFixed(2)}`);
+      return null;
+    }
 
     return this.createJournalEntry(restaurantId, {
       entry_date: new Date(),
-      reference_type: 'order',
-      reference_id: order.id,
-      description: `رسوم توصيل - ${order.order_number}`,
-      source: 'pos',
+      reference_type: 'receipt_voucher',
+      reference_id: voucher.id,
+      description: `سند قبض #${voucher.voucherNumber} - ${voucher.customerName}`,
+      source: 'manual',
       is_posted: true,
-      lines: [
-        {
-          account_id: cashAcc.id,
-          debit: deliveryFee,
-          credit: 0,
-          description: `استلام رسوم توصيل`,
-          line_order: 1,
-        },
-        {
-          account_id: deliveryRevAcc.id,
-          debit: 0,
-          credit: deliveryFee,
-          description: `إيرادات توصيل`,
-          line_order: 2,
-        },
-      ],
+      lines,
+    });
+  }
+
+  async createPaymentVoucherJournalEntry(
+    restaurantId: string,
+    businessType: string,
+    voucher: {
+      id: string;
+      voucherNumber: string;
+      amount: number;
+      vendorId: string;
+      vendorName: string;
+      paymentMethod: string;
+      description: string;
+    }
+  ): Promise<JournalEntry | null> {
+    const mapping = this.getBusinessMapping(businessType);
+    const lines: Omit<JournalEntryLine, 'id' | 'entry_id'>[] = [];
+
+    const cashAcc = await this.getAccountByCode(restaurantId, mapping.cashAccount);
+    const apAcc = await this.getAccountByCode(restaurantId, mapping.accountsPayable);
+
+    if (!cashAcc || !apAcc) return null;
+
+    // STANDARD DOUBLE-ENTRY STRUCTURE FOR PAYMENT VOUCHERS:
+    // Debit: Vendor Account (amount) - with vendorId
+    // Credit: Cash/Bank Account (amount)
+
+    // 1. Debit: Accounts Payable - WITH VENDOR LINK
+    lines.push({
+      account_id: apAcc.id,
+      debit: voucher.amount,
+      credit: 0,
+      description: `سداد للمورد - سند صرف #${voucher.voucherNumber}`,
+      line_order: 1,
+      vendor_id: voucher.vendorId, // Sub-ledger linking
+    });
+
+    // 2. Credit: Cash/Bank Account
+    lines.push({
+      account_id: cashAcc.id,
+      debit: 0,
+      credit: voucher.amount,
+      description: `سند صرف #${voucher.voucherNumber} - ${voucher.vendorName}`,
+      line_order: 2,
+    });
+
+    // VALIDATION: Ensure total debit equals total credit
+    const totalDebit = lines.reduce((sum, line) => sum + (line.debit || 0), 0);
+    const totalCredit = lines.reduce((sum, line) => sum + (line.credit || 0), 0);
+    
+    if (Math.abs(totalDebit - totalCredit) > 0.01) {
+      console.error('Payment voucher journal entry validation failed: Debit != Credit', {
+        totalDebit,
+        totalCredit,
+        difference: totalDebit - totalCredit,
+        voucherNumber: voucher.voucherNumber,
+      });
+      toast.error(`خطأ في التوازن المحاسبي لسند الصرف: المدين=${totalDebit.toFixed(2)}، الدائن=${totalCredit.toFixed(2)}`);
+      return null;
+    }
+
+    return this.createJournalEntry(restaurantId, {
+      entry_date: new Date(),
+      reference_type: 'payment_voucher',
+      reference_id: voucher.id,
+      description: `سند صرف #${voucher.voucherNumber} - ${voucher.vendorName}`,
+      source: 'manual',
+      is_posted: true,
+      lines,
     });
   }
 
   async createExpenseJournalEntry(
     restaurantId: string,
+    businessType: string,
     expense: {
       amount: number;
       description: string;
@@ -631,7 +776,7 @@ class JournalService {
       date?: Date;
     }
   ): Promise<JournalEntry | null> {
-    const mapping = this.getBusinessMapping('general');
+    const mapping = this.getBusinessMapping(businessType);
     
     // Map expense category to account
     const categoryToAccount: Record<string, string> = {
@@ -769,6 +914,109 @@ class JournalService {
     });
 
     return entry;
+  }
+
+  // ============================================================
+  // REVERSAL & ROLLBACK
+  // ============================================================
+
+  async reverseJournalEntry(
+    restaurantId: string,
+    originalEntryId: string,
+    reason: string
+  ): Promise<JournalEntry | null> {
+    // Fetch the original journal entry with its lines
+    const { data: originalEntry, error: fetchError } = await supabase
+      .from('journal_entries')
+      .select('*, lines(*)')
+      .eq('id', originalEntryId)
+      .single();
+
+    if (fetchError || !originalEntry) {
+      console.error('Failed to fetch original journal entry for reversal:', fetchError);
+      toast.error('فشل في جلب القيد المحاسبي الأصلي للعكس');
+      return null;
+    }
+
+    if (!originalEntry.is_posted) {
+      console.warn('Cannot reverse an unposted entry');
+      toast.error('لا يمكن عكس قيد غير مرحل');
+      return null;
+    }
+
+    // Create reversal lines (swap debit and credit)
+    const reversalLines: Omit<JournalEntryLine, 'id' | 'entry_id'>[] = originalEntry.lines.map((line: any) => ({
+      account_id: line.account_id,
+      debit: line.credit, // Swap: original credit becomes debit
+      credit: line.debit, // Swap: original debit becomes credit
+      description: `عكس: ${line.description}`,
+      line_order: line.line_order,
+      customer_id: line.customer_id || null,
+      vendor_id: line.vendor_id || null,
+    }));
+
+    // VALIDATION: Ensure total debit equals total credit in reversal
+    const totalDebit = reversalLines.reduce((sum, line) => sum + (line.debit || 0), 0);
+    const totalCredit = reversalLines.reduce((sum, line) => sum + (line.credit || 0), 0);
+    
+    if (Math.abs(totalDebit - totalCredit) > 0.01) {
+      console.error('Reversal journal entry validation failed: Debit != Credit', {
+        totalDebit,
+        totalCredit,
+        difference: totalDebit - totalCredit,
+        originalEntryId,
+      });
+      toast.error(`خطأ في التوازن المحاسبي للعكس: المدين=${totalDebit.toFixed(2)}، الدائن=${totalCredit.toFixed(2)}`);
+      return null;
+    }
+
+    // Create the reversal entry
+    const reversalEntry = await this.createJournalEntry(restaurantId, {
+      entry_date: new Date(),
+      reference_type: originalEntry.reference_type,
+      reference_id: originalEntry.reference_id,
+      description: `عكس قيد #${originalEntry.entry_number} - ${reason}`,
+      source: 'reversal',
+      is_posted: true,
+      lines: reversalLines,
+    });
+
+    if (reversalEntry) {
+      // Mark original entry as reversed
+      await supabase
+        .from('journal_entries')
+        .update({ is_reversed: true, reversal_entry_id: reversalEntry.id })
+        .eq('id', originalEntryId);
+    }
+
+    return reversalEntry;
+  }
+
+  async deleteJournalEntryWithReversal(
+    restaurantId: string,
+    entryId: string,
+    reason: string
+  ): Promise<boolean> {
+    // First reverse the entry
+    const reversal = await this.reverseJournalEntry(restaurantId, entryId, reason);
+    
+    if (!reversal) {
+      return false;
+    }
+
+    // Then mark the original entry as deleted (soft delete)
+    const { error: updateError } = await supabase
+      .from('journal_entries')
+      .update({ is_deleted: true, deleted_at: new Date().toISOString() })
+      .eq('id', entryId);
+
+    if (updateError) {
+      console.error('Failed to mark journal entry as deleted:', updateError);
+      toast.error('فشل في حذف القيد المحاسبي');
+      return false;
+    }
+
+    return true;
   }
 
   // ============================================================
