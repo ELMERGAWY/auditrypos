@@ -358,12 +358,12 @@ export function InvoiceViewer({
                     </>
                   )}
                   {printSettings.dateTime && (
-                    <div className="flex items-center gap-1 text-[10px] opacity-90 mt-2">
-                      <Calendar className="w-3 h-3" />
+                    <div className="flex items-center gap-1 text-xs font-bold text-primary mt-2">
+                      <Calendar className="w-4 h-4" />
+                      تاريخ الفاتورة:
                       {record?.created_at
-                        ? new Date(record.created_at).toLocaleString('ar-EG', {
-                            year: 'numeric', month: 'short', day: 'numeric',
-                            hour: '2-digit', minute: '2-digit'
+                        ? new Date(record.created_at).toLocaleDateString('ar-EG', {
+                            year: 'numeric', month: 'long', day: 'numeric'
                           })
                         : '—'}
                     </div>
