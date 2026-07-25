@@ -181,11 +181,24 @@ export function SalesInvoices({ restaurantId, currency, restaurant, isSuperAdmin
 
       // 3. Ensure Accounting & Create Journal Entry
       await journalService.ensureAccountingSetup(restaurantId, currency);
-      await journalService.createSaleJournalEntry(restaurantId, {
-        ...order,
-        items: editItems,
-        paid_amount: paidAmount
-      }, 'retail');
+      
+      // Check if journal entry already exists to prevent duplicates
+      const { data: existingJournal } = await supabase
+        .from('journal_entries')
+        .select('id')
+        .eq('restaurant_id', restaurantId)
+        .eq('reference_type', 'order')
+        .eq('reference_id', order.id)
+        .limit(1)
+        .maybeSingle();
+
+      if (!existingJournal?.id) {
+        await journalService.createSaleJournalEntry(restaurantId, {
+          ...order,
+          items: editItems,
+          paid_amount: paidAmount
+        }, 'retail');
+      }
 
       toast.success('تم إنشاء الفاتورة وترحيلها محاسبياً ✅');
       setShowManualForm(false);
@@ -476,11 +489,24 @@ export function SalesInvoices({ restaurantId, currency, restaurant, isSuperAdmin
 
       // Create journal entry
       await journalService.ensureAccountingSetup(restaurantId, currency);
-      await journalService.createSaleJournalEntry(restaurantId, {
-        ...newOrder,
-        items: editItems,
-        paid_amount: paidAmount
-      }, 'retail');
+      
+      // Check if journal entry already exists to prevent duplicates
+      const { data: existingJournal } = await supabase
+        .from('journal_entries')
+        .select('id')
+        .eq('restaurant_id', restaurantId)
+        .eq('reference_type', 'order')
+        .eq('reference_id', newOrder.id)
+        .limit(1)
+        .maybeSingle();
+
+      if (!existingJournal?.id) {
+        await journalService.createSaleJournalEntry(restaurantId, {
+          ...newOrder,
+          items: editItems,
+          paid_amount: paidAmount
+        }, 'retail');
+      }
 
       toast.success('تم إعادة إنشاء الفاتورة وترحيلها محاسبياً بنجاح ✅');
       setShowManualForm(false);
