@@ -1,6 +1,7 @@
 -- Migration: Fix Journal Entries updated_at Column
 -- This migration adds the missing updated_at column to journal_entries and journal_entry_lines tables
 -- to fix the trigger error: "record 'new' has no field 'updated_at'"
+-- Also drops problematic triggers that were causing infinite loops
 
 -- Add updated_at column to journal_entries if it doesn't exist
 ALTER TABLE public.journal_entries 
@@ -10,12 +11,25 @@ ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW();
 ALTER TABLE public.journal_entry_lines 
 ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW();
 
--- 1. Drop old triggers that might cause loops
+-- 1. Drop the catastrophic triggers that cause calculation loops
+DROP TRIGGER IF EXISTS trg_recalc_journal_totals_ins ON public.journal_entries;
+DROP TRIGGER IF EXISTS trg_recalc_journal_totals_upd ON public.journal_entries;
+DROP TRIGGER IF EXISTS trg_recalc_journal_totals_del ON public.journal_entries;
+
+-- 2. Drop duplicate balance check triggers, keep only one
+DROP TRIGGER IF EXISTS trg_journal_entry_balance_check ON public.journal_entries;
+DROP TRIGGER IF EXISTS trg_journal_entry_balance_validation ON public.journal_entries;
+
+-- 3. Drop any other redundant triggers
+DROP TRIGGER IF EXISTS trg_validate_journal_balance ON public.journal_entries;
+DROP TRIGGER IF EXISTS trg_validate_journal_header ON public.journal_entries;
+
+-- 4. Drop old updated_at triggers that might cause loops
 DROP TRIGGER IF EXISTS set_journal_entries_updated_at ON public.journal_entries;
 DROP TRIGGER IF EXISTS handle_journal_entries_updated_at ON public.journal_entries;
 DROP TRIGGER IF EXISTS journal_entries_updated_at ON public.journal_entries;
 
--- 2. Create a simple and safe trigger function (BEFORE UPDATE)
+-- 5. Create a simple and safe trigger function (BEFORE UPDATE)
 CREATE OR REPLACE FUNCTION public.update_updated_at_column()
 RETURNS TRIGGER
 LANGUAGE plpgsql
@@ -26,13 +40,13 @@ BEGIN
 END;
 $$;
 
--- 3. Attach the safe trigger to journal_entries table
+-- 6. Attach the safe trigger to journal_entries table
 CREATE TRIGGER update_journal_entries_updated_at
 BEFORE UPDATE ON public.journal_entries
 FOR EACH ROW
 EXECUTE FUNCTION public.update_updated_at_column();
 
--- 4. Attach the same trigger to journal_entry_lines table
+-- 7. Attach the same trigger to journal_entry_lines table
 DROP TRIGGER IF EXISTS set_journal_entry_lines_updated_at ON public.journal_entry_lines;
 DROP TRIGGER IF EXISTS handle_journal_entry_lines_updated_at ON public.journal_entry_lines;
 DROP TRIGGER IF EXISTS journal_entry_lines_updated_at ON public.journal_entry_lines;
