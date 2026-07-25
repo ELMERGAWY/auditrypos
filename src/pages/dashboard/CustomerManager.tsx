@@ -547,6 +547,14 @@ export function CustomerManager({ restaurantId, currency }: Props) {
           .eq('customer_id', c.id)
           .neq('type', 'sale'); // Exclude 'sale' type as it's redundant with orders
         
+        // Get payment vouchers (refunds) for this customer
+        const { data: paymentVouchersData } = await supabase
+          .from('payment_vouchers')
+          .select('id, voucher_date, amount')
+          .eq('actor_id', c.id)
+          .eq('actor_type', 'customer')
+          .eq('restaurant_id', restaurantId);
+        
         // Build and sort all transactions by date
         const allTransactions: any[] = [];
         
@@ -577,6 +585,16 @@ export function CustomerManager({ restaurantId, currency }: Props) {
             date: tx.created_at,
             debit: tx.type === 'debit' ? Math.abs(amount) : 0,
             credit: tx.type !== 'debit' ? Math.abs(amount) : 0
+          });
+        });
+        
+        // Add payment vouchers (refunds) as debit transactions
+        paymentVouchersData?.forEach((voucher: any) => {
+          const amount = Number(voucher.amount) || 0;
+          allTransactions.push({
+            date: voucher.voucher_date,
+            debit: amount,
+            credit: 0
           });
         });
         
