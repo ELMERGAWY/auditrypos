@@ -8,7 +8,7 @@ CREATE OR REPLACE FUNCTION create_journal_entry_with_transaction(
   p_reference_id UUID,
   p_description TEXT,
   p_source TEXT,
-  p_is_posted BOOLEAN DEFAULT TRUE,
+  p_is_posted BOOLEAN,
   p_lines JSONB
 )
 RETURNS JSONB
