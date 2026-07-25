@@ -426,7 +426,7 @@ BEGIN
   SELECT * INTO v_order FROM public.orders WHERE client_order_id = v_client_id LIMIT 1;
   IF FOUND THEN
     UPDATE public.orders SET
-      paid_amount = GREATEST(COALESCE(paid_amount, 0), v_paid),
+      paid_amount = v_paid,  -- Use direct value, not GREATEST
       total = CASE WHEN v_total > 0 THEN v_total ELSE total END,
       discount = COALESCE((p_payload->>'discount')::numeric, discount),
       status = COALESCE(NULLIF(p_payload->>'status', ''), status),
@@ -451,7 +451,7 @@ BEGIN
   IF FOUND THEN
     UPDATE public.orders SET
       client_order_id = COALESCE(client_order_id, v_client_id),
-      paid_amount = GREATEST(COALESCE(paid_amount, 0), v_paid),
+      paid_amount = v_paid,  -- Use direct value, not GREATEST
       total = CASE WHEN v_total > 0 THEN v_total ELSE total END,
       status = COALESCE(NULLIF(p_payload->>'status', ''), status),
       updated_by_name = COALESCE(v_actor, updated_by_name),
@@ -501,7 +501,7 @@ BEGIN
     IF NOT FOUND THEN RAISE; END IF;
     UPDATE public.orders SET
       client_order_id = COALESCE(client_order_id, v_client_id),
-      paid_amount = GREATEST(COALESCE(paid_amount, 0), v_paid),
+      paid_amount = v_paid,  -- Use direct value, not GREATEST
       updated_by_name = COALESCE(v_actor, updated_by_name),
       updated_by = COALESCE(v_actor_id, updated_by),
       updated_at = NOW()

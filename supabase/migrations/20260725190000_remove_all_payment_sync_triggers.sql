@@ -23,6 +23,7 @@ DROP FUNCTION IF EXISTS public.sync_invoice_paid_amount() CASCADE;
 DROP FUNCTION IF EXISTS public.sync_order_paid_amount_with_allocations() CASCADE;
 DROP FUNCTION IF EXISTS public.sync_order_to_sales_order() CASCADE;
 DROP FUNCTION IF EXISTS public.sync_sales_order_to_order() CASCADE;
+DROP FUNCTION IF EXISTS public.get_order_total_paid() CASCADE;
 
 -- 5. Modify upsert_pos_order to use direct value instead of GREATEST (prevents accumulation)
 CREATE OR REPLACE FUNCTION public.upsert_pos_order(p_payload jsonb)
