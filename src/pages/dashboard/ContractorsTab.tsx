@@ -244,6 +244,9 @@ export function ContractorsTab({ restaurant }: Props) {
   };
 
   const openAddServiceDialog = async () => {
+    // Clear date filters to load all data by default
+    setDateFilterStart('');
+    setDateFilterEnd('');
     await Promise.all([loadInvoices(), loadOrders()]);
     setSelectedServices([]);
     setServiceForm({
