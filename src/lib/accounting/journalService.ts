@@ -274,13 +274,11 @@ class JournalService {
 
     const paidAmount = order.paid_amount || order.total;
     const remaining = order.total - paidAmount;
-    const totalWithDiscount = order.total + (order.discount || 0);
 
     // STANDARD DOUBLE-ENTRY STRUCTURE FOR SALES INVOICES:
     // Debit: Cash/Bank Account (paid_amount only)
     // Debit: Customer Account (remaining_amount) - with customerId
-    // Credit: Sales Revenue Account (total_amount including tax)
-    // Credit: Tax Payable Account (tax_amount only)
+    // Credit: Sales Revenue Account (total_amount - tax is included in revenue)
 
     // 1. Debit: Cash/Bank for paid amount only
     if (paidAmount > 0) {
@@ -305,25 +303,14 @@ class JournalService {
       });
     }
 
-    // 3. Credit: Revenue Account (total amount including tax)
+    // 3. Credit: Revenue Account (total amount - tax included)
     lines.push({
       account_id: salesAcc.id,
       debit: 0,
-      credit: totalWithDiscount,
+      credit: order.total,
       description: `إيرادات ${businessType} - ${order.order_number}`,
       line_order: 3,
     });
-
-    // 4. Credit: Tax Payable (tax amount only)
-    if (taxAmount > 0 && taxAcc) {
-      lines.push({
-        account_id: taxAcc.id,
-        debit: 0,
-        credit: taxAmount,
-        description: `ضريبة القيمة المضافة`,
-        line_order: 4,
-      });
-    }
 
     // VALIDATION: Ensure total debit equals total credit
     const totalDebit = lines.reduce((sum, line) => sum + (line.debit || 0), 0);
