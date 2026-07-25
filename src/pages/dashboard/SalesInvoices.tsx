@@ -160,6 +160,7 @@ export function SalesInvoices({ restaurantId, currency, restaurant, isSuperAdmin
           status: 'completed',
           payment_method: form.payment_method,
           delivery_date: form.delivery_date || null,
+          created_at: form.invoice_date || new Date().toISOString(), // Use invoice_date for creation date
           is_pos: false, // Mark as manual
           ...actor,
         })
