@@ -157,7 +157,7 @@ function ReceiptContent({
   const paidAmount = Number((order as any).paid_amount) || 0;
   const paymentMethod = (order as any).payment_method || 'cash';
   const voucherTotal = receiptVouchers.reduce((sum, v) => sum + (v.amount || 0), 0);
-  const totalPaid = paidAmount + voucherTotal;
+  const totalPaid = paidAmount; // Only direct payment, not including vouchers to prevent auto-attaching old payments
   const remaining = Math.max(0, Number(order.total) - totalPaid);
   const change = totalPaid > Number(order.total) ? totalPaid - Number(order.total) : 0;
 
@@ -388,12 +388,13 @@ export function ReceiptModalWrapper({ order, restaurant, onClose, onComplete, is
 
   // Load receipt vouchers for this customer
   useEffect(() => {
-    if (isOpen && (resolvedOrder as any).customer_id && restaurant.id) {
+    if (isOpen && (resolvedOrder as any).customer_id && restaurant.id && (resolvedOrder as any).created_at) {
       supabase
         .from('receipt_vouchers')
         .select('*')
         .eq('customer_id', (resolvedOrder as any).customer_id)
         .eq('restaurant_id', restaurant.id)
+        .gt('created_at', (resolvedOrder as any).created_at) // Only vouchers created AFTER this order
         .order('voucher_date', { ascending: true })
         .then(({ data }) => {
           setReceiptVouchers(data || []);
@@ -473,7 +474,7 @@ export function ReceiptModalWrapper({ order, restaurant, onClose, onComplete, is
       const paidAmount = Number((order as any).paid_amount) || 0;
       const paymentMethod = (order as any).payment_method || 'cash';
       const voucherTotal = receiptVouchers.reduce((sum, v) => sum + (v.amount || 0), 0);
-      const totalPaid = paidAmount + voucherTotal;
+      const totalPaid = paidAmount; // Only direct payment, not including vouchers to prevent auto-attaching old payments
       const remaining = Math.max(0, Number(order.total) - totalPaid);
       const change = totalPaid > Number(order.total) ? totalPaid - Number(order.total) : 0;
 
