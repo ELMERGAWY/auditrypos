@@ -174,13 +174,14 @@ export function InvoiceViewer({
         }
         setItems(lineItems);
 
-        // Load receipt vouchers when customer is linked (cash walk-ins are fine without)
-        if (data?.customer_id && restaurantId) {
+        // Load receipt vouchers created AFTER this invoice only (to avoid auto-attaching old payments)
+        if (data?.customer_id && restaurantId && data?.created_at) {
           const { data: vouchers } = await supabase
             .from('receipt_vouchers')
             .select('*')
             .eq('customer_id', data.customer_id)
             .eq('restaurant_id', restaurantId)
+            .gt('created_at', data.created_at) // Only vouchers created AFTER this invoice
             .order('voucher_date', { ascending: true });
 
           const voucherTotal = vouchers?.reduce((sum, v) => sum + (v.amount || 0), 0) || 0;
@@ -218,17 +219,18 @@ export function InvoiceViewer({
           }
         }
 
-        // Load receipt vouchers for this customer (all vouchers, not date-restricted)
-        if (orderData?.customer_id && restaurantId) {
+        // Load receipt vouchers created AFTER this invoice only (to avoid auto-attaching old payments)
+        if (orderData?.customer_id && restaurantId && orderData?.created_at) {
           const { data: vouchers } = await supabase
             .from('receipt_vouchers')
             .select('*')
             .eq('customer_id', orderData.customer_id)
             .eq('restaurant_id', restaurantId)
+            .gt('created_at', orderData.created_at) // Only vouchers created AFTER this invoice
             .order('voucher_date', { ascending: true });
-          
+
           const voucherTotal = vouchers?.reduce((sum, v) => sum + (v.amount || 0), 0) || 0;
-          
+
           setRecord(prev => ({
             ...prev,
             receipt_vouchers: vouchers || [],
@@ -271,10 +273,8 @@ export function InvoiceViewer({
   // orders table uses `discount`; sales_orders may use `discount_amount`
   const discount = Number(record?.discount_amount ?? record?.discount ?? 0);
   // paid_amount represents direct payments only (at order creation)
-  // receipt vouchers are tracked separately in receipt_voucher_ids array
-  const directPaidAmount = Number(record?.paid_amount || 0);
-  const receiptVoucherTotal = Number(record?.receipt_voucher_total || 0);
-  const totalPaid = directPaidAmount + receiptVoucherTotal;
+  // We do NOT include receipt_voucher_total to avoid auto-attaching old payments
+  const totalPaid = Number(record?.paid_amount || 0);
   const remaining = total - totalPaid;
   const change = totalPaid > total ? totalPaid - total : 0;
   const customerRef = extractCustomerRef(record) || record?.customer_ref || '';
