@@ -737,7 +737,7 @@ export default function Dashboard() {
             service_details: c.service_details,
             variables: c.variables || null
           })),
-          customerName, customerPhone, customerRef, customerId, orderType: orderType as any, deliveryAddress, deliveryDate, deliveryAgentId: selectedDeliveryAgent, paymentMethod: paymentMethod as any, paidAmount: paidNum, discount: discountAmount, discountType: discountType === 'percent' ? 'percentage' : 'fixed', notes: orderNotes, destinationAccountId: selectedAccountId, customOrderNumber: customOrderNumber || undefined,
+          customerName, customerPhone, customerRef, orderType: orderType as any, deliveryAddress, deliveryDate, deliveryAgentId: selectedDeliveryAgent, paymentMethod: paymentMethod as any, paidAmount: paidNum, discount: discountAmount, discountType: discountType === 'percent' ? 'percentage' : 'fixed', notes: orderNotes, destinationAccountId: selectedAccountId, customOrderNumber: customOrderNumber || undefined,
           clientOrderId: checkoutClientOrderId
         }
       );
