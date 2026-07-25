@@ -79,6 +79,7 @@ class CheckoutIntegration {
 
     // نتذكر إذا تم إنشاء الطلب فعلياً حتى لا نضيفه لطابور الأوفلاين مرة أخرى
     let createdOrder: any = null;
+    let customerId: string | null = null; // Define customerId outside try block
     
     let finalNotes = orderData.notes || '';
     if (orderData.customerRef) {
@@ -169,7 +170,7 @@ class CheckoutIntegration {
         });
 
       // Use existingCustomerId if found, otherwise find or create customer
-      let customerId = existingCustomerId;
+      customerId = existingCustomerId;
       if (!customerId && orderData.customerName?.trim()) {
         customerId = await this.findOrCreateCustomer(context.restaurantId, orderData.customerName.trim(), orderData.customerPhone, orderData.customerRef)
           .catch((e) => { console.warn('[checkout] customer upsert failed:', e); return null; });
