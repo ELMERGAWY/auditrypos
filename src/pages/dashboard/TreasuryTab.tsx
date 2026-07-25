@@ -25,6 +25,9 @@ export function TreasuryTab({ restaurantId, currency }: TreasuryTabProps) {
   const [loading, setLoading] = useState(true);
   const [showTransferModal, setShowTransferModal] = useState(false);
   const [showReconciliation, setShowReconciliation] = useState(false);
+  const [receiptVouchers, setReceiptVouchers] = useState<any[]>([]);
+  const [paymentVouchers, setPaymentVouchers] = useState<any[]>([]);
+  const [showHistory, setShowHistory] = useState(false);
   const [transferForm, setTransferForm] = useState({
     fromId: '',
     toId: '',
@@ -40,13 +43,27 @@ export function TreasuryTab({ restaurantId, currency }: TreasuryTabProps) {
   const loadData = async () => {
     try {
       setLoading(true);
-      const [banksRes, accountsRes] = await Promise.all([
+      const [banksRes, accountsRes, receiptsRes, paymentsRes] = await Promise.all([
         supabase.from('bank_accounts').select('*').eq('restaurant_id', restaurantId),
-        supabase.from('chart_of_accounts').select('*').eq('restaurant_id', restaurantId).ilike('code', '11%')
+        supabase.from('chart_of_accounts').select('*').eq('restaurant_id', restaurantId).ilike('code', '11%'),
+        supabase.from('receipt_vouchers').select(`
+          id, voucher_number, voucher_date, actor_id, actor_type, amount, payment_method, notes,
+          account_id, counter_account_id, created_at,
+          customers(name),
+          suppliers(name)
+        `).eq('restaurant_id', restaurantId).order('voucher_date', { ascending: false }).limit(10),
+        supabase.from('payment_vouchers').select(`
+          id, voucher_number, voucher_date, actor_id, actor_type, amount, payment_method, notes,
+          account_id, counter_account_id, created_at,
+          customers(name),
+          suppliers(name)
+        `).eq('restaurant_id', restaurantId).order('voucher_date', { ascending: false }).limit(10)
       ]);
 
       setBanks(banksRes.data || []);
       setCashAccounts(accountsRes.data || []);
+      setReceiptVouchers(receiptsRes.data || []);
+      setPaymentVouchers(paymentsRes.data || []);
     } catch (e) {
       toast.error('فشل تحميل بيانات الخزينة');
     } finally {
@@ -290,6 +307,70 @@ export function TreasuryTab({ restaurantId, currency }: TreasuryTabProps) {
           </div>
         </Card>
       </div>
+
+      {/* Recent Transactions */}
+      <Card className="p-6 glass-card">
+        <div className="flex justify-between items-center mb-4">
+          <h3 className="text-xl font-bold flex items-center gap-2">
+            <History className="w-5 h-5" /> أحدث المعاملات
+          </h3>
+          <Button variant="outline" size="sm" onClick={() => setShowHistory(!showHistory)}>
+            {showHistory ? 'إخفاء' : 'عرض الكل'}
+          </Button>
+        </div>
+        
+        <div className="space-y-4">
+          {/* Receipt Vouchers */}
+          {receiptVouchers.length > 0 && (
+            <div>
+              <h4 className="text-sm font-semibold text-primary mb-2">سندات القبض الأخيرة</h4>
+              <div className="space-y-2">
+                {receiptVouchers.slice(0, showHistory ? undefined : 3).map((rv: any) => (
+                  <div key={rv.id} className="flex justify-between items-center p-3 rounded-lg bg-primary/5 border border-primary/10">
+                    <div>
+                      <span className="text-sm font-bold">{rv.voucher_number}</span>
+                      <span className="text-xs text-muted-foreground mr-2">
+                        {rv.actor_type === 'supplier' ? (rv.suppliers?.name || 'غير معروف') : (rv.customers?.name || 'غير معروف')}
+                      </span>
+                      <span className="text-[10px] text-muted-foreground mr-2">
+                        {new Date(rv.voucher_date).toLocaleDateString('ar-EG')}
+                      </span>
+                    </div>
+                    <span className="font-bold text-primary">+{rv.amount.toFixed(2)} {currency}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Payment Vouchers */}
+          {paymentVouchers.length > 0 && (
+            <div>
+              <h4 className="text-sm font-semibold text-destructive mb-2">أذون الدفع الأخيرة</h4>
+              <div className="space-y-2">
+                {paymentVouchers.slice(0, showHistory ? undefined : 3).map((pv: any) => (
+                  <div key={pv.id} className="flex justify-between items-center p-3 rounded-lg bg-destructive/5 border border-destructive/10">
+                    <div>
+                      <span className="text-sm font-bold">{pv.voucher_number}</span>
+                      <span className="text-xs text-muted-foreground mr-2">
+                        {pv.actor_type === 'customer' ? (pv.customers?.name || 'غير معروف') : (pv.suppliers?.name || 'غير معروف')}
+                      </span>
+                      <span className="text-[10px] text-muted-foreground mr-2">
+                        {new Date(pv.voucher_date).toLocaleDateString('ar-EG')}
+                      </span>
+                    </div>
+                    <span className="font-bold text-destructive">-{pv.amount.toFixed(2)} {currency}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {receiptVouchers.length === 0 && paymentVouchers.length === 0 && (
+            <p className="text-sm text-muted-foreground text-center py-4">لا توجد معاملات حديثة</p>
+          )}
+        </div>
+      </Card>
 
       {/* Internal Transfers Logic Modal */}
       {showTransferModal && (
