@@ -498,7 +498,10 @@ export function DeliveryHub(props: any) {
                               title={log.notes || undefined}
                             >
                               {log.status === 'contacted' ? 'تم التواصل' : 'لا رد'} (
-                              {new Date(log.created_at).toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' })}){log.notes ? ' 💬' : ''}
+                              {new Date(log.created_at).toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit'})})
+                              {log.notes && (
+                                <span className="mr-1 text-[8px] opacity-75">- {log.notes}</span>
+                              )}
                             </Badge>
                           ))}
                         </div>

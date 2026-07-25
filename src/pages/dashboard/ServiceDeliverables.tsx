@@ -141,6 +141,7 @@ export function ServiceDeliverables({ restaurantId }: Props) {
   const [statusFilter, setStatusFilter] = useState('all');
   const [priorityFilter, setPriorityFilter] = useState('all');
   const [sourceFilter, setSourceFilter] = useState('all');
+  const [dateFilter, setDateFilter] = useState('');
 
   // Receipt confirmation (who received + date + item selection)
   const [showReceiptModal, setShowReceiptModal] = useState(false);
@@ -628,6 +629,11 @@ export function ServiceDeliverables({ restaurantId }: Props) {
       if (statusFilter !== 'all' && d.status !== statusFilter) return false;
       if (priorityFilter !== 'all' && d.priority !== priorityFilter) return false;
       if (sourceFilter !== 'all' && d.source !== sourceFilter) return false;
+      if (dateFilter) {
+        const filterDate = new Date(dateFilter);
+        const itemDate = new Date(d.expected_delivery_date || d.created_at);
+        if (itemDate.toDateString() !== filterDate.toDateString()) return false;
+      }
       if (!q) return true;
       const hay = [
         d.service_name,
@@ -642,7 +648,7 @@ export function ServiceDeliverables({ restaurantId }: Props) {
         .toLowerCase();
       return hay.includes(q);
     });
-  }, [deliverables, searchQuery, statusFilter, priorityFilter, sourceFilter]);
+  }, [deliverables, searchQuery, statusFilter, priorityFilter, sourceFilter, dateFilter]);
 
   const stats = useMemo(() => {
     const delayed = deliverables.filter((d) => d.status === 'delayed').length;
@@ -769,6 +775,12 @@ export function ServiceDeliverables({ restaurantId }: Props) {
                 <SelectItem value="marketing">تسليمات يدوية</SelectItem>
               </SelectContent>
             </Select>
+            <Input
+              type="date"
+              className="w-[150px]"
+              value={dateFilter}
+              onChange={(e) => setDateFilter(e.target.value)}
+            />
           </div>
         </div>
       </Card>
