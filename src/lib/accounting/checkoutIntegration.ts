@@ -80,7 +80,7 @@ class CheckoutIntegration {
 
     // نتذكر إذا تم إنشاء الطلب فعلياً حتى لا نضيفه لطابور الأوفلاين مرة أخرى
     let createdOrder: any = null;
-    let customerId: string | null = null; // Define customerId outside try block
+    let customerId: string | null = null;
     
     let finalNotes = orderData.notes || '';
     if (orderData.customerRef) {
@@ -89,9 +89,13 @@ class CheckoutIntegration {
         : `المرجع: ${orderData.customerRef}`;
     }
 
-    // Find existing customer by name and phone to prevent duplicates
-    let existingCustomerId: string | null = orderData.customerId || null;
-    if (!existingCustomerId && orderData.customerName && orderData.customerPhone) {
+    // Customer deduplication logic: match by (name + phone)
+    // 1. If customerId is provided from UI (selected from autocomplete), use it directly
+    if (orderData.customerId) {
+      customerId = orderData.customerId;
+    }
+    // 2. Otherwise, search for existing customer by name and phone
+    else if (orderData.customerName && orderData.customerPhone) {
       try {
         const { data: existingCustomer } = await supabase
           .from('customers')
@@ -102,7 +106,7 @@ class CheckoutIntegration {
           .limit(1)
           .maybeSingle();
         if (existingCustomer?.id) {
-          existingCustomerId = existingCustomer.id;
+          customerId = existingCustomer.id;
         }
       } catch (e) {
         console.warn('[checkout] Failed to find existing customer:', e);
@@ -127,7 +131,7 @@ class CheckoutIntegration {
       paid_amount: paidAmount,
       notes: finalNotes,
       client_order_id: clientOrderId,
-      customer_id: existingCustomerId, // Use existing customer_id if found
+      customer_id: customerId, // Use customer_id if found (will be null if not found yet)
     };
 
     try {
@@ -170,8 +174,7 @@ class CheckoutIntegration {
           return { totalCOGS: 0, itemsWithCost: [] as any[] };
         });
 
-      // Use existingCustomerId if found, otherwise find or create customer
-      customerId = existingCustomerId;
+      // If customerId is still null, create new customer
       if (!customerId && orderData.customerName?.trim()) {
         customerId = await this.findOrCreateCustomer(context.restaurantId, orderData.customerName.trim(), orderData.customerPhone, orderData.customerRef)
           .catch((e) => { console.warn('[checkout] customer upsert failed:', e); return null; });
