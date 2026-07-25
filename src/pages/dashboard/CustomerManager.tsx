@@ -633,6 +633,15 @@ export function CustomerManager({ restaurantId, currency }: Props) {
         .neq('type', 'sale') // CRITICAL: 'sale' in transactions is redundant with 'orders' table
         .order('created_at', { ascending: true });
 
+      // Get payment vouchers (refunds) for this customer
+      const { data: paymentVouchersData } = await supabase
+        .from('payment_vouchers')
+        .select('id, voucher_number, voucher_date, amount, payment_method, notes, created_at')
+        .eq('actor_id', customerId)
+        .eq('actor_type', 'customer')
+        .eq('restaurant_id', restaurantId)
+        .order('voucher_date', { ascending: true });
+
       // Build statement
       const statement: CustomerTransaction[] = [];
       const orderById = new Map((ordersData || []).map((o: any) => [o.id, o]));
@@ -684,6 +693,21 @@ export function CustomerManager({ restaurantId, currency }: Props) {
           description: payment.description || (payment.type === 'payment' ? 'سداد' : 'تسوية'),
           debit: payment.type === 'debit' ? Math.abs(amount) : 0,
           credit: payment.type !== 'debit' ? Math.abs(amount) : 0,
+          balance: 0
+        });
+      });
+
+      // Add payment vouchers (refunds) as credit transactions
+      paymentVouchersData?.forEach((voucher: any) => {
+        const amount = Number(voucher.amount);
+        statement.push({
+          id: voucher.id,
+          date: voucher.voucher_date,
+          type: 'refund',
+          reference: voucher.voucher_number,
+          description: `إذن دفع - ${voucher.notes || 'استرداد'}`,
+          debit: 0,
+          credit: amount,
           balance: 0
         });
       });
