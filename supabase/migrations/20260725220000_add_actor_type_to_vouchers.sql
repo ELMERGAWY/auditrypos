@@ -35,10 +35,18 @@ BEGIN
   END IF;
 END $$;
 
--- Add constraint to ensure actor_type is valid
-ALTER TABLE public.receipt_vouchers 
-ADD CONSTRAINT receipt_vouchers_actor_type_check 
-CHECK (actor_type IN ('customer', 'supplier'));
+-- Add constraint to ensure actor_type is valid (if not exists)
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint 
+    WHERE conname = 'receipt_vouchers_actor_type_check'
+  ) THEN
+    ALTER TABLE public.receipt_vouchers 
+    ADD CONSTRAINT receipt_vouchers_actor_type_check 
+    CHECK (actor_type IN ('customer', 'supplier'));
+  END IF;
+END $$;
 
 -- Note: We cannot add foreign key constraints that depend on actor_type
 -- Foreign key validation will be handled at application level or via triggers
@@ -71,10 +79,18 @@ BEGIN
   END IF;
 END $$;
 
--- Add constraint to ensure actor_type is valid
-ALTER TABLE public.payment_vouchers 
-ADD CONSTRAINT payment_vouchers_actor_type_check 
-CHECK (actor_type IN ('customer', 'supplier'));
+-- Add constraint to ensure actor_type is valid (if not exists)
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint 
+    WHERE conname = 'payment_vouchers_actor_type_check'
+  ) THEN
+    ALTER TABLE public.payment_vouchers 
+    ADD CONSTRAINT payment_vouchers_actor_type_check 
+    CHECK (actor_type IN ('customer', 'supplier'));
+  END IF;
+END $$;
 
 -- Note: We cannot add foreign key constraints that depend on actor_type
 -- Foreign key validation will be handled at application level or via triggers
