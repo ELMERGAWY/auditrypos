@@ -130,10 +130,12 @@ export function ContractorsTab({ restaurant }: Props) {
       .eq('company_id', companyId);
     
     if (dateFilterStart) {
-      query = query.gte('created_at', dateFilterStart);
+      query = query.gte('created_at', new Date(dateFilterStart).toISOString());
     }
     if (dateFilterEnd) {
-      query = query.lte('created_at', `${dateFilterEnd}T23:59:59`);
+      const endDate = new Date(dateFilterEnd);
+      endDate.setHours(23, 59, 59, 999);
+      query = query.lte('created_at', endDate.toISOString());
     }
     
     const { data, error } = await query.order('created_at', { ascending: false }).limit(50);
@@ -152,10 +154,12 @@ export function ContractorsTab({ restaurant }: Props) {
       .eq('restaurant_id', restaurant.id);
     
     if (dateFilterStart) {
-      query = query.gte('created_at', dateFilterStart);
+      query = query.gte('created_at', new Date(dateFilterStart).toISOString());
     }
     if (dateFilterEnd) {
-      query = query.lte('created_at', `${dateFilterEnd}T23:59:59`);
+      const endDate = new Date(dateFilterEnd);
+      endDate.setHours(23, 59, 59, 999);
+      query = query.lte('created_at', endDate.toISOString());
     }
     
     const { data, error } = await query.order('created_at', { ascending: false }).limit(50);
