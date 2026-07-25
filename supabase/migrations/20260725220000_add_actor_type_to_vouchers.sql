@@ -103,7 +103,7 @@ BEGIN
     RETURNING id INTO v_voucher_id;
   ELSE
     -- Generate voucher number
-    SELECT 'RV-' || LPAD(COALESCE(MAX(SUBSTRING(voucher_number FROM 4 FOR 6))::INTEGER, 0) + 1::TEXT, 6, '0')
+    SELECT 'RV-' || LPAD((COALESCE(MAX(SUBSTRING(voucher_number FROM 4 FOR 6))::INTEGER, 0) + 1)::TEXT, 6, '0')
     INTO v_voucher_number
     FROM public.receipt_vouchers
     WHERE restaurant_id = p_restaurant_id;
@@ -161,7 +161,7 @@ BEGIN
     RETURNING id INTO v_voucher_id;
   ELSE
     -- Generate voucher number
-    SELECT 'PV-' || LPAD(COALESCE(MAX(SUBSTRING(voucher_number FROM 4 FOR 6))::INTEGER, 0) + 1::TEXT, 6, '0')
+    SELECT 'PV-' || LPAD((COALESCE(MAX(SUBSTRING(voucher_number FROM 4 FOR 6))::INTEGER, 0) + 1)::TEXT, 6, '0')
     INTO v_voucher_number
     FROM public.payment_vouchers
     WHERE restaurant_id = p_restaurant_id;
