@@ -849,7 +849,8 @@ export function CustomerManager({ restaurantId, currency }: Props) {
       } else {
         const { data: voucherId, error } = await supabase.rpc('save_receipt_voucher', {
           p_restaurant_id: restaurantId,
-          p_customer_id: receiptVoucherForm.actor_id,
+          p_actor_id: receiptVoucherForm.actor_id,
+          p_actor_type: 'customer',
           p_amount: amount,
           p_payment_method: receiptVoucherForm.payment_method,
           p_voucher_date: receiptVoucherForm.voucher_date,
@@ -935,7 +936,8 @@ export function CustomerManager({ restaurantId, currency }: Props) {
     try {
       const { data: voucherId, error } = await supabase.rpc('save_payment_voucher', {
         p_restaurant_id: restaurantId,
-        p_supplier_id: paymentVoucherForm.actor_id,
+        p_actor_id: paymentVoucherForm.actor_id,
+        p_actor_type: 'customer',
         p_amount: amount,
         p_payment_method: paymentVoucherForm.payment_method,
         p_voucher_date: paymentVoucherForm.voucher_date,
@@ -945,14 +947,6 @@ export function CustomerManager({ restaurantId, currency }: Props) {
         p_voucher_id: editingPaymentVoucher?.id || null
       });
       if (error) throw error;
-
-      // Update customer balance (subtract refund amount)
-      const customer = customers.find(c => c.id === paymentVoucherForm.actor_id);
-      if (customer) {
-        await supabase.from('customers').update({
-          balance: customer.balance - amount
-        }).eq('id', customer.id);
-      }
 
       toast.success(editingPaymentVoucher ? 'تم تحديث إذن الدفع' : 'تم إضافة إذن الدفع');
 

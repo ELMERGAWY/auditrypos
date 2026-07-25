@@ -102,10 +102,11 @@ CREATE INDEX idx_receipt_vouchers_restaurant ON public.receipt_vouchers(restaura
 DROP INDEX IF EXISTS idx_payment_vouchers_restaurant;
 CREATE INDEX idx_payment_vouchers_restaurant ON public.payment_vouchers(restaurant_id, actor_type, voucher_date DESC);
 
--- Update the save_receipt_voucher function to use actor_id
+-- Update the save_receipt_voucher function to use actor_id and actor_type
 CREATE OR REPLACE FUNCTION public.save_receipt_voucher(
   p_restaurant_id UUID,
-  p_customer_id UUID,
+  p_actor_id UUID,
+  p_actor_type TEXT DEFAULT 'customer',
   p_amount NUMERIC,
   p_payment_method TEXT DEFAULT 'cash',
   p_voucher_date DATE DEFAULT CURRENT_DATE,
@@ -127,7 +128,8 @@ BEGIN
     -- Update existing voucher
     UPDATE public.receipt_vouchers
     SET 
-      actor_id = p_customer_id,
+      actor_id = p_actor_id,
+      actor_type = p_actor_type,
       amount = p_amount,
       payment_method = p_payment_method,
       voucher_date = p_voucher_date,
@@ -149,19 +151,34 @@ BEGIN
       restaurant_id, voucher_number, voucher_date, actor_id, actor_type,
       amount, payment_method, notes, account_id, counter_account_id
     ) VALUES (
-      p_restaurant_id, v_voucher_number, p_voucher_date, p_customer_id, 'customer',
+      p_restaurant_id, v_voucher_number, p_voucher_date, p_actor_id, p_actor_type,
       p_amount, p_payment_method, p_notes, p_account_id, p_counter_account_id
     ) RETURNING id INTO v_voucher_id;
+    
+    -- Update customer balance if actor_type is 'customer' (payment reduces balance)
+    IF p_actor_type = 'customer' THEN
+      UPDATE public.customers
+      SET balance = balance - p_amount
+      WHERE id = p_actor_id;
+    END IF;
+    
+    -- Update supplier balance if actor_type is 'supplier' (payment reduces balance)
+    IF p_actor_type = 'supplier' THEN
+      UPDATE public.suppliers
+      SET balance = balance - p_amount
+      WHERE id = p_actor_id;
+    END IF;
   END IF;
 
   RETURN v_voucher_id;
 END;
 $$;
 
--- Update the save_payment_voucher function to use actor_id
+-- Update the save_payment_voucher function to use actor_id and actor_type
 CREATE OR REPLACE FUNCTION public.save_payment_voucher(
   p_restaurant_id UUID,
-  p_supplier_id UUID,
+  p_actor_id UUID,
+  p_actor_type TEXT DEFAULT 'supplier',
   p_amount NUMERIC,
   p_payment_method TEXT DEFAULT 'cash',
   p_voucher_date DATE DEFAULT CURRENT_DATE,
@@ -184,7 +201,8 @@ BEGIN
     -- Update existing voucher
     UPDATE public.payment_vouchers
     SET 
-      actor_id = p_supplier_id,
+      actor_id = p_actor_id,
+      actor_type = p_actor_type,
       amount = p_amount,
       payment_method = p_payment_method,
       voucher_date = p_voucher_date,
@@ -207,9 +225,23 @@ BEGIN
       restaurant_id, voucher_number, voucher_date, actor_id, actor_type,
       amount, payment_method, notes, account_id, counter_account_id, reference_number
     ) VALUES (
-      p_restaurant_id, v_voucher_number, p_voucher_date, p_supplier_id, 'supplier',
+      p_restaurant_id, v_voucher_number, p_voucher_date, p_actor_id, p_actor_type,
       p_amount, p_payment_method, p_notes, p_account_id, p_counter_account_id, p_reference_number
     ) RETURNING id INTO v_voucher_id;
+    
+    -- Update customer balance if actor_type is 'customer' (refund reduces balance)
+    IF p_actor_type = 'customer' THEN
+      UPDATE public.customers
+      SET balance = balance - p_amount
+      WHERE id = p_actor_id;
+    END IF;
+    
+    -- Update supplier balance if actor_type is 'supplier' (refund reduces balance)
+    IF p_actor_type = 'supplier' THEN
+      UPDATE public.suppliers
+      SET balance = balance - p_amount
+      WHERE id = p_actor_id;
+    END IF;
   END IF;
 
   RETURN v_voucher_id;
