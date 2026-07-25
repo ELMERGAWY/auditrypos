@@ -130,7 +130,9 @@ export function ContractorsTab({ restaurant }: Props) {
       .eq('company_id', companyId);
     
     if (dateFilterStart) {
-      query = query.gte('created_at', new Date(dateFilterStart).toISOString());
+      const startDate = new Date(dateFilterStart);
+      startDate.setHours(0, 0, 0, 0);
+      query = query.gte('created_at', startDate.toISOString());
     }
     if (dateFilterEnd) {
       const endDate = new Date(dateFilterEnd);
@@ -138,11 +140,14 @@ export function ContractorsTab({ restaurant }: Props) {
       query = query.lte('created_at', endDate.toISOString());
     }
     
+    console.log('Loading invoices with date filter:', { dateFilterStart, dateFilterEnd });
+    
     const { data, error } = await query.order('created_at', { ascending: false }).limit(50);
     if (error) {
       console.error('Error loading invoices:', error);
       toast.error('خطأ في تحميل الفواتير: ' + error.message);
     } else {
+      console.log('Loaded invoices:', data?.length);
       setInvoices(data || []);
     }
   };
@@ -154,7 +159,9 @@ export function ContractorsTab({ restaurant }: Props) {
       .eq('restaurant_id', restaurant.id);
     
     if (dateFilterStart) {
-      query = query.gte('created_at', new Date(dateFilterStart).toISOString());
+      const startDate = new Date(dateFilterStart);
+      startDate.setHours(0, 0, 0, 0);
+      query = query.gte('created_at', startDate.toISOString());
     }
     if (dateFilterEnd) {
       const endDate = new Date(dateFilterEnd);
@@ -162,11 +169,14 @@ export function ContractorsTab({ restaurant }: Props) {
       query = query.lte('created_at', endDate.toISOString());
     }
     
+    console.log('Loading orders with date filter:', { dateFilterStart, dateFilterEnd });
+    
     const { data, error } = await query.order('created_at', { ascending: false }).limit(50);
     if (error) {
       console.error('Error loading orders:', error);
       toast.error('خطأ في تحميل الطلبات: ' + error.message);
     } else {
+      console.log('Loaded orders:', data?.length);
       setOrders(data || []);
     }
   };
@@ -703,7 +713,11 @@ export function ContractorsTab({ restaurant }: Props) {
                         />
                       </div>
                     </div>
-                    <Button size="sm" variant="outline" onClick={() => { loadInvoices(); loadOrders(); }} className="w-full">
+                    <Button size="sm" variant="outline" onClick={() => { 
+                      console.log('Load button clicked with filters:', { dateFilterStart, dateFilterEnd });
+                      loadInvoices(); 
+                      loadOrders(); 
+                    }} className="w-full">
                       تحميل الفواتير والطلبات
                     </Button>
                   </div>
