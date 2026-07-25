@@ -180,21 +180,32 @@ export function SupplierManager({ restaurantId, currency }: Props) {
         .from('payment_vouchers')
         .select(`
           id, voucher_number, voucher_date, actor_id, actor_type, amount, payment_method, 
-          reference_number, notes, account_id, created_at,
-          suppliers(name),
-          customers(name)
+          reference_number, notes, account_id, created_at
         `)
         .eq('restaurant_id', restaurantId)
         .order('voucher_date', { ascending: false });
 
       if (error) throw error;
+      
+      // Fetch supplier and customer names separately
+      const supplierIds = [...new Set((data || []).filter((v: any) => v.actor_type === 'supplier').map((v: any) => v.actor_id))];
+      const customerIds = [...new Set((data || []).filter((v: any) => v.actor_type === 'customer').map((v: any) => v.actor_id))];
+      
+      const [suppliersData, customersData] = await Promise.all([
+        supplierIds.length > 0 ? supabase.from('suppliers').select('id, name').in('id', supplierIds) : Promise.resolve({ data: [] }),
+        customerIds.length > 0 ? supabase.from('customers').select('id, name').in('id', customerIds) : Promise.resolve({ data: [] })
+      ]);
+      
+      const supplierMap = new Map((suppliersData.data || []).map((s: any) => [s.id, s.name]));
+      const customerMap = new Map((customersData.data || []).map((c: any) => [c.id, c.name]));
+      
       const formatted = (data || []).map((v: any) => ({
         id: v.id,
         voucher_number: v.voucher_number,
         voucher_date: v.voucher_date,
         actor_id: v.actor_id,
         actor_type: v.actor_type || 'supplier',
-        supplier_name: v.actor_type === 'customer' ? (v.customers?.name || 'غير معروف') : (v.suppliers?.name || 'غير معروف'),
+        supplier_name: v.actor_type === 'customer' ? (customerMap.get(v.actor_id) || 'غير معروف') : (supplierMap.get(v.actor_id) || 'غير معروف'),
         amount: Number(v.amount),
         payment_method: v.payment_method,
         reference_number: v.reference_number,

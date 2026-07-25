@@ -48,22 +48,58 @@ export function TreasuryTab({ restaurantId, currency }: TreasuryTabProps) {
         supabase.from('chart_of_accounts').select('*').eq('restaurant_id', restaurantId).ilike('code', '11%'),
         supabase.from('receipt_vouchers').select(`
           id, voucher_number, voucher_date, actor_id, actor_type, amount, payment_method, notes,
-          account_id, counter_account_id, created_at,
-          customers(name),
-          suppliers(name)
+          account_id, counter_account_id, created_at
         `).eq('restaurant_id', restaurantId).order('voucher_date', { ascending: false }).limit(10),
         supabase.from('payment_vouchers').select(`
           id, voucher_number, voucher_date, actor_id, actor_type, amount, payment_method, notes,
-          account_id, counter_account_id, created_at,
-          customers(name),
-          suppliers(name)
+          account_id, counter_account_id, created_at
         `).eq('restaurant_id', restaurantId).order('voucher_date', { ascending: false }).limit(10)
       ]);
 
       setBanks(banksRes.data || []);
       setCashAccounts(accountsRes.data || []);
-      setReceiptVouchers(receiptsRes.data || []);
-      setPaymentVouchers(paymentsRes.data || []);
+      
+      // Fetch names separately for receipts
+      const receiptData = receiptsRes.data || [];
+      const receiptCustomerIds = [...new Set(receiptData.filter((v: any) => v.actor_type === 'customer').map((v: any) => v.actor_id))];
+      const receiptSupplierIds = [...new Set(receiptData.filter((v: any) => v.actor_type === 'supplier').map((v: any) => v.actor_id))];
+      
+      const [receiptCustomers, receiptSuppliers] = await Promise.all([
+        receiptCustomerIds.length > 0 ? supabase.from('customers').select('id, name').in('id', receiptCustomerIds) : Promise.resolve({ data: [] }),
+        receiptSupplierIds.length > 0 ? supabase.from('suppliers').select('id, name').in('id', receiptSupplierIds) : Promise.resolve({ data: [] })
+      ]);
+      
+      const receiptCustomerMap = new Map((receiptCustomers.data || []).map((c: any) => [c.id, c.name]));
+      const receiptSupplierMap = new Map((receiptSuppliers.data || []).map((s: any) => [s.id, s.name]));
+      
+      const receiptVouchersWithNames = receiptData.map((rv: any) => ({
+        ...rv,
+        customers: { name: rv.actor_type === 'customer' ? (receiptCustomerMap.get(rv.actor_id) || 'غير معروف') : null },
+        suppliers: { name: rv.actor_type === 'supplier' ? (receiptSupplierMap.get(rv.actor_id) || 'غير معروف') : null }
+      }));
+      
+      setReceiptVouchers(receiptVouchersWithNames);
+      
+      // Fetch names separately for payments
+      const paymentData = paymentsRes.data || [];
+      const paymentCustomerIds = [...new Set(paymentData.filter((v: any) => v.actor_type === 'customer').map((v: any) => v.actor_id))];
+      const paymentSupplierIds = [...new Set(paymentData.filter((v: any) => v.actor_type === 'supplier').map((v: any) => v.actor_id))];
+      
+      const [paymentCustomers, paymentSuppliers] = await Promise.all([
+        paymentCustomerIds.length > 0 ? supabase.from('customers').select('id, name').in('id', paymentCustomerIds) : Promise.resolve({ data: [] }),
+        paymentSupplierIds.length > 0 ? supabase.from('suppliers').select('id, name').in('id', paymentSupplierIds) : Promise.resolve({ data: [] })
+      ]);
+      
+      const paymentCustomerMap = new Map((paymentCustomers.data || []).map((c: any) => [c.id, c.name]));
+      const paymentSupplierMap = new Map((paymentSuppliers.data || []).map((s: any) => [s.id, s.name]));
+      
+      const paymentVouchersWithNames = paymentData.map((pv: any) => ({
+        ...pv,
+        customers: { name: pv.actor_type === 'customer' ? (paymentCustomerMap.get(pv.actor_id) || 'غير معروف') : null },
+        suppliers: { name: pv.actor_type === 'supplier' ? (paymentSupplierMap.get(pv.actor_id) || 'غير معروف') : null }
+      }));
+      
+      setPaymentVouchers(paymentVouchersWithNames);
     } catch (e) {
       toast.error('فشل تحميل بيانات الخزينة');
     } finally {

@@ -390,21 +390,31 @@ export function CustomerManager({ restaurantId, currency }: Props) {
         .from('receipt_vouchers')
         .select(`
           id, voucher_number, voucher_date, actor_id, actor_type, amount, payment_method, notes,
-          account_id, counter_account_id, created_at,
-          customers(name),
-          suppliers(name)
+          account_id, counter_account_id, created_at
         `)
         .eq('restaurant_id', restaurantId)
         .order('voucher_date', { ascending: false });
 
       if (!error && data) {
+        // Fetch customer and supplier names separately
+        const customerIds = [...new Set((data || []).filter((v: any) => v.actor_type === 'customer').map((v: any) => v.actor_id))];
+        const supplierIds = [...new Set((data || []).filter((v: any) => v.actor_type === 'supplier').map((v: any) => v.actor_id))];
+        
+        const [customersData, suppliersData] = await Promise.all([
+          customerIds.length > 0 ? supabase.from('customers').select('id, name').in('id', customerIds) : Promise.resolve({ data: [] }),
+          supplierIds.length > 0 ? supabase.from('suppliers').select('id, name').in('id', supplierIds) : Promise.resolve({ data: [] })
+        ]);
+        
+        const customerMap = new Map((customersData.data || []).map((c: any) => [c.id, c.name]));
+        const supplierMap = new Map((suppliersData.data || []).map((s: any) => [s.id, s.name]));
+        
         vouchers.push(...(data || []).map((rv: any) => ({
           id: rv.id,
           voucher_number: rv.voucher_number,
           voucher_date: rv.voucher_date,
           actor_id: rv.actor_id,
           actor_type: rv.actor_type || 'customer',
-          customer_name: rv.actor_type === 'supplier' ? (rv.suppliers?.name || 'غير معروف') : (rv.customers?.name || 'غير معروف'),
+          customer_name: rv.actor_type === 'supplier' ? (supplierMap.get(rv.actor_id) || 'غير معروف') : (customerMap.get(rv.actor_id) || 'غير معروف'),
           amount: Number(rv.amount),
           payment_method: rv.payment_method,
           notes: rv.notes,
@@ -455,21 +465,31 @@ export function CustomerManager({ restaurantId, currency }: Props) {
         .from('payment_vouchers')
         .select(`
           id, voucher_number, voucher_date, actor_id, actor_type, amount, payment_method, notes,
-          account_id, counter_account_id, created_at,
-          customers(name),
-          suppliers(name)
+          account_id, counter_account_id, created_at
         `)
         .eq('restaurant_id', restaurantId)
         .order('voucher_date', { ascending: false });
 
       if (!error && data) {
+        // Fetch customer and supplier names separately
+        const customerIds = [...new Set((data || []).filter((v: any) => v.actor_type === 'customer').map((v: any) => v.actor_id))];
+        const supplierIds = [...new Set((data || []).filter((v: any) => v.actor_type === 'supplier').map((v: any) => v.actor_id))];
+        
+        const [customersData, suppliersData] = await Promise.all([
+          customerIds.length > 0 ? supabase.from('customers').select('id, name').in('id', customerIds) : Promise.resolve({ data: [] }),
+          supplierIds.length > 0 ? supabase.from('suppliers').select('id, name').in('id', supplierIds) : Promise.resolve({ data: [] })
+        ]);
+        
+        const customerMap = new Map((customersData.data || []).map((c: any) => [c.id, c.name]));
+        const supplierMap = new Map((suppliersData.data || []).map((s: any) => [s.id, s.name]));
+        
         vouchers.push(...(data || []).map((pv: any) => ({
           id: pv.id,
           voucher_number: pv.voucher_number,
           voucher_date: pv.voucher_date,
           actor_id: pv.actor_id,
           actor_type: pv.actor_type || 'supplier',
-          customer_name: pv.actor_type === 'customer' ? (pv.customers?.name || 'غير معروف') : (pv.suppliers?.name || 'غير معروف'),
+          customer_name: pv.actor_type === 'customer' ? (customerMap.get(pv.actor_id) || 'غير معروف') : (supplierMap.get(pv.actor_id) || 'غير معروف'),
           amount: Number(pv.amount),
           payment_method: pv.payment_method,
           notes: pv.notes,
