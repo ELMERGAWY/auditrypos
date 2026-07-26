@@ -242,10 +242,25 @@ export function InventoryTab({ restaurantId, currency, businessType }: Props) {
 
   const handleDelete = async (id: string) => {
     if (!confirm('حذف هذا المنتج?')) return;
-    const { error } = await supabase.from('products').delete().eq('id', id);
-    if (error) { toast.error(`فشل الحذف: ${error.message}`); return; }
-    toast.success('تم الحذف');
-    load();
+    
+    try {
+      // First delete related stock_movements
+      const { error: mvErr } = await supabase.from('stock_movements').delete().eq('product_id', id);
+      if (mvErr) console.warn('Failed to delete stock_movements:', mvErr.message);
+      
+      // Delete warehouse_stock records
+      const { error: whErr } = await supabase.from('warehouse_stock').delete().eq('product_id', id);
+      if (whErr) console.warn('Failed to delete warehouse_stock:', whErr.message);
+      
+      // Then delete the product
+      const { error } = await supabase.from('products').delete().eq('id', id);
+      if (error) { toast.error(`فشل الحذف: ${error.message}`); return; }
+      
+      toast.success('تم الحذف');
+      load();
+    } catch (e: any) {
+      toast.error(`فشل الحذف: ${e?.message || 'تحقق من الصلاحيات'}`);
+    }
   };
 
   const handleMovement = async () => {
@@ -316,7 +331,24 @@ export function InventoryTab({ restaurantId, currency, businessType }: Props) {
     const totalCost = qty * showDeductionModal.cost_price;
 
     try {
-      // Update product quantity
+      // Check if product uses warehouse_stock system
+      const { data: warehouseStock } = await supabase
+        .from('warehouse_stock')
+        .select('*')
+        .eq('product_id', showDeductionModal.id)
+        .eq('restaurant_id', restaurantId)
+        .maybeSingle();
+
+      if (warehouseStock) {
+        // Update warehouse_stock
+        const { error: whErr } = await supabase
+          .from('warehouse_stock')
+          .update({ quantity: Math.max(0, Number(warehouseStock.quantity) - qty) })
+          .eq('id', warehouseStock.id);
+        if (whErr) throw whErr;
+      }
+
+      // Update product quantity (fallback or for products without warehouse_stock)
       const { error: updErr } = await supabase.from('products').update({ quantity: newQty }).eq('id', showDeductionModal.id);
       if (updErr) throw updErr;
 
