@@ -77,7 +77,7 @@ CREATE TABLE IF NOT EXISTS public.oauth_connection_logs (
   error_message TEXT,
   ip_address TEXT,
   user_agent TEXT,
-  created_by UUID REFERENCES public.auth.users(id),
+  created_by UUID,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
