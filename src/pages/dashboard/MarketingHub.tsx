@@ -2,7 +2,7 @@
 import { lazy, Suspense, useState } from 'react';
 import { motion } from 'framer-motion';
 import {
-  Megaphone, FileText, FileCheck, Workflow, DollarSign, Layers, Briefcase, Package
+  Megaphone, FileText, FileCheck, Workflow, DollarSign, Layers, Briefcase, Package, Share2
 } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 
@@ -14,8 +14,9 @@ const MarketingAccounting = lazy(() => import('./MarketingAccounting'));
 const MarketingProjects = lazy(() => import('./MarketingProjects').then(m => ({ default: m.MarketingProjects })));
 const ServiceDeliverables = lazy(() => import('./ServiceDeliverables').then(m => ({ default: m.ServiceDeliverables })));
 const MediaPlans = lazy(() => import('./MediaPlans').then(m => ({ default: m.MediaPlans })));
+const SocialMediaManager = lazy(() => import('./SocialMediaManager').then(m => ({ default: m.SocialMediaManager })));
 
-type SubTab = 'services' | 'quotes' | 'contracts' | 'projects' | 'media_plans' | 'workflow' | 'deliverables' | 'accounting';
+type SubTab = 'services' | 'quotes' | 'contracts' | 'projects' | 'media_plans' | 'workflow' | 'deliverables' | 'accounting' | 'social_media';
 
 const TABS: { id: SubTab; label: string; icon: any; color: string }[] = [
   { id: 'services', label: 'الخدمات والأسعار', icon: Layers, color: 'text-blue-500' },
@@ -26,6 +27,7 @@ const TABS: { id: SubTab; label: string; icon: any; color: string }[] = [
   { id: 'workflow', label: 'سير العمل', icon: Workflow, color: 'text-purple-500' },
   { id: 'deliverables', label: 'المخرجات', icon: Package, color: 'text-orange-500' },
   { id: 'accounting', label: 'المحاسبة والربحية', icon: DollarSign, color: 'text-green-600' },
+  { id: 'social_media', label: 'وسائل التواصل', icon: Share2, color: 'text-red-500' },
 ];
 
 export function MarketingHub(props: any) {
@@ -41,6 +43,7 @@ export function MarketingHub(props: any) {
       case 'workflow': return <MarketingWorkflow {...props} />;
       case 'deliverables': return <ServiceDeliverables {...props} />;
       case 'accounting': return <MarketingAccounting {...props} />;
+      case 'social_media': return <SocialMediaManager restaurantId={props.restaurantId} />;
     }
   };
 

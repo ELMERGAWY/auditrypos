@@ -26,6 +26,7 @@ const InventoryTransfers = lazy(() => import("./pages/InventoryTransfers"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 const OAuthConsent = lazy(() => import("./pages/OAuthConsent"));
 const StaffLogin = lazy(() => import("./pages/StaffLogin"));
+const OAuthCallback = lazy(() => import("./pages/oauth-callback"));
 
 const queryClient = new QueryClient();
 
@@ -88,6 +89,7 @@ const App = () => (
               <Route path="/driver" element={<DriverDashboard />} />
               <Route path="/track/:token" element={<TrackOrder />} />
               <Route path="/.lovable/oauth/consent" element={<OAuthConsent />} />
+              <Route path="/oauth/callback" element={<OAuthCallback />} />
               <Route path="*" element={<NotFound />} />
 
             </Routes>
