@@ -41,7 +41,7 @@ CREATE TABLE IF NOT EXISTS public.social_media_posts (
   published_at TIMESTAMP WITH TIME ZONE,
   metrics JSONB DEFAULT '{}', -- likes, comments, shares, views, etc.
   error_message TEXT,
-  created_by UUID REFERENCES public.auth.users(id),
+  created_by UUID,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
