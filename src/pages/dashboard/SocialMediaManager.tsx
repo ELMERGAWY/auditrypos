@@ -17,6 +17,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import OAuthService, { SOCIAL_PLATFORMS, SocialAccount } from '@/lib/socialMedia/oauthService';
+import { SocialMediaDashboard } from './SocialMediaDashboard';
 
 interface Props {
   restaurantId: string;
@@ -30,6 +31,7 @@ export function SocialMediaManager({ restaurantId }: Props) {
   const [oauthService] = useState(() => new OAuthService(supabase));
   const [showSecrets, setShowSecrets] = useState(false);
   const [platformSecrets, setPlatformSecrets] = useState<Record<string, { clientId: string; clientSecret: string }>>({});
+  const [activeTab, setActiveTab] = useState('accounts');
 
   useEffect(() => {
     loadAccounts();
@@ -161,79 +163,95 @@ export function SocialMediaManager({ restaurantId }: Props) {
           <h2 className="text-2xl font-bold">إدارة وسائل التواصل الاجتماعي</h2>
           <p className="text-muted-foreground">ربط وإدارة حسابات التواصل الاجتماعي عبر OAuth</p>
         </div>
-        <Button onClick={() => setShowConnectModal(true)}>
-          <Plus className="w-4 h-4 mr-2" />
-          إعداد OAuth
-        </Button>
+        {activeTab === 'accounts' && (
+          <Button onClick={() => setShowConnectModal(true)}>
+            <Plus className="w-4 h-4 mr-2" />
+            إعداد OAuth
+          </Button>
+        )}
       </div>
 
-      {/* Connected Accounts */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {accounts.map((account) => {
-          const PlatformIcon = getPlatformIcon(account.platform);
-          const platformConfig = SOCIAL_PLATFORMS[account.platform];
-          
-          return (
-            <Card key={account.id} className="p-4">
-              <div className="flex items-start justify-between mb-3">
-                <div className="flex items-center gap-3">
-                  <div 
-                    className="w-12 h-12 rounded-xl flex items-center justify-center text-2xl"
-                    style={{ backgroundColor: getPlatformColor(account.platform) + '20' }}
-                  >
-                    {platformConfig?.icon || '🌐'}
+      {/* Tabs */}
+      <Tabs value={activeTab} onValueChange={setActiveTab}>
+        <TabsList>
+          <TabsTrigger value="accounts">الحسابات</TabsTrigger>
+          <TabsTrigger value="dashboard">لوحة التحكم</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="accounts">
+          {/* Connected Accounts */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {accounts.map((account) => {
+              const PlatformIcon = getPlatformIcon(account.platform);
+              const platformConfig = SOCIAL_PLATFORMS[account.platform];
+              
+              return (
+                <Card key={account.id} className="p-4">
+                  <div className="flex items-start justify-between mb-3">
+                    <div className="flex items-center gap-3">
+                      <div 
+                        className="w-12 h-12 rounded-xl flex items-center justify-center text-2xl"
+                        style={{ backgroundColor: getPlatformColor(account.platform) + '20' }}
+                      >
+                        {platformConfig?.icon || '🌐'}
+                      </div>
+                      <div>
+                        <p className="font-bold">{account.account_name}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {account.account_handle && `@${account.account_handle}`}
+                        </p>
+                      </div>
+                    </div>
+                    <Badge variant={account.is_primary ? 'default' : 'outline'}>
+                      {account.is_primary ? 'أساسي' : 'عادي'}
+                    </Badge>
+                  </div>
+                  
+                  <div className="flex items-center gap-2 text-xs text-muted-foreground mb-3">
+                    <CheckCircle className="w-3 h-3 text-green-500" />
+                    <span>متصل</span>
+                  </div>
+
+                  <div className="flex gap-2">
+                    <Button size="sm" variant="outline" className="flex-1">
+                      <BarChart3 className="w-3 h-3 mr-1" />
+                      إحصائيات
+                    </Button>
+                    <Button 
+                      size="sm" 
+                      variant="ghost" 
+                      className="text-destructive hover:bg-destructive/10"
+                      onClick={() => handleDisconnect(account.id)}
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </Button>
+                  </div>
+                </Card>
+              );
+            })}
+
+            {accounts.length === 0 && (
+              <Card className="p-8 col-span-full">
+                <div className="text-center space-y-4">
+                  <div className="w-16 h-16 bg-secondary/50 rounded-full flex items-center justify-center mx-auto">
+                    <Link2 className="w-8 h-8 text-muted-foreground" />
                   </div>
                   <div>
-                    <p className="font-bold">{account.account_name}</p>
-                    <p className="text-xs text-muted-foreground">
-                      {account.account_handle && `@${account.account_handle}`}
+                    <p className="font-bold">لا توجد حسابات متصلة</p>
+                    <p className="text-sm text-muted-foreground">
+                      قم بإعداد OAuth وربط حسابات التواصل الاجتماعي للبدء
                     </p>
                   </div>
                 </div>
-                <Badge variant={account.is_primary ? 'default' : 'outline'}>
-                  {account.is_primary ? 'أساسي' : 'عادي'}
-                </Badge>
-              </div>
-              
-              <div className="flex items-center gap-2 text-xs text-muted-foreground mb-3">
-                <CheckCircle className="w-3 h-3 text-green-500" />
-                <span>متصل</span>
-              </div>
+              </Card>
+            )}
+          </div>
+        </TabsContent>
 
-              <div className="flex gap-2">
-                <Button size="sm" variant="outline" className="flex-1">
-                  <BarChart3 className="w-3 h-3 mr-1" />
-                  إحصائيات
-                </Button>
-                <Button 
-                  size="sm" 
-                  variant="ghost" 
-                  className="text-destructive hover:bg-destructive/10"
-                  onClick={() => handleDisconnect(account.id)}
-                >
-                  <Trash2 className="w-4 h-4" />
-                </Button>
-              </div>
-            </Card>
-          );
-        })}
-
-        {accounts.length === 0 && (
-          <Card className="p-8 col-span-full">
-            <div className="text-center space-y-4">
-              <div className="w-16 h-16 bg-secondary/50 rounded-full flex items-center justify-center mx-auto">
-                <Link2 className="w-8 h-8 text-muted-foreground" />
-              </div>
-              <div>
-                <p className="font-bold">لا توجد حسابات متصلة</p>
-                <p className="text-sm text-muted-foreground">
-                  قم بإعداد OAuth وربط حسابات التواصل الاجتماعي للبدء
-                </p>
-              </div>
-            </div>
-          </Card>
-        )}
-      </div>
+        <TabsContent value="dashboard">
+          <SocialMediaDashboard restaurantId={restaurantId} />
+        </TabsContent>
+      </Tabs>
 
       {/* OAuth Setup Modal */}
       <AnimatePresence>
