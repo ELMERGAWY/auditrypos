@@ -110,6 +110,7 @@ export function InventoryTab({ restaurantId, currency, businessType }: Props) {
   const [movementReason, setMovementReason] = useState('');
   const [showDeductionModal, setShowDeductionModal] = useState<Product | null>(null);
   const [deductionQty, setDeductionQty] = useState('');
+  const [deductionCost, setDeductionCost] = useState('');
   const [deductionType, setDeductionType] = useState<'direct' | 'cogs'>('direct');
   const [deductionReason, setDeductionReason] = useState('');
   const [showReports, setShowReports] = useState(false);
@@ -328,7 +329,9 @@ export function InventoryTab({ restaurantId, currency, businessType }: Props) {
     if (qty > showDeductionModal.quantity) return toast.error('الكمية أكبر من الرصيد المتاح');
 
     const newQty = Math.max(0, showDeductionModal.quantity - qty);
-    const totalCost = qty * showDeductionModal.cost_price;
+    // Use input cost if provided, otherwise use product cost
+    const costPerUnit = deductionCost ? Number(deductionCost) : showDeductionModal.cost_price;
+    const totalCost = qty * costPerUnit;
 
     try {
       // Check if product uses warehouse_stock system
@@ -358,7 +361,9 @@ export function InventoryTab({ restaurantId, currency, businessType }: Props) {
         restaurant_id: restaurantId,
         type: 'out',
         quantity: qty,
-        reason: deductionType === 'direct' ? `خصم مباشر: ${deductionReason}` : `هلاك/تلف (COGS): ${deductionReason}`,
+        reason: deductionType === 'direct' 
+          ? `خصم مباشر: ${deductionReason} (تكلفة: ${costPerUnit})` 
+          : `هلاك/تلف (COGS): ${deductionReason} (تكلفة: ${costPerUnit})`,
       });
       if (mvErr) console.warn('stock_movements log failed:', mvErr.message);
 
@@ -388,6 +393,7 @@ export function InventoryTab({ restaurantId, currency, businessType }: Props) {
       toast.success(deductionType === 'direct' ? 'تم الخصم المباشر' : 'تم تسجيل الهلاك كمصروف COGS');
       setShowDeductionModal(null);
       setDeductionQty('');
+      setDeductionCost('');
       setDeductionReason('');
       load();
     } catch (e: any) {
@@ -588,7 +594,6 @@ export function InventoryTab({ restaurantId, currency, businessType }: Props) {
                   </div>
                   <div className="flex gap-1">
                     <Button size="sm" variant="ghost" className="rounded-lg h-8 w-8 p-0" onClick={() => loadProductHistory(p)} title="سجل الحركة"><BarChart3 className="w-4 h-4" /></Button>
-                    <Button size="sm" variant="ghost" className="rounded-lg h-8 w-8 p-0" onClick={() => setShowMovement(p)} title="حركة مخزون"><Package className="w-4 h-4" /></Button>
                     <Button size="sm" variant="ghost" className="rounded-lg h-8 w-8 p-0 text-destructive hover:bg-destructive/10" onClick={() => setShowDeductionModal(p)} title="خصم مخزون"><ArrowUp className="w-4 h-4" /></Button>
                     <Button size="sm" variant="ghost" className="rounded-lg h-8 w-8 p-0" onClick={() => startEdit(p)}><Edit2 className="w-4 h-4" /></Button>
                     <Button size="sm" variant="ghost" className="rounded-lg h-8 w-8 p-0 text-destructive hover:bg-destructive/10" onClick={() => handleDelete(p.id)}><Trash2 className="w-4 h-4" /></Button>
@@ -1152,6 +1157,12 @@ export function InventoryTab({ restaurantId, currency, businessType }: Props) {
                 <div>
                   <Label className="text-xs mb-1 block mr-1">الكمية</Label>
                   <Input placeholder="0.00" type="number" step="0.01" value={deductionQty} onChange={e => setDeductionQty(e.target.value)} className="h-11 rounded-xl" />
+                </div>
+
+                <div>
+                  <Label className="text-xs mb-1 block mr-1">التكلفة للوحدة (اختياري)</Label>
+                  <Input placeholder={`الافتراضي: ${showDeductionModal.cost_price}`} type="number" step="0.01" value={deductionCost} onChange={e => setDeductionCost(e.target.value)} className="h-11 rounded-xl" />
+                  <p className="text-[10px] text-muted-foreground mt-1">اتركه فارغاً لاستخدام تكلفة المنتج الافتراضية</p>
                 </div>
 
                 <div>
