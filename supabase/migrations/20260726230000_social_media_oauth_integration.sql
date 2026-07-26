@@ -115,36 +115,36 @@ ALTER TABLE public.oauth_connection_logs ENABLE ROW LEVEL SECURITY;
 -- Social media accounts RLS
 CREATE POLICY "Users can view own restaurant social accounts"
   ON public.social_media_accounts FOR SELECT
-  USING (restaurant_id IN (SELECT id FROM public.restaurants WHERE user_id = auth.uid()));
+  USING (restaurant_id IN (SELECT id FROM public.restaurants WHERE owner_id = auth.uid()));
 
 CREATE POLICY "Users can insert own restaurant social accounts"
   ON public.social_media_accounts FOR INSERT
-  WITH CHECK (restaurant_id IN (SELECT id FROM public.restaurants WHERE user_id = auth.uid()));
+  WITH CHECK (restaurant_id IN (SELECT id FROM public.restaurants WHERE owner_id = auth.uid()));
 
 CREATE POLICY "Users can update own restaurant social accounts"
   ON public.social_media_accounts FOR UPDATE
-  USING (restaurant_id IN (SELECT id FROM public.restaurants WHERE user_id = auth.uid()));
+  USING (restaurant_id IN (SELECT id FROM public.restaurants WHERE owner_id = auth.uid()));
 
 CREATE POLICY "Users can delete own restaurant social accounts"
   ON public.social_media_accounts FOR DELETE
-  USING (restaurant_id IN (SELECT id FROM public.restaurants WHERE user_id = auth.uid()));
+  USING (restaurant_id IN (SELECT id FROM public.restaurants WHERE owner_id = auth.uid()));
 
 -- Social media posts RLS
 CREATE POLICY "Users can view own restaurant social posts"
   ON public.social_media_posts FOR SELECT
-  USING (restaurant_id IN (SELECT id FROM public.restaurants WHERE user_id = auth.uid()));
+  USING (restaurant_id IN (SELECT id FROM public.restaurants WHERE owner_id = auth.uid()));
 
 CREATE POLICY "Users can insert own restaurant social posts"
   ON public.social_media_posts FOR INSERT
-  WITH CHECK (restaurant_id IN (SELECT id FROM public.restaurants WHERE user_id = auth.uid()));
+  WITH CHECK (restaurant_id IN (SELECT id FROM public.restaurants WHERE owner_id = auth.uid()));
 
 CREATE POLICY "Users can update own restaurant social posts"
   ON public.social_media_posts FOR UPDATE
-  USING (restaurant_id IN (SELECT id FROM public.restaurants WHERE user_id = auth.uid()));
+  USING (restaurant_id IN (SELECT id FROM public.restaurants WHERE owner_id = auth.uid()));
 
 CREATE POLICY "Users can delete own restaurant social posts"
   ON public.social_media_posts FOR DELETE
-  USING (restaurant_id IN (SELECT id FROM public.restaurants WHERE user_id = auth.uid()));
+  USING (restaurant_id IN (SELECT id FROM public.restaurants WHERE owner_id = auth.uid()));
 
 -- Social media analytics RLS
 CREATE POLICY "Users can view own restaurant analytics"
@@ -152,18 +152,18 @@ CREATE POLICY "Users can view own restaurant analytics"
   USING (
     social_account_id IN (
       SELECT id FROM public.social_media_accounts 
-      WHERE restaurant_id IN (SELECT id FROM public.restaurants WHERE user_id = auth.uid())
+      WHERE restaurant_id IN (SELECT id FROM public.restaurants WHERE owner_id = auth.uid())
     )
   );
 
 -- OAuth logs RLS
 CREATE POLICY "Users can view own restaurant oauth logs"
   ON public.oauth_connection_logs FOR SELECT
-  USING (restaurant_id IN (SELECT id FROM public.restaurants WHERE user_id = auth.uid()));
+  USING (restaurant_id IN (SELECT id FROM public.restaurants WHERE owner_id = auth.uid()));
 
 CREATE POLICY "Users can insert own restaurant oauth logs"
   ON public.oauth_connection_logs FOR INSERT
-  WITH CHECK (restaurant_id IN (SELECT id FROM public.restaurants WHERE user_id = auth.uid()));
+  WITH CHECK (restaurant_id IN (SELECT id FROM public.restaurants WHERE owner_id = auth.uid()));
 
 -- Function to update updated_at timestamp
 CREATE OR REPLACE FUNCTION public.update_updated_at_column()
@@ -179,19 +179,19 @@ ALTER TABLE public.social_media_oauth_config ENABLE ROW LEVEL SECURITY;
 
 CREATE POLICY "Users can view own restaurant oauth config"
   ON public.social_media_oauth_config FOR SELECT
-  USING (restaurant_id IN (SELECT id FROM public.restaurants WHERE user_id = auth.uid()));
+  USING (restaurant_id IN (SELECT id FROM public.restaurants WHERE owner_id = auth.uid()));
 
 CREATE POLICY "Users can insert own restaurant oauth config"
   ON public.social_media_oauth_config FOR INSERT
-  WITH CHECK (restaurant_id IN (SELECT id FROM public.restaurants WHERE user_id = auth.uid()));
+  WITH CHECK (restaurant_id IN (SELECT id FROM public.restaurants WHERE owner_id = auth.uid()));
 
 CREATE POLICY "Users can update own restaurant oauth config"
   ON public.social_media_oauth_config FOR UPDATE
-  USING (restaurant_id IN (SELECT id FROM public.restaurants WHERE user_id = auth.uid()));
+  USING (restaurant_id IN (SELECT id FROM public.restaurants WHERE owner_id = auth.uid()));
 
 CREATE POLICY "Users can delete own restaurant oauth config"
   ON public.social_media_oauth_config FOR DELETE
-  USING (restaurant_id IN (SELECT id FROM public.restaurants WHERE user_id = auth.uid()));
+  USING (restaurant_id IN (SELECT id FROM public.restaurants WHERE owner_id = auth.uid()));
 
 -- Triggers for updated_at
 CREATE TRIGGER update_social_media_accounts_updated_at
