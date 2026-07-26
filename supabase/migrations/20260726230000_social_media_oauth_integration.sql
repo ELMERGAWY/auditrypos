@@ -193,7 +193,7 @@ CREATE POLICY "Users can delete own restaurant oauth config"
   ON public.social_media_oauth_config FOR DELETE
   USING (restaurant_id IN (SELECT id FROM public.restaurants WHERE user_id = auth.uid()));
 
- triggers for updated_at
+-- Triggers for updated_at
 CREATE TRIGGER update_social_media_accounts_updated_at
   BEFORE UPDATE ON public.social_media_accounts
   FOR EACH ROW EXECUTE FUNCTION public.update_updated_at_column();
