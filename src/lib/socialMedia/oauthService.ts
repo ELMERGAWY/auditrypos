@@ -157,10 +157,15 @@ class OAuthService {
       throw new Error(`Platform ${platform} not configured`);
     }
 
+    // Ensure scopes are never empty - use default if needed
+    const scopes = platformConfig.scopes && platformConfig.scopes.length > 0
+      ? platformConfig.scopes.join(' ')
+      : 'email public_profile';
+
     const params = new URLSearchParams({
       client_id: oauthConfig.clientId,
       redirect_uri: oauthConfig.redirectUri,
-      scope: platformConfig.scopes.join(' '),
+      scope: scopes,
       response_type: 'code',
       state: state,
     });
