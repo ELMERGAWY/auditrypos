@@ -113,8 +113,15 @@ export function SocialMediaManager({ restaurantId }: Props) {
     localStorage.setItem('oauth_restaurant_id', restaurantId);
     
     console.log('OAuth Connect - Stored state in localStorage:', state);
+    console.log('OAuth Connect - All localStorage items:', {
+      state: localStorage.getItem('oauth_state'),
+      platform: localStorage.getItem('oauth_platform'),
+      restaurantId: localStorage.getItem('oauth_restaurant_id')
+    });
 
-    window.open(authUrl, '_blank', 'width=600,height=700');
+    // Redirect in the same window instead of opening a new window
+    // This ensures localStorage is accessible
+    window.location.href = authUrl;
   };
 
   const handleDisconnect = async (accountId: string) => {

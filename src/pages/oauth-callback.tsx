@@ -27,14 +27,17 @@ export default function OAuthCallback() {
       const storedPlatform = localStorage.getItem('oauth_platform');
       const storedRestaurantId = localStorage.getItem('oauth_restaurant_id');
 
+      console.log('OAuth Callback - localStorage contents:', {
+        oauth_state: storedState,
+        oauth_platform: storedPlatform,
+        oauth_restaurant_id: storedRestaurantId,
+        allKeys: Object.keys(localStorage)
+      });
+
       // Clear stored state
       localStorage.removeItem('oauth_state');
       localStorage.removeItem('oauth_platform');
       localStorage.removeItem('oauth_restaurant_id');
-
-      console.log('OAuth Callback - Retrieved state from localStorage:', storedState);
-      console.log('OAuth Callback - Retrieved platform:', storedPlatform);
-      console.log('OAuth Callback - Retrieved restaurant ID:', storedRestaurantId);
 
       if (error) {
         console.error('OAuth error:', error);
@@ -69,7 +72,10 @@ export default function OAuthCallback() {
           stored: storedState,
           match: state === storedState
         });
+        console.warn('OAuth Callback - Continuing anyway due to graceful fallback');
         // Continue anyway since this is not critical for this use case
+      } else {
+        console.log('OAuth Callback - State validation passed');
       }
 
       try {
