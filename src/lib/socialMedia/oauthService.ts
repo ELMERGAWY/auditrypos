@@ -171,34 +171,24 @@ class OAuthService {
     console.log('OAuth Service Debug - Platform Config Scopes:', platformConfig.scopes);
     console.log('OAuth Service Debug - Scopes length:', scopes?.length);
 
-    const params = new URLSearchParams();
-    params.append('client_id', oauthConfig.clientId);
-    params.append('redirect_uri', oauthConfig.redirectUri);
-    params.append('scope', scopes);
-    params.append('response_type', 'code');
-    params.append('state', state);
-
-    // Debug: Verify scope was added
-    console.log('OAuth Service Debug - Params after append:', params.toString());
-    console.log('OAuth Service Debug - Scope in params:', params.get('scope'));
+    // Manually construct URL to ensure scope is always included
+    const params = [
+      `client_id=${oauthConfig.clientId}`,
+      `redirect_uri=${encodeURIComponent(oauthConfig.redirectUri)}`,
+      `scope=${encodeURIComponent(scopes)}`,
+      `response_type=code`,
+      `state=${state}`
+    ];
 
     // Add config_id for Meta Business Login if available
     if (oauthConfig.configId && platformConfig.isBusinessApp) {
-      params.append('config_id', oauthConfig.configId);
+      params.push(`config_id=${oauthConfig.configId}`);
       console.log('OAuth Service Debug - Config ID:', oauthConfig.configId);
     }
 
-    const finalUrl = `${platformConfig.authUrl}?${params.toString()}`;
+    const finalUrl = `${platformConfig.authUrl}?${params.join('&')}`;
     console.log('OAuth Service Debug - Final URL:', finalUrl);
     console.log('OAuth Service Debug - URL contains scope:', finalUrl.includes('scope='));
-    
-    // Force scope to be in the URL if it's missing
-    if (!finalUrl.includes('scope=')) {
-      console.error('CRITICAL: Scope parameter is missing from URL! Forcing it.');
-      const forcedUrl = `${platformConfig.authUrl}?client_id=${oauthConfig.clientId}&redirect_uri=${encodeURIComponent(oauthConfig.redirectUri)}&scope=${encodeURIComponent(scopes)}&response_type=code&state=${state}`;
-      console.log('OAuth Service Debug - Forced URL:', forcedUrl);
-      return forcedUrl;
-    }
     
     return finalUrl;
   }
