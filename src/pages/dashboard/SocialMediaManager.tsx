@@ -107,20 +107,12 @@ export function SocialMediaManager({ restaurantId }: Props) {
     const state = Math.random().toString(36).substring(7);
     const authUrl = oauthService.generateAuthUrl(platform, state);
     
-    // Debug: Log OAuth URL parameters
-    console.log('OAuth Debug - Platform:', platform);
-    console.log('OAuth Debug - Auth URL:', authUrl);
-    console.log('OAuth Debug - Client ID:', secrets.clientId);
-    console.log('OAuth Debug - Redirect URI:', `${window.location.origin}/oauth/callback`);
+    // Store state in localStorage for verification (persists across windows)
+    localStorage.setItem('oauth_state', state);
+    localStorage.setItem('oauth_platform', platform);
+    localStorage.setItem('oauth_restaurant_id', restaurantId);
     
-    // Show auth URL on screen for debugging
-    setDebugUrl(authUrl);
-    toast.success(`رابط OAuth: ${authUrl.substring(0, 100)}...`, { duration: 5000 });
-    
-    // Store state in sessionStorage for verification
-    sessionStorage.setItem('oauth_state', state);
-    sessionStorage.setItem('oauth_platform', platform);
-    sessionStorage.setItem('oauth_restaurant_id', restaurantId);
+    console.log('OAuth Connect - Stored state in localStorage:', state);
 
     window.open(authUrl, '_blank', 'width=600,height=700');
   };
