@@ -206,6 +206,12 @@ class OAuthService {
       throw new Error(`Platform ${platform} not configured`);
     }
 
+    console.log('OAuth Service - Exchange Code for Token');
+    console.log('OAuth Service - Platform:', platform);
+    console.log('OAuth Service - Token URL:', platformConfig.tokenUrl);
+    console.log('OAuth Service - Redirect URI:', oauthConfig.redirectUri);
+    console.log('OAuth Service - Code:', code.substring(0, 20) + '...');
+
     const response = await fetch(platformConfig.tokenUrl, {
       method: 'POST',
       headers: {
@@ -220,11 +226,15 @@ class OAuthService {
       }),
     });
 
+    console.log('OAuth Service - Token Response Status:', response.status);
+    const responseText = await response.text();
+    console.log('OAuth Service - Token Response Body:', responseText);
+
     if (!response.ok) {
-      throw new Error(`Failed to exchange code for token: ${response.statusText}`);
+      throw new Error(`Failed to exchange code for token: ${response.statusText} - ${responseText}`);
     }
 
-    return await response.json();
+    return JSON.parse(responseText);
   }
 
   // Refresh access token

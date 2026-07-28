@@ -61,45 +61,67 @@ export default function OAuthCallback() {
       }
 
       try {
+        console.log('OAuth Callback - Starting callback process');
+        console.log('OAuth Callback - Platform:', storedPlatform);
+        console.log('OAuth Callback - Restaurant ID:', storedRestaurantId);
+        
         // Load platform secrets
-        const { data: configData } = await supabase
+        const { data: configData, error: configError } = await supabase
           .from('social_media_oauth_config')
-          .select('client_id, client_secret')
+          .select('client_id, client_secret, config_id')
           .eq('restaurant_id', storedRestaurantId)
           .eq('platform', storedPlatform)
           .single();
 
-        if (!configData) {
-          throw new Error('OAuth configuration not found');
+        if (configError || !configData) {
+          console.error('OAuth Callback - Config error:', configError);
+          throw new Error('OAuth configuration not found: ' + (configError?.message || 'No config data'));
         }
 
+        console.log('OAuth Callback - Config loaded successfully');
+
         // Set platform config
+        const redirectUri = `${window.location.origin}/oauth/callback`;
         oauthService.setPlatformConfig(storedPlatform, {
           clientId: configData.client_id,
           clientSecret: configData.client_secret,
-          redirectUri: `${window.location.origin}/oauth/callback`,
+          redirectUri: redirectUri,
+          configId: configData.config_id,
         });
 
+        console.log('OAuth Callback - Platform config set');
+        console.log('OAuth Callback - Redirect URI:', redirectUri);
+
         // Exchange code for token
+        console.log('OAuth Callback - Exchanging code for token...');
         const tokenResponse = await oauthService.exchangeCodeForToken(
           storedPlatform,
           code,
           state
         );
 
+        console.log('OAuth Callback - Token exchange successful');
+        console.log('OAuth Callback - Token response:', tokenResponse);
+
         // Fetch account details from platform (this is platform-specific)
+        console.log('OAuth Callback - Fetching account details...');
         const accountData = await fetchAccountDetails(
           storedPlatform,
           tokenResponse.access_token
         );
 
+        console.log('OAuth Callback - Account data fetched:', accountData);
+
         // Save account to database
+        console.log('OAuth Callback - Saving account to database...');
         await oauthService.saveSocialAccount(
           storedRestaurantId,
           storedPlatform,
           tokenResponse,
           accountData
         );
+
+        console.log('OAuth Callback - Account saved successfully');
 
         // Navigate back to dashboard with success
         navigate('/dashboard', {
@@ -111,10 +133,18 @@ export default function OAuthCallback() {
         });
       } catch (error: any) {
         console.error('OAuth callback error:', error);
+        console.error('OAuth callback error details:', {
+          message: error.message,
+          stack: error.stack,
+          name: error.name,
+        });
+        
+        // Show detailed error in navigation state
         navigate('/dashboard', {
           state: {
             oauthError: true,
             message: error.message || 'فشل في إكمال المصادقة',
+            details: error.stack || 'No stack trace',
           },
         });
       }

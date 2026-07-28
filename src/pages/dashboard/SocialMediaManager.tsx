@@ -3,6 +3,7 @@
 
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useLocation } from 'react-router-dom';
 import { 
   Facebook, Instagram, Youtube, Linkedin, Music, Twitter, Pin, 
   Plus, X, CheckCircle, AlertCircle, RefreshCw, Calendar, BarChart3, 
@@ -24,6 +25,7 @@ interface Props {
 }
 
 export function SocialMediaManager({ restaurantId }: Props) {
+  const location = useLocation();
   const [accounts, setAccounts] = useState<SocialAccount[]>([]);
   const [loading, setLoading] = useState(true);
   const [showConnectModal, setShowConnectModal] = useState(false);
@@ -37,6 +39,19 @@ export function SocialMediaManager({ restaurantId }: Props) {
     loadAccounts();
     loadPlatformSecrets();
   }, [restaurantId]);
+
+  // Handle OAuth callback results
+  useEffect(() => {
+    if (location.state?.oauthSuccess) {
+      toast.success(`تم ربط حساب ${location.state.platform} بنجاح!`);
+      loadAccounts();
+    } else if (location.state?.oauthError) {
+      toast.error(`فشل ربط الحساب: ${location.state.message}`);
+      if (location.state.details) {
+        console.error('OAuth Error Details:', location.state.details);
+      }
+    }
+  }, [location.state]);
 
   const loadAccounts = async () => {
     try {
