@@ -18,6 +18,7 @@ export interface OAuthConfig {
   clientId: string;
   clientSecret: string;
   redirectUri: string;
+  configId?: string; // Meta Business Login Configuration ID
 }
 
 export interface OAuthTokenResponse {
@@ -49,7 +50,7 @@ export const SOCIAL_PLATFORMS: Record<string, SocialPlatform> = {
     color: '#1877F2',
     authUrl: 'https://www.facebook.com/v18.0/dialog/oauth',
     tokenUrl: 'https://graph.facebook.com/v18.0/oauth/access_token',
-    scopes: ['public_profile'],
+    scopes: ['business_management', 'pages_show_list', 'pages_read_engagement'],
     requiresAppSecret: true,
     isBusinessApp: true,
   },
@@ -176,6 +177,12 @@ class OAuthService {
       response_type: 'code',
       state: state,
     });
+
+    // Add config_id for Meta Business Login if available
+    if (oauthConfig.configId && platformConfig.isBusinessApp) {
+      params.append('config_id', oauthConfig.configId);
+      console.log('OAuth Service Debug - Config ID:', oauthConfig.configId);
+    }
 
     const finalUrl = `${platformConfig.authUrl}?${params.toString()}`;
     console.log('OAuth Service Debug - Final URL:', finalUrl);

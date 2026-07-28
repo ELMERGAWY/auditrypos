@@ -71,6 +71,8 @@ export function SocialMediaManager({ restaurantId }: Props) {
     }
   };
 
+  const [debugUrl, setDebugUrl] = useState<string>('');
+
   const handleConnect = async (platform: string) => {
     const secrets = platformSecrets[platform];
     if (!secrets || !secrets.clientId || !secrets.clientSecret) {
@@ -84,6 +86,7 @@ export function SocialMediaManager({ restaurantId }: Props) {
       clientId: secrets.clientId,
       clientSecret: secrets.clientSecret,
       redirectUri: `${window.location.origin}/oauth/callback`,
+      configId: secrets.configId, // Pass config_id if available for Meta Business Login
     });
 
     const state = Math.random().toString(36).substring(7);
@@ -94,6 +97,10 @@ export function SocialMediaManager({ restaurantId }: Props) {
     console.log('OAuth Debug - Auth URL:', authUrl);
     console.log('OAuth Debug - Client ID:', secrets.clientId);
     console.log('OAuth Debug - Redirect URI:', `${window.location.origin}/oauth/callback`);
+    
+    // Show auth URL on screen for debugging
+    setDebugUrl(authUrl);
+    toast.success(`رابط OAuth: ${authUrl.substring(0, 100)}...`, { duration: 5000 });
     
     // Store state in sessionStorage for verification
     sessionStorage.setItem('oauth_state', state);
@@ -176,6 +183,40 @@ export function SocialMediaManager({ restaurantId }: Props) {
           </Button>
         )}
       </div>
+
+      {/* Debug URL Display */}
+      {debugUrl && (
+        <Card className="p-4 bg-yellow-50 border-yellow-200">
+          <div className="space-y-2">
+            <p className="text-sm font-semibold text-yellow-800">رابط OAuth للتصحيح:</p>
+            <div className="flex gap-2">
+              <input
+                type="text"
+                value={debugUrl}
+                readOnly
+                className="flex-1 text-xs p-2 border rounded bg-white"
+              />
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => {
+                  navigator.clipboard.writeText(debugUrl);
+                  toast.success('تم نسخ الرابط');
+                }}
+              >
+                نسخ
+              </Button>
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() => setDebugUrl('')}
+              >
+                إغلاق
+              </Button>
+            </div>
+          </div>
+        </Card>
+      )}
 
       {/* Tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab}>
