@@ -169,14 +169,14 @@ class OAuthService {
     console.log('OAuth Service Debug - Platform:', platform);
     console.log('OAuth Service Debug - Scopes:', scopes);
     console.log('OAuth Service Debug - Platform Config Scopes:', platformConfig.scopes);
+    console.log('OAuth Service Debug - Scopes length:', scopes?.length);
 
-    const params = new URLSearchParams({
-      client_id: oauthConfig.clientId,
-      redirect_uri: oauthConfig.redirectUri,
-      scope: scopes,
-      response_type: 'code',
-      state: state,
-    });
+    const params = new URLSearchParams();
+    params.append('client_id', oauthConfig.clientId);
+    params.append('redirect_uri', oauthConfig.redirectUri);
+    params.append('scope', scopes);
+    params.append('response_type', 'code');
+    params.append('state', state);
 
     // Add config_id for Meta Business Login if available
     if (oauthConfig.configId && platformConfig.isBusinessApp) {
@@ -186,6 +186,7 @@ class OAuthService {
 
     const finalUrl = `${platformConfig.authUrl}?${params.toString()}`;
     console.log('OAuth Service Debug - Final URL:', finalUrl);
+    console.log('OAuth Service Debug - URL contains scope:', finalUrl.includes('scope='));
     
     return finalUrl;
   }
