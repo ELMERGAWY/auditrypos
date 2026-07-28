@@ -1,14 +1,18 @@
 // OAuth Callback Handler
 // Handles OAuth callback from social media platforms
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import OAuthService from '@/lib/socialMedia/oauthService';
+import { AlertCircle, CheckCircle, XCircle } from 'lucide-react';
 
 export default function OAuthCallback() {
   const navigate = useNavigate();
   const oauthService = new OAuthService(supabase);
+  const [status, setStatus] = useState<'loading' | 'success' | 'error'>('loading');
+  const [message, setMessage] = useState('');
+  const [details, setDetails] = useState('');
 
   useEffect(() => {
     const handleCallback = async () => {
@@ -29,34 +33,25 @@ export default function OAuthCallback() {
 
       if (error) {
         console.error('OAuth error:', error);
-        navigate('/dashboard', { 
-          state: { 
-            oauthError: true, 
-            message: 'فشل في المصادقة: ' + error 
-          } 
-        });
+        setStatus('error');
+        setMessage('فشل في المصادقة: ' + error);
+        setDetails(error);
         return;
       }
 
       if (!code || !state || !storedState || state !== storedState) {
         console.error('Invalid OAuth callback');
-        navigate('/dashboard', { 
-          state: { 
-            oauthError: true, 
-            message: 'رمز المصادقة غير صالح' 
-          } 
-        });
+        setStatus('error');
+        setMessage('رمز المصادقة غير صالح');
+        setDetails('Code: ' + (code ? 'present' : 'missing') + ', State: ' + (state ? 'present' : 'missing') + ', Stored State: ' + (storedState ? 'present' : 'missing'));
         return;
       }
 
       if (!storedPlatform || !storedRestaurantId) {
         console.error('Missing OAuth context');
-        navigate('/dashboard', { 
-          state: { 
-            oauthError: true, 
-            message: 'سياق المصادقة مفقود' 
-          } 
-        });
+        setStatus('error');
+        setMessage('سياق المصادقة مفقود');
+        setDetails('Platform: ' + (storedPlatform || 'missing') + ', Restaurant ID: ' + (storedRestaurantId || 'missing'));
         return;
       }
 
@@ -75,7 +70,10 @@ export default function OAuthCallback() {
 
         if (configError || !configData) {
           console.error('OAuth Callback - Config error:', configError);
-          throw new Error('OAuth configuration not found: ' + (configError?.message || 'No config data'));
+          setStatus('error');
+          setMessage('OAuth configuration not found');
+          setDetails(configError?.message || 'No config data');
+          return;
         }
 
         console.log('OAuth Callback - Config loaded successfully');
@@ -123,14 +121,19 @@ export default function OAuthCallback() {
 
         console.log('OAuth Callback - Account saved successfully');
 
-        // Navigate back to dashboard with success
-        navigate('/dashboard', {
-          state: {
-            oauthSuccess: true,
-            platform: storedPlatform,
-            accountName: accountData.account_name,
-          },
-        });
+        setStatus('success');
+        setMessage(`تم ربط حساب ${storedPlatform} بنجاح!`);
+        
+        // Navigate back to dashboard after a short delay
+        setTimeout(() => {
+          navigate('/dashboard', {
+            state: {
+              oauthSuccess: true,
+              platform: storedPlatform,
+              accountName: accountData.account_name,
+            },
+          });
+        }, 2000);
       } catch (error: any) {
         console.error('OAuth callback error:', error);
         console.error('OAuth callback error details:', {
@@ -139,14 +142,9 @@ export default function OAuthCallback() {
           name: error.name,
         });
         
-        // Show detailed error in navigation state
-        navigate('/dashboard', {
-          state: {
-            oauthError: true,
-            message: error.message || 'فشل في إكمال المصادقة',
-            details: error.stack || 'No stack trace',
-          },
-        });
+        setStatus('error');
+        setMessage('فشل في إكمال المصادقة');
+        setDetails(error.message || 'Unknown error');
       }
     };
 
@@ -311,10 +309,51 @@ export default function OAuthCallback() {
   };
 
   return (
-    <div className="flex items-center justify-center min-h-screen">
-      <div className="text-center space-y-4">
-        <div className="w-16 h-16 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto" />
-        <p className="text-muted-foreground">جاري إكمال المصادقة...</p>
+    <div className="flex items-center justify-center min-h-screen bg-background">
+      <div className="max-w-md w-full p-6 space-y-4">
+        {status === 'loading' && (
+          <div className="text-center space-y-4">
+            <div className="w-16 h-16 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto" />
+            <p className="text-muted-foreground">جاري إكمال المصادقة...</p>
+          </div>
+        )}
+        
+        {status === 'success' && (
+          <div className="text-center space-y-4">
+            <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto">
+              <CheckCircle className="w-8 h-8 text-green-600" />
+            </div>
+            <div>
+              <h3 className="text-lg font-bold text-green-600">نجاح!</h3>
+              <p className="text-muted-foreground">{message}</p>
+            </div>
+            <p className="text-sm text-muted-foreground">جاري التوجيه إلى لوحة التحكم...</p>
+          </div>
+        )}
+        
+        {status === 'error' && (
+          <div className="text-center space-y-4">
+            <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto">
+              <XCircle className="w-8 h-8 text-red-600" />
+            </div>
+            <div>
+              <h3 className="text-lg font-bold text-red-600">فشل المصادقة</h3>
+              <p className="text-muted-foreground">{message}</p>
+            </div>
+            {details && (
+              <div className="bg-red-50 border border-red-200 rounded-lg p-4 text-left">
+                <p className="text-xs font-semibold text-red-800 mb-2">تفاصيل الخطأ:</p>
+                <p className="text-xs text-red-700 font-mono break-all">{details}</p>
+              </div>
+            )}
+            <Button 
+              onClick={() => navigate('/dashboard')}
+              className="w-full"
+            >
+              العودة إلى لوحة التحكم
+            </Button>
+          </div>
+        )}
       </div>
     </div>
   );

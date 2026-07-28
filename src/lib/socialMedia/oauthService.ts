@@ -278,11 +278,17 @@ class OAuthService {
       account_avatar_url?: string;
     }
   ): Promise<void> {
+    console.log('Save Social Account - Starting save process');
+    console.log('Save Social Account - Restaurant ID:', restaurantId);
+    console.log('Save Social Account - Platform:', platform);
+    console.log('Save Social Account - Account ID:', accountData.account_id);
+    console.log('Save Social Account - Account Name:', accountData.account_name);
+
     const expiresAt = tokenResponse.expires_in
       ? new Date(Date.now() + tokenResponse.expires_in * 1000).toISOString()
       : null;
 
-    const { error } = await this.supabase.from('social_media_accounts').upsert({
+    const accountRecord = {
       restaurant_id: restaurantId,
       platform: platform,
       account_id: accountData.account_id,
@@ -295,11 +301,24 @@ class OAuthService {
       scopes: tokenResponse.scope?.split(' ') || [],
       is_active: true,
       updated_at: new Date().toISOString(),
-    });
+    };
+
+    console.log('Save Social Account - Account record:', accountRecord);
+
+    const { error, data } = await this.supabase.from('social_media_accounts').upsert(accountRecord);
 
     if (error) {
-      throw new Error(`Failed to save social account: ${error.message}`);
+      console.error('Save Social Account - Database error:', error);
+      console.error('Save Social Account - Error details:', {
+        message: error.message,
+        code: error.code,
+        details: error.details,
+        hint: error.hint,
+      });
+      throw new Error(`Failed to save social account: ${error.message} (Code: ${error.code})`);
     }
+
+    console.log('Save Social Account - Save successful:', data);
 
     // Log the connection
     await this.logOAuthEvent(restaurantId, platform, 'connect', 'success');
