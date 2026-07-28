@@ -133,7 +133,7 @@ export default function OAuthCallback() {
         // Load platform secrets
         const { data: configData, error: configError } = await supabase
           .from('social_media_oauth_config')
-          .select('client_id, client_secret, config_id')
+          .select('client_id, client_secret')
           .eq('restaurant_id', storedRestaurantId)
           .eq('platform', storedPlatform)
           .single();
@@ -154,7 +154,6 @@ export default function OAuthCallback() {
           clientId: configData.client_id,
           clientSecret: configData.client_secret,
           redirectUri: redirectUri,
-          configId: configData.config_id,
         });
 
         console.log('OAuth Callback - Platform config set');

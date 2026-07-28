@@ -101,7 +101,6 @@ export function SocialMediaManager({ restaurantId }: Props) {
       clientId: secrets.clientId,
       clientSecret: secrets.clientSecret,
       redirectUri: `${window.location.origin}/oauth/callback`,
-      configId: secrets.configId, // Pass config_id if available for Meta Business Login
     });
 
     // Encode context in OAuth state parameter (more reliable than localStorage)
