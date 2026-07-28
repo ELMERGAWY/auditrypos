@@ -122,9 +122,11 @@ export const edaraCore = {
         restaurant_id: data.restaurantId,
         product_id: item.productId,
         quantity: -item.quantity, // Deduction
+        type: 'out',
         movement_type: 'sale',
         reference_id: data.orderId,
-        notes: `عملية بيع رقم: ${data.orderNumber}`
+        notes: `عملية بيع رقم: ${data.orderNumber}`,
+        warehouse_id: item.warehouseId || null // Will be auto-set by trigger if null
       }));
 
     if (movements.length > 0) {

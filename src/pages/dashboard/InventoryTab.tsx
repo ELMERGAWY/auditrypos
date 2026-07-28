@@ -279,7 +279,7 @@ export function InventoryTab({ restaurantId, currency, businessType }: Props) {
         type: movementType, 
         quantity: qty, 
         reason: movementReason,
-        project_id: selectedProjectId || null,
+        warehouse_id: showMovement.warehouse_id || null,
       });
       if (mvErr) console.warn('stock_movements log failed (continuing):', mvErr.message);
 
@@ -364,6 +364,7 @@ export function InventoryTab({ restaurantId, currency, businessType }: Props) {
         reason: deductionType === 'direct' 
           ? `خصم مباشر: ${deductionReason} (تكلفة: ${costPerUnit})` 
           : `هلاك/تلف (COGS): ${deductionReason} (تكلفة: ${costPerUnit})`,
+        warehouse_id: showDeductionModal.warehouse_id || null,
       });
       if (mvErr) console.warn('stock_movements log failed:', mvErr.message);
 
