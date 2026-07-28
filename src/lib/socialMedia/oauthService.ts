@@ -18,7 +18,6 @@ export interface OAuthConfig {
   clientId: string;
   clientSecret: string;
   redirectUri: string;
-  configId?: string; // Meta Business Login Configuration ID
 }
 
 export interface OAuthTokenResponse {
@@ -179,12 +178,6 @@ class OAuthService {
       `response_type=code`,
       `state=${state}`
     ];
-
-    // Add config_id for Meta Business Login if available
-    if (oauthConfig.configId && platformConfig.isBusinessApp) {
-      params.push(`config_id=${oauthConfig.configId}`);
-      console.log('OAuth Service Debug - Config ID:', oauthConfig.configId);
-    }
 
     const finalUrl = `${platformConfig.authUrl}?${params.join('&')}`;
     console.log('OAuth Service Debug - Final URL:', finalUrl);
