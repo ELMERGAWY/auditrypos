@@ -178,6 +178,10 @@ class OAuthService {
     params.append('response_type', 'code');
     params.append('state', state);
 
+    // Debug: Verify scope was added
+    console.log('OAuth Service Debug - Params after append:', params.toString());
+    console.log('OAuth Service Debug - Scope in params:', params.get('scope'));
+
     // Add config_id for Meta Business Login if available
     if (oauthConfig.configId && platformConfig.isBusinessApp) {
       params.append('config_id', oauthConfig.configId);
@@ -187,6 +191,14 @@ class OAuthService {
     const finalUrl = `${platformConfig.authUrl}?${params.toString()}`;
     console.log('OAuth Service Debug - Final URL:', finalUrl);
     console.log('OAuth Service Debug - URL contains scope:', finalUrl.includes('scope='));
+    
+    // Force scope to be in the URL if it's missing
+    if (!finalUrl.includes('scope=')) {
+      console.error('CRITICAL: Scope parameter is missing from URL! Forcing it.');
+      const forcedUrl = `${platformConfig.authUrl}?client_id=${oauthConfig.clientId}&redirect_uri=${encodeURIComponent(oauthConfig.redirectUri)}&scope=${encodeURIComponent(scopes)}&response_type=code&state=${state}`;
+      console.log('OAuth Service Debug - Forced URL:', forcedUrl);
+      return forcedUrl;
+    }
     
     return finalUrl;
   }
