@@ -48,7 +48,7 @@ export const SOCIAL_PLATFORMS: Record<string, SocialPlatform> = {
     color: '#1877F2',
     authUrl: 'https://www.facebook.com/v18.0/dialog/oauth',
     tokenUrl: 'https://graph.facebook.com/v18.0/oauth/access_token',
-    scopes: ['email', 'public_profile', 'pages_show_list', 'pages_read_engagement', 'pages_read_user_content'],
+    scopes: ['email', 'public_profile'],
     requiresAppSecret: true,
   },
   instagram: {
