@@ -136,13 +136,21 @@ export default function OAuthCallback() {
           .select('client_id, client_secret')
           .eq('restaurant_id', storedRestaurantId)
           .eq('platform', storedPlatform)
-          .single();
+          .maybeSingle();
 
-        if (configError || !configData) {
-          console.error('OAuth Callback - Config error:', configError);
+        if (configError) {
+          console.error('OAuth Callback - Config query error:', configError);
+          setStatus('error');
+          setMessage('OAuth configuration query failed');
+          setDetails(configError.message);
+          return;
+        }
+
+        if (!configData) {
+          console.error('OAuth Callback - No config found for platform:', storedPlatform);
           setStatus('error');
           setMessage('OAuth configuration not found');
-          setDetails(configError?.message || 'No config data');
+          setDetails(`No OAuth configuration found for platform '${storedPlatform}' and restaurant '${storedRestaurantId}'. Please configure OAuth settings first.`);
           return;
         }
 
