@@ -11,6 +11,7 @@ export interface SocialPlatform {
   tokenUrl: string;
   scopes: string[];
   requiresAppSecret: boolean;
+  isBusinessApp?: boolean;
 }
 
 export interface OAuthConfig {
@@ -48,8 +49,9 @@ export const SOCIAL_PLATFORMS: Record<string, SocialPlatform> = {
     color: '#1877F2',
     authUrl: 'https://www.facebook.com/v18.0/dialog/oauth',
     tokenUrl: 'https://graph.facebook.com/v18.0/oauth/access_token',
-    scopes: ['email', 'public_profile'],
+    scopes: ['public_profile'],
     requiresAppSecret: true,
+    isBusinessApp: true,
   },
   instagram: {
     id: 'instagram',
@@ -162,6 +164,11 @@ class OAuthService {
       ? platformConfig.scopes.join(' ')
       : 'email public_profile';
 
+    // Debug: Log scopes being used
+    console.log('OAuth Service Debug - Platform:', platform);
+    console.log('OAuth Service Debug - Scopes:', scopes);
+    console.log('OAuth Service Debug - Platform Config Scopes:', platformConfig.scopes);
+
     const params = new URLSearchParams({
       client_id: oauthConfig.clientId,
       redirect_uri: oauthConfig.redirectUri,
@@ -170,7 +177,10 @@ class OAuthService {
       state: state,
     });
 
-    return `${platformConfig.authUrl}?${params.toString()}`;
+    const finalUrl = `${platformConfig.authUrl}?${params.toString()}`;
+    console.log('OAuth Service Debug - Final URL:', finalUrl);
+    
+    return finalUrl;
   }
 
   // Exchange authorization code for access token

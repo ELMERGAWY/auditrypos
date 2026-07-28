@@ -89,6 +89,12 @@ export function SocialMediaManager({ restaurantId }: Props) {
     const state = Math.random().toString(36).substring(7);
     const authUrl = oauthService.generateAuthUrl(platform, state);
     
+    // Debug: Log OAuth URL parameters
+    console.log('OAuth Debug - Platform:', platform);
+    console.log('OAuth Debug - Auth URL:', authUrl);
+    console.log('OAuth Debug - Client ID:', secrets.clientId);
+    console.log('OAuth Debug - Redirect URI:', `${window.location.origin}/oauth/callback`);
+    
     // Store state in sessionStorage for verification
     sessionStorage.setItem('oauth_state', state);
     sessionStorage.setItem('oauth_platform', platform);
