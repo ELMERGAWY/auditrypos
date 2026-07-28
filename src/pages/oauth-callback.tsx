@@ -6,6 +6,7 @@ import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import OAuthService from '@/lib/socialMedia/oauthService';
 import { AlertCircle, CheckCircle, XCircle } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 
 export default function OAuthCallback() {
   const navigate = useNavigate();
