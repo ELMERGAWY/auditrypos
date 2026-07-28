@@ -22,19 +22,36 @@ export default function OAuthCallback() {
       const state = urlParams.get('state');
       const error = urlParams.get('error');
 
-      // Get stored OAuth state from localStorage (persists across windows)
-      const storedState = localStorage.getItem('oauth_state');
-      const storedPlatform = localStorage.getItem('oauth_platform');
-      const storedRestaurantId = localStorage.getItem('oauth_restaurant_id');
+      console.log('OAuth Callback - Raw state:', state);
 
-      console.log('OAuth Callback - localStorage contents:', {
-        oauth_state: storedState,
-        oauth_platform: storedPlatform,
-        oauth_restaurant_id: storedRestaurantId,
-        allKeys: Object.keys(localStorage)
-      });
+      // Parse state to extract context
+      let statePayload = null;
+      let storedState = null;
+      let storedPlatform = null;
+      let storedRestaurantId = null;
 
-      // Clear stored state
+      try {
+        if (state) {
+          statePayload = JSON.parse(atob(state));
+          storedState = statePayload.stateId;
+          storedPlatform = statePayload.platform;
+          storedRestaurantId = statePayload.restaurantId;
+          console.log('OAuth Callback - Parsed state payload:', statePayload);
+        }
+      } catch (e) {
+        console.error('OAuth Callback - Failed to parse state:', e);
+        // Fallback to localStorage
+        storedState = localStorage.getItem('oauth_state');
+        storedPlatform = localStorage.getItem('oauth_platform');
+        storedRestaurantId = localStorage.getItem('oauth_restaurant_id');
+        console.log('OAuth Callback - Fallback to localStorage:', {
+          state: storedState,
+          platform: storedPlatform,
+          restaurantId: storedRestaurantId
+        });
+      }
+
+      // Clear localStorage fallback
       localStorage.removeItem('oauth_state');
       localStorage.removeItem('oauth_platform');
       localStorage.removeItem('oauth_restaurant_id');
@@ -47,8 +64,6 @@ export default function OAuthCallback() {
         return;
       }
 
-      // Graceful state validation - allow continuation if state is present but stored state is missing
-      // This can happen due to cross-window issues or browser security policies
       if (!code) {
         console.error('OAuth Callback - No code parameter');
         setStatus('error');
@@ -59,24 +74,56 @@ export default function OAuthCallback() {
 
       if (!storedPlatform || !storedRestaurantId) {
         console.error('OAuth Callback - Missing OAuth context');
-        setStatus('error');
-        setMessage('سياق المصادقة مفقود');
-        setDetails('Platform: ' + (storedPlatform || 'missing') + ', Restaurant ID: ' + (storedRestaurantId || 'missing'));
-        return;
+        
+        // Fallback: Try to fetch default restaurant from user session
+        try {
+          console.log('OAuth Callback - Attempting fallback to fetch default restaurant');
+          const { data: { user } } = await supabase.auth.getUser();
+          
+          if (user) {
+            const { data: restaurantData } = await supabase
+              .from('restaurants')
+              .select('id')
+              .eq('owner_id', user.id)
+              .limit(1)
+              .single();
+            
+            if (restaurantData) {
+              storedRestaurantId = restaurantData.id;
+              console.log('OAuth Callback - Fallback successful, restaurant ID:', storedRestaurantId);
+              
+              // If platform is still missing, we can't continue
+              if (!storedPlatform) {
+                setStatus('error');
+                setMessage('سياق المصادقة مفقود');
+                setDetails('Platform is missing and cannot be determined from session');
+                return;
+              }
+            } else {
+              setStatus('error');
+              setMessage('سياق المصادقة مفقود');
+              setDetails('No restaurant found for user in session');
+              return;
+            }
+          } else {
+            setStatus('error');
+            setMessage('سياق المصادقة مفقود');
+            setDetails('No user session found');
+            return;
+          }
+        } catch (fallbackError) {
+          console.error('OAuth Callback - Fallback failed:', fallbackError);
+          setStatus('error');
+          setMessage('سياق المصادقة مفقود');
+          setDetails('Platform: ' + (storedPlatform || 'missing') + ', Restaurant ID: ' + (storedRestaurantId || 'missing') + ' - Fallback failed');
+          return;
+        }
       }
 
-      // Log state validation result but don't block if stored state is missing
-      if (!storedState || state !== storedState) {
-        console.warn('OAuth Callback - State validation warning:', {
-          received: state,
-          stored: storedState,
-          match: state === storedState
-        });
-        console.warn('OAuth Callback - Continuing anyway due to graceful fallback');
-        // Continue anyway since this is not critical for this use case
-      } else {
-        console.log('OAuth Callback - State validation passed');
-      }
+      console.log('OAuth Callback - Context retrieved:', {
+        platform: storedPlatform,
+        restaurantId: storedRestaurantId
+      });
 
       try {
         console.log('OAuth Callback - Starting callback process');

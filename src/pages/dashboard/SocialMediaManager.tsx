@@ -104,23 +104,19 @@ export function SocialMediaManager({ restaurantId }: Props) {
       configId: secrets.configId, // Pass config_id if available for Meta Business Login
     });
 
-    const state = Math.random().toString(36).substring(7);
+    // Encode context in OAuth state parameter (more reliable than localStorage)
+    const statePayload = {
+      stateId: Math.random().toString(36).substring(7),
+      restaurantId: restaurantId,
+      platform: platform
+    };
+    const state = btoa(JSON.stringify(statePayload)); // Base64 encode
     const authUrl = oauthService.generateAuthUrl(platform, state);
     
-    // Store state in localStorage for verification (persists across windows)
-    localStorage.setItem('oauth_state', state);
-    localStorage.setItem('oauth_platform', platform);
-    localStorage.setItem('oauth_restaurant_id', restaurantId);
-    
-    console.log('OAuth Connect - Stored state in localStorage:', state);
-    console.log('OAuth Connect - All localStorage items:', {
-      state: localStorage.getItem('oauth_state'),
-      platform: localStorage.getItem('oauth_platform'),
-      restaurantId: localStorage.getItem('oauth_restaurant_id')
-    });
+    console.log('OAuth Connect - State payload:', statePayload);
+    console.log('OAuth Connect - Encoded state:', state);
 
-    // Redirect in the same window instead of opening a new window
-    // This ensures localStorage is accessible
+    // Redirect in the same window
     window.location.href = authUrl;
   };
 
