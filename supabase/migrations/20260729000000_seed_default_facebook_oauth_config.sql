@@ -1,6 +1,10 @@
 -- Seed Default Facebook OAuth Configuration
 -- This migration adds a global Facebook OAuth configuration that can be used by all restaurants
 
+-- First, alter the table to allow NULL restaurant_id for global configs
+ALTER TABLE public.social_media_oauth_config 
+ALTER COLUMN restaurant_id DROP NOT NULL;
+
 -- Insert global Facebook OAuth config (restaurant_id IS NULL)
 INSERT INTO public.social_media_oauth_config (
   id,
