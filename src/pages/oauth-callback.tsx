@@ -130,38 +130,15 @@ export default function OAuthCallback() {
         console.log('OAuth Callback - Platform:', storedPlatform);
         console.log('OAuth Callback - Restaurant ID:', storedRestaurantId);
         
-        // Load platform secrets - try restaurant-specific first, then fallback to global
-        let configData = null;
-        let configError = null;
-
-        // Try restaurant-specific config first
-        const restaurantConfig = await supabase
+        // Load platform secrets - single query with OR logic for restaurant_id
+        const { data: configData, error: configError } = await supabase
           .from('social_media_oauth_config')
-          .select('client_id, client_secret')
-          .eq('restaurant_id', storedRestaurantId)
+          .select('client_id, client_secret, restaurant_id')
           .eq('platform', storedPlatform)
+          .or(`restaurant_id.eq.${storedRestaurantId},restaurant_id.is.null`)
+          .order('restaurant_id', { ascending: false, nullsFirst: false }) // Restaurant-specific first (non-null first)
+          .limit(1)
           .maybeSingle();
-
-        if (restaurantConfig.data) {
-          configData = restaurantConfig.data;
-          console.log('OAuth Callback - Using restaurant-specific config');
-        } else {
-          console.log('OAuth Callback - No restaurant-specific config, trying global config');
-          // Fallback to global config (restaurant_id IS NULL)
-          const globalConfig = await supabase
-            .from('social_media_oauth_config')
-            .select('client_id, client_secret')
-            .is('restaurant_id', null)
-            .eq('platform', storedPlatform)
-            .maybeSingle();
-          
-          configData = globalConfig.data;
-          configError = globalConfig.error;
-
-          if (configData) {
-            console.log('OAuth Callback - Using global config');
-          }
-        }
 
         if (configError) {
           console.error('OAuth Callback - Config query error:', configError);
@@ -177,6 +154,20 @@ export default function OAuthCallback() {
           setMessage('OAuth configuration not found');
           setDetails(`No OAuth configuration found for platform '${storedPlatform}'. Please configure OAuth settings in the dashboard.`);
           return;
+        }
+
+        console.log('OAuth Callback - Config loaded:', {
+          isGlobal: configData.restaurant_id === null,
+          restaurantId: configData.restaurant_id
+        });
+
+        // Fallback to environment variable if client_secret is placeholder
+        if (configData.client_secret === 'your_client_secret_here' && storedPlatform === 'facebook') {
+          const envSecret = import.meta.env.VITE_FACEBOOK_CLIENT_SECRET;
+          if (envSecret) {
+            configData.client_secret = envSecret;
+            console.log('OAuth Callback - Using environment variable for client_secret');
+          }
         }
 
         console.log('OAuth Callback - Config loaded successfully');
