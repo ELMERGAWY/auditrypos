@@ -66,18 +66,31 @@ export function SocialMediaManager({ restaurantId }: Props) {
 
   const loadPlatformSecrets = async () => {
     try {
-      const { data } = await supabase
+      // Try restaurant-specific config first
+      const { data: restaurantData } = await supabase
         .from('social_media_oauth_config')
         .select('platform, client_id, client_secret')
         .eq('restaurant_id', restaurantId);
 
-      if (data) {
+      // Fallback to global config (restaurant_id IS NULL)
+      const { data: globalData } = await supabase
+        .from('social_media_oauth_config')
+        .select('platform, client_id, client_secret')
+        .is('restaurant_id', null);
+
+      // Merge configs, restaurant-specific takes precedence
+      const allConfigs = [...(restaurantData || []), ...(globalData || [])];
+      
+      if (allConfigs) {
         const secrets: Record<string, { clientId: string; clientSecret: string }> = {};
-        data.forEach((config: any) => {
-          secrets[config.platform] = {
-            clientId: config.client_id,
-            clientSecret: config.client_secret,
-          };
+        allConfigs.forEach((config: any) => {
+          // Only use if not already set (restaurant-specific takes precedence)
+          if (!secrets[config.platform]) {
+            secrets[config.platform] = {
+              clientId: config.client_id,
+              clientSecret: config.client_secret,
+            };
+          }
         });
         setPlatformSecrets(secrets);
       }

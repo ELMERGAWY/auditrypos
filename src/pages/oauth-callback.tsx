@@ -130,13 +130,38 @@ export default function OAuthCallback() {
         console.log('OAuth Callback - Platform:', storedPlatform);
         console.log('OAuth Callback - Restaurant ID:', storedRestaurantId);
         
-        // Load platform secrets
-        const { data: configData, error: configError } = await supabase
+        // Load platform secrets - try restaurant-specific first, then fallback to global
+        let configData = null;
+        let configError = null;
+
+        // Try restaurant-specific config first
+        const restaurantConfig = await supabase
           .from('social_media_oauth_config')
           .select('client_id, client_secret')
           .eq('restaurant_id', storedRestaurantId)
           .eq('platform', storedPlatform)
           .maybeSingle();
+
+        if (restaurantConfig.data) {
+          configData = restaurantConfig.data;
+          console.log('OAuth Callback - Using restaurant-specific config');
+        } else {
+          console.log('OAuth Callback - No restaurant-specific config, trying global config');
+          // Fallback to global config (restaurant_id IS NULL)
+          const globalConfig = await supabase
+            .from('social_media_oauth_config')
+            .select('client_id, client_secret')
+            .is('restaurant_id', null)
+            .eq('platform', storedPlatform)
+            .maybeSingle();
+          
+          configData = globalConfig.data;
+          configError = globalConfig.error;
+
+          if (configData) {
+            console.log('OAuth Callback - Using global config');
+          }
+        }
 
         if (configError) {
           console.error('OAuth Callback - Config query error:', configError);
@@ -150,7 +175,7 @@ export default function OAuthCallback() {
           console.error('OAuth Callback - No config found for platform:', storedPlatform);
           setStatus('error');
           setMessage('OAuth configuration not found');
-          setDetails(`No OAuth configuration found for platform '${storedPlatform}' and restaurant '${storedRestaurantId}'. Please configure OAuth settings first.`);
+          setDetails(`No OAuth configuration found for platform '${storedPlatform}'. Please configure OAuth settings in the dashboard.`);
           return;
         }
 
