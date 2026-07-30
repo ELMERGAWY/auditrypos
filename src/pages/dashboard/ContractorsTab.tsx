@@ -567,34 +567,56 @@ export function ContractorsTab({ restaurant }: Props) {
       return;
     }
 
-    const payload = {
-      restaurant_id: restaurant.id,
-      contractor_id: paymentForm.contractor_id,
-      amount: Number(paymentForm.amount),
-      payment_method: paymentForm.payment_method,
-      reference: paymentForm.reference || null,
-      notes: paymentForm.notes || null
-    };
-
-    const { error } = await supabase.from('contractor_payments').insert(payload);
-    if (error) {
-      toast.error('خطأ في إضافة الدفع: ' + error.message);
+    const contractor = contractors.find(c => c.id === paymentForm.contractor_id);
+    if (!contractor) {
+      toast.error('الصنايعي غير موجود');
       return;
     }
 
-    toast.success('تم إضافة الدفع بنجاح');
-    setShowPaymentDialog(false);
-    setPaymentForm({
-      contractor_id: '',
-      amount: '',
-      payment_method: 'cash',
-      reference: '',
-      notes: ''
-    });
+    try {
+      // Create payment voucher using save_payment_voucher function
+      const { data: voucherData, error: voucherError } = await supabase
+        .rpc('save_payment_voucher', {
+          p_restaurant_id: restaurant.id,
+          p_actor_id: contractor.id,
+          p_actor_type: 'contractor',
+          p_amount: Number(paymentForm.amount),
+          p_payment_method: paymentForm.payment_method,
+          p_reference_number: paymentForm.reference || `PV-${Date.now()}`,
+          p_notes: paymentForm.notes || `سداد مستحقات صنايعي - ${contractor.name}`
+        });
 
-    if (selectedContractor) {
-      loadPayments(selectedContractor.id);
-      loadContractors();
+      if (voucherError) {
+        toast.error('خطأ في إنشاء إذن الدفع: ' + voucherError.message);
+        return;
+      }
+
+      // Record contractor payment
+      await supabase.from('contractor_payments').insert({
+        restaurant_id: restaurant.id,
+        contractor_id: contractor.id,
+        amount: Number(paymentForm.amount),
+        payment_method: paymentForm.payment_method,
+        reference: paymentForm.reference,
+        notes: paymentForm.notes
+      });
+
+      toast.success('تم إنشاء إذن الدفع وتسجيل السداد بنجاح');
+      setShowPaymentDialog(false);
+      setPaymentForm({
+        contractor_id: '',
+        amount: '',
+        payment_method: 'cash',
+        reference: '',
+        notes: ''
+      });
+
+      if (selectedContractor) {
+        loadPayments(selectedContractor.id);
+        loadContractors();
+      }
+    } catch (error: any) {
+      toast.error('خطأ في إنشاء إذن الدفع: ' + error.message);
     }
   };
 
