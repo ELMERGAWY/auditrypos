@@ -3,8 +3,19 @@
 
 BEGIN;
 
--- Drop existing function
-DROP FUNCTION IF EXISTS public.save_payment_voucher CASCADE;
+-- Drop all existing save_payment_voucher functions (all signatures)
+DO $$ 
+DECLARE 
+    r RECORD;
+BEGIN
+    FOR r IN (SELECT oid, proname, proargtypes, proargmodes, proargnames 
+              FROM pg_proc 
+              WHERE proname = 'save_payment_voucher' 
+              AND pronamespace = 'public'::regnamespace) 
+    LOOP
+        EXECUTE 'DROP FUNCTION IF EXISTS public.save_payment_voucher(' || oidvectortypes(r.proargtypes) || ') CASCADE';
+    END LOOP;
+END $$;
 
 -- Recreate function with journal entry support
 CREATE OR REPLACE FUNCTION public.save_payment_voucher(
