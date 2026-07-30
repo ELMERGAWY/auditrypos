@@ -8,7 +8,7 @@ import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Plus, Save, Trash2, Edit, User, Phone, MapPin, DollarSign, CheckCircle, Clock, AlertCircle, Receipt, ShoppingCart } from 'lucide-react';
+import { Plus, Save, Trash2, Edit, User, Phone, MapPin, DollarSign, CheckCircle, Clock, AlertCircle, Receipt } from 'lucide-react';
 import { AnimatePresence, motion } from 'framer-motion';
 import type { Restaurant } from './types';
 
@@ -52,14 +52,11 @@ export function ContractorsTab({ restaurant }: Props) {
   const [selectedContractor, setSelectedContractor] = useState<Contractor | null>(null);
   const [showAddServiceDialog, setShowAddServiceDialog] = useState(false);
   const [showPaymentDialog, setShowPaymentDialog] = useState(false);
-  const [showSummaryDialog, setShowSummaryDialog] = useState(false);
   const [invoices, setInvoices] = useState<any[]>([]);
   const [orders, setOrders] = useState<any[]>([]);
   const [payments, setPayments] = useState<any[]>([]);
   const [selectedInvoice, setSelectedInvoice] = useState<string>('');
   const [selectedOrder, setSelectedOrder] = useState<string>('');
-  const [selectedInvoices, setSelectedInvoices] = useState<string[]>([]);
-  const [selectedOrders, setSelectedOrders] = useState<string[]>([]);
   const [invoiceSearch, setInvoiceSearch] = useState('');
   const [orderSearch, setOrderSearch] = useState('');
   const [dateFilterStart, setDateFilterStart] = useState('');
@@ -398,12 +395,23 @@ export function ContractorsTab({ restaurant }: Props) {
 
       toast.success(`تم إضافة ${selectedServices.length} خدمة بنجاح`);
 
-      // Auto-transfer to حصر مستحقات
-      setSelectedInvoices(invoiceIds);
-      setSelectedOrders(orderIds);
-      setServiceForm({ ...serviceForm, contractor_id: serviceForm.contractor_id });
+      // Clear form and close dialog
       setShowAddServiceDialog(false);
-      setShowSummaryDialog(true);
+      setServiceForm({
+        contractor_id: '',
+        service_name: '',
+        service_amount: '',
+        notes: ''
+      });
+      setSelectedInvoice('');
+      setSelectedOrder('');
+      setSelectedService(null);
+      setSelectedServices([]);
+
+      // Reload contractor services to show the new services
+      if (selectedContractor) {
+        loadContractorServices(selectedContractor.id);
+      }
       return;
     } else {
       // Single service (manual entry)
@@ -590,77 +598,13 @@ export function ContractorsTab({ restaurant }: Props) {
     }
   };
 
-  const calculateContractorSummary = (contractorId: string) => {
-    const contractor = contractors.find(c => c.id === contractorId);
-    if (!contractor) return null;
-
-    const selectedInvoiceData = invoices.filter(inv => selectedInvoices.includes(inv.id));
-    const selectedOrderData = orders.filter(ord => selectedOrders.includes(ord.id));
-
-    const totalServiceAmount = selectedInvoiceData.reduce((sum, inv) => sum + (inv.total_amount || inv.total || 0), 0) +
-                               selectedOrderData.reduce((sum, ord) => sum + (ord.total || 0), 0);
-
-    const contractorAmount = contractor.payment_type === 'fixed'
-      ? contractor.payment_value * (selectedInvoiceData.length + selectedOrderData.length)
-      : (totalServiceAmount * contractor.payment_value / 100);
-
-    return {
-      contractor,
-      selectedInvoices: selectedInvoiceData,
-      selectedOrders: selectedOrderData,
-      totalServiceAmount,
-      contractorAmount
-    };
-  };
-
-  const handleCreatePaymentVoucher = async (summary: any) => {
-    try {
-      const { data: voucherData, error: voucherError } = await supabase
-        .rpc('save_payment_voucher', {
-          p_restaurant_id: restaurant.id,
-          p_actor_id: summary.contractor.id,
-          p_actor_type: 'contractor',
-          p_amount: summary.contractorAmount,
-          p_payment_method: paymentForm.payment_method,
-          p_reference_number: paymentForm.reference || `PV-${Date.now()}`,
-          p_notes: paymentForm.notes || `سداد مستحقات صنايعي - ${summary.contractor.name}`
-        });
-
-      if (voucherError) {
-        toast.error('خطأ في إنشاء إذن الدفع: ' + voucherError.message);
-        return;
-      }
-
-      // Record contractor payment
-      await supabase.from('contractor_payments').insert({
-        restaurant_id: restaurant.id,
-        contractor_id: summary.contractor.id,
-        amount: summary.contractorAmount,
-        payment_method: paymentForm.payment_method,
-        reference: paymentForm.reference,
-        notes: paymentForm.notes
-      });
-
-      toast.success('تم إنشاء إذن الدفع وتسجيل السداد بنجاح');
-      setShowSummaryDialog(false);
-      setSelectedInvoices([]);
-      setSelectedOrders([]);
-      
-      if (selectedContractor) {
-        loadPayments(selectedContractor.id);
-        loadContractors();
-      }
-    } catch (e: any) {
-      toast.error('خطأ: ' + e.message);
-    }
-  };
-
   const getStatusBadge = (status: string) => {
     const statusConfig = {
       pending: { label: 'قيد الانتظار', className: 'bg-yellow-500/20 text-yellow-700' },
       completed: { label: 'تم الإنجاز', className: 'bg-blue-500/20 text-blue-700' },
       approved: { label: 'معتمد', className: 'bg-green-500/20 text-green-700' },
-      paid: { label: 'مدفوع', className: 'bg-purple-500/20 text-purple-700' }
+      paid: { label: 'مدفوع', className: 'bg-purple-500/20 text-purple-700' },
+      cancelled: { label: 'ملغي', className: 'bg-red-500/20 text-red-700' }
     };
     const config = statusConfig[status as keyof typeof statusConfig] || statusConfig.pending;
     return <Badge className={config.className}>{config.label}</Badge>;
@@ -960,224 +904,6 @@ export function ContractorsTab({ restaurant }: Props) {
                     <Save className="w-4 h-4 ml-1" /> إضافة الخدمة
                   </Button>
                   <Button variant="outline" onClick={() => setShowAddServiceDialog(false)}>إلغاء</Button>
-                </div>
-              </div>
-            </DialogContent>
-          </Dialog>
-          <Dialog open={showSummaryDialog} onOpenChange={setShowSummaryDialog}>
-            <DialogTrigger asChild>
-              <Button onClick={async () => { await Promise.all([loadInvoices(), loadOrders()]); setShowSummaryDialog(true); }} variant="outline">
-                <ShoppingCart className="w-4 h-4 ml-1" /> حصر مستحقات من فواتير
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="max-w-2xl max-h-[80vh] overflow-auto">
-              <DialogHeader>
-                <DialogTitle>حصر مستحقات الصنايعي</DialogTitle>
-              </DialogHeader>
-              <div className="space-y-4">
-                <div>
-                  <Label>الصنايعي *</Label>
-                  <Select value={serviceForm.contractor_id} onValueChange={(v) => setServiceForm({ ...serviceForm, contractor_id: v })}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="اختر الصنايعي" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {contractors.filter(c => c.is_active).map(c => (
-                        <SelectItem key={c.id} value={c.id}>{c.name} - {c.specialty || 'بدون تخصص'}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                
-                <div>
-                  <Label className="font-bold">اختر الفواتير</Label>
-                  <div className="max-h-40 overflow-auto border rounded-lg p-2 space-y-2">
-                    {invoices.map(inv => (
-                      <label key={inv.id} className="flex items-center gap-2 p-2 hover:bg-secondary rounded cursor-pointer">
-                        <input
-                          type="checkbox"
-                          checked={selectedInvoices.includes(inv.id)}
-                          onChange={(e) => {
-                            if (e.target.checked) {
-                              setSelectedInvoices([...selectedInvoices, inv.id]);
-                            } else {
-                              setSelectedInvoices(selectedInvoices.filter(id => id !== inv.id));
-                            }
-                          }}
-                        />
-                        <span className="flex-1">{inv.invoice_number}</span>
-                        <span className="font-bold">{inv.total_amount || inv.total} ج.م</span>
-                      </label>
-                    ))}
-                  </div>
-                </div>
-
-                <div>
-                  <Label className="font-bold">اختر الطلبات</Label>
-                  <div className="max-h-40 overflow-auto border rounded-lg p-2 space-y-2">
-                    {orders.map(ord => (
-                      <label key={ord.id} className="flex items-center gap-2 p-2 hover:bg-secondary rounded cursor-pointer">
-                        <input
-                          type="checkbox"
-                          checked={selectedOrders.includes(ord.id)}
-                          onChange={(e) => {
-                            if (e.target.checked) {
-                              setSelectedOrders([...selectedOrders, ord.id]);
-                            } else {
-                              setSelectedOrders(selectedOrders.filter(id => id !== ord.id));
-                            }
-                          }}
-                        />
-                        <span className="flex-1">{ord.order_number}</span>
-                        <span className="font-bold">{ord.total} ج.م</span>
-                      </label>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Show selected services for removal */}
-                {serviceForm.contractor_id && (selectedInvoices.length > 0 || selectedOrders.length > 0) && (() => {
-                  const summary = calculateContractorSummary(serviceForm.contractor_id);
-                  if (!summary) return null;
-
-                  // Get services for selected invoices/orders
-                  const selectedServicesList: any[] = [];
-                  summary.selectedInvoices.forEach((inv: any) => {
-                    if (inv.sales_invoice_lines) {
-                      inv.sales_invoice_lines.forEach((item: any) => {
-                        selectedServicesList.push({
-                          ...item,
-                          item_name: item.description,
-                          unit_price: item.unit_price,
-                          total: item.line_total,
-                          invoice_id: inv.id,
-                          invoice_number: inv.invoice_number
-                        });
-                      });
-                    }
-                  });
-                  summary.selectedOrders.forEach((ord: any) => {
-                    if (ord.order_items) {
-                      ord.order_items.forEach((item: any) => {
-                        selectedServicesList.push({
-                          ...item,
-                          item_name: item.menu_item_name,
-                          unit_price: item.price,
-                          total: Number(item.quantity) * Number(item.price),
-                          order_id: ord.id,
-                          order_number: ord.order_number
-                        });
-                      });
-                    }
-                  });
-
-                  if (selectedServicesList.length === 0) return null;
-
-                  return (
-                    <div>
-                      <Label className="font-bold">الخدمات المختارة (يمكن الحذف)</Label>
-                      <div className="max-h-40 overflow-auto border rounded-lg p-2 space-y-1">
-                        {selectedServicesList.map((service, idx) => (
-                          <div key={`${service.id}-${idx}`} className="flex items-center justify-between p-2 bg-secondary/50 rounded text-xs">
-                            <div className="flex-1">
-                              <div className="font-medium">{service.item_name}</div>
-                              <div className="text-muted-foreground">
-                                {service.invoice_number ? `فاتورة ${service.invoice_number}` : `طلب ${service.order_number}`}
-                              </div>
-                              <div className="text-muted-foreground">
-                                {service.quantity} × {service.unit_price} = {service.total} ج.م
-                              </div>
-                            </div>
-                            <Button
-                              onClick={() => {
-                                if (service.invoice_id) {
-                                  setSelectedInvoices(selectedInvoices.filter(id => id !== service.invoice_id));
-                                } else if (service.order_id) {
-                                  setSelectedOrders(selectedOrders.filter(id => id !== service.order_id));
-                                }
-                              }}
-                              variant="ghost"
-                              size="sm"
-                              className="text-destructive hover:text-destructive h-6 w-6 p-0"
-                            >
-                              <Trash2 className="w-3 h-3" />
-                            </Button>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  );
-                })()}
-
-                {serviceForm.contractor_id && (selectedInvoices.length > 0 || selectedOrders.length > 0) && (() => {
-                  const summary = calculateContractorSummary(serviceForm.contractor_id);
-                  if (!summary) return null;
-                  return (
-                    <div className="p-4 bg-primary/10 rounded-lg space-y-2">
-                      <div className="flex justify-between">
-                        <span>عدد الفواتير:</span>
-                        <span className="font-bold">{summary.selectedInvoices.length}</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span>عدد الطلبات:</span>
-                        <span className="font-bold">{summary.selectedOrders.length}</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span>إجمالي قيمة الخدمات:</span>
-                        <span className="font-bold">{summary.totalServiceAmount.toFixed(2)} ج.م</span>
-                      </div>
-                      <div className="flex justify-between text-lg">
-                        <span className="font-bold">صافي المستحق للصنايعي:</span>
-                        <span className="font-bold text-primary">{summary.contractorAmount.toFixed(2)} ج.م</span>
-                      </div>
-                    </div>
-                  );
-                })()}
-
-                <div className="space-y-2">
-                  <Label>طريقة الدفع</Label>
-                  <Select value={paymentForm.payment_method} onValueChange={(v) => setPaymentForm({ ...paymentForm, payment_method: v })}>
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="cash">نقدي</SelectItem>
-                      <SelectItem value="bank_transfer">تحويل بنكي</SelectItem>
-                      <SelectItem value="check">شيك</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div>
-                  <Label>رقم الإيصال</Label>
-                  <Input
-                    value={paymentForm.reference}
-                    onChange={e => setPaymentForm({ ...paymentForm, reference: e.target.value })}
-                    placeholder="رقم الإيصال"
-                  />
-                </div>
-
-                <div>
-                  <Label>ملاحظات</Label>
-                  <Input
-                    value={paymentForm.notes}
-                    onChange={e => setPaymentForm({ ...paymentForm, notes: e.target.value })}
-                    placeholder="ملاحظات إضافية"
-                  />
-                </div>
-
-                <div className="flex gap-2">
-                  <Button 
-                    onClick={() => {
-                      const summary = calculateContractorSummary(serviceForm.contractor_id);
-                      if (summary) handleCreatePaymentVoucher(summary);
-                    }} 
-                    className="gradient-bg text-primary-foreground border-0 flex-1"
-                    disabled={!serviceForm.contractor_id || (selectedInvoices.length === 0 && selectedOrders.length === 0)}
-                  >
-                    <Save className="w-4 h-4 ml-1" /> إنشاء إذن دفع
-                  </Button>
-                  <Button variant="outline" onClick={() => setShowSummaryDialog(false)}>إلغاء</Button>
                 </div>
               </div>
             </DialogContent>
