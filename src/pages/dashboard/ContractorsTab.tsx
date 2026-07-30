@@ -615,8 +615,8 @@ export function ContractorsTab({ restaurant }: Props) {
       const { data: voucherData, error: voucherError } = await supabase
         .rpc('save_payment_voucher', {
           p_restaurant_id: restaurant.id,
-          p_supplier_id: null,
-          p_contractor_id: summary.contractor.id,
+          p_actor_id: summary.contractor.id,
+          p_actor_type: 'contractor',
           p_amount: summary.contractorAmount,
           p_payment_method: paymentForm.payment_method,
           p_reference_number: paymentForm.reference || `PV-${Date.now()}`,
