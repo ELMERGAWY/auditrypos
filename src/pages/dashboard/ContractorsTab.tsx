@@ -204,9 +204,11 @@ export function ContractorsTab({ restaurant }: Props) {
   };
 
   const handleServiceSelect = (service: any) => {
-    // Add to selected services array
+    // Add to selected services array with unique ID
     const itemTotal = service.line_total || service.total || (Number(service.quantity) * Number(service.price || service.unit_price));
+    const uniqueId = `${service.id}-${Date.now()}-${Math.random()}`; // Unique ID for each selection
     const newService = {
+      uniqueId: uniqueId, // Use unique ID for removal
       id: service.id,
       item_name: service.description || service.product_name || service.menu_item_name || service.item_name,
       unit_price: service.unit_price || service.price,
@@ -215,7 +217,8 @@ export function ContractorsTab({ restaurant }: Props) {
       invoice_id: selectedInvoice,
       order_id: selectedOrder,
       invoice_number: invoices.find(i => i.id === selectedInvoice)?.invoice_number,
-      order_number: orders.find(o => o.id === selectedOrder)?.order_number
+      order_number: orders.find(o => o.id === selectedOrder)?.order_number,
+      variables: service.variables
     };
     const updatedServices = [...selectedServices, newService];
     setSelectedServices(updatedServices);
@@ -232,8 +235,8 @@ export function ContractorsTab({ restaurant }: Props) {
     setSelectedService(null);
   };
 
-  const handleRemoveService = (serviceId: string) => {
-    const updatedServices = selectedServices.filter(s => s.id !== serviceId);
+  const handleRemoveService = (uniqueId: string) => {
+    const updatedServices = selectedServices.filter(s => s.uniqueId !== uniqueId);
     setSelectedServices(updatedServices);
     // Recalculate total
     const totalServicesAmount = updatedServices.reduce((sum, s) => sum + (s.total || 0), 0);
@@ -789,20 +792,44 @@ export function ContractorsTab({ restaurant }: Props) {
                         if (!items || items.length === 0) {
                           return <div className="p-2 text-xs text-muted-foreground">لا توجد أصناف في هذه الفاتورة</div>;
                         }
-                        return items.map((item: any) => (
-                          <div
-                            key={item.id}
-                            onClick={() => handleServiceSelect(item)}
-                            className={`p-2 rounded cursor-pointer hover:bg-primary/10 text-xs ${
-                              selectedService?.id === item.id ? 'bg-primary/20 border border-primary/30' : ''
-                            }`}
-                          >
-                            <div className="font-medium">{item.description}</div>
-                            <div className="text-muted-foreground">
-                              {item.quantity} × {item.unit_price} = {item.line_total} ج.م
+                        
+                        // Filter items to show only those matching contractor variables
+                        const contractor = contractors.find(c => c.id === serviceForm.contractor_id);
+                        const keywords = contractor?.service_variables || [];
+                        
+                        const matchItem = (vars: any[]) =>
+                          Array.isArray(vars) && vars.some((v: any) => {
+                            const l = String(v?.label || '').toLowerCase();
+                            const val = String(v?.value || '').toLowerCase();
+                            return keywords.some(k => l.includes(k) || val.includes(k));
+                          });
+                        
+                        // Show all items, but highlight matching ones
+                        return items.map((item: any) => {
+                          const matches = matchItem(item.variables);
+                          return (
+                            <div
+                              key={item.id}
+                              onClick={() => handleServiceSelect(item)}
+                              className={`p-2 rounded cursor-pointer hover:bg-primary/10 text-xs ${
+                                selectedService?.id === item.id ? 'bg-primary/20 border border-primary/30' : ''
+                              } ${!matches ? 'opacity-50' : ''}`}
+                            >
+                              <div className="font-medium">{item.description}</div>
+                              <div className="text-muted-foreground">
+                                {item.quantity} × {item.unit_price} = {item.line_total} ج.م
+                              </div>
+                              {item.variables && item.variables.length > 0 && (
+                                <div className="text-xs text-muted-foreground mt-1">
+                                  المتغيرات: {item.variables.map((v: any) => v.label || v.value).join(', ')}
+                                </div>
+                              )}
+                              {matches && (
+                                <div className="text-xs text-green-600 mt-1">✓ يطابق متغيرات الصنايعي</div>
+                              )}
                             </div>
-                          </div>
-                        ));
+                          );
+                        });
                       })()}
                     </div>
                   </div>
@@ -818,20 +845,44 @@ export function ContractorsTab({ restaurant }: Props) {
                         if (!items || items.length === 0) {
                           return <div className="p-2 text-xs text-muted-foreground">لا توجد أصناف في هذا الطلب</div>;
                         }
-                        return items.map((item: any) => (
-                          <div
-                            key={item.id}
-                            onClick={() => handleServiceSelect(item)}
-                            className={`p-2 rounded cursor-pointer hover:bg-primary/10 text-xs ${
-                              selectedService?.id === item.id ? 'bg-primary/20 border border-primary/30' : ''
-                            }`}
-                          >
-                            <div className="font-medium">{item.menu_item_name}</div>
-                            <div className="text-muted-foreground">
-                              {item.quantity} × {item.price} = {(Number(item.quantity) * Number(item.price)).toFixed(2)} ج.م
+                        
+                        // Filter items to show only those matching contractor variables
+                        const contractor = contractors.find(c => c.id === serviceForm.contractor_id);
+                        const keywords = contractor?.service_variables || [];
+                        
+                        const matchItem = (vars: any[]) =>
+                          Array.isArray(vars) && vars.some((v: any) => {
+                            const l = String(v?.label || '').toLowerCase();
+                            const val = String(v?.value || '').toLowerCase();
+                            return keywords.some(k => l.includes(k) || val.includes(k));
+                          });
+                        
+                        // Show all items, but highlight matching ones
+                        return items.map((item: any) => {
+                          const matches = matchItem(item.variables);
+                          return (
+                            <div
+                              key={item.id}
+                              onClick={() => handleServiceSelect(item)}
+                              className={`p-2 rounded cursor-pointer hover:bg-primary/10 text-xs ${
+                                selectedService?.id === item.id ? 'bg-primary/20 border border-primary/30' : ''
+                              } ${!matches ? 'opacity-50' : ''}`}
+                            >
+                              <div className="font-medium">{item.menu_item_name}</div>
+                              <div className="text-muted-foreground">
+                                {item.quantity} × {item.price} = {(Number(item.quantity) * Number(item.price)).toFixed(2)} ج.م
+                              </div>
+                              {item.variables && item.variables.length > 0 && (
+                                <div className="text-xs text-muted-foreground mt-1">
+                                  المتغيرات: {item.variables.map((v: any) => v.label || v.value).join(', ')}
+                                </div>
+                              )}
+                              {matches && (
+                                <div className="text-xs text-green-600 mt-1">✓ يطابق متغيرات الصنايعي</div>
+                              )}
                             </div>
-                          </div>
-                        ));
+                          );
+                        });
                       })()}
                     </div>
                   </div>
@@ -863,7 +914,7 @@ export function ContractorsTab({ restaurant }: Props) {
                     <Label className="text-xs">الخدمات المختارة</Label>
                     <div className="max-h-40 overflow-y-auto border rounded-lg p-2 space-y-1">
                       {selectedServices.map((service, idx) => (
-                        <div key={`${service.id}-${idx}`} className="flex items-center justify-between p-2 bg-secondary/50 rounded text-xs">
+                        <div key={service.uniqueId} className="flex items-center justify-between p-2 bg-secondary/50 rounded text-xs">
                           <div className="flex-1">
                             <div className="font-medium">{service.item_name}</div>
                             <div className="text-muted-foreground">
@@ -874,7 +925,7 @@ export function ContractorsTab({ restaurant }: Props) {
                             </div>
                           </div>
                           <Button
-                            onClick={() => handleRemoveService(service.id)}
+                            onClick={() => handleRemoveService(service.uniqueId)}
                             variant="ghost"
                             size="sm"
                             className="text-destructive hover:text-destructive h-6 w-6 p-0"
