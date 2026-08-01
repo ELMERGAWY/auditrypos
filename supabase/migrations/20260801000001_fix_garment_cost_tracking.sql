@@ -242,6 +242,9 @@ END;
 $$;
 
 -- 7. Add trigger to auto-update cost_per_unit when costs change
+DROP TRIGGER IF EXISTS garment_stage_costs_cost_update ON public.garment_stage_costs;
+DROP FUNCTION IF EXISTS public.garment_trigger_cost_update();
+
 CREATE OR REPLACE FUNCTION public.garment_trigger_cost_update()
 RETURNS TRIGGER
 LANGUAGE plpgsql
