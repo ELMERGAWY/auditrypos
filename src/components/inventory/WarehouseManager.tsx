@@ -162,7 +162,7 @@ export function WarehouseManager({ restaurantId, warehouses: propsWarehouses, on
 
     try {
       // Get products in this warehouse using warehouse_stock table
-      const { data: stockData } = await supabase
+      const { data: stockData, error } = await supabase
         .from('warehouse_stock')
         .select(`
           quantity,
@@ -176,18 +176,29 @@ export function WarehouseManager({ restaurantId, warehouses: propsWarehouses, on
             price
           )
         `)
-        .eq('warehouse_id', warehouse.id)
-        .eq('restaurant_id', restaurantId);
+        .eq('warehouse_id', warehouse.id);
+
+      if (error) {
+        console.error('Error fetching warehouse_stock:', error);
+        toast.error('فشل في تحميل المنتجات');
+        setWarehouseProducts([]);
+        return;
+      }
+
+      console.log('Warehouse:', warehouse.name_ar, 'ID:', warehouse.id);
+      console.log('Stock data:', stockData);
 
       const products = (stockData || []).map((item: any) => ({
         ...item.product,
         quantity: item.quantity || 0
       }));
 
+      console.log('Mapped products:', products);
       setWarehouseProducts(products);
     } catch (error) {
       console.error('Error fetching warehouse products:', error);
       toast.error('فشل في تحميل المنتجات');
+      setWarehouseProducts([]);
     } finally {
       setLoadingProducts(false);
     }
