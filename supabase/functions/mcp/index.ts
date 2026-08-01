@@ -2,7 +2,135 @@
 // To take ownership, delete this banner line; the plugin then leaves the file alone.
 // supabase function: mcp
 // Bundled from src/lib/mcp/index.ts by @lovable.dev/mcp-js.
+// src/lib/mcp/index.ts
+import { auth, defineMcp } from "npm:@lovable.dev/mcp-js@0.20.0";
+
+// src/lib/mcp/tools/list-products.ts
+import { createClient } from "npm:@supabase/supabase-js@^2.110.0";
+import { defineTool } from "npm:@lovable.dev/mcp-js@0.20.0";
+import { z } from "npm:zod@^3.25.76";
+function supabaseForUser(ctx) {
+  return createClient(process.env.SUPABASE_URL, process.env.SUPABASE_PUBLISHABLE_KEY, {
+    global: { headers: { Authorization: `Bearer ${ctx.getToken()}` } },
+    auth: { persistSession: false, autoRefreshToken: false }
+  });
+}
+var list_products_default = defineTool({
+  name: "list_products",
+  title: "List products",
+  description: "List products/menu items for the signed-in user's restaurant. Supports optional search query and limit.",
+  inputSchema: {
+    search: z.string().optional().describe("Optional case-insensitive substring to match product name."),
+    limit: z.number().int().min(1).max(100).optional().describe("Max rows to return (default 25).")
+  },
+  annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: false },
+  handler: async ({ search, limit }, ctx) => {
+    if (!ctx.isAuthenticated()) {
+      return { content: [{ type: "text", text: "Not authenticated" }], isError: true };
+    }
+    const supabase = supabaseForUser(ctx);
+    let query = supabase.from("products").select("id, name, price, category, stock_quantity, barcode").limit(limit ?? 25);
+    if (search) query = query.ilike("name", `%${search}%`);
+    const { data, error } = await query;
+    if (error) return { content: [{ type: "text", text: error.message }], isError: true };
+    return {
+      content: [{ type: "text", text: JSON.stringify(data ?? [], null, 2) }],
+      structuredContent: { products: data ?? [] }
+    };
+  }
+});
+
+// src/lib/mcp/tools/list-orders.ts
+import { createClient as createClient2 } from "npm:@supabase/supabase-js@^2.110.0";
+import { defineTool as defineTool2 } from "npm:@lovable.dev/mcp-js@0.20.0";
+import { z as z2 } from "npm:zod@^3.25.76";
+function supabaseForUser2(ctx) {
+  return createClient2(process.env.SUPABASE_URL, process.env.SUPABASE_PUBLISHABLE_KEY, {
+    global: { headers: { Authorization: `Bearer ${ctx.getToken()}` } },
+    auth: { persistSession: false, autoRefreshToken: false }
+  });
+}
+var list_orders_default = defineTool2({
+  name: "list_orders",
+  title: "List orders",
+  description: "List recent orders for the signed-in user's restaurant. Optional filter by status.",
+  inputSchema: {
+    status: z2.string().optional().describe("Optional order status filter (e.g. pending, preparing, completed)."),
+    limit: z2.number().int().min(1).max(100).optional().describe("Max rows to return (default 25).")
+  },
+  annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: false },
+  handler: async ({ status, limit }, ctx) => {
+    if (!ctx.isAuthenticated()) {
+      return { content: [{ type: "text", text: "Not authenticated" }], isError: true };
+    }
+    const supabase = supabaseForUser2(ctx);
+    let query = supabase.from("orders").select("id, order_number, customer_name, total, status, order_type, created_at").order("created_at", { ascending: false }).limit(limit ?? 25);
+    if (status) query = query.eq("status", status);
+    const { data, error } = await query;
+    if (error) return { content: [{ type: "text", text: error.message }], isError: true };
+    return {
+      content: [{ type: "text", text: JSON.stringify(data ?? [], null, 2) }],
+      structuredContent: { orders: data ?? [] }
+    };
+  }
+});
+
+// src/lib/mcp/tools/sales-summary.ts
+import { createClient as createClient3 } from "npm:@supabase/supabase-js@^2.110.0";
+import { defineTool as defineTool3 } from "npm:@lovable.dev/mcp-js@0.20.0";
+import { z as z3 } from "npm:zod@^3.25.76";
+function supabaseForUser3(ctx) {
+  return createClient3(process.env.SUPABASE_URL, process.env.SUPABASE_PUBLISHABLE_KEY, {
+    global: { headers: { Authorization: `Bearer ${ctx.getToken()}` } },
+    auth: { persistSession: false, autoRefreshToken: false }
+  });
+}
+var sales_summary_default = defineTool3({
+  name: "sales_summary",
+  title: "Sales summary",
+  description: "Return a summary of orders (count, revenue, average) for the signed-in user's restaurant over the last N days.",
+  inputSchema: {
+    days: z3.number().int().min(1).max(365).optional().describe("Lookback window in days (default 7).")
+  },
+  annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: false },
+  handler: async ({ days }, ctx) => {
+    if (!ctx.isAuthenticated()) {
+      return { content: [{ type: "text", text: "Not authenticated" }], isError: true };
+    }
+    const supabase = supabaseForUser3(ctx);
+    const since = new Date(Date.now() - (days ?? 7) * 24 * 60 * 60 * 1e3).toISOString();
+    const { data, error } = await supabase.from("orders").select("total, status, created_at").gte("created_at", since);
+    if (error) return { content: [{ type: "text", text: error.message }], isError: true };
+    const rows = data ?? [];
+    const total = rows.reduce((s, r) => s + Number(r.total || 0), 0);
+    const count = rows.length;
+    const summary = {
+      days: days ?? 7,
+      order_count: count,
+      total_revenue: Number(total.toFixed(2)),
+      average_order_value: count ? Number((total / count).toFixed(2)) : 0
+    };
+    return {
+      content: [{ type: "text", text: JSON.stringify(summary, null, 2) }],
+      structuredContent: summary
+    };
+  }
+});
+
+// src/lib/mcp/index.ts
+var projectRef = "nmkjyweoagbblkbqavdz";
+var mcp_default = defineMcp({
+  name: "auditry-pos-mcp",
+  title: "Auditry POS MCP",
+  version: "0.1.0",
+  instructions: "Tools for the Auditry SmartPOS app. Use `list_products` to browse inventory, `list_orders` for recent orders, and `sales_summary` for aggregated revenue over a recent window. All tools are scoped to the signed-in user's restaurant via Supabase RLS.",
+  auth: auth.oauth.issuer({
+    issuer: `https://${projectRef}.supabase.co/auth/v1`,
+    acceptedAudiences: "authenticated"
+  }),
+  tools: [list_products_default, list_orders_default, sales_summary_default]
+});
+
 // lovable-mcp-supabase-entry.ts
-import mcp from "npm:D:\\auditrypos-main\\auditrypos-main\\auditrypos-1\\src\\lib\\mcp\\index.ts";
 import { createSupabaseHandler } from "npm:@lovable.dev/mcp-js@0.20.0/stacks/supabase";
-Deno.serve(createSupabaseHandler(mcp, { functionName: "mcp" }));
+Deno.serve(createSupabaseHandler(mcp_default, { functionName: "mcp" }));

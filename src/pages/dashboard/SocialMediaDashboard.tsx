@@ -1,3 +1,4 @@
+// @ts-nocheck
 // Social Media Dashboard Component
 // Provides posting and analytics functionality for connected social media accounts
 

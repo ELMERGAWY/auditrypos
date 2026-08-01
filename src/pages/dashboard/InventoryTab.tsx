@@ -1,5 +1,5 @@
 // @ts-nocheck
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Package, Plus, Search, AlertTriangle, Edit2, Trash2, 
@@ -129,6 +129,8 @@ export function InventoryTab({ restaurantId, currency, businessType }: Props) {
     warehouse_id: '',
   });
   const [filterCategory, setFilterCategory] = useState('all');
+  const [warehouseStocks, setWarehouseStocks] = useState<any[]>([]);
+  const [activeWarehouse, setActiveWarehouse] = useState<string>(() => localStorage.getItem(`inv_active_wh_${restaurantId}`) || 'all');
   const [projects, setProjects] = useState<any[]>([]);
   const [selectedProjectId, setSelectedProjectId] = useState<string>('');
   const [itemTypes, setItemTypes] = useState<ItemType[]>([]);
@@ -138,7 +140,8 @@ export function InventoryTab({ restaurantId, currency, businessType }: Props) {
     const { data: prodData } = await supabase.from('products').select('*').eq('restaurant_id', restaurantId).order('created_at', { ascending: false });
 
     // Load Warehouse Stocks to aggregate quantities
-    const { data: stockData } = await supabase.from('warehouse_stock').select('product_id, quantity').eq('restaurant_id', restaurantId);
+    const { data: stockData } = await supabase.from('warehouse_stock').select('product_id, quantity, warehouse_id').eq('restaurant_id', restaurantId);
+    setWarehouseStocks(stockData || []);
 
     const aggregatedProducts = ((prodData || []) as Product[]).map(p => {
       const pStocks = (stockData || []).filter(s => s.product_id === p.id);
@@ -183,18 +186,38 @@ export function InventoryTab({ restaurantId, currency, businessType }: Props) {
 
   useEffect(() => { load(); }, [restaurantId]);
 
-  const categories = [...new Set(products.map(p => p.category))];
-  const lowStock = products.filter(p => p.quantity <= p.min_quantity && p.quantity > 0);
-  const outOfStock = products.filter(p => p.quantity === 0);
-  const totalValue = products.reduce((s, p) => s + p.price * p.quantity, 0);
-  const totalCost = products.reduce((s, p) => s + p.cost_price * p.quantity, 0);
+  useEffect(() => {
+    if (restaurantId) localStorage.setItem(`inv_active_wh_${restaurantId}`, activeWarehouse);
+  }, [activeWarehouse, restaurantId]);
+
+  // Products are scoped to the selected warehouse: an item that lives in another
+  // warehouse never leaks into this one, even if the name matches.
+  const scopedProducts = useMemo(() => {
+    if (activeWarehouse === 'all') return products;
+    if (activeWarehouse === 'unassigned') {
+      return products.filter(p => !p.warehouse_id && !warehouseStocks.some(s => s.product_id === p.id));
+    }
+    return products
+      .filter(p => p.warehouse_id === activeWarehouse || warehouseStocks.some(s => s.product_id === p.id && s.warehouse_id === activeWarehouse))
+      .map(p => {
+        const row = warehouseStocks.find(s => s.product_id === p.id && s.warehouse_id === activeWarehouse);
+        return row ? { ...p, quantity: Number(row.quantity || 0) } : p;
+      });
+  }, [products, warehouseStocks, activeWarehouse]);
+
+  const categories = [...new Set(scopedProducts.map(p => p.category))];
+  const lowStock = scopedProducts.filter(p => p.quantity <= p.min_quantity && p.quantity > 0);
+  const outOfStock = scopedProducts.filter(p => p.quantity === 0);
+  const totalValue = scopedProducts.reduce((s, p) => s + p.price * p.quantity, 0);
+  const totalCost = scopedProducts.reduce((s, p) => s + p.cost_price * p.quantity, 0);
   const totalProfit = totalValue - totalCost;
 
-  const filtered = products.filter(p => {
+  const filtered = scopedProducts.filter(p => {
     if (filterCategory !== 'all' && p.category !== filterCategory) return false;
     if (search && !p.name.toLowerCase().includes(search.toLowerCase()) && !p.barcode.includes(search)) return false;
     return true;
   });
+
 
   const handleSave = async () => {
     if (!form.name) { toast.error('أدخل اسم المنتج'); return; }
@@ -456,7 +479,7 @@ export function InventoryTab({ restaurantId, currency, businessType }: Props) {
 
   const resetForm = () => {
     setShowForm(false); setEditingProduct(null); setPricingMode('fixed'); setMarkupValue('');
-    setForm({ name: '', barcode: '', sku: '', category: 'عام', price: '', cost_price: '', quantity: '', min_quantity: '5', unit: 'قطعة', image: '📦', expiry_date: '', secondary_unit: '', unit_conversion_factor: '', batch_number: '', item_type_id: '', warehouse_id: '' });
+    setForm({ name: '', barcode: '', sku: '', category: 'عام', price: '', cost_price: '', quantity: '', min_quantity: '5', unit: 'قطعة', image: '📦', expiry_date: '', secondary_unit: '', unit_conversion_factor: '', batch_number: '', item_type_id: '', warehouse_id: (activeWarehouse !== 'all' && activeWarehouse !== 'unassigned') ? activeWarehouse : '' });
   };
 
   const calcSellingPrice = (costStr: string) => {
@@ -589,16 +612,36 @@ export function InventoryTab({ restaurantId, currency, businessType }: Props) {
             </div>
           )}
 
+          {/* Warehouse scope selector — items are isolated per warehouse */}
+          <div className="glass-card p-3 rounded-2xl flex flex-col sm:flex-row sm:items-center gap-3">
+            <div className="flex items-center gap-2 text-xs font-bold whitespace-nowrap">
+              <Building2 className="w-4 h-4 text-primary" /> المخزن الحالي
+            </div>
+            <div className="flex gap-2 overflow-x-auto pb-1">
+              <button onClick={() => setActiveWarehouse('all')} className={`px-3 py-1.5 rounded-xl text-xs whitespace-nowrap transition-all ${activeWarehouse === 'all' ? 'gradient-bg text-primary-foreground shadow' : 'bg-secondary/50 hover:bg-secondary'}`}>كل المخازن</button>
+              {warehouses.map(w => (
+                <button key={w.id} onClick={() => setActiveWarehouse(w.id)} className={`px-3 py-1.5 rounded-xl text-xs whitespace-nowrap transition-all ${activeWarehouse === w.id ? 'gradient-bg text-primary-foreground shadow' : 'bg-secondary/50 hover:bg-secondary'}`}>
+                  {w.name}
+                </button>
+              ))}
+              <button onClick={() => setActiveWarehouse('unassigned')} className={`px-3 py-1.5 rounded-xl text-xs whitespace-nowrap transition-all ${activeWarehouse === 'unassigned' ? 'gradient-bg text-primary-foreground shadow' : 'bg-secondary/50 hover:bg-secondary'}`}>بدون مخزن</button>
+            </div>
+            <div className="sm:mr-auto text-[11px] text-muted-foreground">
+              {scopedProducts.length} صنف في النطاق الحالي
+            </div>
+          </div>
+
           {/* Toolbar */}
           <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between">
             <div className="flex gap-2 overflow-x-auto pb-1 w-full sm:w-auto">
-              <button onClick={() => setFilterCategory('all')} className={`px-4 py-2 rounded-xl text-xs whitespace-nowrap transition-all ${filterCategory === 'all' ? 'gradient-bg text-primary-foreground shadow-lg' : 'bg-secondary/50 text-secondary-foreground hover:bg-secondary'}`}>الكل ({products.length})</button>
+              <button onClick={() => setFilterCategory('all')} className={`px-4 py-2 rounded-xl text-xs whitespace-nowrap transition-all ${filterCategory === 'all' ? 'gradient-bg text-primary-foreground shadow-lg' : 'bg-secondary/50 text-secondary-foreground hover:bg-secondary'}`}>الكل ({scopedProducts.length})</button>
               {categories.map(cat => (
                 <button key={cat} onClick={() => setFilterCategory(cat)} className={`px-4 py-2 rounded-xl text-xs whitespace-nowrap transition-all ${filterCategory === cat ? 'gradient-bg text-primary-foreground shadow-lg' : 'bg-secondary/50 text-secondary-foreground hover:bg-secondary'}`}>
-                  {cat} ({products.filter(p => p.category === cat).length})
+                  {cat} ({scopedProducts.filter(p => p.category === cat).length})
                 </button>
               ))}
             </div>
+
             <div className="relative w-full sm:w-64">
               <Search className="w-4 h-4 absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
               <Input value={search} onChange={e => setSearch(e.target.value)} placeholder="بحث بالاسم أو باركود..." className="pr-10 h-10 rounded-xl text-xs border-0 bg-secondary/30 focus:bg-white transition-all" />
