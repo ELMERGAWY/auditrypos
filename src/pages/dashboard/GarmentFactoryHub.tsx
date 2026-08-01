@@ -633,6 +633,18 @@ export function GarmentFactoryHub({ restaurantId, currency = 'ج.م', profileNam
     toast.success('تمت إضافة المرحلة');
   };
 
+  const deleteOrder = async (orderId: string) => {
+    if (!window.confirm('هل أنت متأكد من حذف أمر التشغيل؟ سيتم إرجاع الكميات للمخزون.')) return;
+    const { error } = await supabase.rpc('garment_delete_order', {
+      p_order_id: orderId,
+      p_actor_name: actor,
+    });
+    if (error) return toast.error(error.message);
+    toast.success('تم حذف أمر التشغيل وإرجاع المخزون');
+    if (selectedId === orderId) setSelectedId(null);
+    load();
+  };
+
   const boardColumns = useMemo(
     () => activeStages.filter(s => !s.is_terminal),
     [activeStages]
@@ -746,6 +758,8 @@ export function GarmentFactoryHub({ restaurantId, currency = 'ج.م', profileNam
                           {o.customer_name && <div>عميل: {o.customer_name}</div>}
                           <div>قص {o.quantity_cut || 0} · تعبئة {o.quantity_packed || 0}</div>
                           <div>تكلفة: {(Number(o.total_stage_cost || 0) + Number(o.total_outsourcing_cost || 0)).toLocaleString()} {currency}</div>
+                          {o.cost_per_unit > 0 && <div>تكلفة/قطعة: {Number(o.cost_per_unit).toLocaleString()} {currency}</div>}
+                          {o.cost_variance !== 0 && <div className={cn(o.cost_variance > 0 ? 'text-rose-600' : 'text-emerald-600')}>فرق التكلفة: {Number(o.cost_variance).toLocaleString()} {currency}</div>}
                           {o.sales_order_id && <Badge className="text-[9px] bg-emerald-600">فاتورة مرتبطة</Badge>}
                         </div>
                         <div className="flex gap-1 mt-2">
@@ -755,6 +769,11 @@ export function GarmentFactoryHub({ restaurantId, currency = 'ج.م', profileNam
                           {showDeliverButton(o) && (
                             <Button size="sm" variant="outline" className="h-7 text-[10px]" onClick={e => { e.stopPropagation(); deliverNow(o); }}>
                               تسليم+فاتورة
+                            </Button>
+                          )}
+                          {o.status !== 'completed' && !o.sales_order_id && (
+                            <Button size="sm" variant="destructive" className="h-7 text-[10px]" onClick={e => { e.stopPropagation(); deleteOrder(o.id); }}>
+                              <Trash2 className="w-3 h-3" />
                             </Button>
                           )}
                         </div>
@@ -869,6 +888,7 @@ export function GarmentFactoryHub({ restaurantId, currency = 'ج.م', profileNam
                   <th className="py-2 text-right">الأمر</th>
                   <th className="py-2 text-right">المرحلة</th>
                   <th className="py-2 text-right">النوع</th>
+                  <th className="py-2 text-right">كمية منقولة</th>
                   <th className="py-2 text-right">كمية × سعر</th>
                   <th className="py-2 text-right">الإجمالي</th>
                   <th className="py-2 text-right">جهة</th>
@@ -882,6 +902,7 @@ export function GarmentFactoryHub({ restaurantId, currency = 'ج.م', profileNam
                       <td className="py-2">{ord?.order_number || '—'}</td>
                       <td className="py-2">{stageLabel(c.stage)}</td>
                       <td className="py-2"><Badge variant="outline">{COST_TYPES.find(t => t.id === c.cost_type)?.label || c.cost_type}</Badge></td>
+                      <td className="py-2">{c.quantity_transferred || c.quantity || 0}</td>
                       <td className="py-2">{Number(c.quantity).toLocaleString()} × {Number(c.unit_cost).toLocaleString()}</td>
                       <td className="py-2 font-black">{Number(c.total_cost).toLocaleString()}</td>
                       <td className="py-2 text-xs">{c.vendor_name || '—'}</td>
