@@ -308,10 +308,8 @@ export function WarehouseManager({ restaurantId, warehouses: propsWarehouses, on
 
       setWarehouseProducts(products);
 
-      // Show debug info in toast
-      toast.success(`المخزن: ${warehouse.name_ar} - عدد المنتجات: ${products.length}`, {
-        description: `ID: ${warehouse.id}`
-      });
+      // Show debug info
+      toast.success(`المخزن: ${warehouse.name_ar} - عدد المنتجات: ${products.length} (ID: ${warehouse.id})`);
     } catch (error) {
       console.error('Error fetching warehouse products:', error);
       toast.error('فشل في تحميل المنتجات');
