@@ -25,7 +25,7 @@ WHERE id IN (
     SELECT id
     FROM (
         SELECT id,
-               ROW_NUMBER() OVER (PARTITION BY warehouse_id, product_id ORDER BY created_at) as row_num
+               ROW_NUMBER() OVER (PARTITION BY warehouse_id, product_id) as row_num
         FROM public.warehouse_stock
     ) duplicates
     WHERE row_num > 1
