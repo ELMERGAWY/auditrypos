@@ -138,7 +138,8 @@ export function InventoryTab({ restaurantId, currency, businessType }: Props) {
     const { data: prodData } = await supabase.from('products').select('*').eq('restaurant_id', restaurantId).order('created_at', { ascending: false });
 
     // Load Warehouse Stocks to aggregate quantities
-    const { data: stockData } = await supabase.from('warehouse_stock').select('product_id, quantity').eq('restaurant_id', restaurantId);
+    const { data: stockData } = await supabase.from('warehouse_stock').select('product_id, quantity, warehouse_id').eq('restaurant_id', restaurantId);
+    setWarehouseStocks(stockData || []);
 
     const aggregatedProducts = ((prodData || []) as Product[]).map(p => {
       const pStocks = (stockData || []).filter(s => s.product_id === p.id);
@@ -183,18 +184,38 @@ export function InventoryTab({ restaurantId, currency, businessType }: Props) {
 
   useEffect(() => { load(); }, [restaurantId]);
 
-  const categories = [...new Set(products.map(p => p.category))];
-  const lowStock = products.filter(p => p.quantity <= p.min_quantity && p.quantity > 0);
-  const outOfStock = products.filter(p => p.quantity === 0);
-  const totalValue = products.reduce((s, p) => s + p.price * p.quantity, 0);
-  const totalCost = products.reduce((s, p) => s + p.cost_price * p.quantity, 0);
+  useEffect(() => {
+    if (restaurantId) localStorage.setItem(`inv_active_wh_${restaurantId}`, activeWarehouse);
+  }, [activeWarehouse, restaurantId]);
+
+  // Products are scoped to the selected warehouse: an item that lives in another
+  // warehouse never leaks into this one, even if the name matches.
+  const scopedProducts = useMemo(() => {
+    if (activeWarehouse === 'all') return products;
+    if (activeWarehouse === 'unassigned') {
+      return products.filter(p => !p.warehouse_id && !warehouseStocks.some(s => s.product_id === p.id));
+    }
+    return products
+      .filter(p => p.warehouse_id === activeWarehouse || warehouseStocks.some(s => s.product_id === p.id && s.warehouse_id === activeWarehouse))
+      .map(p => {
+        const row = warehouseStocks.find(s => s.product_id === p.id && s.warehouse_id === activeWarehouse);
+        return row ? { ...p, quantity: Number(row.quantity || 0) } : p;
+      });
+  }, [products, warehouseStocks, activeWarehouse]);
+
+  const categories = [...new Set(scopedProducts.map(p => p.category))];
+  const lowStock = scopedProducts.filter(p => p.quantity <= p.min_quantity && p.quantity > 0);
+  const outOfStock = scopedProducts.filter(p => p.quantity === 0);
+  const totalValue = scopedProducts.reduce((s, p) => s + p.price * p.quantity, 0);
+  const totalCost = scopedProducts.reduce((s, p) => s + p.cost_price * p.quantity, 0);
   const totalProfit = totalValue - totalCost;
 
-  const filtered = products.filter(p => {
+  const filtered = scopedProducts.filter(p => {
     if (filterCategory !== 'all' && p.category !== filterCategory) return false;
     if (search && !p.name.toLowerCase().includes(search.toLowerCase()) && !p.barcode.includes(search)) return false;
     return true;
   });
+
 
   const handleSave = async () => {
     if (!form.name) { toast.error('أدخل اسم المنتج'); return; }
