@@ -232,7 +232,7 @@ export function WarehouseManager({ restaurantId, warehouses: propsWarehouses, on
         product_id: selectedProduct.id,
         type: 'transfer' as any,
         quantity: qty,
-        reason: `تحويل من ${selectedWarehouse.name_ar} إلى ${propsWarehouses.find(w => w.id === targetWarehouseId)?.name_ar}`,
+        reason: `تحويل من ${selectedWarehouse.name_ar} إلى ${(propsWarehouses || []).find(w => w.id === targetWarehouseId)?.name_ar}`,
         warehouse_id: selectedWarehouse.id,
       });
 
@@ -435,7 +435,7 @@ export function WarehouseManager({ restaurantId, warehouses: propsWarehouses, on
   };
 
   const getWarehousesByType = (types: string[]) => {
-    return propsWarehouses.filter(w => types.includes(w.type));
+    return (propsWarehouses || []).filter(w => types.includes(w.type));
   };
 
   // Fetch parent warehouses for display
@@ -443,7 +443,7 @@ export function WarehouseManager({ restaurantId, warehouses: propsWarehouses, on
   useEffect(() => {
     const fetchParents = async () => {
       const withParents = await Promise.all(
-        propsWarehouses.map(async (warehouse) => {
+        (propsWarehouses || []).map(async (warehouse) => {
           if (warehouse.parent_warehouse_id) {
             const { data: parent } = await supabase
               .from('warehouses')
@@ -887,7 +887,7 @@ export function WarehouseManager({ restaurantId, warehouses: propsWarehouses, on
                   <SelectValue placeholder="اختر المخزن المستهدف" />
                 </SelectTrigger>
                 <SelectContent>
-                  {propsWarehouses
+                  {(propsWarehouses || [])
                     .filter(w => w.id !== selectedWarehouse?.id)
                     .map((warehouse) => (
                       <SelectItem key={warehouse.id} value={warehouse.id}>
