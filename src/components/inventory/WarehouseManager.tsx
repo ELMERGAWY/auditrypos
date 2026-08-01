@@ -8,7 +8,7 @@ import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Plus, Trash2, Building2, Package, Factory, Wrench, FolderTree, AlertCircle, MapPin, Edit } from 'lucide-react';
+import { Plus, Trash2, Building2, Package, Factory, Wrench, FolderTree, AlertCircle, MapPin, Edit, ArrowRightLeft, Box, Warehouse, PackageSearch, Archive, PackageCheck } from 'lucide-react';
 import { toast } from 'sonner';
 
 type WarehouseType = 'MAIN' | 'SUB';
@@ -74,11 +74,15 @@ export function WarehouseManager({ restaurantId, warehouses: propsWarehouses, on
   const [loading, setLoading] = useState(false);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [detailsDialogOpen, setDetailsDialogOpen] = useState(false);
+  const [transferDialogOpen, setTransferDialogOpen] = useState(false);
   const [selectedWarehouse, setSelectedWarehouse] = useState<Warehouse | null>(null);
+  const [selectedProduct, setSelectedProduct] = useState<any>(null);
   const [warehouseProducts, setWarehouseProducts] = useState<any[]>([]);
   const [loadingProducts, setLoadingProducts] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [editingWarehouseId, setEditingWarehouseId] = useState<string | null>(null);
+  const [transferQuantity, setTransferQuantity] = useState('');
+  const [targetWarehouseId, setTargetWarehouseId] = useState('');
   const [formData, setFormData] = useState({
     code: '',
     name: '',
@@ -155,6 +159,97 @@ export function WarehouseManager({ restaurantId, warehouses: propsWarehouses, on
     setDialogOpen(true);
   };
 
+  const handleTransferProduct = async () => {
+    if (!selectedWarehouse || !selectedProduct || !transferQuantity || !targetWarehouseId) {
+      toast.error('يرجى ملء جميع الحقول');
+      return;
+    }
+
+    const qty = Number(transferQuantity);
+    if (qty <= 0) {
+      toast.error('الكمية يجب أن تكون أكبر من صفر');
+      return;
+    }
+
+    if (qty > selectedProduct.quantity) {
+      toast.error('الكمية المطلوبة أكبر من المتوفرة');
+      return;
+    }
+
+    try {
+      setLoading(true);
+
+      // Get current warehouse stock
+      const { data: currentStock } = await supabase
+        .from('warehouse_stock')
+        .select('*')
+        .eq('warehouse_id', selectedWarehouse.id)
+        .eq('product_id', selectedProduct.id)
+        .single();
+
+      if (!currentStock) {
+        toast.error('لم يتم العثور على المخزون الحالي');
+        return;
+      }
+
+      // Update source warehouse stock
+      const newSourceQty = Number(currentStock.quantity) - qty;
+      await supabase
+        .from('warehouse_stock')
+        .update({ quantity: newSourceQty })
+        .eq('id', currentStock.id);
+
+      // Get or create target warehouse stock
+      const { data: targetStock } = await supabase
+        .from('warehouse_stock')
+        .select('*')
+        .eq('warehouse_id', targetWarehouseId)
+        .eq('product_id', selectedProduct.id)
+        .maybeSingle();
+
+      if (targetStock) {
+        // Update existing target stock
+        await supabase
+          .from('warehouse_stock')
+          .update({ quantity: Number(targetStock.quantity) + qty })
+          .eq('id', targetStock.id);
+      } else {
+        // Create new target stock record
+        await supabase
+          .from('warehouse_stock')
+          .insert({
+            restaurant_id: restaurantId,
+            warehouse_id: targetWarehouseId,
+            product_id: selectedProduct.id,
+            quantity: qty,
+            min_quantity: 0,
+          });
+      }
+
+      // Log the transfer
+      await supabase.from('stock_movements').insert({
+        restaurant_id: restaurantId,
+        product_id: selectedProduct.id,
+        type: 'transfer' as any,
+        quantity: qty,
+        reason: `تحويل من ${selectedWarehouse.name_ar} إلى ${propsWarehouses.find(w => w.id === targetWarehouseId)?.name_ar}`,
+        warehouse_id: selectedWarehouse.id,
+      });
+
+      toast.success('تم التحويل بنجاح');
+      setTransferDialogOpen(false);
+      setTransferQuantity('');
+      setTargetWarehouseId('');
+      setSelectedProduct(null);
+      handleViewWarehouseDetails(selectedWarehouse); // Refresh the view
+    } catch (error: any) {
+      console.error('Transfer error:', error);
+      toast.error(`فشل التحويل: ${error?.message || 'خطأ غير معروف'}`);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleViewWarehouseDetails = async (warehouse: Warehouse) => {
     setSelectedWarehouse(warehouse);
     setLoadingProducts(true);
@@ -186,21 +281,15 @@ export function WarehouseManager({ restaurantId, warehouses: propsWarehouses, on
         return;
       }
 
-      // Log for debugging
-      console.log('Warehouse ID:', warehouse.id, 'Name:', warehouse.name_ar);
-      console.log('Stock data count:', stockData?.length);
-      console.log('Sample stock data:', stockData?.slice(0, 2));
-
-      // Show toast with debug info
-      toast.success(`المخزن: ${warehouse.name_ar} - عدد المنتجات: ${stockData?.length || 0}`);
-
       const products = (stockData || []).map((item: any) => ({
         ...item.product,
-        warehouse_id: item.warehouse_id, // Include warehouse_id for verification
-        quantity: item.quantity || 0
+        warehouse_id: item.warehouse_id,
+        quantity: item.quantity || 0,
+        is_sub_warehouse: warehouse.type === 'SUB'
       }));
 
       setWarehouseProducts(products);
+      toast.success(`المخزن: ${warehouse.name_ar} - عدد المنتجات: ${products.length}`);
     } catch (error) {
       console.error('Error fetching warehouse products:', error);
       toast.error('فشل في تحميل المنتجات');
@@ -725,22 +814,98 @@ export function WarehouseManager({ restaurantId, warehouses: propsWarehouses, on
                   <TableHead>الكمية</TableHead>
                   <TableHead>سعر التكلفة</TableHead>
                   <TableHead>سعر البيع</TableHead>
+                  <TableHead>إجراءات</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {warehouseProducts.map((product) => (
                   <TableRow key={product.id}>
-                    <TableCell className="font-medium">{product.name}</TableCell>
+                    <TableCell className="font-medium flex items-center gap-2">
+                      {product.is_sub_warehouse ? (
+                        <Box className="w-4 h-4 text-orange-500" />
+                      ) : (
+                        <Package className="w-4 h-4 text-primary" />
+                      )}
+                      {product.name}
+                    </TableCell>
                     <TableCell>{product.barcode}</TableCell>
                     <TableCell><Badge variant="outline">{product.category}</Badge></TableCell>
                     <TableCell>{product.quantity?.toLocaleString('ar-EG') || 0}</TableCell>
                     <TableCell>{Number(product.cost_price).toLocaleString('ar-EG')} ج.م</TableCell>
                     <TableCell>{Number(product.price).toLocaleString('ar-EG')} ج.م</TableCell>
+                    <TableCell>
+                      {selectedWarehouse && selectedWarehouse.type === 'MAIN' && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => {
+                            setSelectedProduct(product);
+                            setTransferDialogOpen(true);
+                          }}
+                          className="h-8 text-xs"
+                        >
+                          <ArrowRightLeft className="w-3 h-3 ml-1" />
+                          تحويل
+                        </Button>
+                      )}
+                    </TableCell>
                   </TableRow>
                 ))}
               </TableBody>
             </Table>
           )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Transfer Product Dialog */}
+      <Dialog open={transferDialogOpen} onOpenChange={setTransferDialogOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <ArrowRightLeft className="h-5 w-5" />
+              تحويل منتج بين المخازن
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="bg-secondary/50 p-4 rounded-lg">
+              <p className="text-sm font-medium">المنتج: {selectedProduct?.name}</p>
+              <p className="text-xs text-muted-foreground">الكمية المتوفرة: {selectedProduct?.quantity}</p>
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium">الكمية المراد تحويلها</label>
+              <Input
+                type="number"
+                value={transferQuantity}
+                onChange={(e) => setTransferQuantity(e.target.value)}
+                placeholder="أدخل الكمية"
+              />
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium">المخزن المستهدف</label>
+              <Select value={targetWarehouseId} onValueChange={setTargetWarehouseId}>
+                <SelectTrigger>
+                  <SelectValue placeholder="اختر المخزن المستهدف" />
+                </SelectTrigger>
+                <SelectContent>
+                  {propsWarehouses
+                    .filter(w => w.id !== selectedWarehouse?.id)
+                    .map((warehouse) => (
+                      <SelectItem key={warehouse.id} value={warehouse.id}>
+                        {warehouse.name_ar} ({warehouse.type === 'MAIN' ? 'رئيسي' : 'فرعي'})
+                      </SelectItem>
+                    ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setTransferDialogOpen(false)}>
+              إلغاء
+            </Button>
+            <Button onClick={handleTransferProduct} disabled={loading}>
+              {loading ? 'جاري التحويل...' : 'تحويل'}
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>
