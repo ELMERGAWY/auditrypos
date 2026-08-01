@@ -21,10 +21,14 @@ END $$;
 -- 2. Remove duplicate warehouse_stock records
 -- Keep only the first record for each product-warehouse combination
 DELETE FROM public.warehouse_stock
-WHERE id NOT IN (
-    SELECT MIN(id)
-    FROM public.warehouse_stock
-    GROUP BY warehouse_id, product_id
+WHERE id IN (
+    SELECT id
+    FROM (
+        SELECT id,
+               ROW_NUMBER() OVER (PARTITION BY warehouse_id, product_id ORDER BY created_at) as row_num
+        FROM public.warehouse_stock
+    ) duplicates
+    WHERE row_num > 1
 );
 
 -- 3. Ensure unique constraint exists
