@@ -121,6 +121,9 @@ export function GarmentFactoryHub({ restaurantId, currency = 'ج.م', profileNam
   const [outOpen, setOutOpen] = useState(false);
   const [recvOpen, setRecvOpen] = useState(false);
   const [stagesOpen, setStagesOpen] = useState(false);
+  const [ratesOpen, setRatesOpen] = useState(false);
+  const [rates, setRates] = useState<any[]>([]);
+  const [rateForm, setRateForm] = useState({ stage_key: '', cost_type: 'internal', rate_per_piece: '', vendor_name: '', auto_apply: true });
   const [recvJobId, setRecvJobId] = useState<string | null>(null);
   const [newStageLabel, setNewStageLabel] = useState('');
   const [stagesSaving, setStagesSaving] = useState(false);
@@ -176,7 +179,7 @@ export function GarmentFactoryHub({ restaurantId, currency = 'ج.م', profileNam
       supabase.from('garment_cutting_lots').select('*').eq('restaurant_id', restaurantId).order('created_at', { ascending: false }).limit(200),
       supabase.from('garment_stage_costs').select('*').eq('restaurant_id', restaurantId).order('created_at', { ascending: false }).limit(500),
       supabase.from('garment_outsourcing_jobs').select('*').eq('restaurant_id', restaurantId).order('created_at', { ascending: false }).limit(300),
-      supabase.from('products').select('id, name, quantity, unit').eq('restaurant_id', restaurantId).order('name').limit(500),
+      supabase.from('products').select('id, name, quantity, unit, cost_price').eq('restaurant_id', restaurantId).order('name').limit(500),
     ]);
     await loadStages();
     if (o.error) toast.error(o.error.message);
@@ -186,6 +189,8 @@ export function GarmentFactoryHub({ restaurantId, currency = 'ج.م', profileNam
     setCosts(sc.error ? [] : (sc.data || []));
     setJobs(oj.error ? [] : (oj.data || []));
     setProducts(p.data || []);
+    const rt = await supabase.from('garment_stage_rates').select('*').eq('restaurant_id', restaurantId).order('stage_key');
+    setRates(rt.error ? [] : (rt.data || []));
     setLoading(false);
   }, [restaurantId, loadStages]);
 
@@ -258,6 +263,31 @@ export function GarmentFactoryHub({ restaurantId, currency = 'ج.م', profileNam
     }
     return map;
   }, [costs, selectedId]);
+
+  // Full cost sheet for the selected work order: fabric + stage costs + outsourcing.
+  const orderCostSheet = useMemo(() => {
+    if (!selected) return null;
+    const orderRolls = rolls.filter(r => r.garment_order_id === selected.id);
+    const fabricCost = orderRolls.reduce((sum, r) => {
+      const prod = products.find(p => p.id === r.product_id);
+      const unitCost = Number(r.cost_per_meter ?? prod?.cost_price ?? 0);
+      return sum + Number(r.meters_consumed || 0) * unitCost;
+    }, 0);
+    const orderCosts = costs.filter(c => c.garment_order_id === selected.id);
+    const byType = (t: string) => orderCosts.filter(c => (c.cost_type || 'internal') === t)
+      .reduce((s, c) => s + Number(c.total_cost || 0), 0);
+    const internal = byType('internal');
+    const outsourcing = byType('outsourcing') + Number(selected.total_outsourcing_cost || 0) - byType('outsourcing');
+    const material = byType('material');
+    const overhead = byType('overhead');
+    const total = fabricCost + internal + outsourcing + material + overhead;
+    const qty = Number(selected.quantity_delivered || selected.quantity_packed || selected.quantity_planned || 0);
+    const perUnit = qty > 0 ? total / qty : 0;
+    const revenue = Number(selected.unit_price || 0) * qty;
+    const margin = revenue - total;
+    return { fabricCost, internal, outsourcing, material, overhead, total, qty, perUnit, revenue, margin,
+      marginPct: revenue > 0 ? (margin / revenue) * 100 : 0 };
+  }, [selected, rolls, products, costs]);
 
   const parseSizes = (raw: string) => {
     const out: Record<string, number> = {};
@@ -389,6 +419,28 @@ export function GarmentFactoryHub({ restaurantId, currency = 'ج.م', profileNam
     load();
   };
 
+  // Auto-costing: applies the standard rate configured per stage when a quantity
+  // is moved into that stage. Manual entries stay available on top of this.
+  const applyStageRate = async (stageKey: string, quantity: number) => {
+    if (!selectedId || !quantity) return;
+    const rate = rates.find(r => r.stage_key === stageKey && r.is_active !== false && r.auto_apply);
+    if (!rate || !Number(rate.rate_per_piece)) return;
+    const { error } = await supabase.rpc('garment_record_stage_cost', {
+      p_restaurant_id: restaurantId,
+      p_garment_order_id: selectedId,
+      p_stage: stageKey,
+      p_cost_type: rate.cost_type || 'internal',
+      p_quantity: quantity,
+      p_unit_cost: Number(rate.rate_per_piece),
+      p_vendor_name: rate.vendor_name || null,
+      p_outsourcing_job_id: null,
+      p_notes: 'تكلفة تلقائية حسب معدل المرحلة',
+      p_actor_name: actor,
+    });
+    if (error) toast.error('تعذر تسجيل التكلفة التلقائية: ' + error.message);
+    else toast.success('تم احتساب تكلفة المرحلة تلقائياً');
+  };
+
   const advanceStage = async () => {
     if (!selectedId || !advanceForm.to_stage) return toast.error('حدد المرحلة التالية');
     const targetDef = getDef(advanceForm.to_stage);
@@ -432,6 +484,7 @@ export function GarmentFactoryHub({ restaurantId, currency = 'ج.م', profileNam
       if (error) return toast.error(error.message);
       toast.success(`تم النقل إلى: ${stageLabel(advanceForm.to_stage)}`);
     }
+    await applyStageRate(advanceForm.to_stage, Number(advanceForm.quantity) || 0);
     setAdvanceOpen(false);
     load();
   };
@@ -481,6 +534,29 @@ export function GarmentFactoryHub({ restaurantId, currency = 'ج.م', profileNam
     if (error) return toast.error(error.message);
     toast.success('تم تسجيل تكلفة المرحلة');
     setCostOpen(false);
+    load();
+  };
+
+  const saveRate = async () => {
+    if (!rateForm.stage_key) return toast.error('اختر المرحلة');
+    const { error } = await supabase.from('garment_stage_rates').upsert({
+      restaurant_id: restaurantId,
+      stage_key: rateForm.stage_key,
+      cost_type: rateForm.cost_type,
+      rate_per_piece: Number(rateForm.rate_per_piece) || 0,
+      vendor_name: rateForm.vendor_name || null,
+      auto_apply: rateForm.auto_apply,
+      is_active: true,
+    });
+    if (error) return toast.error(error.message);
+    toast.success('تم حفظ معدل التكلفة');
+    setRateForm({ stage_key: '', cost_type: 'internal', rate_per_piece: '', vendor_name: '', auto_apply: true });
+    load();
+  };
+
+  const deleteRate = async (id: string) => {
+    const { error } = await supabase.from('garment_stage_rates').delete().eq('id', id);
+    if (error) return toast.error(error.message);
     load();
   };
 
@@ -679,6 +755,9 @@ export function GarmentFactoryHub({ restaurantId, currency = 'ج.م', profileNam
           <Button variant="outline" size="sm" onClick={load}><RefreshCcw className="w-4 h-4 ml-1" />تحديث</Button>
           <Button variant="outline" size="sm" onClick={() => { setStagesOpen(true); loadStages(); }}>
             <Settings2 className="w-4 h-4 ml-1" />إعداد المراحل
+          </Button>
+          <Button variant="outline" size="sm" onClick={() => setRatesOpen(true)}>
+            <DollarSign className="w-4 h-4 ml-1" />معدلات التكلفة
           </Button>
           <Button size="sm" onClick={() => setOrderOpen(true)}><Plus className="w-4 h-4 ml-1" />أمر تشغيل</Button>
           <Button size="sm" variant="secondary" onClick={() => setRollOpen(true)}><Package className="w-4 h-4 ml-1" />استلام توب</Button>
