@@ -5591,6 +5591,48 @@ export type Database = {
           },
         ]
       }
+      garment_stage_rates: {
+        Row: {
+          auto_apply: boolean
+          cost_type: string
+          created_at: string
+          id: string
+          is_active: boolean
+          notes: string | null
+          rate_per_piece: number
+          restaurant_id: string
+          stage_key: string
+          updated_at: string
+          vendor_name: string | null
+        }
+        Insert: {
+          auto_apply?: boolean
+          cost_type?: string
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          notes?: string | null
+          rate_per_piece?: number
+          restaurant_id: string
+          stage_key: string
+          updated_at?: string
+          vendor_name?: string | null
+        }
+        Update: {
+          auto_apply?: boolean
+          cost_type?: string
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          notes?: string | null
+          rate_per_piece?: number
+          restaurant_id?: string
+          stage_key?: string
+          updated_at?: string
+          vendor_name?: string | null
+        }
+        Relationships: []
+      }
       gift_cards: {
         Row: {
           balance: number | null
