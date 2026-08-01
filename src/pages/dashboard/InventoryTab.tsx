@@ -612,16 +612,36 @@ export function InventoryTab({ restaurantId, currency, businessType }: Props) {
             </div>
           )}
 
+          {/* Warehouse scope selector — items are isolated per warehouse */}
+          <div className="glass-card p-3 rounded-2xl flex flex-col sm:flex-row sm:items-center gap-3">
+            <div className="flex items-center gap-2 text-xs font-bold whitespace-nowrap">
+              <Building2 className="w-4 h-4 text-primary" /> المخزن الحالي
+            </div>
+            <div className="flex gap-2 overflow-x-auto pb-1">
+              <button onClick={() => setActiveWarehouse('all')} className={`px-3 py-1.5 rounded-xl text-xs whitespace-nowrap transition-all ${activeWarehouse === 'all' ? 'gradient-bg text-primary-foreground shadow' : 'bg-secondary/50 hover:bg-secondary'}`}>كل المخازن</button>
+              {warehouses.map(w => (
+                <button key={w.id} onClick={() => setActiveWarehouse(w.id)} className={`px-3 py-1.5 rounded-xl text-xs whitespace-nowrap transition-all ${activeWarehouse === w.id ? 'gradient-bg text-primary-foreground shadow' : 'bg-secondary/50 hover:bg-secondary'}`}>
+                  {w.name}
+                </button>
+              ))}
+              <button onClick={() => setActiveWarehouse('unassigned')} className={`px-3 py-1.5 rounded-xl text-xs whitespace-nowrap transition-all ${activeWarehouse === 'unassigned' ? 'gradient-bg text-primary-foreground shadow' : 'bg-secondary/50 hover:bg-secondary'}`}>بدون مخزن</button>
+            </div>
+            <div className="sm:mr-auto text-[11px] text-muted-foreground">
+              {scopedProducts.length} صنف في النطاق الحالي
+            </div>
+          </div>
+
           {/* Toolbar */}
           <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between">
             <div className="flex gap-2 overflow-x-auto pb-1 w-full sm:w-auto">
-              <button onClick={() => setFilterCategory('all')} className={`px-4 py-2 rounded-xl text-xs whitespace-nowrap transition-all ${filterCategory === 'all' ? 'gradient-bg text-primary-foreground shadow-lg' : 'bg-secondary/50 text-secondary-foreground hover:bg-secondary'}`}>الكل ({products.length})</button>
+              <button onClick={() => setFilterCategory('all')} className={`px-4 py-2 rounded-xl text-xs whitespace-nowrap transition-all ${filterCategory === 'all' ? 'gradient-bg text-primary-foreground shadow-lg' : 'bg-secondary/50 text-secondary-foreground hover:bg-secondary'}`}>الكل ({scopedProducts.length})</button>
               {categories.map(cat => (
                 <button key={cat} onClick={() => setFilterCategory(cat)} className={`px-4 py-2 rounded-xl text-xs whitespace-nowrap transition-all ${filterCategory === cat ? 'gradient-bg text-primary-foreground shadow-lg' : 'bg-secondary/50 text-secondary-foreground hover:bg-secondary'}`}>
-                  {cat} ({products.filter(p => p.category === cat).length})
+                  {cat} ({scopedProducts.filter(p => p.category === cat).length})
                 </button>
               ))}
             </div>
+
             <div className="relative w-full sm:w-64">
               <Search className="w-4 h-4 absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
               <Input value={search} onChange={e => setSearch(e.target.value)} placeholder="بحث بالاسم أو باركود..." className="pr-10 h-10 rounded-xl text-xs border-0 bg-secondary/30 focus:bg-white transition-all" />
