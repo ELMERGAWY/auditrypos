@@ -289,24 +289,23 @@ BEGIN
     RAISE EXCEPTION 'لا يمكن حذف أمر له فاتورة مبيعات';
   END IF;
 
-  -- Rollback fabric inventory if fabric_product_id exists
+  -- Rollback fabric inventory if fabric_product_id exists using adjust_product_stock
   v_fabric_product_id := v_order.fabric_product_id;
   IF v_fabric_product_id IS NOT NULL AND v_order.quantity_cut > 0 THEN
-    -- Return fabric to inventory (reverse the cutting consumption)
-    -- This assumes fabric is tracked as a product in inventory
-    INSERT INTO public.inventory_transactions (
-      restaurant_id, product_id, transaction_type, quantity,
-      reference_type, reference_id, notes, created_by_name
-    ) VALUES (
-      v_order.restaurant_id,
-      v_fabric_product_id,
-      'adjustment',
-      v_order.quantity_cut, -- Positive to add back to inventory
-      'garment_order',
-      p_order_id,
-      'إرجاع قماش من حذف أمر إنتاج ' || v_order.order_number,
-      p_actor_name
-    );
+    -- Use adjust_product_stock function if available, otherwise skip
+    BEGIN
+      PERFORM public.adjust_product_stock(
+        v_fabric_product_id,
+        v_order.restaurant_id,
+        v_order.quantity_cut,
+        'in',
+        'garment_order_delete',
+        p_order_id::text
+      );
+    EXCEPTION WHEN OTHERS THEN
+      -- If adjust_product_stock doesn't exist or fails, continue with deletion
+      RAISE NOTICE 'Could not adjust inventory: %', SQLERRM;
+    END;
   END IF;
 
   -- Delete related records in order
