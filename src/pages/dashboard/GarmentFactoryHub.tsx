@@ -277,7 +277,7 @@ export function GarmentFactoryHub({ restaurantId, currency = 'ج.م', profileNam
     const byType = (t: string) => orderCosts.filter(c => (c.cost_type || 'internal') === t)
       .reduce((s, c) => s + Number(c.total_cost || 0), 0);
     const internal = byType('internal');
-    const outsourcing = byType('outsourcing') + Number(selected.total_outsourcing_cost || 0) - byType('outsourcing');
+    const outsourcing = byType('outsourcing') || Number(selected.total_outsourcing_cost || 0);
     const material = byType('material');
     const overhead = byType('overhead');
     const total = fabricCost + internal + outsourcing + material + overhead;
@@ -941,6 +941,41 @@ export function GarmentFactoryHub({ restaurantId, currency = 'ج.م', profileNam
         </div>
       ) : view === 'costs' ? (
         <div className="space-y-3">
+          {orderCostSheet && (
+            <Card className="p-4 border-primary/30">
+              <div className="text-xs font-black mb-3">كشف تكلفة أمر التشغيل — {selected.order_number}</div>
+              <div className="grid md:grid-cols-4 gap-2 text-xs">
+                {[
+                  { l: 'خامات (أقمشة مستهلكة)', v: orderCostSheet.fabricCost },
+                  { l: 'تشغيل داخلي', v: orderCostSheet.internal },
+                  { l: 'تصنيع خارجي', v: orderCostSheet.outsourcing },
+                  { l: 'مواد مساعدة', v: orderCostSheet.material },
+                  { l: 'أعباء صناعية', v: orderCostSheet.overhead },
+                ].map(row => (
+                  <Card key={row.l} className="p-3 border-border/50">
+                    <div className="text-[10px] text-muted-foreground">{row.l}</div>
+                    <div className="font-black">{row.v.toLocaleString(undefined, { maximumFractionDigits: 2 })} {currency}</div>
+                  </Card>
+                ))}
+                <Card className="p-3 bg-primary/5 border-primary/30">
+                  <div className="text-[10px] text-muted-foreground">إجمالي التكلفة</div>
+                  <div className="font-black text-primary">{orderCostSheet.total.toLocaleString(undefined, { maximumFractionDigits: 2 })} {currency}</div>
+                </Card>
+                <Card className="p-3 border-border/50">
+                  <div className="text-[10px] text-muted-foreground">تكلفة القطعة ({orderCostSheet.qty} قطعة)</div>
+                  <div className="font-black">{orderCostSheet.perUnit.toLocaleString(undefined, { maximumFractionDigits: 2 })} {currency}</div>
+                </Card>
+                <Card className="p-3 border-border/50">
+                  <div className="text-[10px] text-muted-foreground">إيراد متوقع</div>
+                  <div className="font-black">{orderCostSheet.revenue.toLocaleString(undefined, { maximumFractionDigits: 2 })} {currency}</div>
+                </Card>
+                <Card className={`p-3 ${orderCostSheet.margin >= 0 ? 'border-emerald-500/40 bg-emerald-500/5' : 'border-destructive/40 bg-destructive/5'}`}>
+                  <div className="text-[10px] text-muted-foreground">هامش الربح</div>
+                  <div className="font-black">{orderCostSheet.margin.toLocaleString(undefined, { maximumFractionDigits: 2 })} {currency} ({orderCostSheet.marginPct.toFixed(1)}%)</div>
+                </Card>
+              </div>
+            </Card>
+          )}
           <Card className="p-4">
             <div className="text-xs font-black mb-3">ملخص تكلفة المراحل {selected ? `— ${selected.order_number}` : '(كل الأوامر)'}</div>
             <div className="grid md:grid-cols-3 gap-2">
@@ -1055,6 +1090,43 @@ export function GarmentFactoryHub({ restaurantId, currency = 'ج.م', profileNam
       )}
 
       {/* dialogs */}
+      <Dialog open={ratesOpen} onOpenChange={setRatesOpen}>
+        <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto" dir="rtl">
+          <DialogHeader><DialogTitle>معدلات تكلفة المراحل (احتساب تلقائي)</DialogTitle></DialogHeader>
+          <p className="text-[11px] text-muted-foreground">
+            حدّد تكلفة القطعة لكل مرحلة، وسيتم احتساب التكلفة تلقائياً عند نقل الكمية لهذه المرحلة — مع إمكانية التسجيل اليدوي في أي وقت.
+          </p>
+          <div className="space-y-2">
+            {rates.map(r => (
+              <div key={r.id} className="flex items-center gap-2 text-xs border rounded-lg p-2">
+                <span className="font-bold flex-1">{stageLabel(r.stage_key)}</span>
+                <Badge variant="outline">{COST_TYPES.find(t => t.id === r.cost_type)?.label || r.cost_type}</Badge>
+                <span className="font-black">{Number(r.rate_per_piece).toLocaleString()} {currency}/قطعة</span>
+                {r.auto_apply ? <Badge className="bg-emerald-600">تلقائي</Badge> : <Badge variant="secondary">يدوي</Badge>}
+                <Button size="sm" variant="ghost" className="h-7 text-destructive" onClick={() => deleteRate(r.id)}>حذف</Button>
+              </div>
+            ))}
+            {rates.length === 0 && <div className="text-xs text-muted-foreground py-4 text-center">لا توجد معدلات بعد</div>}
+          </div>
+          <div className="grid grid-cols-2 gap-2 border-t pt-3">
+            <Select value={rateForm.stage_key} onValueChange={v => setRateForm(f => ({ ...f, stage_key: v }))}>
+              <SelectTrigger><SelectValue placeholder="المرحلة" /></SelectTrigger>
+              <SelectContent>{activeStages.map(st => <SelectItem key={st.stage_key} value={st.stage_key}>{st.label_ar}</SelectItem>)}</SelectContent>
+            </Select>
+            <Select value={rateForm.cost_type} onValueChange={v => setRateForm(f => ({ ...f, cost_type: v }))}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>{COST_TYPES.map(t => <SelectItem key={t.id} value={t.id}>{t.label}</SelectItem>)}</SelectContent>
+            </Select>
+            <Input type="number" placeholder="تكلفة القطعة" value={rateForm.rate_per_piece} onChange={e => setRateForm(f => ({ ...f, rate_per_piece: e.target.value }))} />
+            <Input placeholder="جهة / ورشة (اختياري)" value={rateForm.vendor_name} onChange={e => setRateForm(f => ({ ...f, vendor_name: e.target.value }))} />
+            <label className="col-span-2 flex items-center gap-2 text-xs">
+              <input type="checkbox" checked={rateForm.auto_apply} onChange={e => setRateForm(f => ({ ...f, auto_apply: e.target.checked }))} />
+              احتساب تلقائي عند نقل الكمية لهذه المرحلة
+            </label>
+          </div>
+          <DialogFooter><Button onClick={saveRate}>حفظ المعدل</Button></DialogFooter>
+        </DialogContent>
+      </Dialog>
       <Dialog open={orderOpen} onOpenChange={setOrderOpen}>
         <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto" dir="rtl">
           <DialogHeader><DialogTitle>أمر تشغيل جديد</DialogTitle></DialogHeader>
