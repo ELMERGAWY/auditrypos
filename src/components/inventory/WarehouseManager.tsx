@@ -161,13 +161,30 @@ export function WarehouseManager({ restaurantId, warehouses: propsWarehouses, on
     setDetailsDialogOpen(true);
 
     try {
-      // Get products directly assigned to this warehouse
-      const { data: products } = await supabase
-        .from('products')
-        .select('*')
-        .eq('warehouse_id', warehouse.id);
+      // Get products in this warehouse using warehouse_stock table
+      const { data: stockData } = await supabase
+        .from('warehouse_stock')
+        .select(`
+          quantity,
+          product:products!inner(
+            id,
+            name,
+            barcode,
+            category,
+            quantity,
+            cost_price,
+            price
+          )
+        `)
+        .eq('warehouse_id', warehouse.id)
+        .eq('restaurant_id', restaurantId);
 
-      setWarehouseProducts(products || []);
+      const products = (stockData || []).map((item: any) => ({
+        ...item.product,
+        quantity: item.quantity || 0
+      }));
+
+      setWarehouseProducts(products);
     } catch (error) {
       console.error('Error fetching warehouse products:', error);
       toast.error('فشل في تحميل المنتجات');

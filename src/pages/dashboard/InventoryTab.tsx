@@ -222,15 +222,24 @@ export function InventoryTab({ restaurantId, currency, businessType }: Props) {
         toast.success('تم إضافة المنتج');
       }
 
-      // If warehouse is selected, assign directly to warehouse
+      // If warehouse is selected, assign to warehouse using warehouse_stock table
       if (form.warehouse_id) {
-        const { error: updateError } = await supabase
-          .from('products')
-          .update({ warehouse_id: form.warehouse_id })
-          .eq('id', productId);
+        // First, remove any existing warehouse_stock records for this product
+        await supabase.from('warehouse_stock').delete().eq('product_id', productId);
 
-        if (updateError) {
-          console.error('Failed to assign product to warehouse:', updateError);
+        // Then, create a new warehouse_stock record for the selected warehouse
+        const { error: stockError } = await supabase
+          .from('warehouse_stock')
+          .insert({
+            restaurant_id: restaurantId,
+            warehouse_id: form.warehouse_id,
+            product_id: productId,
+            quantity: Number(form.quantity) || 0,
+            min_quantity: Number(form.min_quantity) || 5,
+          });
+
+        if (stockError) {
+          console.error('Failed to assign product to warehouse_stock:', stockError);
           toast.warning('تم حفظ المنتج ولكن فشل ربطه بالمخزن');
         }
       }
