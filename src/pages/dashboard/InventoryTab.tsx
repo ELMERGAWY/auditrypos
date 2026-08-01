@@ -479,7 +479,7 @@ export function InventoryTab({ restaurantId, currency, businessType }: Props) {
 
   const resetForm = () => {
     setShowForm(false); setEditingProduct(null); setPricingMode('fixed'); setMarkupValue('');
-    setForm({ name: '', barcode: '', sku: '', category: 'عام', price: '', cost_price: '', quantity: '', min_quantity: '5', unit: 'قطعة', image: '📦', expiry_date: '', secondary_unit: '', unit_conversion_factor: '', batch_number: '', item_type_id: '', warehouse_id: '' });
+    setForm({ name: '', barcode: '', sku: '', category: 'عام', price: '', cost_price: '', quantity: '', min_quantity: '5', unit: 'قطعة', image: '📦', expiry_date: '', secondary_unit: '', unit_conversion_factor: '', batch_number: '', item_type_id: '', warehouse_id: (activeWarehouse !== 'all' && activeWarehouse !== 'unassigned') ? activeWarehouse : '' });
   };
 
   const calcSellingPrice = (costStr: string) => {
