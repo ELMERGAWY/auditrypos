@@ -466,8 +466,24 @@ export function InventoryTab({ restaurantId, currency, businessType }: Props) {
     return form.price;
   };
 
-  const startEdit = (p: Product) => {
+  const startEdit = async (p: Product) => {
     setEditingProduct(p);
+    
+    // Get warehouse_id from warehouse_stock instead of products.warehouse_id
+    let warehouseId = '';
+    try {
+      const { data: stockData } = await supabase
+        .from('warehouse_stock')
+        .select('warehouse_id')
+        .eq('product_id', p.id)
+        .maybeSingle();
+      if (stockData) {
+        warehouseId = stockData.warehouse_id;
+      }
+    } catch (e) {
+      console.error('Error fetching warehouse assignment:', e);
+    }
+    
     setForm({
       name: p.name, barcode: p.barcode, sku: p.sku, category: p.category,
       price: String(p.price), cost_price: String(p.cost_price), quantity: String(p.quantity),
@@ -477,7 +493,7 @@ export function InventoryTab({ restaurantId, currency, businessType }: Props) {
       unit_conversion_factor: String(p.unit_conversion_factor || 1),
       batch_number: (p as any).batch_number || '',
       item_type_id: (p as any).item_type_id || '',
-      warehouse_id: (p as any).warehouse_id || '',
+      warehouse_id: warehouseId,
     });
     setShowForm(true);
   };
