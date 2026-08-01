@@ -1,5 +1,5 @@
 // @ts-nocheck
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Package, Plus, Search, AlertTriangle, Edit2, Trash2, 
@@ -129,6 +129,8 @@ export function InventoryTab({ restaurantId, currency, businessType }: Props) {
     warehouse_id: '',
   });
   const [filterCategory, setFilterCategory] = useState('all');
+  const [warehouseStocks, setWarehouseStocks] = useState<any[]>([]);
+  const [activeWarehouse, setActiveWarehouse] = useState<string>(() => localStorage.getItem(`inv_active_wh_${restaurantId}`) || 'all');
   const [projects, setProjects] = useState<any[]>([]);
   const [selectedProjectId, setSelectedProjectId] = useState<string>('');
   const [itemTypes, setItemTypes] = useState<ItemType[]>([]);
