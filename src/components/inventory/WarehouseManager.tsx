@@ -165,6 +165,7 @@ export function WarehouseManager({ restaurantId, warehouses: propsWarehouses, on
       const { data: stockData, error } = await supabase
         .from('warehouse_stock')
         .select(`
+          warehouse_id,
           quantity,
           product:products!inner(
             id,
@@ -185,15 +186,20 @@ export function WarehouseManager({ restaurantId, warehouses: propsWarehouses, on
         return;
       }
 
-      console.log('Warehouse:', warehouse.name_ar, 'ID:', warehouse.id);
-      console.log('Stock data:', stockData);
+      // Log for debugging
+      console.log('Warehouse ID:', warehouse.id, 'Name:', warehouse.name_ar);
+      console.log('Stock data count:', stockData?.length);
+      console.log('Sample stock data:', stockData?.slice(0, 2));
+
+      // Show toast with debug info
+      toast.success(`المخزن: ${warehouse.name_ar} - عدد المنتجات: ${stockData?.length || 0}`);
 
       const products = (stockData || []).map((item: any) => ({
         ...item.product,
+        warehouse_id: item.warehouse_id, // Include warehouse_id for verification
         quantity: item.quantity || 0
       }));
 
-      console.log('Mapped products:', products);
       setWarehouseProducts(products);
     } catch (error) {
       console.error('Error fetching warehouse products:', error);
