@@ -125,10 +125,43 @@ export default function OAuthCallback() {
         restaurantId: storedRestaurantId
       });
 
+      // Preferred path: exchange the code server-side (secrets stay private and
+      // the shared/global OAuth config is readable there).
+      try {
+        const { data: brokerData, error: brokerError } = await supabase.functions.invoke('social-oauth', {
+          body: {
+            action: 'exchange',
+            platform: storedPlatform,
+            restaurantId: storedRestaurantId,
+            redirectUri: `${window.location.origin}/oauth/callback`,
+            code,
+          },
+        });
+        if (!brokerError && brokerData?.success) {
+          setStatus('success');
+          setMessage(`تم ربط حساب ${storedPlatform} بنجاح!`);
+          setTimeout(() => {
+            navigate('/dashboard', {
+              state: {
+                oauthSuccess: true,
+                platform: storedPlatform,
+                accountName: brokerData.account?.account_name,
+              },
+            });
+          }, 1500);
+          return;
+        }
+        console.warn('OAuth broker exchange failed, falling back:', brokerData?.error || brokerError?.message);
+      } catch (brokerErr) {
+        console.warn('OAuth broker unavailable, falling back:', brokerErr);
+      }
+
       try {
         console.log('OAuth Callback - Starting callback process');
         console.log('OAuth Callback - Platform:', storedPlatform);
         console.log('OAuth Callback - Restaurant ID:', storedRestaurantId);
+        
+
         
         // Load platform secrets - single query with OR logic for restaurant_id
         const { data: configData, error: configError } = await supabase
