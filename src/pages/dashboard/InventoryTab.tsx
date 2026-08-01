@@ -6,7 +6,7 @@ import {
   ArrowDown, ArrowUp, BarChart3, X, TrendingUp, DollarSign,
   Truck, Calculator, History, FileSpreadsheet, Layers, Boxes, Save, RefreshCw, Download,
   Bell, ShoppingCart, RotateCcw, Scale, Zap, CheckCircle, Building2, FolderTree,
-  ArrowRightLeft, ClipboardList
+  ArrowRightLeft, ClipboardList, FileText
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -117,6 +117,8 @@ export function InventoryTab({ restaurantId, currency, businessType }: Props) {
   const [movements, setMovements] = useState<(StockMovement & { product_name?: string })[]>([]);
   const [showProductHistory, setShowProductHistory] = useState<Product | null>(null);
   const [productMovements, setProductMovements] = useState<StockMovement[]>([]);
+  const [showProductJournal, setShowProductJournal] = useState<Product | null>(null);
+  const [productJournalEntries, setProductJournalEntries] = useState<any[]>([]);
   const [pricingMode, setPricingMode] = useState<'fixed' | 'markup_percent' | 'markup_fixed'>('fixed');
   const [markupValue, setMarkupValue] = useState('');
   const [costingMethod, setCostingMethod] = useState<'fifo' | 'lifo' | 'wac' | 'specific'>('fifo');
@@ -420,6 +422,29 @@ export function InventoryTab({ restaurantId, currency, businessType }: Props) {
     setProductMovements((data || []) as StockMovement[]);
   };
 
+  const loadProductJournal = async (p: Product) => {
+    setShowProductJournal(p);
+    // Load journal entries related to this product
+    const { data } = await supabase
+      .from('journal_entry_lines')
+      .select(`
+        *,
+        journal_entry:journal_entries!inner(
+          entry_date,
+          description,
+          reference_number
+        ),
+        account:chart_of_accounts!inner(
+          code,
+          name
+        )
+      `)
+      .ilike('description', `%${p.name}%`)
+      .order('created_at', { ascending: false })
+      .limit(100);
+    setProductJournalEntries(data || []);
+  };
+
   const resetForm = () => {
     setShowForm(false); setEditingProduct(null); setPricingMode('fixed'); setMarkupValue('');
     setForm({ name: '', barcode: '', sku: '', category: 'عام', price: '', cost_price: '', quantity: '', min_quantity: '5', unit: 'قطعة', image: '📦', expiry_date: '', secondary_unit: '', unit_conversion_factor: '', batch_number: '', item_type_id: '', warehouse_id: '' });
@@ -595,6 +620,7 @@ export function InventoryTab({ restaurantId, currency, businessType }: Props) {
                   </div>
                   <div className="flex gap-1">
                     <Button size="sm" variant="ghost" className="rounded-lg h-8 w-8 p-0" onClick={() => loadProductHistory(p)} title="سجل الحركة"><BarChart3 className="w-4 h-4" /></Button>
+                    <Button size="sm" variant="ghost" className="rounded-lg h-8 w-8 p-0" onClick={() => loadProductJournal(p)} title="القيود المحاسبية"><FileText className="w-4 h-4" /></Button>
                     <Button size="sm" variant="ghost" className="rounded-lg h-8 w-8 p-0 text-destructive hover:bg-destructive/10" onClick={() => setShowDeductionModal(p)} title="خصم مخزون"><ArrowUp className="w-4 h-4" /></Button>
                     <Button size="sm" variant="ghost" className="rounded-lg h-8 w-8 p-0" onClick={() => startEdit(p)}><Edit2 className="w-4 h-4" /></Button>
                     <Button size="sm" variant="ghost" className="rounded-lg h-8 w-8 p-0 text-destructive hover:bg-destructive/10" onClick={() => handleDelete(p.id)}><Trash2 className="w-4 h-4" /></Button>
@@ -749,6 +775,53 @@ export function InventoryTab({ restaurantId, currency, businessType }: Props) {
                     <span className={`font-black text-sm ${m.type === 'in' ? 'text-success' : 'text-destructive'}`}>
                       {m.type === 'in' ? '+' : '-'}{m.quantity}
                     </span>
+                  </div>
+                ))}
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Product Journal Entries Modal */}
+      <AnimatePresence>
+        {showProductJournal && (
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 bg-background/80 backdrop-blur-sm flex items-center justify-center p-4" onClick={() => setShowProductJournal(null)}>
+            <motion.div initial={{ scale: 0.9 }} animate={{ scale: 1 }} exit={{ scale: 0.9 }}
+              className="glass-card p-6 max-w-2xl w-full max-h-[85vh] overflow-auto space-y-4 rounded-3xl" onClick={e => e.stopPropagation()}>
+              <div className="flex items-center justify-between">
+                <h3 className="font-display font-bold text-lg flex items-center gap-2">
+                  <FileText className="w-5 h-5 text-primary" />
+                  {showProductJournal.image} القيود المحاسبية — {showProductJournal.name}
+                </h3>
+                <Button variant="ghost" size="sm" onClick={() => setShowProductJournal(null)} className="rounded-full"><X className="w-5 h-5" /></Button>
+              </div>
+              <div className="space-y-2">
+                {productJournalEntries.length === 0 && (
+                  <p className="text-muted-foreground text-center py-8 text-sm">لا توجد قيود محاسبية مرتبطة بهذا الصنف</p>
+                )}
+                {productJournalEntries.map((entry, idx) => (
+                  <div key={entry.id || idx} className="p-4 bg-secondary/30 rounded-xl border border-border/30">
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="flex items-center gap-2">
+                        <Badge variant="outline" className="text-[10px]">{entry.account?.code}</Badge>
+                        <span className="font-bold text-sm">{entry.account?.name}</span>
+                      </div>
+                      <div className="flex gap-2">
+                        {entry.debit > 0 && (
+                          <span className="text-success font-black text-sm">{Number(entry.debit).toLocaleString()} {currency}</span>
+                        )}
+                        {entry.credit > 0 && (
+                          <span className="text-destructive font-black text-sm">{Number(entry.credit).toLocaleString()} {currency}</span>
+                        )}
+                      </div>
+                    </div>
+                    <p className="text-[11px] text-muted-foreground">{entry.description}</p>
+                    <p className="text-[10px] text-muted-foreground mt-1">
+                      {entry.journal_entry?.entry_date && new Date(entry.journal_entry.entry_date).toLocaleString('ar-EG')}
+                      {entry.journal_entry?.reference_number && ` · ${entry.journal_entry.reference_number}`}
+                    </p>
                   </div>
                 ))}
               </div>
