@@ -547,7 +547,7 @@ export function GarmentFactoryHub({ restaurantId, currency = 'ج.م', profileNam
       vendor_name: rateForm.vendor_name || null,
       auto_apply: rateForm.auto_apply,
       is_active: true,
-    });
+    }, { onConflict: 'restaurant_id,stage_key,cost_type' });
     if (error) return toast.error(error.message);
     toast.success('تم حفظ معدل التكلفة');
     setRateForm({ stage_key: '', cost_type: 'internal', rate_per_piece: '', vendor_name: '', auto_apply: true });
