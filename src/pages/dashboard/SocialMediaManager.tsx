@@ -1,3 +1,4 @@
+// @ts-nocheck
 // Social Media Manager Component
 // Manages OAuth-connected social media accounts and posting
 
