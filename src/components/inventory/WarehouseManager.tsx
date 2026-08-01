@@ -256,10 +256,15 @@ export function WarehouseManager({ restaurantId, warehouses: propsWarehouses, on
     setDetailsDialogOpen(true);
 
     try {
+      console.log('=== Fetching products for warehouse ===');
+      console.log('Target warehouse ID:', warehouse.id);
+      console.log('Target warehouse name:', warehouse.name_ar);
+
       // Get products in this warehouse using warehouse_stock table
       const { data: stockData, error } = await supabase
         .from('warehouse_stock')
         .select(`
+          id,
           warehouse_id,
           quantity,
           product:products!inner(
@@ -274,6 +279,10 @@ export function WarehouseManager({ restaurantId, warehouses: propsWarehouses, on
         `)
         .eq('warehouse_id', warehouse.id);
 
+      console.log('Query error:', error);
+      console.log('Raw stock data:', stockData);
+      console.log('Number of records:', stockData?.length);
+
       if (error) {
         console.error('Error fetching warehouse_stock:', error);
         toast.error('فشل في تحميل المنتجات');
@@ -281,15 +290,28 @@ export function WarehouseManager({ restaurantId, warehouses: propsWarehouses, on
         return;
       }
 
-      const products = (stockData || []).map((item: any) => ({
+      // Verify each record's warehouse_id
+      const verifiedData = (stockData || []).map((item: any) => {
+        console.log(`Product: ${item.product.name}, warehouse_id: ${item.warehouse_id}, target: ${warehouse.id}, match: ${item.warehouse_id === warehouse.id}`);
+        return item;
+      });
+
+      const products = verifiedData.map((item: any) => ({
         ...item.product,
         warehouse_id: item.warehouse_id,
         quantity: item.quantity || 0,
         is_sub_warehouse: warehouse.type === 'SUB'
       }));
 
+      console.log('Final products count:', products.length);
+      console.log('Final products:', products);
+
       setWarehouseProducts(products);
-      toast.success(`المخزن: ${warehouse.name_ar} - عدد المنتجات: ${products.length}`);
+
+      // Show debug info in toast
+      toast.success(`المخزن: ${warehouse.name_ar} - عدد المنتجات: ${products.length}`, {
+        description: `ID: ${warehouse.id}`
+      });
     } catch (error) {
       console.error('Error fetching warehouse products:', error);
       toast.error('فشل في تحميل المنتجات');
