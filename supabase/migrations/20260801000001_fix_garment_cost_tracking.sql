@@ -3,6 +3,11 @@
 
 BEGIN;
 
+-- Drop old version of garment_advance_stage to avoid function ambiguity
+DROP FUNCTION IF EXISTS public.garment_advance_stage(
+  UUID, TEXT, INTEGER, INTEGER, INTEGER, TEXT, TEXT, TEXT
+);
+
 -- 1. Add quantity_transferred to garment_stage_costs to link costs with actual quantities
 ALTER TABLE public.garment_stage_costs
 ADD COLUMN IF NOT EXISTS quantity_transferred INTEGER DEFAULT 0,
@@ -255,5 +260,66 @@ $$;
 CREATE TRIGGER garment_stage_costs_cost_update
 AFTER INSERT OR UPDATE OR DELETE ON public.garment_stage_costs
 FOR EACH ROW EXECUTE FUNCTION public.garment_trigger_cost_update();
+
+-- 8. Add garment order deletion function with inventory rollback
+CREATE OR REPLACE FUNCTION public.garment_delete_order(
+  p_order_id UUID,
+  p_actor_name TEXT DEFAULT NULL
+)
+RETURNS BOOLEAN
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_order public.garment_orders%ROWTYPE;
+  v_fabric_product_id UUID;
+BEGIN
+  SELECT * INTO v_order FROM public.garment_orders WHERE id = p_order_id FOR UPDATE;
+  IF NOT FOUND THEN RAISE EXCEPTION 'أمر التشغيل غير موجود'; END IF;
+
+  -- Prevent deletion if order is completed or has sales invoice
+  IF v_order.status = 'completed' THEN
+    RAISE EXCEPTION 'لا يمكن حذف أمر مكتمل';
+  END IF;
+  IF v_order.sales_order_id IS NOT NULL THEN
+    RAISE EXCEPTION 'لا يمكن حذف أمر له فاتورة مبيعات';
+  END IF;
+
+  -- Rollback fabric inventory if fabric_product_id exists
+  v_fabric_product_id := v_order.fabric_product_id;
+  IF v_fabric_product_id IS NOT NULL AND v_order.quantity_cut > 0 THEN
+    -- Return fabric to inventory (reverse the cutting consumption)
+    -- This assumes fabric is tracked as a product in inventory
+    INSERT INTO public.inventory_transactions (
+      restaurant_id, product_id, transaction_type, quantity,
+      reference_type, reference_id, notes, created_by_name
+    ) VALUES (
+      v_order.restaurant_id,
+      v_fabric_product_id,
+      'adjustment',
+      v_order.quantity_cut, -- Positive to add back to inventory
+      'garment_order',
+      p_order_id,
+      'إرجاع قماش من حذف أمر إنتاج ' || v_order.order_number,
+      p_actor_name
+    );
+  END IF;
+
+  -- Delete related records in order
+  DELETE FROM public.garment_stage_logs WHERE garment_order_id = p_order_id;
+  DELETE FROM public.garment_stage_costs WHERE garment_order_id = p_order_id;
+  DELETE FROM public.garment_outsourcing_jobs WHERE garment_order_id = p_order_id;
+  DELETE FROM public.garment_cutting_lots WHERE garment_order_id = p_order_id;
+  DELETE FROM public.garment_fabric_rolls WHERE garment_order_id = p_order_id;
+
+  -- Delete the order itself
+  DELETE FROM public.garment_orders WHERE id = p_order_id;
+
+  RETURN true;
+END;
+$$;
+
+GRANT EXECUTE ON FUNCTION public.garment_delete_order(UUID, TEXT) TO authenticated;
 
 COMMIT;
