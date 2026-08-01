@@ -46,10 +46,13 @@ END $$;
 
 -- 4. Clean up products.warehouse_id to avoid confusion
 -- This field should not be used for assignment, only warehouse_stock should be used
-UPDATE public.products
-SET warehouse_id = NULL
-WHERE warehouse_id IS NOT NULL;
-
-RAISE NOTICE 'Cleared products.warehouse_id to prevent confusion with warehouse_stock';
+DO $$
+BEGIN
+    UPDATE public.products
+    SET warehouse_id = NULL
+    WHERE warehouse_id IS NOT NULL;
+    
+    RAISE NOTICE 'Cleared products.warehouse_id to prevent confusion with warehouse_stock';
+END $$;
 
 COMMIT;
