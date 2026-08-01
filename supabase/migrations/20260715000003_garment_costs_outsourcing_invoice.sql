@@ -449,7 +449,7 @@ BEGIN
 
   INSERT INTO public.orders (
     restaurant_id, order_number, customer_name, customer_id,
-    total, paid_amount, status, payment_method, notes, is_pos, created_by_name
+    total, paid_amount, status, payment_method, notes, created_by_name
   ) VALUES (
     v_order.restaurant_id,
     v_order_number,
@@ -460,7 +460,6 @@ BEGIN
     'completed',
     COALESCE(NULLIF(p_payment_method, ''), 'credit'),
     COALESCE(p_notes, 'فاتورة تسليم أمر ملابس ' || v_order.order_number || ' — ' || v_order.style_name),
-    false,
     p_actor_name
   )
   RETURNING id INTO v_invoice_id;
