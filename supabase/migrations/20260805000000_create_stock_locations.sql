@@ -161,9 +161,14 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
-CREATE TRIGGER trigger_stock_locations_updated_at 
-    BEFORE UPDATE ON stock_locations
-    FOR EACH ROW EXECUTE FUNCTION update_stock_locations_updated_at();
+DO $$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_trigger WHERE tgname = 'trigger_stock_locations_updated_at') THEN
+        CREATE TRIGGER trigger_stock_locations_updated_at 
+            BEFORE UPDATE ON stock_locations
+            FOR EACH ROW EXECUTE FUNCTION update_stock_locations_updated_at();
+    END IF;
+END $$;
 
 CREATE OR REPLACE FUNCTION update_stock_moves_updated_at()
 RETURNS TRIGGER AS $$
@@ -173,9 +178,14 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
-CREATE TRIGGER trigger_stock_moves_updated_at 
-    BEFORE UPDATE ON stock_moves
-    FOR EACH ROW EXECUTE FUNCTION update_stock_moves_updated_at();
+DO $$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_trigger WHERE tgname = 'trigger_stock_moves_updated_at') THEN
+        CREATE TRIGGER trigger_stock_moves_updated_at 
+            BEFORE UPDATE ON stock_moves
+            FOR EACH ROW EXECUTE FUNCTION update_stock_moves_updated_at();
+    END IF;
+END $$;
 
 -- Create function to create stock move
 CREATE OR REPLACE FUNCTION create_stock_move(
