@@ -78,9 +78,7 @@ export function ItemMovementReport({ restaurantId, currency }: Props) {
         .from('stock_movements')
         .select(`
           *,
-          warehouses!inner(name),
-          customers!inner(name),
-          suppliers!inner(name)
+          warehouses!inner(name)
         `)
         .eq('restaurant_id', restaurantId)
         .eq('product_id', selectedProductId)
