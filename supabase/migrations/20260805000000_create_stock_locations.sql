@@ -93,10 +93,26 @@ CREATE INDEX IF NOT EXISTS idx_stock_moves_state ON stock_moves(state);
 CREATE INDEX IF NOT EXISTS idx_stock_moves_date ON stock_moves(date);
 
 -- Foreign key constraints for stock_moves
-ALTER TABLE stock_moves ADD CONSTRAINT IF NOT EXISTS stock_moves_location_id_fkey 
-    FOREIGN KEY (location_id) REFERENCES stock_locations(id) ON DELETE SET NULL;
-ALTER TABLE stock_moves ADD CONSTRAINT IF NOT EXISTS stock_moves_location_dest_id_fkey 
-    FOREIGN KEY (location_dest_id) REFERENCES stock_locations(id) ON DELETE SET NULL;
+-- Note: IF NOT EXISTS is not supported for ADD CONSTRAINT in PostgreSQL
+-- These will be created only if they don't exist
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_constraint 
+        WHERE conname = 'stock_moves_location_id_fkey'
+    ) THEN
+        ALTER TABLE stock_moves ADD CONSTRAINT stock_moves_location_id_fkey 
+            FOREIGN KEY (location_id) REFERENCES stock_locations(id) ON DELETE SET NULL;
+    END IF;
+    
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_constraint 
+        WHERE conname = 'stock_moves_location_dest_id_fkey'
+    ) THEN
+        ALTER TABLE stock_moves ADD CONSTRAINT stock_moves_location_dest_id_fkey 
+            FOREIGN KEY (location_dest_id) REFERENCES stock_locations(id) ON DELETE SET NULL;
+    END IF;
+END $$;
 
 -- Enable RLS
 ALTER TABLE stock_locations ENABLE ROW LEVEL SECURITY;
