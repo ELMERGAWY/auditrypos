@@ -4,7 +4,7 @@ import { motion } from 'framer-motion';
 import { 
   Building2, Plus, Trash2, Calculator, Calendar, 
   TrendingDown, ShieldCheck, History, ArrowUpRight, 
-  Settings2, FileText, Landmark
+  Settings2, FileText, Landmark, Search
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -43,6 +43,7 @@ export function FixedAssetsTab({ restaurantId, currency }) {
   const [assets, setAssets] = useState<FixedAsset[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
   const [coa, setCoa] = useState([]);
   
   const [form, setForm] = useState({
@@ -220,8 +221,25 @@ export function FixedAssetsTab({ restaurantId, currency }) {
       </div>
 
       {/* Assets List */}
-      <div className="space-y-3">
-        {assets.map(asset => (
+      <div className="space-y-4">
+        <div className="relative">
+          <Search className="w-4 h-4 absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            placeholder="بحث في الأصول الثابتة..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="pr-10"
+          />
+        </div>
+        <div className="space-y-3">
+          {assets.filter(asset => {
+            if (!searchQuery) return true;
+            const q = searchQuery.toLowerCase();
+            return (
+              (asset.name || '').toLowerCase().includes(q) ||
+              (asset.category || '').toLowerCase().includes(q)
+            );
+          }).map(asset => (
           <div key={asset.id} className="glass-card p-4 flex items-center justify-between group hover:border-indigo-500/30 transition-all">
             <div className="flex items-center gap-4">
               <div className="w-10 h-10 rounded-xl bg-white/5 flex items-center justify-center">
@@ -273,6 +291,7 @@ export function FixedAssetsTab({ restaurantId, currency }) {
             <Button variant="link" onClick={() => setShowForm(true)} className="mt-2 text-indigo-500">سجل أول أصل لك الآن</Button>
           </div>
         )}
+        </div>
       </div>
 
       {/* Add Modal */}

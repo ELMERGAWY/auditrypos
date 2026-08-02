@@ -4,7 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Users, Plus, Edit2, Trash2, Shield, Eye, EyeOff, X, DollarSign, 
   Building2, Calendar, RefreshCw, Download, Globe, Award, CreditCard, 
-  TrendingUp, AlertCircle, FileText
+  TrendingUp, AlertCircle, FileText, Search
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -96,6 +96,10 @@ export function EmployeesTab({ restaurantId, currency, businessType }: Props) {
   const [accounts, setAccounts] = useState<any[]>([]);
   const [payrolls, setPayrolls] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [deptSearchQuery, setDeptSearchQuery] = useState('');
+  const [roleSearchQuery, setRoleSearchQuery] = useState('');
+  const [payrollSearchQuery, setPayrollSearchQuery] = useState('');
 
   const [showStaffForm, setShowStaffForm] = useState(false);
   const [editingStaff, setEditingStaff] = useState<any | null>(null);
@@ -178,8 +182,17 @@ export function EmployeesTab({ restaurantId, currency, businessType }: Props) {
     [accounts]
   );
   const filteredPayrolls = useMemo(() =>
-    payrolls.filter(p => String(p.month) === filterMonth && String(p.year) === filterYear),
-    [payrolls, filterMonth, filterYear]
+    payrolls.filter(p => {
+      const matchesDate = String(p.month) === filterMonth && String(p.year) === filterYear;
+      if (!payrollSearchQuery) return matchesDate;
+      const q = payrollSearchQuery.toLowerCase();
+      const matchesSearch = (
+        (p.staff_profiles?.full_name || '').toLowerCase().includes(q) ||
+        (p.staff_departments?.name || '').toLowerCase().includes(q)
+      );
+      return matchesDate && matchesSearch;
+    }),
+    [payrolls, filterMonth, filterYear, payrollSearchQuery]
   );
   const monthlyTotal = filteredPayrolls.reduce((s, p) => s + Number(p.net_salary || 0), 0);
   const monthlyGross = filteredPayrolls.reduce((s, p) => s + Number(p.gross_salary || p.net_salary || 0), 0);
@@ -520,8 +533,27 @@ export function EmployeesTab({ restaurantId, currency, businessType }: Props) {
             <Button onClick={() => { resetStaffForm(); setShowStaffForm(true); }} className="gradient-bg text-primary-foreground border-0" size="sm"><Plus className="w-4 h-4 ml-1" /> إضافة موظف</Button>
           </div>
 
+          <div className="relative">
+            <Search className="w-4 h-4 absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              placeholder="بحث في الموظفين..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pr-10"
+            />
+          </div>
+
           <div className="space-y-2">
-            {staff.map(s => {
+            {staff.filter(s => {
+              if (!searchQuery) return true;
+              const q = searchQuery.toLowerCase();
+              return (
+                (s.name || '').toLowerCase().includes(q) ||
+                (s.phone || '').toLowerCase().includes(q) ||
+                (s.email || '').toLowerCase().includes(q) ||
+                (s.role || '').toLowerCase().includes(q)
+              );
+            }).map(s => {
               const roleInfo = getRoleDisplay(s.role);
               const basicSalary = s.base_salary || s.profile?.basic_salary || 0;
               const managedDept = departments.find(d => d.manager_id === s.profile?.id);
@@ -577,8 +609,24 @@ export function EmployeesTab({ restaurantId, currency, businessType }: Props) {
             <div><h2 className="font-display text-xl font-bold flex items-center gap-2">الأقسام ({departments.length} أقسام){loading && <RefreshCw className="w-4 h-4 animate-spin text-muted-foreground" />}</h2><p className="text-xs text-muted-foreground">توزيع الموظفين على الأقسام</p></div>
             <Button onClick={() => { resetDeptForm(); setShowDeptForm(true); }} className="gradient-bg text-primary-foreground border-0" size="sm"><Plus className="w-4 h-4 ml-1" /> إضافة قسم</Button>
           </div>
+          <div className="relative">
+            <Search className="w-4 h-4 absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              placeholder="بحث في الأقسام..."
+              value={deptSearchQuery}
+              onChange={(e) => setDeptSearchQuery(e.target.value)}
+              className="pr-10"
+            />
+          </div>
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {departments.map(d => {
+            {departments.filter(d => {
+              if (!deptSearchQuery) return true;
+              const q = deptSearchQuery.toLowerCase();
+              return (
+                (d.name || '').toLowerCase().includes(q) ||
+                (d.code || '').toLowerCase().includes(q)
+              );
+            }).map(d => {
               const deptStaff = staff.filter(s => s.profile?.department_id === d.id);
               const manager = staff.find(s => s.profile?.id === d.manager_id);
               return (
@@ -607,11 +655,20 @@ export function EmployeesTab({ restaurantId, currency, businessType }: Props) {
         <div className="space-y-4">
           <div className="flex items-center justify-between flex-wrap gap-3">
             <div><h2 className="font-display text-xl font-bold flex items-center gap-2">مسير الرواتب{loading && <RefreshCw className="w-4 h-4 animate-spin text-muted-foreground" />}</h2><p className="text-xs text-muted-foreground">إدارة الرواتب الشهرية والتصدير</p></div>
-            <div className="flex items-center gap-3">
-              <div className="flex items-center gap-2"><Label className="text-xs">الشهر</Label><select className="h-10 rounded-md border border-input bg-background px-3" value={filterMonth} onChange={e => setFilterMonth(e.target.value)}>{Array.from({length:12},(_,i)=> <option key={i+1} value={String(i+1)}>{i+1}</option>)}</select></div>
-              <div className="flex items-center gap-2"><Label className="text-xs">السنة</Label><Input type="number" className="w-24 h-10" value={filterYear} onChange={e => setFilterYear(e.target.value)} /></div>
-              <Button variant="outline" size="sm" onClick={exportReport} disabled={!filteredPayrolls.length}><Download className="w-4 h-4 ml-1" /> تصدير</Button>
-            </div>
+          </div>
+          <div className="relative">
+            <Search className="w-4 h-4 absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              placeholder="بحث في الرواتب..."
+              value={payrollSearchQuery}
+              onChange={(e) => setPayrollSearchQuery(e.target.value)}
+              className="pr-10"
+            />
+          </div>
+          <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2"><Label className="text-xs">الشهر</Label><select className="h-10 rounded-md border border-input bg-background px-3" value={filterMonth} onChange={e => setFilterMonth(e.target.value)}>{Array.from({length:12},(_,i)=> <option key={i+1} value={String(i+1)}>{i+1}</option>)}</select></div>
+            <div className="flex items-center gap-2"><Label className="text-xs">السنة</Label><Input type="number" className="w-24 h-10" value={filterYear} onChange={e => setFilterYear(e.target.value)} /></div>
+            <Button variant="outline" size="sm" onClick={exportReport} disabled={!filteredPayrolls.length}><Download className="w-4 h-4 ml-1" /> تصدير</Button>
           </div>
           <div className="glass-card overflow-x-auto">
             <table className="w-full text-sm">
@@ -680,9 +737,21 @@ export function EmployeesTab({ restaurantId, currency, businessType }: Props) {
             <div><h2 className="font-display text-xl font-bold flex items-center gap-2"><Shield className="w-5 h-5" /> إدارة الأدوار الوظيفية</h2><p className="text-xs text-muted-foreground">إضافة وتعديل الأدوار الوظيفية للموظفين</p></div>
             <Button onClick={() => setShowAddRole(true)} className="gradient-bg text-primary-foreground border-0" size="sm"><Plus className="w-4 h-4 ml-1" /> إضافة دور جديد</Button>
           </div>
-
+          <div className="relative">
+            <Search className="w-4 h-4 absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              placeholder="بحث في الأدوار..."
+              value={roleSearchQuery}
+              onChange={(e) => setRoleSearchQuery(e.target.value)}
+              className="pr-10"
+            />
+          </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {Object.entries(STANDARD_ROLES).map(([key, role]) => (
+            {Object.entries(STANDARD_ROLES).filter(([key, role]) => {
+              if (!roleSearchQuery) return true;
+              const q = roleSearchQuery.toLowerCase();
+              return role.label.toLowerCase().includes(q);
+            }).map(([key, role]) => (
               <Card key={key} className="glass-card p-4">
                 <div className="flex items-start justify-between">
                   <div className="flex items-center gap-3">

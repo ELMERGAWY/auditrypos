@@ -118,25 +118,39 @@ END $$;
 ALTER TABLE stock_locations ENABLE ROW LEVEL SECURITY;
 ALTER TABLE stock_moves ENABLE ROW LEVEL SECURITY;
 
--- RLS Policies for stock_locations
-CREATE POLICY "Users can view stock_locations" ON stock_locations
-    FOR SELECT USING (true);
-CREATE POLICY "Users can insert stock_locations" ON stock_locations
-    FOR INSERT WITH CHECK (true);
-CREATE POLICY "Users can update stock_locations" ON stock_locations
-    FOR UPDATE USING (true);
-CREATE POLICY "Users can delete stock_locations" ON stock_locations
-    FOR DELETE USING (true);
+-- RLS Policies for stock_locations (with IF NOT EXISTS check)
+DO $$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'stock_locations' AND policyname = 'Users can view stock_locations') THEN
+        CREATE POLICY "Users can view stock_locations" ON stock_locations FOR SELECT USING (true);
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'stock_locations' AND policyname = 'Users can insert stock_locations') THEN
+        CREATE POLICY "Users can insert stock_locations" ON stock_locations FOR INSERT WITH CHECK (true);
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'stock_locations' AND policyname = 'Users can update stock_locations') THEN
+        CREATE POLICY "Users can update stock_locations" ON stock_locations FOR UPDATE USING (true);
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'stock_locations' AND policyname = 'Users can delete stock_locations') THEN
+        CREATE POLICY "Users can delete stock_locations" ON stock_locations FOR DELETE USING (true);
+    END IF;
+END $$;
 
--- RLS Policies for stock_moves
-CREATE POLICY "Users can view stock_moves" ON stock_moves
-    FOR SELECT USING (true);
-CREATE POLICY "Users can insert stock_moves" ON stock_moves
-    FOR INSERT WITH CHECK (true);
-CREATE POLICY "Users can update stock_moves" ON stock_moves
-    FOR UPDATE USING (true);
-CREATE POLICY "Users can delete stock_moves" ON stock_moves
-    FOR DELETE USING (true);
+-- RLS Policies for stock_moves (with IF NOT EXISTS check)
+DO $$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'stock_moves' AND policyname = 'Users can view stock_moves') THEN
+        CREATE POLICY "Users can view stock_moves" ON stock_moves FOR SELECT USING (true);
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'stock_moves' AND policyname = 'Users can insert stock_moves') THEN
+        CREATE POLICY "Users can insert stock_moves" ON stock_moves FOR INSERT WITH CHECK (true);
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'stock_moves' AND policyname = 'Users can update stock_moves') THEN
+        CREATE POLICY "Users can update stock_moves" ON stock_moves FOR UPDATE USING (true);
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'stock_moves' AND policyname = 'Users can delete stock_moves') THEN
+        CREATE POLICY "Users can delete stock_moves" ON stock_moves FOR DELETE USING (true);
+    END IF;
+END $$;
 
 -- Trigger for updated_at
 CREATE OR REPLACE FUNCTION update_stock_locations_updated_at()
@@ -162,3 +176,45 @@ $$ LANGUAGE plpgsql;
 CREATE TRIGGER trigger_stock_moves_updated_at 
     BEFORE UPDATE ON stock_moves
     FOR EACH ROW EXECUTE FUNCTION update_stock_moves_updated_at();
+
+-- Create function to create stock move
+CREATE OR REPLACE FUNCTION create_stock_move(
+    p_restaurant_id UUID,
+    p_product_id UUID,
+    p_quantity DECIMAL,
+    p_location_src_id UUID DEFAULT NULL,
+    p_location_dest_id UUID DEFAULT NULL,
+    p_reference VARCHAR(100) DEFAULT NULL,
+    p_note TEXT DEFAULT NULL,
+    p_created_by UUID DEFAULT NULL
+) RETURNS UUID AS $$
+DECLARE
+    v_move_id UUID;
+BEGIN
+    INSERT INTO stock_moves (
+        restaurant_id,
+        product_id,
+        quantity,
+        location_id,
+        location_dest_id,
+        reference,
+        note,
+        created_by,
+        state,
+        date
+    ) VALUES (
+        p_restaurant_id,
+        p_product_id,
+        p_quantity,
+        p_location_src_id,
+        p_location_dest_id,
+        p_reference,
+        p_note,
+        p_created_by,
+        'draft',
+        CURRENT_DATE
+    ) RETURNING id INTO v_move_id;
+    
+    RETURN v_move_id;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;

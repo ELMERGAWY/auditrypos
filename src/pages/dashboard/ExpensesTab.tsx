@@ -1,7 +1,7 @@
 // @ts-nocheck
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Wallet, Plus, Trash2, TrendingDown, Calendar, Calculator, ArrowRightLeft, Clock, Package } from 'lucide-react';
+import { Wallet, Plus, Trash2, TrendingDown, Calendar, Calculator, ArrowRightLeft, Clock, Package, Search } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
@@ -75,6 +75,7 @@ export function ExpensesTab({ restaurantId, currency }: Props) {
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [overheads, setOverheads] = useState<DailyOverhead[]>([]);
   const [showForm, setShowForm] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
   const [form, setForm] = useState({ 
     category: 'أخرى', 
     amount: '', 
@@ -716,8 +717,25 @@ export function ExpensesTab({ restaurantId, currency }: Props) {
 
       {/* Expenses List */}
       {activeView === 'expenses' && (
-        <div className="space-y-2">
-          {expenses.map(e => (
+        <div className="space-y-4">
+          <div className="relative">
+            <Search className="w-4 h-4 absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              placeholder="بحث في المصروفات..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pr-10"
+            />
+          </div>
+          <div className="space-y-2">
+            {expenses.filter(e => {
+              if (!searchQuery) return true;
+              const q = searchQuery.toLowerCase();
+              return (
+                (e.category || '').toLowerCase().includes(q) ||
+                (e.description || '').toLowerCase().includes(q)
+              );
+            }).map(e => (
             <div key={e.id} className="glass-card p-3.5 flex items-center gap-3 border border-border/50 hover:border-primary/10 transition-all">
               <div className="flex-1">
                 <div className="flex items-center gap-2 flex-wrap">
@@ -747,6 +765,7 @@ export function ExpensesTab({ restaurantId, currency }: Props) {
             </div>
           ))}
           {expenses.length === 0 && <p className="text-muted-foreground text-center py-12 text-xs">لا توجد مصروفات</p>}
+          </div>
         </div>
       )}
 

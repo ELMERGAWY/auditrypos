@@ -769,9 +769,9 @@ export function InventoryTab({ restaurantId, currency, businessType }: Props) {
       <AnimatePresence>
         {showReports && (
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-            className="fixed inset-0 z-50 bg-background/80 backdrop-blur-sm flex items-center justify-center p-4" onClick={() => setShowReports(false)}>
+            className="fixed inset-0 z-[100] bg-background/90 backdrop-blur-md flex items-center justify-center p-4" onClick={() => setShowReports(false)}>
             <motion.div initial={{ scale: 0.9, y: 20 }} animate={{ scale: 1, y: 0 }} exit={{ scale: 0.9, y: 20 }}
-              className="glass-card p-6 max-w-4xl w-full max-h-[85vh] overflow-auto space-y-6 rounded-3xl shadow-2xl" onClick={e => e.stopPropagation()}>
+              className="glass-card p-6 max-w-4xl w-full max-h-[85vh] overflow-auto space-y-6 rounded-3xl shadow-2xl relative z-[101]" onClick={e => e.stopPropagation()}>
               <div className="flex items-center justify-between border-b border-border pb-4">
                 <h3 className="font-display font-bold text-xl flex items-center gap-2 text-primary"><BarChart3 className="w-6 h-6" /> تقارير المخزون المتقدمة</h3>
                 <Button variant="ghost" size="sm" className="rounded-full" onClick={() => setShowReports(false)}><X className="w-5 h-5" /></Button>
@@ -853,9 +853,9 @@ export function InventoryTab({ restaurantId, currency, businessType }: Props) {
       <AnimatePresence>
         {showProductHistory && (
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-            className="fixed inset-0 z-50 bg-background/80 backdrop-blur-sm flex items-center justify-center p-4" onClick={() => setShowProductHistory(null)}>
+            className="fixed inset-0 z-[100] bg-background/90 backdrop-blur-md flex items-center justify-center p-4" onClick={() => setShowProductHistory(null)}>
             <motion.div initial={{ scale: 0.9 }} animate={{ scale: 1 }} exit={{ scale: 0.9 }}
-              className="glass-card p-6 max-w-md w-full max-h-[80vh] overflow-auto space-y-4 rounded-3xl" onClick={e => e.stopPropagation()}>
+              className="glass-card p-6 max-w-md w-full max-h-[80vh] overflow-auto space-y-4 rounded-3xl relative z-[101]" onClick={e => e.stopPropagation()}>
               <div className="flex items-center justify-between">
                 <h3 className="font-display font-bold text-lg">{showProductHistory.image} سجل حركة — {showProductHistory.name}</h3>
                 <Button variant="ghost" size="sm" onClick={() => setShowProductHistory(null)} className="rounded-full"><X className="w-5 h-5" /></Button>
@@ -887,9 +887,9 @@ export function InventoryTab({ restaurantId, currency, businessType }: Props) {
       <AnimatePresence>
         {showProductJournal && (
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-            className="fixed inset-0 z-50 bg-background/80 backdrop-blur-sm flex items-center justify-center p-4" onClick={() => setShowProductJournal(null)}>
+            className="fixed inset-0 z-[100] bg-background/90 backdrop-blur-md flex items-center justify-center p-4" onClick={() => setShowProductJournal(null)}>
             <motion.div initial={{ scale: 0.9 }} animate={{ scale: 1 }} exit={{ scale: 0.9 }}
-              className="glass-card p-6 max-w-2xl w-full max-h-[85vh] overflow-auto space-y-4 rounded-3xl" onClick={e => e.stopPropagation()}>
+              className="glass-card p-6 max-w-2xl w-full max-h-[85vh] overflow-auto space-y-4 rounded-3xl relative z-[101]" onClick={e => e.stopPropagation()}>
               <div className="flex items-center justify-between">
                 <h3 className="font-display font-bold text-lg flex items-center gap-2">
                   <FileText className="w-5 h-5 text-primary" />
@@ -934,10 +934,10 @@ export function InventoryTab({ restaurantId, currency, businessType }: Props) {
       <AnimatePresence>
         {showForm && (
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-            className="fixed inset-0 z-50 bg-background/80 backdrop-blur-sm flex items-center justify-center p-4"
+            className="fixed inset-0 z-[100] bg-background/90 backdrop-blur-md flex items-center justify-center p-4"
             onClick={() => resetForm()}>
             <motion.div initial={{ scale: 0.9, y: 20 }} animate={{ scale: 1, y: 0 }} exit={{ scale: 0.9, y: 20 }}
-              className="glass-card p-6 max-w-xl w-full max-h-[90vh] overflow-auto space-y-4 rounded-3xl shadow-2xl" onClick={e => e.stopPropagation()}>
+              className="glass-card p-6 max-w-xl w-full max-h-[90vh] overflow-auto space-y-4 rounded-3xl shadow-2xl relative z-[101]" onClick={e => e.stopPropagation()}>
               <div className="flex items-center justify-between">
                 <h3 className="font-display font-bold text-xl text-primary">{editingProduct ? 'تعديل بيانات الصنف' : 'إضافة صنف جديد للمخزون'}</h3>
                 <Button variant="ghost" size="sm" onClick={() => resetForm()} className="rounded-full"><X className="w-5 h-5" /></Button>
@@ -1236,10 +1236,10 @@ export function InventoryTab({ restaurantId, currency, businessType }: Props) {
       <AnimatePresence>
         {showMovement && (
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-            className="fixed inset-0 z-50 bg-background/80 backdrop-blur-sm flex items-center justify-center p-4"
+            className="fixed inset-0 z-[100] bg-background/90 backdrop-blur-md flex items-center justify-center p-4"
             onClick={() => setShowMovement(null)}>
             <motion.div initial={{ scale: 0.9, y: 20 }} animate={{ scale: 1, y: 0 }} exit={{ scale: 0.9, y: 20 }}
-              className="glass-card p-6 max-w-md w-full space-y-5 rounded-3xl shadow-2xl" onClick={e => e.stopPropagation()}>
+              className="glass-card p-6 max-w-md w-full space-y-5 rounded-3xl shadow-2xl relative z-[101]" onClick={e => e.stopPropagation()}>
               <div className="flex items-center justify-between">
                 <h3 className="font-display font-bold text-lg text-primary">حركة مخزون يدوية</h3>
                 <Button variant="ghost" size="sm" onClick={() => setShowMovement(null)} className="rounded-full"><X className="w-5 h-5" /></Button>
@@ -1301,10 +1301,10 @@ export function InventoryTab({ restaurantId, currency, businessType }: Props) {
       <AnimatePresence>
         {showDeductionModal && (
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-            className="fixed inset-0 z-50 bg-background/80 backdrop-blur-sm flex items-center justify-center p-4"
+            className="fixed inset-0 z-[100] bg-background/90 backdrop-blur-md flex items-center justify-center p-4"
             onClick={() => setShowDeductionModal(null)}>
             <motion.div initial={{ scale: 0.9, y: 20 }} animate={{ scale: 1, y: 0 }} exit={{ scale: 0.9, y: 20 }}
-              className="glass-card p-6 max-w-md w-full space-y-5 rounded-3xl shadow-2xl" onClick={e => e.stopPropagation()}>
+              className="glass-card p-6 max-w-md w-full space-y-5 rounded-3xl shadow-2xl relative z-[101]" onClick={e => e.stopPropagation()}>
               <div className="flex items-center justify-between">
                 <h3 className="font-display font-bold text-lg text-destructive">خصم مخزون</h3>
                 <Button variant="ghost" size="sm" onClick={() => setShowDeductionModal(null)} className="rounded-full"><X className="w-5 h-5" /></Button>
@@ -1739,8 +1739,8 @@ function WarehousesManager({ restaurantId, warehouses, onRefresh, products, curr
       {/* Stock Details Modal */}
       <AnimatePresence>
         {stockView && (
-          <div className="fixed inset-0 z-50 bg-background/80 backdrop-blur-sm flex items-center justify-center p-4">
-            <motion.div initial={{ scale: 0.9 }} animate={{ scale: 1 }} className="glass-card p-6 max-w-2xl w-full max-h-[90vh] flex flex-col rounded-3xl shadow-2xl">
+          <div className="fixed inset-0 z-[100] bg-background/90 backdrop-blur-md flex items-center justify-center p-4">
+            <motion.div initial={{ scale: 0.9 }} animate={{ scale: 1 }} className="glass-card p-6 max-w-2xl w-full max-h-[90vh] flex flex-col rounded-3xl shadow-2xl relative z-[101]">
               <div className="flex items-center justify-between mb-4">
                 <div>
                   <h3 className="font-display font-bold text-lg flex items-center gap-2">
@@ -1850,9 +1850,9 @@ function WarehousesManager({ restaurantId, warehouses, onRefresh, products, curr
       {/* ===================== TRANSFER PRODUCT DIALOG ===================== */}
       <AnimatePresence>
         {transferTarget && (
-          <div className="fixed inset-0 z-[60] bg-background/80 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="fixed inset-0 z-[100] bg-background/90 backdrop-blur-md flex items-center justify-center p-4">
             <motion.div initial={{ scale: 0.9 }} animate={{ scale: 1 }} exit={{ scale: 0.9 }}
-              className="glass-card p-6 max-w-md w-full rounded-3xl shadow-2xl space-y-4">
+              className="glass-card p-6 max-w-md w-full rounded-3xl shadow-2xl space-y-4 relative z-[101]">
               <div className="flex items-center justify-between">
                 <h3 className="font-bold text-base flex items-center gap-2">
                   <ArrowRightLeft className="w-4 h-4 text-primary" />
@@ -1966,9 +1966,9 @@ function WarehousesManager({ restaurantId, warehouses, onRefresh, products, curr
       {/* ===================== ADD QUANTITY DIALOG ===================== */}
       <AnimatePresence>
         {addQtyTarget && (
-          <div className="fixed inset-0 z-[60] bg-background/80 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="fixed inset-0 z-[100] bg-background/90 backdrop-blur-md flex items-center justify-center p-4">
             <motion.div initial={{ scale: 0.9 }} animate={{ scale: 1 }} exit={{ scale: 0.9 }}
-              className="glass-card p-6 max-w-md w-full rounded-3xl shadow-2xl space-y-4">
+              className="glass-card p-6 max-w-md w-full rounded-3xl shadow-2xl space-y-4 relative z-[101]">
               <div className="flex items-center justify-between">
                 <h3 className="font-bold text-base flex items-center gap-2">
                   <ClipboardList className="w-4 h-4 text-success" />
