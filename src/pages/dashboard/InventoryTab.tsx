@@ -6,7 +6,7 @@ import {
   ArrowDown, ArrowUp, BarChart3, X, TrendingUp, DollarSign,
   Truck, Calculator, History, FileSpreadsheet, Layers, Boxes, Save, RefreshCw, Download,
   Bell, ShoppingCart, RotateCcw, Scale, Zap, CheckCircle, Building2, FolderTree,
-  ArrowRightLeft, ClipboardList, FileText, Activity
+  ArrowRightLeft, ClipboardList, FileText, Activity, MapPin, RefreshCw as RefreshCw2
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -27,6 +27,9 @@ import { SmartReorderTab } from '@/components/inventory/SmartReorderTab';
 import { WACTab } from '@/components/inventory/WACTab';
 import { WarehouseReportTab } from '@/components/inventory/WarehouseReportTab';
 import { ItemMovementReport } from '@/components/inventory/ItemMovementReport';
+import { StockLocationsManager } from '@/components/inventory/StockLocationsManager';
+import { StockMovesManager } from '@/components/inventory/StockMovesManager';
+import { ReorderingRulesManager } from '@/components/inventory/ReorderingRulesManager';
 
 interface Warehouse {
   id: string;
@@ -579,6 +582,15 @@ export function InventoryTab({ restaurantId, currency, businessType }: Props) {
           <TabsTrigger value="item_movement" className="rounded-xl flex items-center gap-2 data-[state=active]:gradient-bg data-[state=active]:text-white">
             <Activity className="w-4 h-4" /> حركة صنف
           </TabsTrigger>
+          <TabsTrigger value="stock_locations" className="rounded-xl flex items-center gap-2 data-[state=active]:gradient-bg data-[state=active]:text-white">
+            <MapPin className="w-4 h-4" /> المواقع
+          </TabsTrigger>
+          <TabsTrigger value="stock_moves" className="rounded-xl flex items-center gap-2 data-[state=active]:gradient-bg data-[state=active]:text-white">
+            <ArrowRightLeft className="w-4 h-4" /> حركات المخزون
+          </TabsTrigger>
+          <TabsTrigger value="reordering_rules" className="rounded-xl flex items-center gap-2 data-[state=active]:gradient-bg data-[state=active]:text-white">
+            <RefreshCw2 className="w-4 h-4" /> قواعد إعادة الطلب
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="products" className="space-y-4">
@@ -738,6 +750,18 @@ export function InventoryTab({ restaurantId, currency, businessType }: Props) {
 
         <TabsContent value="item_movement" className="space-y-4">
           <ItemMovementReport restaurantId={restaurantId} currency={currency} />
+        </TabsContent>
+
+        <TabsContent value="stock_locations" className="space-y-4">
+          <StockLocationsManager restaurantId={restaurantId} currency={currency} />
+        </TabsContent>
+
+        <TabsContent value="stock_moves" className="space-y-4">
+          <StockMovesManager restaurantId={restaurantId} currency={currency} />
+        </TabsContent>
+
+        <TabsContent value="reordering_rules" className="space-y-4">
+          <ReorderingRulesManager restaurantId={restaurantId} currency={currency} />
         </TabsContent>
       </Tabs>
 
