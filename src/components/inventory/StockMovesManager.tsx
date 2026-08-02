@@ -95,7 +95,7 @@ export function StockMovesManager({ restaurantId, currency }: Props) {
           .eq('restaurant_id', restaurantId)
           .order('date', { ascending: false })
           .limit(100),
-        supabase.from('stock_locations').select('*').eq('restaurant_id', restaurantId).eq('is_active', true),
+        supabase.from('stock_locations').select('*').eq('restaurant_id', restaurantId),
         supabase.from('products').select('id, name, sku, barcode').eq('restaurant_id', restaurantId)
       ]);
 

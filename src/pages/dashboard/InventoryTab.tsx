@@ -1463,6 +1463,9 @@ function WarehousesManager({ restaurantId, warehouses, onRefresh, products, curr
   // Filter stock for the selected warehouse view
   const filteredStockItems = stockView
     ? (stockMatrix.find(m => m.warehouse.id === stockView.id)?.items || []).filter(s => {
+        // Double-check that the stock item belongs to the selected warehouse
+        if (s.warehouse_id !== stockView.id) return false;
+        
         if (!stockSearch) return true;
         const q = stockSearch.toLowerCase();
         return (
