@@ -320,103 +320,21 @@ export function PurchaseInvoices({ restaurantId, currency }: Props) {
         }
       }
 
-      // Auto journal entry - use RPC function to avoid stack depth error
+      // القيد المحاسبي يتم إنشاؤه وترحيله تلقائياً على مستوى قاعدة البيانات
+      // (trg_autopost_purchase_invoice_journal) لضمان توازن القيد وعدم التكرار.
       try {
-        // Get default accounts directly
-        const { data: accounts, error: accountsError } = await supabase
-          .from('chart_of_accounts')
-          .select('id,code')
-          .eq('restaurant_id', restaurantId)
-          .in('code', ['1200', '1100', '2100']); // Inventory, Cash, Accounts Payable
-
-        if (accountsError) {
-          console.error('Failed to load accounts:', accountsError);
-        } else {
-          const invAcc = accounts?.find(a => a.code === '1200');
-          const cashAcc = accounts?.find(a => a.code === '1100');
-          const apAcc = accounts?.find(a => a.code === '2100');
-
-          if (invAcc) {
-            // Get next entry number
-            const { data: lastEntry } = await supabase
-              .from('journal_entries')
-              .select('entry_number')
-              .eq('restaurant_id', restaurantId)
-              .order('created_at', { ascending: false })
-              .limit(1);
-
-            const lastNum = lastEntry?.[0]?.entry_number || 'JE-000000';
-            const num = parseInt(lastNum.replace(/\D/g, '')) || 0;
-            const entryNumber = `JE-${String(num + 1).padStart(6, '0')}`;
-
-            // Create journal entry with is_posted=false to avoid trigger execution
-            const { data: journalData, error: journalError } = await supabase
-              .from('journal_entries')
-              .insert({
-                restaurant_id: restaurantId,
-                entry_number: entryNumber,
-                entry_date: form.invoice_date,
-                reference_type: 'purchase',
-                reference_id: inv.id,
-                description: `فاتورة مشتريات من ${supplier?.name || 'مورد'}`,
-                source: 'pos',
-                total_debit: netTotal,
-                total_credit: netTotal,
-                is_posted: false, // Create as draft first
-              })
-              .select()
-              .single();
-
-            if (!journalError && journalData) {
-              // Create journal lines
-              const lines = [
-                {
-                  entry_id: journalData.id,
-                  account_id: invAcc.id,
-                  debit: netTotal,
-                  credit: 0,
-                  description: `شراء مخزون - ${inv.invoice_number}`,
-                  line_order: 1,
-                }
-              ];
-
-              // Add credit line
-              const creditAcc = (form.is_credit && paid < netTotal && apAcc) ? apAcc : cashAcc;
-              if (creditAcc) {
-                lines.push({
-                  entry_id: journalData.id,
-                  account_id: creditAcc.id,
-                  debit: 0,
-                  credit: netTotal,
-                  description: form.is_credit && paid < netTotal ? `ذمم موردين - ${supplier?.name}` : `دفع نقدي للمورد - ${supplier?.name}`,
-                  line_order: 2,
-                });
-              }
-
-              await supabase.from('journal_entry_lines').insert(lines);
-              await supabase.from('purchase_invoices').update({ journal_entry_id: journalData.id }).eq('id', inv.id);
-
-              // Post the entry by directly updating is_posted flag (bypass RPC to avoid errors)
-              console.log('Attempting to post journal entry:', journalData.id);
-              const { error: postError } = await supabase
-                .from('journal_entries')
-                .update({ is_posted: true, posted_at: new Date().toISOString() })
-                .eq('id', journalData.id);
-
-              if (postError) {
-                console.error('Failed to post journal entry:', postError);
-                toast.error(`فشل ترحيل القيد: ${postError.message}`);
-              } else {
-                console.log('Successfully posted journal entry:', journalData.id);
-                toast.success(`تم إنشاء وترحيل القيد المحاسبي ${entryNumber}`);
-              }
-            }
-          }
+        const { data: postedInv } = await supabase
+          .from('purchase_invoices')
+          .select('journal_entry_id')
+          .eq('id', inv.id)
+          .maybeSingle();
+        if (postedInv?.journal_entry_id) {
+          toast.success('تم إنشاء وترحيل القيد المحاسبي للفاتورة');
         }
       } catch (jeErr: any) {
-        console.error('Journal entry error:', jeErr);
-        // Don't show error - invoice is saved successfully
+        console.error('Journal entry check error:', jeErr);
       }
+
 
       toast.success('تم حفظ الفاتورة');
       setShowAddModal(false);
