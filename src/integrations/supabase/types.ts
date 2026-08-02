@@ -21159,6 +21159,18 @@ export type Database = {
           status: string
         }[]
       }
+      fn_upsert_doc_journal: {
+        Args: {
+          p_date: string
+          p_description: string
+          p_lines: Json
+          p_ref_id: string
+          p_ref_type: string
+          p_restaurant_id: string
+          p_source: string
+        }
+        Returns: string
+      }
       fn_validate_period_close_controls: {
         Args: {
           p_company_id: string
