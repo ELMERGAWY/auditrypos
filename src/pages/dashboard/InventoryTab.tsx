@@ -6,7 +6,7 @@ import {
   ArrowDown, ArrowUp, BarChart3, X, TrendingUp, DollarSign,
   Truck, Calculator, History, FileSpreadsheet, Layers, Boxes, Save, RefreshCw, Download,
   Bell, ShoppingCart, RotateCcw, Scale, Zap, CheckCircle, Building2, FolderTree,
-  ArrowRightLeft, ClipboardList, FileText
+  ArrowRightLeft, ClipboardList, FileText, Activity
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -26,6 +26,7 @@ import { LandedCostsManager } from '@/components/inventory/LandedCostsManager';
 import { SmartReorderTab } from '@/components/inventory/SmartReorderTab';
 import { WACTab } from '@/components/inventory/WACTab';
 import { WarehouseReportTab } from '@/components/inventory/WarehouseReportTab';
+import { ItemMovementReport } from '@/components/inventory/ItemMovementReport';
 
 interface Warehouse {
   id: string;
@@ -575,6 +576,9 @@ export function InventoryTab({ restaurantId, currency, businessType }: Props) {
           <TabsTrigger value="warehouse_report" className="rounded-xl flex items-center gap-2 data-[state=active]:gradient-bg data-[state=active]:text-white">
             <FileSpreadsheet className="w-4 h-4" /> تقارير المخازن
           </TabsTrigger>
+          <TabsTrigger value="item_movement" className="rounded-xl flex items-center gap-2 data-[state=active]:gradient-bg data-[state=active]:text-white">
+            <Activity className="w-4 h-4" /> حركة صنف
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="products" className="space-y-4">
@@ -730,6 +734,10 @@ export function InventoryTab({ restaurantId, currency, businessType }: Props) {
 
         <TabsContent value="warehouse_report" className="space-y-4">
           <WarehouseReportTab products={products} warehouses={warehouses} currency={currency} restaurantId={restaurantId} />
+        </TabsContent>
+
+        <TabsContent value="item_movement" className="space-y-4">
+          <ItemMovementReport restaurantId={restaurantId} currency={currency} />
         </TabsContent>
       </Tabs>
 

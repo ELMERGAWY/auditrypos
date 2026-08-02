@@ -161,6 +161,8 @@ export function AdvancedReportsHub({ restaurantId, currency }: Props) {
         { id: 'inventory_qty', label: 'ملخص كميات المخزون', trend: 'كميات' },
         { id: 'inventory_margin', label: 'هامش ربح المخزون', trend: 'أرباح' },
         { id: 'inventory_costing', label: 'ورقة عمل حساب تكلفة المخزون', trend: 'تكاليف' },
+        { id: 'item_movement', label: 'حركة صنف تفصيلية', trend: 'حركة' },
+        { id: 'low_stock_report', label: 'تقرير المخزون المنخفض', trend: 'تنبيه' },
       ]
     },
     {
@@ -219,6 +221,12 @@ export function AdvancedReportsHub({ restaurantId, currency }: Props) {
         if (!error) setListData(data || []);
       } else if (activeReport === 'inventory_value' || activeReport === 'inventory_qty') {
         const { data } = await supabase.from('products').select('*').eq('restaurant_id', restaurantId).order('category');
+        setListData(data || []);
+      } else if (activeReport === 'item_movement') {
+        const { data } = await supabase.from('stock_movements').select('*').eq('restaurant_id', restaurantId).order('created_at', { ascending: false }).limit(500);
+        setListData(data || []);
+      } else if (activeReport === 'low_stock_report') {
+        const { data } = await supabase.from('products').select('*').eq('restaurant_id', restaurantId).lt('quantity', 10).order('quantity', { ascending: true });
         setListData(data || []);
       } else if (activeReport === 'fixed_assets_summary') {
         const { data } = await supabase.from('fixed_assets').select('*').eq('restaurant_id', restaurantId);

@@ -67,6 +67,7 @@ export function SalesInvoices({ restaurantId, currency, restaurant, isSuperAdmin
   const [editItems, setEditItems] = useState<any[]>([]);
   const [menuItems, setMenuItems] = useState<any[]>([]);
   const [products, setProducts] = useState<any[]>([]);
+  const [warehouseStocks, setWarehouseStocks] = useState<any[]>([]);
   const [itemSearch, setItemSearch] = useState('');
   const [selectedItem, setSelectedItem] = useState<any>(null);
   const [newItemQty, setNewItemQty] = useState(1);
@@ -96,6 +97,21 @@ export function SalesInvoices({ restaurantId, currency, restaurant, isSuperAdmin
   const loadProducts = async () => {
     const { data } = await supabase.from('products').select('*').eq('restaurant_id', restaurantId);
     setProducts(data || []);
+    
+    // Load warehouse stocks for inventory display
+    const { data: stockData } = await supabase.from('warehouse_stock').select('product_id, quantity, warehouse_id').eq('restaurant_id', restaurantId);
+    setWarehouseStocks(stockData || []);
+  };
+
+  // Helper function to get current stock for a product
+  const getProductStock = (productId: string): number => {
+    const productStocks = warehouseStocks.filter(s => s.product_id === productId);
+    if (productStocks.length > 0) {
+      return productStocks.reduce((sum, s) => sum + Number(s.quantity || 0), 0);
+    }
+    // Fallback to product quantity if no warehouse_stock records
+    const product = products.find(p => p.id === productId);
+    return product ? Number(product.quantity || 0) : 0;
   };
 
   // Check if invoice editing is allowed - always allow for flexibility
@@ -836,18 +852,24 @@ export function SalesInvoices({ restaurantId, currency, restaurant, isSuperAdmin
                               {item.name} - {item.price} {currency}
                             </div>
                           ))}
-                          {products.filter(p => p.name.toLowerCase().includes(itemSearch.toLowerCase())).map(product => (
-                            <div 
-                              key={product.id}
-                              className="p-2 hover:bg-secondary cursor-pointer text-sm"
-                              onClick={() => {
-                                setSelectedItem(product);
-                                setItemSearch(product.name);
-                              }}
-                            >
-                              {product.name} - {product.cost_price} {currency}
-                            </div>
-                          ))}
+                          {products.filter(p => p.name.toLowerCase().includes(itemSearch.toLowerCase())).map(product => {
+                            const currentStock = getProductStock(product.id);
+                            return (
+                              <div 
+                                key={product.id}
+                                className="p-2 hover:bg-secondary cursor-pointer text-sm flex justify-between items-center"
+                                onClick={() => {
+                                  setSelectedItem(product);
+                                  setItemSearch(product.name);
+                                }}
+                              >
+                                <span>{product.name} - {product.cost_price} {currency}</span>
+                                <Badge variant={currentStock > 0 ? "outline" : "destructive"} className="text-xs">
+                                  رصيد: {currentStock} {product.unit}
+                                </Badge>
+                              </div>
+                            );
+                          })}
                         </div>
                       )}
                       <div className="grid grid-cols-3 gap-2">

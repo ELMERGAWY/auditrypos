@@ -123,12 +123,35 @@ export function FixedAssetsTab({ restaurantId, currency }) {
     const toastId = toast.loading('جاري حساب الإهلاكات الدورية...');
     
     try {
-      // محاكاة عملية المعالجة لضمان ظهور الحالة للمستخدم
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      let successCount = 0;
+      let skippedCount = 0;
       
-      // هنا يتم مستقبلاً إضافة منطق توليد القيود المحاسبية آلياً
+      // Get current user ID
+      const { data: { user } } = await supabase.auth.getUser();
       
-      toast.success('تم تحديث الإهلاكات بنجاح', { id: toastId });
+      for (const asset of assets) {
+        if (asset.status === 'disposed' || asset.status === 'fully_depreciated') {
+          skippedCount++;
+          continue;
+        }
+        
+        // Call the database function to record depreciation
+        const { data, error } = await supabase.rpc('record_asset_depreciation', {
+          p_asset_id: asset.id,
+          p_restaurant_id: restaurantId,
+          p_depreciation_date: new Date().toISOString().split('T')[0],
+          p_notes: 'إهلاك دوري تلقائي',
+          p_created_by: user?.id
+        });
+        
+        if (error) {
+          console.error(`Failed to depreciate asset ${asset.name}:`, error);
+        } else if (data) {
+          successCount++;
+        }
+      }
+      
+      toast.success(`تم تحديث الإهلاكات: ${successCount} أصل، ${skippedCount} تم التخطي`, { id: toastId });
       load();
     } catch (error) {
       toast.error('فشل تحديث الإهلاكات', { id: toastId });

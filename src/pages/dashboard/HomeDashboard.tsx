@@ -524,6 +524,13 @@ export function HomeDashboard({ restaurantId, currency, onNavigate, userId }: Ho
           color="bg-amber-500"
           subtitle={`${stats.processingOrders} قيد التنفيذ`}
         />
+        <StatCard
+          title="الموردين"
+          value={stats.totalSuppliers}
+          icon={Truck}
+          color="bg-cyan-500"
+          subtitle={`ذمم ${formatCurrency(stats.pendingPayables)}`}
+        />
       </motion.div>
 
       {/* Charts Row */}

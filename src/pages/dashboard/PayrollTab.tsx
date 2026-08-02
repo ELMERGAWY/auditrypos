@@ -179,7 +179,8 @@ export function PayrollTab({ restaurantId, currency, businessType }: Props) {
     staff_id: '', month: String(new Date().getMonth() + 1), year: String(new Date().getFullYear()),
     net_salary: '', gross_salary: '', allowances: '0', deductions: '0',
     tax_amount: '0', insurance_employee: '0', insurance_employer: '0',
-    expense_account_id: '', payment_account_id: '', department_id: '', notes: ''
+    expense_account_id: '', payment_account_id: '', department_id: '', notes: '',
+    journal_entry_id: ''
   });
 
   const [filterMonth, setFilterMonth] = useState(String(new Date().getMonth() + 1));

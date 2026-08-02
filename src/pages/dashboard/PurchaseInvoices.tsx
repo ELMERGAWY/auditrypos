@@ -66,11 +66,12 @@ export function PurchaseInvoices({ restaurantId, currency }: Props) {
   const [suppliers, setSuppliers] = useState<{ id: string; name: string }[]>([]);
   const [supplierContracts, setSupplierContracts] = useState<any[]>([]);
   const [projects, setProjects] = useState<any[]>([]);
-  const [products, setProducts] = useState<{ id: string; name: string; cost_price: number; unit: string; barcode?: string; sku?: string; category?: string }[]>([]);
+  const [products, setProducts] = useState<{ id: string; name: string; cost_price: number; unit: string; barcode?: string; sku?: string; category?: string; quantity?: number }[]>([]);
   const [glAccounts, setGlAccounts] = useState<{ id: string; code: string; name: string; account_type: string }[]>([]);
   const [warehouses, setWarehouses] = useState<{ id: string; name: string }[]>([]);
   const [subWarehouses, setSubWarehouses] = useState<{ id: string; name: string; main_warehouse_id: string }[]>([]);
   const [itemTypes, setItemTypes] = useState<{ id: string; code: string; name_ar: string }[]>([]);
+  const [warehouseStocks, setWarehouseStocks] = useState<any[]>([]);
   const [costingMethod, setCostingMethod] = useState<'fifo' | 'lifo' | 'wac' | 'specific'>('fifo');
 
   const [form, setForm] = useState({
@@ -98,14 +99,15 @@ export function PurchaseInvoices({ restaurantId, currency }: Props) {
       supabase.from('suppliers').select('id,name').eq('restaurant_id', restaurantId),
       supabase.from('supplier_contracts').select('*').eq('restaurant_id', restaurantId).eq('status', 'active'),
       supabase.from('projects').select('id,name').eq('restaurant_id', restaurantId),
-      supabase.from('products').select('id,name,cost_price,unit,barcode,sku,category').eq('restaurant_id', restaurantId),
+      supabase.from('products').select('id,name,cost_price,unit,barcode,sku,category,quantity').eq('restaurant_id', restaurantId),
       supabase.from('chart_of_accounts').select('id,code,name,account_type').eq('restaurant_id', restaurantId),
       supabase.from('warehouses').select('id,name').eq('restaurant_id', restaurantId),
       supabase.from('sub_warehouses').select('id,name,main_warehouse_id').eq('restaurant_id', restaurantId),
       supabase.from('item_types').select('id,code,name_ar').eq('is_active', true),
+      supabase.from('warehouse_stock').select('product_id,quantity,warehouse_id').eq('restaurant_id', restaurantId),
       supabase.from('restaurants').select('inventory_method').eq('id', restaurantId).single(),
       supabase.from('inventory_settings').select('costing_method').eq('restaurant_id', restaurantId).maybeSingle(),
-    ]).then(([s, sc, prj, p, a, w, sw, it, rest, settings]: any) => {
+    ]).then(([s, sc, prj, p, a, w, sw, it, ws, rest, settings]: any) => {
       console.log('Products query:', { data: p.data, error: p.error, restaurantId });
       // Show toast with query result for debugging
       if (p.error) {
@@ -123,6 +125,7 @@ export function PurchaseInvoices({ restaurantId, currency }: Props) {
       setWarehouses(w.data || []);
       setSubWarehouses(sw.data || []);
       setItemTypes(it.data || []);
+      setWarehouseStocks(ws.data || []);
 
       // Get costing method from restaurant settings first, then fallback to old settings
       let method = 'fifo';
@@ -209,6 +212,17 @@ export function PurchaseInvoices({ restaurantId, currency }: Props) {
   const subTotal = lines.reduce((s, l) => s + (Number(l.quantity) * Number(l.unit_cost)), 0);
   const taxTotal = lines.reduce((s, l) => s + Number(l.tax_amount || 0), 0);
   const netTotal = subTotal + taxTotal;
+
+  // Helper function to get current stock for a product
+  const getProductStock = (productId: string): number => {
+    const productStocks = warehouseStocks.filter(s => s.product_id === productId);
+    if (productStocks.length > 0) {
+      return productStocks.reduce((sum, s) => sum + Number(s.quantity || 0), 0);
+    }
+    // Fallback to product quantity if no warehouse_stock records
+    const product = products.find(p => p.id === productId);
+    return product ? Number(product.quantity || 0) : 0;
+  };
 
   const addLine = () => setLines([...lines, { line_type: 'inventory', description: '', quantity: 1, unit_cost: 0, tax_amount: 0 }]);
   const updateLine = (i: number, patch: Partial<LineItem>) => setLines(prev => prev.map((l, idx) => idx === i ? { ...l, ...patch } : l));
@@ -811,7 +825,15 @@ export function PurchaseInvoices({ restaurantId, currency }: Props) {
                             />
                             <Search className="w-3.5 h-3.5 absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground" />
                             <datalist id={`product-list-${i}`}>
-                              {products.map(p => <option key={p.id} value={p.name}>{p.barcode ? `[${p.barcode}] ` : ''}{p.sku ? `[${p.sku}] ` : ''}{p.category || ''}</option>)}
+                              {products.map(p => {
+                                const currentStock = getProductStock(p.id);
+                                const stockLabel = ` - رصيد: ${currentStock} ${p.unit}`;
+                                return (
+                                  <option key={p.id} value={p.name}>
+                                    {p.barcode ? `[${p.barcode}] ` : ''}{p.sku ? `[${p.sku}] ` : ''}{p.category || ''}{stockLabel}
+                                  </option>
+                                );
+                              })}
                             </datalist>
                           </div>
                         ) : (

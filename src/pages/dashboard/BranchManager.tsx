@@ -20,6 +20,10 @@ interface Branch {
   status: 'active' | 'inactive';
   created_at: string;
   order_count: number;
+  restaurant_id?: string; // Link to independent database
+  is_independent_db?: boolean; // Flag for independent database
+  currency?: string;
+  accounting_standard?: string;
 }
 
 interface CreateBranchForm {
@@ -27,6 +31,9 @@ interface CreateBranchForm {
   address: string;
   phone: string;
   manager_name: string;
+  is_independent_db?: boolean;
+  currency?: string;
+  accounting_standard?: string;
 }
 
 export default function BranchManager() {
@@ -40,7 +47,10 @@ export default function BranchManager() {
     name: '',
     address: '',
     phone: '',
-    manager_name: ''
+    manager_name: '',
+    is_independent_db: false,
+    currency: 'ج.م',
+    accounting_standard: 'EAS'
   });
 
   useEffect(() => {
@@ -76,19 +86,50 @@ export default function BranchManager() {
       return;
     }
 
-    const { error } = await supabase.from('branches').insert({
+    const branchPayload = {
       ...form,
       status: 'active',
       created_at: new Date().toISOString(),
       order_count: 0
-    });
+    };
+
+    // If independent database, create a new restaurant record
+    if (form.is_independent_db) {
+      const { data: restaurantData, error: restaurantError } = await supabase
+        .from('restaurants')
+        .insert({
+          name: form.name,
+          currency: form.currency || 'ج.م',
+          accounting_standard: form.accounting_standard || 'EAS',
+          is_branch: true,
+          branch_settings: {
+            address: form.address,
+            phone: form.phone,
+            manager_name: form.manager_name
+          }
+        })
+        .select('id')
+        .single();
+
+      if (restaurantError) {
+        toast.error('فشل في إنشاء قاعدة البيانات المستقلة');
+        return;
+      }
+
+      branchPayload.restaurant_id = restaurantData.id;
+    }
+
+    const { error } = await supabase.from('branches').insert(branchPayload);
     
     if (error) {
       toast.error('فشل في إنشاء الفرع');
     } else {
-      toast.success('تم إنشاء الفرع بنجاح');
+      toast.success(form.is_independent_db ? 'تم إنشاء الفرع بقاعدة بيانات مستقلة' : 'تم إنشاء الفرع بنجاح');
       setShowCreate(false);
-      setForm({ name: '', address: '', phone: '', manager_name: '' });
+      setForm({ 
+        name: '', address: '', phone: '', manager_name: '',
+        is_independent_db: false, currency: 'ج.م', accounting_standard: 'EAS'
+      });
       loadBranches();
     }
   };
@@ -217,6 +258,48 @@ export default function BranchManager() {
                 placeholder="اسم المدير"
               />
             </div>
+            <div className="col-span-2 flex items-center gap-2 p-3 bg-indigo-500/10 rounded-lg border border-indigo-500/20">
+              <input
+                type="checkbox"
+                id="independent_db"
+                checked={form.is_independent_db}
+                onChange={(e) => setForm(f => ({ ...f, is_independent_db: e.target.checked }))}
+                className="w-5 h-5 rounded"
+              />
+              <label htmlFor="independent_db" className="text-sm font-medium cursor-pointer">
+                قاعدة بيانات مستقلة (ملف محاسبي منفصل)
+              </label>
+            </div>
+            {form.is_independent_db && (
+              <>
+                <div>
+                  <label className="text-sm font-medium mb-1 block">العملة</label>
+                  <select
+                    value={form.currency}
+                    onChange={(e) => setForm(f => ({ ...f, currency: e.target.value }))}
+                    className="w-full h-10 px-3 rounded-lg bg-white/5 border border-white/10"
+                  >
+                    <option value="ج.م">جنيه مصري (ج.م)</option>
+                    <option value="ر.س">ريال سعودي (ر.س)</option>
+                    <option value="د.إ">درهم إماراتي (د.إ)</option>
+                    <option value="$">دولار أمريكي ($)</option>
+                    <option value="€">يورو (€)</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="text-sm font-medium mb-1 block">المعيار المحاسبي</label>
+                  <select
+                    value={form.accounting_standard}
+                    onChange={(e) => setForm(f => ({ ...f, accounting_standard: e.target.value }))}
+                    className="w-full h-10 px-3 rounded-lg bg-white/5 border border-white/10"
+                  >
+                    <option value="EAS">المصري (EAS)</option>
+                    <option value="IFRS">الدولي (IFRS)</option>
+                    <option value="US_GAAP">الأمريكي (US GAAP)</option>
+                  </select>
+                </div>
+              </>
+            )}
           </div>
           <div className="flex gap-2">
             <Button variant="outline" onClick={() => setShowCreate(false)}>إلغاء</Button>
