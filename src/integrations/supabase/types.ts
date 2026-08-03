@@ -1452,6 +1452,118 @@ export type Database = {
           },
         ]
       }
+      asset_depreciation_history: {
+        Row: {
+          accumulated_depreciation_after: number
+          accumulated_depreciation_before: number
+          asset_id: string
+          book_value_after: number
+          book_value_before: number
+          created_at: string | null
+          created_by: string | null
+          depreciation_amount: number
+          depreciation_date: string
+          id: string
+          journal_entry_id: string | null
+          notes: string | null
+          restaurant_id: string
+        }
+        Insert: {
+          accumulated_depreciation_after: number
+          accumulated_depreciation_before: number
+          asset_id: string
+          book_value_after: number
+          book_value_before: number
+          created_at?: string | null
+          created_by?: string | null
+          depreciation_amount: number
+          depreciation_date: string
+          id?: string
+          journal_entry_id?: string | null
+          notes?: string | null
+          restaurant_id: string
+        }
+        Update: {
+          accumulated_depreciation_after?: number
+          accumulated_depreciation_before?: number
+          asset_id?: string
+          book_value_after?: number
+          book_value_before?: number
+          created_at?: string | null
+          created_by?: string | null
+          depreciation_amount?: number
+          depreciation_date?: string
+          id?: string
+          journal_entry_id?: string | null
+          notes?: string | null
+          restaurant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "asset_depreciation_history_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: false
+            referencedRelation: "fixed_assets"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "asset_depreciation_history_journal_entry_id_fkey"
+            columns: ["journal_entry_id"]
+            isOneToOne: false
+            referencedRelation: "journal_entries"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "asset_depreciation_history_journal_entry_id_fkey"
+            columns: ["journal_entry_id"]
+            isOneToOne: false
+            referencedRelation: "v_cash_flow"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "asset_depreciation_history_journal_entry_id_fkey"
+            columns: ["journal_entry_id"]
+            isOneToOne: false
+            referencedRelation: "v_gl_autopost_activity_30d"
+            referencedColumns: ["journal_entry_id"]
+          },
+          {
+            foreignKeyName: "asset_depreciation_history_journal_entry_id_fkey"
+            columns: ["journal_entry_id"]
+            isOneToOne: false
+            referencedRelation: "v_journal_workflow_queue"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "asset_depreciation_history_restaurant_id_fkey"
+            columns: ["restaurant_id"]
+            isOneToOne: false
+            referencedRelation: "public_restaurant_info"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "asset_depreciation_history_restaurant_id_fkey"
+            columns: ["restaurant_id"]
+            isOneToOne: false
+            referencedRelation: "restaurants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "asset_depreciation_history_restaurant_id_fkey"
+            columns: ["restaurant_id"]
+            isOneToOne: false
+            referencedRelation: "restaurants_public"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "asset_depreciation_history_restaurant_id_fkey"
+            columns: ["restaurant_id"]
+            isOneToOne: false
+            referencedRelation: "v_restaurant_plan_health"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       audit_log: {
         Row: {
           action: string | null
@@ -8214,6 +8326,457 @@ export type Database = {
           },
         ]
       }
+      marketing_ad_campaigns: {
+        Row: {
+          campaign_id: string
+          campaign_name: string
+          campaign_objective: string | null
+          campaign_status: string | null
+          created_at: string | null
+          created_by: string | null
+          daily_budget: number | null
+          end_date: string | null
+          facebook_page_id: string | null
+          id: string
+          lifetime_budget: number | null
+          metadata: Json | null
+          platform: string
+          project_id: string | null
+          restaurant_id: string
+          start_date: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          campaign_id: string
+          campaign_name: string
+          campaign_objective?: string | null
+          campaign_status?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          daily_budget?: number | null
+          end_date?: string | null
+          facebook_page_id?: string | null
+          id?: string
+          lifetime_budget?: number | null
+          metadata?: Json | null
+          platform?: string
+          project_id?: string | null
+          restaurant_id: string
+          start_date?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          campaign_id?: string
+          campaign_name?: string
+          campaign_objective?: string | null
+          campaign_status?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          daily_budget?: number | null
+          end_date?: string | null
+          facebook_page_id?: string | null
+          id?: string
+          lifetime_budget?: number | null
+          metadata?: Json | null
+          platform?: string
+          project_id?: string | null
+          restaurant_id?: string
+          start_date?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "marketing_ad_campaigns_facebook_page_id_fkey"
+            columns: ["facebook_page_id"]
+            isOneToOne: false
+            referencedRelation: "marketing_facebook_pages"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "marketing_ad_campaigns_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "marketing_projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "marketing_ad_campaigns_restaurant_id_fkey"
+            columns: ["restaurant_id"]
+            isOneToOne: false
+            referencedRelation: "public_restaurant_info"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "marketing_ad_campaigns_restaurant_id_fkey"
+            columns: ["restaurant_id"]
+            isOneToOne: false
+            referencedRelation: "restaurants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "marketing_ad_campaigns_restaurant_id_fkey"
+            columns: ["restaurant_id"]
+            isOneToOne: false
+            referencedRelation: "restaurants_public"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "marketing_ad_campaigns_restaurant_id_fkey"
+            columns: ["restaurant_id"]
+            isOneToOne: false
+            referencedRelation: "v_restaurant_plan_health"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      marketing_ad_performance: {
+        Row: {
+          campaign_id: string | null
+          click_through_rate: number | null
+          clicks: number | null
+          conversion_rate: number | null
+          conversions: number | null
+          cost_per_click: number | null
+          cost_per_conversion: number | null
+          cost_per_thousand_impressions: number | null
+          created_at: string | null
+          created_by: string | null
+          engagement_rate: number | null
+          engagements: number | null
+          facebook_page_id: string | null
+          id: string
+          impressions: number | null
+          metric_date: string
+          raw_data: Json | null
+          reach: number | null
+          restaurant_id: string
+          return_on_ad_spend: number | null
+          revenue: number | null
+          spend: number | null
+          updated_at: string | null
+        }
+        Insert: {
+          campaign_id?: string | null
+          click_through_rate?: number | null
+          clicks?: number | null
+          conversion_rate?: number | null
+          conversions?: number | null
+          cost_per_click?: number | null
+          cost_per_conversion?: number | null
+          cost_per_thousand_impressions?: number | null
+          created_at?: string | null
+          created_by?: string | null
+          engagement_rate?: number | null
+          engagements?: number | null
+          facebook_page_id?: string | null
+          id?: string
+          impressions?: number | null
+          metric_date: string
+          raw_data?: Json | null
+          reach?: number | null
+          restaurant_id: string
+          return_on_ad_spend?: number | null
+          revenue?: number | null
+          spend?: number | null
+          updated_at?: string | null
+        }
+        Update: {
+          campaign_id?: string | null
+          click_through_rate?: number | null
+          clicks?: number | null
+          conversion_rate?: number | null
+          conversions?: number | null
+          cost_per_click?: number | null
+          cost_per_conversion?: number | null
+          cost_per_thousand_impressions?: number | null
+          created_at?: string | null
+          created_by?: string | null
+          engagement_rate?: number | null
+          engagements?: number | null
+          facebook_page_id?: string | null
+          id?: string
+          impressions?: number | null
+          metric_date?: string
+          raw_data?: Json | null
+          reach?: number | null
+          restaurant_id?: string
+          return_on_ad_spend?: number | null
+          revenue?: number | null
+          spend?: number | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "marketing_ad_performance_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "marketing_ad_campaigns"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "marketing_ad_performance_facebook_page_id_fkey"
+            columns: ["facebook_page_id"]
+            isOneToOne: false
+            referencedRelation: "marketing_facebook_pages"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "marketing_ad_performance_restaurant_id_fkey"
+            columns: ["restaurant_id"]
+            isOneToOne: false
+            referencedRelation: "public_restaurant_info"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "marketing_ad_performance_restaurant_id_fkey"
+            columns: ["restaurant_id"]
+            isOneToOne: false
+            referencedRelation: "restaurants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "marketing_ad_performance_restaurant_id_fkey"
+            columns: ["restaurant_id"]
+            isOneToOne: false
+            referencedRelation: "restaurants_public"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "marketing_ad_performance_restaurant_id_fkey"
+            columns: ["restaurant_id"]
+            isOneToOne: false
+            referencedRelation: "v_restaurant_plan_health"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      marketing_ad_spend_expenses: {
+        Row: {
+          base_currency_amount: number | null
+          billed_amount: number | null
+          campaign_id: string | null
+          campaign_name: string | null
+          client_id: string | null
+          created_at: string | null
+          created_by: string | null
+          currency: string
+          exchange_rate: number | null
+          id: string
+          invoice_id: string | null
+          is_billable_to_client: boolean | null
+          metadata: Json | null
+          notes: string | null
+          platform: string
+          platform_account_id: string | null
+          project_id: string | null
+          receipt_url: string | null
+          restaurant_id: string
+          screenshot_url: string | null
+          spend_amount: number
+          spend_date: string
+          status: string
+          updated_at: string | null
+        }
+        Insert: {
+          base_currency_amount?: number | null
+          billed_amount?: number | null
+          campaign_id?: string | null
+          campaign_name?: string | null
+          client_id?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          currency: string
+          exchange_rate?: number | null
+          id?: string
+          invoice_id?: string | null
+          is_billable_to_client?: boolean | null
+          metadata?: Json | null
+          notes?: string | null
+          platform: string
+          platform_account_id?: string | null
+          project_id?: string | null
+          receipt_url?: string | null
+          restaurant_id: string
+          screenshot_url?: string | null
+          spend_amount: number
+          spend_date: string
+          status?: string
+          updated_at?: string | null
+        }
+        Update: {
+          base_currency_amount?: number | null
+          billed_amount?: number | null
+          campaign_id?: string | null
+          campaign_name?: string | null
+          client_id?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          currency?: string
+          exchange_rate?: number | null
+          id?: string
+          invoice_id?: string | null
+          is_billable_to_client?: boolean | null
+          metadata?: Json | null
+          notes?: string | null
+          platform?: string
+          platform_account_id?: string | null
+          project_id?: string | null
+          receipt_url?: string | null
+          restaurant_id?: string
+          screenshot_url?: string | null
+          spend_amount?: number
+          spend_date?: string
+          status?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "marketing_ad_spend_expenses_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "marketing_ad_spend_expenses_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_ar_aging_detail"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "marketing_ad_spend_expenses_invoice_id_fkey"
+            columns: ["invoice_id"]
+            isOneToOne: false
+            referencedRelation: "sales_invoices"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "marketing_ad_spend_expenses_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "marketing_projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "marketing_ad_spend_expenses_restaurant_id_fkey"
+            columns: ["restaurant_id"]
+            isOneToOne: false
+            referencedRelation: "public_restaurant_info"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "marketing_ad_spend_expenses_restaurant_id_fkey"
+            columns: ["restaurant_id"]
+            isOneToOne: false
+            referencedRelation: "restaurants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "marketing_ad_spend_expenses_restaurant_id_fkey"
+            columns: ["restaurant_id"]
+            isOneToOne: false
+            referencedRelation: "restaurants_public"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "marketing_ad_spend_expenses_restaurant_id_fkey"
+            columns: ["restaurant_id"]
+            isOneToOne: false
+            referencedRelation: "v_restaurant_plan_health"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      marketing_agency_employees: {
+        Row: {
+          allowed_project_ids: string[] | null
+          can_access_all_projects: boolean | null
+          created_at: string | null
+          created_by: string | null
+          currency: string | null
+          department: string | null
+          email: string
+          full_name: string
+          hourly_rate: number | null
+          id: string
+          is_active: boolean | null
+          metadata: Json | null
+          phone: string | null
+          restaurant_id: string
+          role: string
+          updated_at: string | null
+          user_id: string | null
+        }
+        Insert: {
+          allowed_project_ids?: string[] | null
+          can_access_all_projects?: boolean | null
+          created_at?: string | null
+          created_by?: string | null
+          currency?: string | null
+          department?: string | null
+          email: string
+          full_name: string
+          hourly_rate?: number | null
+          id?: string
+          is_active?: boolean | null
+          metadata?: Json | null
+          phone?: string | null
+          restaurant_id: string
+          role?: string
+          updated_at?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          allowed_project_ids?: string[] | null
+          can_access_all_projects?: boolean | null
+          created_at?: string | null
+          created_by?: string | null
+          currency?: string | null
+          department?: string | null
+          email?: string
+          full_name?: string
+          hourly_rate?: number | null
+          id?: string
+          is_active?: boolean | null
+          metadata?: Json | null
+          phone?: string | null
+          restaurant_id?: string
+          role?: string
+          updated_at?: string | null
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "marketing_agency_employees_restaurant_id_fkey"
+            columns: ["restaurant_id"]
+            isOneToOne: false
+            referencedRelation: "public_restaurant_info"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "marketing_agency_employees_restaurant_id_fkey"
+            columns: ["restaurant_id"]
+            isOneToOne: false
+            referencedRelation: "restaurants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "marketing_agency_employees_restaurant_id_fkey"
+            columns: ["restaurant_id"]
+            isOneToOne: false
+            referencedRelation: "restaurants_public"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "marketing_agency_employees_restaurant_id_fkey"
+            columns: ["restaurant_id"]
+            isOneToOne: false
+            referencedRelation: "v_restaurant_plan_health"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       marketing_billing_schedule: {
         Row: {
           completed_date: string | null
@@ -8569,6 +9132,732 @@ export type Database = {
           },
         ]
       }
+      marketing_crm_leads: {
+        Row: {
+          client_id: string | null
+          company_name: string | null
+          contact_email: string | null
+          contact_name: string | null
+          contact_phone: string | null
+          created_at: string | null
+          created_by: string | null
+          expected_close_date: string | null
+          id: string
+          lead_code: string
+          lead_source: string | null
+          lead_status: string
+          metadata: Json | null
+          next_follow_up: string | null
+          notes: string | null
+          opportunity_value: number | null
+          pipeline_stage: string
+          probability: number | null
+          restaurant_id: string
+          sales_rep_id: string | null
+          tags: string[] | null
+          updated_at: string | null
+        }
+        Insert: {
+          client_id?: string | null
+          company_name?: string | null
+          contact_email?: string | null
+          contact_name?: string | null
+          contact_phone?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          expected_close_date?: string | null
+          id?: string
+          lead_code: string
+          lead_source?: string | null
+          lead_status?: string
+          metadata?: Json | null
+          next_follow_up?: string | null
+          notes?: string | null
+          opportunity_value?: number | null
+          pipeline_stage?: string
+          probability?: number | null
+          restaurant_id: string
+          sales_rep_id?: string | null
+          tags?: string[] | null
+          updated_at?: string | null
+        }
+        Update: {
+          client_id?: string | null
+          company_name?: string | null
+          contact_email?: string | null
+          contact_name?: string | null
+          contact_phone?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          expected_close_date?: string | null
+          id?: string
+          lead_code?: string
+          lead_source?: string | null
+          lead_status?: string
+          metadata?: Json | null
+          next_follow_up?: string | null
+          notes?: string | null
+          opportunity_value?: number | null
+          pipeline_stage?: string
+          probability?: number | null
+          restaurant_id?: string
+          sales_rep_id?: string | null
+          tags?: string[] | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "marketing_crm_leads_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "marketing_crm_leads_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_ar_aging_detail"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "marketing_crm_leads_restaurant_id_fkey"
+            columns: ["restaurant_id"]
+            isOneToOne: false
+            referencedRelation: "public_restaurant_info"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "marketing_crm_leads_restaurant_id_fkey"
+            columns: ["restaurant_id"]
+            isOneToOne: false
+            referencedRelation: "restaurants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "marketing_crm_leads_restaurant_id_fkey"
+            columns: ["restaurant_id"]
+            isOneToOne: false
+            referencedRelation: "restaurants_public"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "marketing_crm_leads_restaurant_id_fkey"
+            columns: ["restaurant_id"]
+            isOneToOne: false
+            referencedRelation: "v_restaurant_plan_health"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "marketing_crm_leads_sales_rep_id_fkey"
+            columns: ["sales_rep_id"]
+            isOneToOne: false
+            referencedRelation: "staff_profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      marketing_employee_project_access: {
+        Row: {
+          access_level: string | null
+          can_approve_time: boolean | null
+          can_edit_tasks: boolean | null
+          can_log_time: boolean | null
+          can_view_financials: boolean | null
+          created_at: string | null
+          created_by: string | null
+          employee_id: string
+          id: string
+          project_id: string
+          restaurant_id: string
+          updated_at: string | null
+        }
+        Insert: {
+          access_level?: string | null
+          can_approve_time?: boolean | null
+          can_edit_tasks?: boolean | null
+          can_log_time?: boolean | null
+          can_view_financials?: boolean | null
+          created_at?: string | null
+          created_by?: string | null
+          employee_id: string
+          id?: string
+          project_id: string
+          restaurant_id: string
+          updated_at?: string | null
+        }
+        Update: {
+          access_level?: string | null
+          can_approve_time?: boolean | null
+          can_edit_tasks?: boolean | null
+          can_log_time?: boolean | null
+          can_view_financials?: boolean | null
+          created_at?: string | null
+          created_by?: string | null
+          employee_id?: string
+          id?: string
+          project_id?: string
+          restaurant_id?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "marketing_employee_project_access_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "marketing_agency_employees"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "marketing_employee_project_access_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "marketing_projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "marketing_employee_project_access_restaurant_id_fkey"
+            columns: ["restaurant_id"]
+            isOneToOne: false
+            referencedRelation: "public_restaurant_info"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "marketing_employee_project_access_restaurant_id_fkey"
+            columns: ["restaurant_id"]
+            isOneToOne: false
+            referencedRelation: "restaurants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "marketing_employee_project_access_restaurant_id_fkey"
+            columns: ["restaurant_id"]
+            isOneToOne: false
+            referencedRelation: "restaurants_public"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "marketing_employee_project_access_restaurant_id_fkey"
+            columns: ["restaurant_id"]
+            isOneToOne: false
+            referencedRelation: "v_restaurant_plan_health"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      marketing_exchange_rates: {
+        Row: {
+          created_at: string | null
+          created_by: string | null
+          effective_date: string
+          exchange_rate: number
+          from_currency: string
+          id: string
+          metadata: Json | null
+          rate_source: string | null
+          restaurant_id: string
+          to_currency: string
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          created_by?: string | null
+          effective_date: string
+          exchange_rate: number
+          from_currency: string
+          id?: string
+          metadata?: Json | null
+          rate_source?: string | null
+          restaurant_id: string
+          to_currency: string
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          created_by?: string | null
+          effective_date?: string
+          exchange_rate?: number
+          from_currency?: string
+          id?: string
+          metadata?: Json | null
+          rate_source?: string | null
+          restaurant_id?: string
+          to_currency?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "marketing_exchange_rates_restaurant_id_fkey"
+            columns: ["restaurant_id"]
+            isOneToOne: false
+            referencedRelation: "public_restaurant_info"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "marketing_exchange_rates_restaurant_id_fkey"
+            columns: ["restaurant_id"]
+            isOneToOne: false
+            referencedRelation: "restaurants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "marketing_exchange_rates_restaurant_id_fkey"
+            columns: ["restaurant_id"]
+            isOneToOne: false
+            referencedRelation: "restaurants_public"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "marketing_exchange_rates_restaurant_id_fkey"
+            columns: ["restaurant_id"]
+            isOneToOne: false
+            referencedRelation: "v_restaurant_plan_health"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      marketing_facebook_accounts: {
+        Row: {
+          access_token_encrypted: string | null
+          account_name: string | null
+          business_id: string | null
+          created_at: string | null
+          created_by: string | null
+          id: string
+          is_active: boolean | null
+          is_connected: boolean | null
+          metadata: Json | null
+          permissions: string[] | null
+          refresh_token_encrypted: string | null
+          restaurant_id: string
+          token_expires_at: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          access_token_encrypted?: string | null
+          account_name?: string | null
+          business_id?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          id?: string
+          is_active?: boolean | null
+          is_connected?: boolean | null
+          metadata?: Json | null
+          permissions?: string[] | null
+          refresh_token_encrypted?: string | null
+          restaurant_id: string
+          token_expires_at?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          access_token_encrypted?: string | null
+          account_name?: string | null
+          business_id?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          id?: string
+          is_active?: boolean | null
+          is_connected?: boolean | null
+          metadata?: Json | null
+          permissions?: string[] | null
+          refresh_token_encrypted?: string | null
+          restaurant_id?: string
+          token_expires_at?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "marketing_facebook_accounts_restaurant_id_fkey"
+            columns: ["restaurant_id"]
+            isOneToOne: false
+            referencedRelation: "public_restaurant_info"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "marketing_facebook_accounts_restaurant_id_fkey"
+            columns: ["restaurant_id"]
+            isOneToOne: false
+            referencedRelation: "restaurants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "marketing_facebook_accounts_restaurant_id_fkey"
+            columns: ["restaurant_id"]
+            isOneToOne: false
+            referencedRelation: "restaurants_public"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "marketing_facebook_accounts_restaurant_id_fkey"
+            columns: ["restaurant_id"]
+            isOneToOne: false
+            referencedRelation: "v_restaurant_plan_health"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      marketing_facebook_pages: {
+        Row: {
+          ad_account_id: string | null
+          ad_account_name: string | null
+          client_id: string | null
+          created_at: string | null
+          created_by: string | null
+          facebook_account_id: string | null
+          id: string
+          is_active: boolean | null
+          is_managed: boolean | null
+          metadata: Json | null
+          page_category: string | null
+          page_id: string
+          page_name: string
+          page_url: string | null
+          project_id: string | null
+          restaurant_id: string
+          updated_at: string | null
+        }
+        Insert: {
+          ad_account_id?: string | null
+          ad_account_name?: string | null
+          client_id?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          facebook_account_id?: string | null
+          id?: string
+          is_active?: boolean | null
+          is_managed?: boolean | null
+          metadata?: Json | null
+          page_category?: string | null
+          page_id: string
+          page_name: string
+          page_url?: string | null
+          project_id?: string | null
+          restaurant_id: string
+          updated_at?: string | null
+        }
+        Update: {
+          ad_account_id?: string | null
+          ad_account_name?: string | null
+          client_id?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          facebook_account_id?: string | null
+          id?: string
+          is_active?: boolean | null
+          is_managed?: boolean | null
+          metadata?: Json | null
+          page_category?: string | null
+          page_id?: string
+          page_name?: string
+          page_url?: string | null
+          project_id?: string | null
+          restaurant_id?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "marketing_facebook_pages_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "marketing_facebook_pages_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_ar_aging_detail"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "marketing_facebook_pages_facebook_account_id_fkey"
+            columns: ["facebook_account_id"]
+            isOneToOne: false
+            referencedRelation: "marketing_facebook_accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "marketing_facebook_pages_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "marketing_projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "marketing_facebook_pages_restaurant_id_fkey"
+            columns: ["restaurant_id"]
+            isOneToOne: false
+            referencedRelation: "public_restaurant_info"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "marketing_facebook_pages_restaurant_id_fkey"
+            columns: ["restaurant_id"]
+            isOneToOne: false
+            referencedRelation: "restaurants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "marketing_facebook_pages_restaurant_id_fkey"
+            columns: ["restaurant_id"]
+            isOneToOne: false
+            referencedRelation: "restaurants_public"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "marketing_facebook_pages_restaurant_id_fkey"
+            columns: ["restaurant_id"]
+            isOneToOne: false
+            referencedRelation: "v_restaurant_plan_health"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      marketing_freelancer_payments: {
+        Row: {
+          created_at: string | null
+          created_by: string | null
+          currency: string | null
+          expense_account_id: string | null
+          freelancer_id: string
+          hourly_rate: number | null
+          hours_worked: number | null
+          id: string
+          journal_entry_id: string | null
+          metadata: Json | null
+          notes: string | null
+          payment_amount: number
+          payment_date: string
+          payment_method: string | null
+          project_allocation: Json | null
+          project_id: string | null
+          restaurant_id: string
+          status: string
+          task_description: string | null
+          transaction_reference: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          created_by?: string | null
+          currency?: string | null
+          expense_account_id?: string | null
+          freelancer_id: string
+          hourly_rate?: number | null
+          hours_worked?: number | null
+          id?: string
+          journal_entry_id?: string | null
+          metadata?: Json | null
+          notes?: string | null
+          payment_amount: number
+          payment_date: string
+          payment_method?: string | null
+          project_allocation?: Json | null
+          project_id?: string | null
+          restaurant_id: string
+          status?: string
+          task_description?: string | null
+          transaction_reference?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          created_by?: string | null
+          currency?: string | null
+          expense_account_id?: string | null
+          freelancer_id?: string
+          hourly_rate?: number | null
+          hours_worked?: number | null
+          id?: string
+          journal_entry_id?: string | null
+          metadata?: Json | null
+          notes?: string | null
+          payment_amount?: number
+          payment_date?: string
+          payment_method?: string | null
+          project_allocation?: Json | null
+          project_id?: string | null
+          restaurant_id?: string
+          status?: string
+          task_description?: string | null
+          transaction_reference?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "marketing_freelancer_payments_expense_account_id_fkey"
+            columns: ["expense_account_id"]
+            isOneToOne: false
+            referencedRelation: "chart_of_accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "marketing_freelancer_payments_freelancer_id_fkey"
+            columns: ["freelancer_id"]
+            isOneToOne: false
+            referencedRelation: "marketing_freelancers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "marketing_freelancer_payments_journal_entry_id_fkey"
+            columns: ["journal_entry_id"]
+            isOneToOne: false
+            referencedRelation: "journal_entries"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "marketing_freelancer_payments_journal_entry_id_fkey"
+            columns: ["journal_entry_id"]
+            isOneToOne: false
+            referencedRelation: "v_cash_flow"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "marketing_freelancer_payments_journal_entry_id_fkey"
+            columns: ["journal_entry_id"]
+            isOneToOne: false
+            referencedRelation: "v_gl_autopost_activity_30d"
+            referencedColumns: ["journal_entry_id"]
+          },
+          {
+            foreignKeyName: "marketing_freelancer_payments_journal_entry_id_fkey"
+            columns: ["journal_entry_id"]
+            isOneToOne: false
+            referencedRelation: "v_journal_workflow_queue"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "marketing_freelancer_payments_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "marketing_projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "marketing_freelancer_payments_restaurant_id_fkey"
+            columns: ["restaurant_id"]
+            isOneToOne: false
+            referencedRelation: "public_restaurant_info"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "marketing_freelancer_payments_restaurant_id_fkey"
+            columns: ["restaurant_id"]
+            isOneToOne: false
+            referencedRelation: "restaurants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "marketing_freelancer_payments_restaurant_id_fkey"
+            columns: ["restaurant_id"]
+            isOneToOne: false
+            referencedRelation: "restaurants_public"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "marketing_freelancer_payments_restaurant_id_fkey"
+            columns: ["restaurant_id"]
+            isOneToOne: false
+            referencedRelation: "v_restaurant_plan_health"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      marketing_freelancers: {
+        Row: {
+          address: string | null
+          bank_account_details: Json | null
+          created_at: string | null
+          created_by: string | null
+          currency: string | null
+          email: string | null
+          hourly_rate: number | null
+          id: string
+          is_active: boolean | null
+          metadata: Json | null
+          name: string
+          notes: string | null
+          payment_method: string | null
+          phone: string | null
+          restaurant_id: string
+          specialization: string | null
+          tax_id: string | null
+          updated_at: string | null
+          vat_number: string | null
+        }
+        Insert: {
+          address?: string | null
+          bank_account_details?: Json | null
+          created_at?: string | null
+          created_by?: string | null
+          currency?: string | null
+          email?: string | null
+          hourly_rate?: number | null
+          id?: string
+          is_active?: boolean | null
+          metadata?: Json | null
+          name: string
+          notes?: string | null
+          payment_method?: string | null
+          phone?: string | null
+          restaurant_id: string
+          specialization?: string | null
+          tax_id?: string | null
+          updated_at?: string | null
+          vat_number?: string | null
+        }
+        Update: {
+          address?: string | null
+          bank_account_details?: Json | null
+          created_at?: string | null
+          created_by?: string | null
+          currency?: string | null
+          email?: string | null
+          hourly_rate?: number | null
+          id?: string
+          is_active?: boolean | null
+          metadata?: Json | null
+          name?: string
+          notes?: string | null
+          payment_method?: string | null
+          phone?: string | null
+          restaurant_id?: string
+          specialization?: string | null
+          tax_id?: string | null
+          updated_at?: string | null
+          vat_number?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "marketing_freelancers_restaurant_id_fkey"
+            columns: ["restaurant_id"]
+            isOneToOne: false
+            referencedRelation: "public_restaurant_info"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "marketing_freelancers_restaurant_id_fkey"
+            columns: ["restaurant_id"]
+            isOneToOne: false
+            referencedRelation: "restaurants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "marketing_freelancers_restaurant_id_fkey"
+            columns: ["restaurant_id"]
+            isOneToOne: false
+            referencedRelation: "restaurants_public"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "marketing_freelancers_restaurant_id_fkey"
+            columns: ["restaurant_id"]
+            isOneToOne: false
+            referencedRelation: "v_restaurant_plan_health"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       marketing_hourly_rates: {
         Row: {
           created_at: string | null
@@ -8656,6 +9945,74 @@ export type Database = {
             columns: ["staff_id"]
             isOneToOne: false
             referencedRelation: "staff_profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      marketing_pipeline_stages: {
+        Row: {
+          created_at: string | null
+          created_by: string | null
+          id: string
+          is_default: boolean | null
+          probability_percentage: number | null
+          restaurant_id: string
+          stage_name: string
+          stage_name_ar: string | null
+          stage_order: number
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          created_by?: string | null
+          id?: string
+          is_default?: boolean | null
+          probability_percentage?: number | null
+          restaurant_id: string
+          stage_name: string
+          stage_name_ar?: string | null
+          stage_order: number
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          created_by?: string | null
+          id?: string
+          is_default?: boolean | null
+          probability_percentage?: number | null
+          restaurant_id?: string
+          stage_name?: string
+          stage_name_ar?: string | null
+          stage_order?: number
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "marketing_pipeline_stages_restaurant_id_fkey"
+            columns: ["restaurant_id"]
+            isOneToOne: false
+            referencedRelation: "public_restaurant_info"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "marketing_pipeline_stages_restaurant_id_fkey"
+            columns: ["restaurant_id"]
+            isOneToOne: false
+            referencedRelation: "restaurants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "marketing_pipeline_stages_restaurant_id_fkey"
+            columns: ["restaurant_id"]
+            isOneToOne: false
+            referencedRelation: "restaurants_public"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "marketing_pipeline_stages_restaurant_id_fkey"
+            columns: ["restaurant_id"]
+            isOneToOne: false
+            referencedRelation: "v_restaurant_plan_health"
             referencedColumns: ["id"]
           },
         ]
@@ -8991,6 +10348,277 @@ export type Database = {
           },
         ]
       }
+      marketing_project_tasks: {
+        Row: {
+          actual_end_date: string | null
+          actual_hours: number | null
+          actual_start_date: string | null
+          assigned_to: string | null
+          created_at: string | null
+          created_by: string | null
+          depends_on_task_ids: string[] | null
+          description: string | null
+          due_date: string | null
+          estimated_hours: number | null
+          id: string
+          metadata: Json | null
+          name: string
+          name_ar: string | null
+          parent_task_id: string | null
+          planned_end_date: string | null
+          planned_start_date: string | null
+          priority: string | null
+          progress_percentage: number | null
+          project_id: string
+          restaurant_id: string
+          status: string
+          tags: string[] | null
+          task_code: string
+          task_type: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          actual_end_date?: string | null
+          actual_hours?: number | null
+          actual_start_date?: string | null
+          assigned_to?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          depends_on_task_ids?: string[] | null
+          description?: string | null
+          due_date?: string | null
+          estimated_hours?: number | null
+          id?: string
+          metadata?: Json | null
+          name: string
+          name_ar?: string | null
+          parent_task_id?: string | null
+          planned_end_date?: string | null
+          planned_start_date?: string | null
+          priority?: string | null
+          progress_percentage?: number | null
+          project_id: string
+          restaurant_id: string
+          status?: string
+          tags?: string[] | null
+          task_code: string
+          task_type?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          actual_end_date?: string | null
+          actual_hours?: number | null
+          actual_start_date?: string | null
+          assigned_to?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          depends_on_task_ids?: string[] | null
+          description?: string | null
+          due_date?: string | null
+          estimated_hours?: number | null
+          id?: string
+          metadata?: Json | null
+          name?: string
+          name_ar?: string | null
+          parent_task_id?: string | null
+          planned_end_date?: string | null
+          planned_start_date?: string | null
+          priority?: string | null
+          progress_percentage?: number | null
+          project_id?: string
+          restaurant_id?: string
+          status?: string
+          tags?: string[] | null
+          task_code?: string
+          task_type?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "marketing_project_tasks_assigned_to_fkey"
+            columns: ["assigned_to"]
+            isOneToOne: false
+            referencedRelation: "staff_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "marketing_project_tasks_parent_task_id_fkey"
+            columns: ["parent_task_id"]
+            isOneToOne: false
+            referencedRelation: "marketing_project_tasks"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "marketing_project_tasks_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "marketing_projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "marketing_project_tasks_restaurant_id_fkey"
+            columns: ["restaurant_id"]
+            isOneToOne: false
+            referencedRelation: "public_restaurant_info"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "marketing_project_tasks_restaurant_id_fkey"
+            columns: ["restaurant_id"]
+            isOneToOne: false
+            referencedRelation: "restaurants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "marketing_project_tasks_restaurant_id_fkey"
+            columns: ["restaurant_id"]
+            isOneToOne: false
+            referencedRelation: "restaurants_public"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "marketing_project_tasks_restaurant_id_fkey"
+            columns: ["restaurant_id"]
+            isOneToOne: false
+            referencedRelation: "v_restaurant_plan_health"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      marketing_projects: {
+        Row: {
+          actual_cost: number | null
+          actual_end_date: string | null
+          actual_revenue: number | null
+          actual_start_date: string | null
+          budget_amount: number | null
+          budget_currency: string | null
+          client_id: string | null
+          created_at: string | null
+          created_by: string | null
+          description: string | null
+          end_date: string | null
+          id: string
+          metadata: Json | null
+          name: string
+          name_ar: string | null
+          priority: string | null
+          profit_margin: number | null
+          project_code: string
+          project_manager_id: string | null
+          project_type: string
+          restaurant_id: string
+          start_date: string | null
+          status: string
+          tags: string[] | null
+          updated_at: string | null
+        }
+        Insert: {
+          actual_cost?: number | null
+          actual_end_date?: string | null
+          actual_revenue?: number | null
+          actual_start_date?: string | null
+          budget_amount?: number | null
+          budget_currency?: string | null
+          client_id?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          description?: string | null
+          end_date?: string | null
+          id?: string
+          metadata?: Json | null
+          name: string
+          name_ar?: string | null
+          priority?: string | null
+          profit_margin?: number | null
+          project_code: string
+          project_manager_id?: string | null
+          project_type?: string
+          restaurant_id: string
+          start_date?: string | null
+          status?: string
+          tags?: string[] | null
+          updated_at?: string | null
+        }
+        Update: {
+          actual_cost?: number | null
+          actual_end_date?: string | null
+          actual_revenue?: number | null
+          actual_start_date?: string | null
+          budget_amount?: number | null
+          budget_currency?: string | null
+          client_id?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          description?: string | null
+          end_date?: string | null
+          id?: string
+          metadata?: Json | null
+          name?: string
+          name_ar?: string | null
+          priority?: string | null
+          profit_margin?: number | null
+          project_code?: string
+          project_manager_id?: string | null
+          project_type?: string
+          restaurant_id?: string
+          start_date?: string | null
+          status?: string
+          tags?: string[] | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "marketing_projects_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "marketing_projects_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_ar_aging_detail"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "marketing_projects_project_manager_id_fkey"
+            columns: ["project_manager_id"]
+            isOneToOne: false
+            referencedRelation: "staff_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "marketing_projects_restaurant_id_fkey"
+            columns: ["restaurant_id"]
+            isOneToOne: false
+            referencedRelation: "public_restaurant_info"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "marketing_projects_restaurant_id_fkey"
+            columns: ["restaurant_id"]
+            isOneToOne: false
+            referencedRelation: "restaurants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "marketing_projects_restaurant_id_fkey"
+            columns: ["restaurant_id"]
+            isOneToOne: false
+            referencedRelation: "restaurants_public"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "marketing_projects_restaurant_id_fkey"
+            columns: ["restaurant_id"]
+            isOneToOne: false
+            referencedRelation: "v_restaurant_plan_health"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       marketing_quote_items: {
         Row: {
           description: string | null
@@ -9126,6 +10754,472 @@ export type Database = {
             columns: ["restaurant_id"]
             isOneToOne: false
             referencedRelation: "v_restaurant_plan_health"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      marketing_retainer_contracts: {
+        Row: {
+          auto_renew: boolean | null
+          billing_cycle: string
+          client_id: string
+          contract_code: string
+          contract_name: string
+          contract_type: string
+          created_at: string | null
+          created_by: string | null
+          currency: string | null
+          end_date: string | null
+          id: string
+          invoicing_day: number | null
+          metadata: Json | null
+          notes: string | null
+          notice_period_days: number | null
+          payment_terms: string | null
+          project_id: string | null
+          restaurant_id: string
+          retainer_amount: number
+          revenue_recognition_method: string | null
+          start_date: string
+          status: string
+          terms_conditions: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          auto_renew?: boolean | null
+          billing_cycle?: string
+          client_id: string
+          contract_code: string
+          contract_name: string
+          contract_type?: string
+          created_at?: string | null
+          created_by?: string | null
+          currency?: string | null
+          end_date?: string | null
+          id?: string
+          invoicing_day?: number | null
+          metadata?: Json | null
+          notes?: string | null
+          notice_period_days?: number | null
+          payment_terms?: string | null
+          project_id?: string | null
+          restaurant_id: string
+          retainer_amount: number
+          revenue_recognition_method?: string | null
+          start_date: string
+          status?: string
+          terms_conditions?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          auto_renew?: boolean | null
+          billing_cycle?: string
+          client_id?: string
+          contract_code?: string
+          contract_name?: string
+          contract_type?: string
+          created_at?: string | null
+          created_by?: string | null
+          currency?: string | null
+          end_date?: string | null
+          id?: string
+          invoicing_day?: number | null
+          metadata?: Json | null
+          notes?: string | null
+          notice_period_days?: number | null
+          payment_terms?: string | null
+          project_id?: string | null
+          restaurant_id?: string
+          retainer_amount?: number
+          revenue_recognition_method?: string | null
+          start_date?: string
+          status?: string
+          terms_conditions?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "marketing_retainer_contracts_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "marketing_retainer_contracts_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_ar_aging_detail"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "marketing_retainer_contracts_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "marketing_projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "marketing_retainer_contracts_restaurant_id_fkey"
+            columns: ["restaurant_id"]
+            isOneToOne: false
+            referencedRelation: "public_restaurant_info"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "marketing_retainer_contracts_restaurant_id_fkey"
+            columns: ["restaurant_id"]
+            isOneToOne: false
+            referencedRelation: "restaurants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "marketing_retainer_contracts_restaurant_id_fkey"
+            columns: ["restaurant_id"]
+            isOneToOne: false
+            referencedRelation: "restaurants_public"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "marketing_retainer_contracts_restaurant_id_fkey"
+            columns: ["restaurant_id"]
+            isOneToOne: false
+            referencedRelation: "v_restaurant_plan_health"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      marketing_retainer_invoices: {
+        Row: {
+          created_at: string | null
+          created_by: string | null
+          currency: string | null
+          id: string
+          invoice_amount: number
+          invoice_id: string | null
+          invoice_number: string
+          metadata: Json | null
+          notes: string | null
+          period_end: string
+          period_start: string
+          recognition_date: string | null
+          recognized_amount: number | null
+          restaurant_id: string
+          retainer_contract_id: string
+          status: string
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          created_by?: string | null
+          currency?: string | null
+          id?: string
+          invoice_amount: number
+          invoice_id?: string | null
+          invoice_number: string
+          metadata?: Json | null
+          notes?: string | null
+          period_end: string
+          period_start: string
+          recognition_date?: string | null
+          recognized_amount?: number | null
+          restaurant_id: string
+          retainer_contract_id: string
+          status?: string
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          created_by?: string | null
+          currency?: string | null
+          id?: string
+          invoice_amount?: number
+          invoice_id?: string | null
+          invoice_number?: string
+          metadata?: Json | null
+          notes?: string | null
+          period_end?: string
+          period_start?: string
+          recognition_date?: string | null
+          recognized_amount?: number | null
+          restaurant_id?: string
+          retainer_contract_id?: string
+          status?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "marketing_retainer_invoices_invoice_id_fkey"
+            columns: ["invoice_id"]
+            isOneToOne: false
+            referencedRelation: "sales_invoices"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "marketing_retainer_invoices_restaurant_id_fkey"
+            columns: ["restaurant_id"]
+            isOneToOne: false
+            referencedRelation: "public_restaurant_info"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "marketing_retainer_invoices_restaurant_id_fkey"
+            columns: ["restaurant_id"]
+            isOneToOne: false
+            referencedRelation: "restaurants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "marketing_retainer_invoices_restaurant_id_fkey"
+            columns: ["restaurant_id"]
+            isOneToOne: false
+            referencedRelation: "restaurants_public"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "marketing_retainer_invoices_restaurant_id_fkey"
+            columns: ["restaurant_id"]
+            isOneToOne: false
+            referencedRelation: "v_restaurant_plan_health"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "marketing_retainer_invoices_retainer_contract_id_fkey"
+            columns: ["retainer_contract_id"]
+            isOneToOne: false
+            referencedRelation: "marketing_retainer_contracts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      marketing_revenue_recognition: {
+        Row: {
+          contract_id: string | null
+          created_at: string | null
+          created_by: string | null
+          currency: string | null
+          id: string
+          metadata: Json | null
+          recognition_end_date: string
+          recognition_method: string | null
+          recognition_period: string | null
+          recognition_start_date: string
+          restaurant_id: string
+          retainer_invoice_id: string | null
+          status: string
+          total_amount: number
+          updated_at: string | null
+        }
+        Insert: {
+          contract_id?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          currency?: string | null
+          id?: string
+          metadata?: Json | null
+          recognition_end_date: string
+          recognition_method?: string | null
+          recognition_period?: string | null
+          recognition_start_date: string
+          restaurant_id: string
+          retainer_invoice_id?: string | null
+          status?: string
+          total_amount: number
+          updated_at?: string | null
+        }
+        Update: {
+          contract_id?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          currency?: string | null
+          id?: string
+          metadata?: Json | null
+          recognition_end_date?: string
+          recognition_method?: string | null
+          recognition_period?: string | null
+          recognition_start_date?: string
+          restaurant_id?: string
+          retainer_invoice_id?: string | null
+          status?: string
+          total_amount?: number
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "marketing_revenue_recognition_contract_id_fkey"
+            columns: ["contract_id"]
+            isOneToOne: false
+            referencedRelation: "marketing_retainer_contracts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "marketing_revenue_recognition_restaurant_id_fkey"
+            columns: ["restaurant_id"]
+            isOneToOne: false
+            referencedRelation: "public_restaurant_info"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "marketing_revenue_recognition_restaurant_id_fkey"
+            columns: ["restaurant_id"]
+            isOneToOne: false
+            referencedRelation: "restaurants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "marketing_revenue_recognition_restaurant_id_fkey"
+            columns: ["restaurant_id"]
+            isOneToOne: false
+            referencedRelation: "restaurants_public"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "marketing_revenue_recognition_restaurant_id_fkey"
+            columns: ["restaurant_id"]
+            isOneToOne: false
+            referencedRelation: "v_restaurant_plan_health"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "marketing_revenue_recognition_retainer_invoice_id_fkey"
+            columns: ["retainer_invoice_id"]
+            isOneToOne: false
+            referencedRelation: "marketing_retainer_invoices"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      marketing_revenue_recognition_entries: {
+        Row: {
+          amount: number
+          created_at: string | null
+          created_by: string | null
+          currency: string | null
+          deferred_revenue_account_id: string | null
+          id: string
+          is_recognized: boolean | null
+          journal_entry_id: string | null
+          metadata: Json | null
+          notes: string | null
+          recognition_date: string
+          recognition_id: string
+          recognized_at: string | null
+          restaurant_id: string
+          revenue_account_id: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          amount: number
+          created_at?: string | null
+          created_by?: string | null
+          currency?: string | null
+          deferred_revenue_account_id?: string | null
+          id?: string
+          is_recognized?: boolean | null
+          journal_entry_id?: string | null
+          metadata?: Json | null
+          notes?: string | null
+          recognition_date: string
+          recognition_id: string
+          recognized_at?: string | null
+          restaurant_id: string
+          revenue_account_id?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          amount?: number
+          created_at?: string | null
+          created_by?: string | null
+          currency?: string | null
+          deferred_revenue_account_id?: string | null
+          id?: string
+          is_recognized?: boolean | null
+          journal_entry_id?: string | null
+          metadata?: Json | null
+          notes?: string | null
+          recognition_date?: string
+          recognition_id?: string
+          recognized_at?: string | null
+          restaurant_id?: string
+          revenue_account_id?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "marketing_revenue_recognition__deferred_revenue_account_id_fkey"
+            columns: ["deferred_revenue_account_id"]
+            isOneToOne: false
+            referencedRelation: "chart_of_accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "marketing_revenue_recognition_entries_journal_entry_id_fkey"
+            columns: ["journal_entry_id"]
+            isOneToOne: false
+            referencedRelation: "journal_entries"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "marketing_revenue_recognition_entries_journal_entry_id_fkey"
+            columns: ["journal_entry_id"]
+            isOneToOne: false
+            referencedRelation: "v_cash_flow"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "marketing_revenue_recognition_entries_journal_entry_id_fkey"
+            columns: ["journal_entry_id"]
+            isOneToOne: false
+            referencedRelation: "v_gl_autopost_activity_30d"
+            referencedColumns: ["journal_entry_id"]
+          },
+          {
+            foreignKeyName: "marketing_revenue_recognition_entries_journal_entry_id_fkey"
+            columns: ["journal_entry_id"]
+            isOneToOne: false
+            referencedRelation: "v_journal_workflow_queue"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "marketing_revenue_recognition_entries_recognition_id_fkey"
+            columns: ["recognition_id"]
+            isOneToOne: false
+            referencedRelation: "marketing_revenue_recognition"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "marketing_revenue_recognition_entries_restaurant_id_fkey"
+            columns: ["restaurant_id"]
+            isOneToOne: false
+            referencedRelation: "public_restaurant_info"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "marketing_revenue_recognition_entries_restaurant_id_fkey"
+            columns: ["restaurant_id"]
+            isOneToOne: false
+            referencedRelation: "restaurants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "marketing_revenue_recognition_entries_restaurant_id_fkey"
+            columns: ["restaurant_id"]
+            isOneToOne: false
+            referencedRelation: "restaurants_public"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "marketing_revenue_recognition_entries_restaurant_id_fkey"
+            columns: ["restaurant_id"]
+            isOneToOne: false
+            referencedRelation: "v_restaurant_plan_health"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "marketing_revenue_recognition_entries_revenue_account_id_fkey"
+            columns: ["revenue_account_id"]
+            isOneToOne: false
+            referencedRelation: "chart_of_accounts"
             referencedColumns: ["id"]
           },
         ]
@@ -9409,6 +11503,131 @@ export type Database = {
             columns: ["restaurant_id"]
             isOneToOne: false
             referencedRelation: "v_restaurant_plan_health"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      marketing_timesheet_entries: {
+        Row: {
+          activity_type: string | null
+          approved_at: string | null
+          approved_by: string | null
+          billable_amount: number | null
+          created_at: string | null
+          created_by: string | null
+          description: string | null
+          end_time: string | null
+          hourly_rate: number | null
+          hours_worked: number
+          id: string
+          is_approved: boolean | null
+          is_billable: boolean | null
+          metadata: Json | null
+          project_id: string | null
+          rejection_reason: string | null
+          restaurant_id: string
+          staff_id: string
+          start_time: string | null
+          task_id: string | null
+          updated_at: string | null
+          work_date: string
+        }
+        Insert: {
+          activity_type?: string | null
+          approved_at?: string | null
+          approved_by?: string | null
+          billable_amount?: number | null
+          created_at?: string | null
+          created_by?: string | null
+          description?: string | null
+          end_time?: string | null
+          hourly_rate?: number | null
+          hours_worked: number
+          id?: string
+          is_approved?: boolean | null
+          is_billable?: boolean | null
+          metadata?: Json | null
+          project_id?: string | null
+          rejection_reason?: string | null
+          restaurant_id: string
+          staff_id: string
+          start_time?: string | null
+          task_id?: string | null
+          updated_at?: string | null
+          work_date: string
+        }
+        Update: {
+          activity_type?: string | null
+          approved_at?: string | null
+          approved_by?: string | null
+          billable_amount?: number | null
+          created_at?: string | null
+          created_by?: string | null
+          description?: string | null
+          end_time?: string | null
+          hourly_rate?: number | null
+          hours_worked?: number
+          id?: string
+          is_approved?: boolean | null
+          is_billable?: boolean | null
+          metadata?: Json | null
+          project_id?: string | null
+          rejection_reason?: string | null
+          restaurant_id?: string
+          staff_id?: string
+          start_time?: string | null
+          task_id?: string | null
+          updated_at?: string | null
+          work_date?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "marketing_timesheet_entries_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "marketing_projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "marketing_timesheet_entries_restaurant_id_fkey"
+            columns: ["restaurant_id"]
+            isOneToOne: false
+            referencedRelation: "public_restaurant_info"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "marketing_timesheet_entries_restaurant_id_fkey"
+            columns: ["restaurant_id"]
+            isOneToOne: false
+            referencedRelation: "restaurants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "marketing_timesheet_entries_restaurant_id_fkey"
+            columns: ["restaurant_id"]
+            isOneToOne: false
+            referencedRelation: "restaurants_public"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "marketing_timesheet_entries_restaurant_id_fkey"
+            columns: ["restaurant_id"]
+            isOneToOne: false
+            referencedRelation: "v_restaurant_plan_health"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "marketing_timesheet_entries_staff_id_fkey"
+            columns: ["staff_id"]
+            isOneToOne: false
+            referencedRelation: "staff_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "marketing_timesheet_entries_task_id_fkey"
+            columns: ["task_id"]
+            isOneToOne: false
+            referencedRelation: "marketing_project_tasks"
             referencedColumns: ["id"]
           },
         ]
@@ -15611,6 +17830,121 @@ export type Database = {
           },
         ]
       }
+      stock_locations: {
+        Row: {
+          address: string | null
+          city: string | null
+          code: string | null
+          country: string | null
+          created_at: string | null
+          created_by: string | null
+          id: string
+          is_active: boolean | null
+          is_internal: boolean | null
+          is_return_location: boolean | null
+          is_scrap_location: boolean | null
+          location_type: string
+          metadata: Json | null
+          name: string
+          name_ar: string | null
+          parent_id: string | null
+          path: string | null
+          restaurant_id: string
+          updated_at: string | null
+          usage: string
+          warehouse_id: string | null
+        }
+        Insert: {
+          address?: string | null
+          city?: string | null
+          code?: string | null
+          country?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          id?: string
+          is_active?: boolean | null
+          is_internal?: boolean | null
+          is_return_location?: boolean | null
+          is_scrap_location?: boolean | null
+          location_type?: string
+          metadata?: Json | null
+          name: string
+          name_ar?: string | null
+          parent_id?: string | null
+          path?: string | null
+          restaurant_id: string
+          updated_at?: string | null
+          usage?: string
+          warehouse_id?: string | null
+        }
+        Update: {
+          address?: string | null
+          city?: string | null
+          code?: string | null
+          country?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          id?: string
+          is_active?: boolean | null
+          is_internal?: boolean | null
+          is_return_location?: boolean | null
+          is_scrap_location?: boolean | null
+          location_type?: string
+          metadata?: Json | null
+          name?: string
+          name_ar?: string | null
+          parent_id?: string | null
+          path?: string | null
+          restaurant_id?: string
+          updated_at?: string | null
+          usage?: string
+          warehouse_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "stock_locations_parent_id_fkey"
+            columns: ["parent_id"]
+            isOneToOne: false
+            referencedRelation: "stock_locations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "stock_locations_restaurant_id_fkey"
+            columns: ["restaurant_id"]
+            isOneToOne: false
+            referencedRelation: "public_restaurant_info"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "stock_locations_restaurant_id_fkey"
+            columns: ["restaurant_id"]
+            isOneToOne: false
+            referencedRelation: "restaurants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "stock_locations_restaurant_id_fkey"
+            columns: ["restaurant_id"]
+            isOneToOne: false
+            referencedRelation: "restaurants_public"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "stock_locations_restaurant_id_fkey"
+            columns: ["restaurant_id"]
+            isOneToOne: false
+            referencedRelation: "v_restaurant_plan_health"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "stock_locations_warehouse_id_fkey"
+            columns: ["warehouse_id"]
+            isOneToOne: false
+            referencedRelation: "warehouses"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       stock_movements: {
         Row: {
           company_id: string | null
@@ -15720,6 +18054,133 @@ export type Database = {
             columns: ["workspace_id"]
             isOneToOne: false
             referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      stock_moves: {
+        Row: {
+          created_at: string | null
+          created_by: string | null
+          date: string
+          id: string
+          location_dest_id: string | null
+          location_id: string | null
+          metadata: Json | null
+          note: string | null
+          origin: string | null
+          partner_id: string | null
+          picking_id: string | null
+          product_id: string
+          quantity: number
+          quantity_done: number | null
+          reference: string | null
+          restaurant_id: string
+          state: string
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          created_by?: string | null
+          date?: string
+          id?: string
+          location_dest_id?: string | null
+          location_id?: string | null
+          metadata?: Json | null
+          note?: string | null
+          origin?: string | null
+          partner_id?: string | null
+          picking_id?: string | null
+          product_id: string
+          quantity: number
+          quantity_done?: number | null
+          reference?: string | null
+          restaurant_id: string
+          state?: string
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          created_by?: string | null
+          date?: string
+          id?: string
+          location_dest_id?: string | null
+          location_id?: string | null
+          metadata?: Json | null
+          note?: string | null
+          origin?: string | null
+          partner_id?: string | null
+          picking_id?: string | null
+          product_id?: string
+          quantity?: number
+          quantity_done?: number | null
+          reference?: string | null
+          restaurant_id?: string
+          state?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "stock_moves_location_dest_id_fkey"
+            columns: ["location_dest_id"]
+            isOneToOne: false
+            referencedRelation: "stock_locations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "stock_moves_location_id_fkey"
+            columns: ["location_id"]
+            isOneToOne: false
+            referencedRelation: "stock_locations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "stock_moves_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "stock_moves_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "public_products"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "stock_moves_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "v_inventory_valuation"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "stock_moves_restaurant_id_fkey"
+            columns: ["restaurant_id"]
+            isOneToOne: false
+            referencedRelation: "public_restaurant_info"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "stock_moves_restaurant_id_fkey"
+            columns: ["restaurant_id"]
+            isOneToOne: false
+            referencedRelation: "restaurants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "stock_moves_restaurant_id_fkey"
+            columns: ["restaurant_id"]
+            isOneToOne: false
+            referencedRelation: "restaurants_public"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "stock_moves_restaurant_id_fkey"
+            columns: ["restaurant_id"]
+            isOneToOne: false
+            referencedRelation: "v_restaurant_plan_health"
             referencedColumns: ["id"]
           },
         ]
@@ -20740,6 +23201,18 @@ export type Database = {
         }
         Returns: number
       }
+      calculate_employee_utilization: {
+        Args: {
+          p_employee_id: string
+          p_end_date: string
+          p_start_date: string
+        }
+        Returns: {
+          billable_hours: number
+          total_hours: number
+          utilization_rate: number
+        }[]
+      }
       calculate_fifo_cost: {
         Args: { p_product_id: string; p_quantity: number }
         Returns: {
@@ -20751,6 +23224,17 @@ export type Database = {
       calculate_marketing_profitability: {
         Args: { p_workflow_instance_id: string }
         Returns: undefined
+      }
+      calculate_project_profitability: {
+        Args: { p_project_id: string }
+        Returns: {
+          gross_profit: number
+          hours_billed: number
+          hours_worked: number
+          profit_margin: number
+          total_cost: number
+          total_revenue: number
+        }[]
       }
       can_approve_journal: {
         Args: { p_restaurant_id: string; p_user_id: string }
@@ -20826,6 +23310,16 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      convert_currency: {
+        Args: {
+          p_amount: number
+          p_date?: string
+          p_from_currency: string
+          p_restaurant_id: string
+          p_to_currency: string
+        }
+        Returns: number
+      }
       create_default_chart_of_accounts: {
         Args: { p_restaurant_id: string }
         Returns: undefined
@@ -20854,6 +23348,19 @@ export type Database = {
           p_source: string
         }
         Returns: Json
+      }
+      create_stock_move: {
+        Args: {
+          p_created_by?: string
+          p_location_dest_id?: string
+          p_location_src_id?: string
+          p_note?: string
+          p_product_id: string
+          p_quantity: number
+          p_reference?: string
+          p_restaurant_id: string
+        }
+        Returns: string
       }
       create_storefront_order: {
         Args: {
@@ -21314,6 +23821,14 @@ export type Database = {
         Args: { p_restaurant_id: string }
         Returns: string
       }
+      generate_retainer_invoice: {
+        Args: {
+          p_period_end: string
+          p_period_start: string
+          p_retainer_id: string
+        }
+        Returns: string
+      }
       generate_return_number: {
         Args: { restaurant_id: string; return_type: string }
         Returns: string
@@ -21592,6 +24107,20 @@ export type Database = {
       recalculate_supplier_balance: {
         Args: { p_supplier_id: string }
         Returns: number
+      }
+      recognize_revenue: {
+        Args: { p_recognition_date: string; p_recognition_id: string }
+        Returns: boolean
+      }
+      record_asset_depreciation: {
+        Args: {
+          p_asset_id: string
+          p_created_by?: string
+          p_depreciation_date?: string
+          p_notes?: string
+          p_restaurant_id: string
+        }
+        Returns: string
       }
       record_device_check_in: {
         Args: {
