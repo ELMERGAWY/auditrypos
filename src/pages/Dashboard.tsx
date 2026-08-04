@@ -30,6 +30,8 @@ import { ModuleErrorBoundary } from '@/components/professional/ModuleErrorBounda
 import { DashboardErrorBoundary } from '@/components/professional/DashboardErrorBoundary';
 import { actorCreateFields, actorUpdateFields } from '@/lib/actor';
 import { updateService } from '@/lib/updateService';
+import { getPOSConfig } from '@/lib/pos/posConfig';
+import { useBarcodeListener } from '@/hooks/useBarcodeListener';
 
 // Lazy loaded components for performance
 const DeliveryTab = lazy(() => import('./dashboard/DeliveryTab').then(m => ({ default: m.DeliveryTab })));
@@ -464,6 +466,52 @@ export default function Dashboard() {
       return newCart;
     });
   }, [menuItems, getUnitOptions]);
+
+  // ---- Unified POS: config-driven behaviour + global hardware barcode scanner ----
+  const posConfig = useMemo(() => getPOSConfig(businessType), [businessType]);
+
+  const handleBarcodeScan = useCallback((code: string) => {
+    const clean = String(code).trim();
+    if (!clean) return;
+    let activeWarehouse = 'all';
+    try { activeWarehouse = localStorage.getItem('pos_active_warehouse') || 'all'; } catch { /* ignore */ }
+    const pool = (menuItems || []).filter((i: any) =>
+      i && i.available !== false &&
+      (activeWarehouse === 'all' || (i.warehouse_name || '') === activeWarehouse)
+    );
+    const match = pool.find((i: any) => i.barcode && String(i.barcode).trim() === clean)
+      || pool.find((i: any) => i.sku && String(i.sku).trim() === clean);
+    if (!match) {
+      toast.error(`لم يتم العثور على صنف بالباركود: ${clean}`);
+      return;
+    }
+    // repeated scan of the same item increases quantity of the last matching line
+    setCart(prev => {
+      const idx = [...prev].reverse().findIndex(c => c.item?.id === match.id);
+      if (idx !== -1) {
+        const realIdx = prev.length - 1 - idx;
+        return prev.map((c, i) => i === realIdx
+          ? { ...c, qty: Math.round((c.qty + 1) * 100) / 100, qtyText: String(Math.round((c.qty + 1) * 100) / 100) }
+          : c);
+      }
+      const defaultUnit = getUnitOptions(match)[0] || { label: 'قطعة', factor: 1 };
+      return [...prev, {
+        lineId: crypto.randomUUID(),
+        item: match,
+        qty: 1,
+        qtyText: '1',
+        unitMode: defaultUnit.label,
+        unitFactor: defaultUnit.factor,
+        price: (Number(match.price) || 0) * defaultUnit.factor,
+      }];
+    });
+  }, [menuItems, getUnitOptions]);
+
+  useBarcodeListener(handleBarcodeScan, {
+    enabled: activeTab === 'pos' && posConfig.barcodeScanner,
+  });
+
+
 
   const updateQty = useCallback((id: string, d: number) => setCart(prev => prev.map(c => c.lineId === id ? { ...c, qty: Math.max(0, Math.round((c.qty + d) * 100) / 100), qtyText: String(Math.max(0, Math.round((c.qty + d) * 100) / 100)) } : c).filter(c => c.qty > 0)), []);
 
