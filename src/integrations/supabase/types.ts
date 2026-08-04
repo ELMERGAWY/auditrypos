@@ -23104,6 +23104,40 @@ export type Database = {
         }
         Returns: string
       }
+      _inv_lock_balance: {
+        Args: { p_item_id: string; p_sub_warehouse_id: string }
+        Returns: {
+          accounting_standard: string | null
+          average_cost: number
+          id: string
+          inventory_valuation_rule: string | null
+          is_lcm_applied: boolean | null
+          item_id: string
+          last_movement_at: string | null
+          last_movement_id: string | null
+          last_purchase_at: string | null
+          last_purchase_cost: number
+          lcm_adjustment: number | null
+          net_realizable_value: number | null
+          quantity_allocated: number
+          quantity_available: number
+          quantity_incoming: number
+          quantity_on_hand: number
+          quantity_reserved: number
+          sub_warehouse_id: string
+          total_value: number
+          unit_cost: number
+          updated_at: string | null
+          updated_by: string | null
+          valuation_method: string | null
+        }
+        SetofOptions: {
+          from: "*"
+          to: "inventory_balances"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       _next_journal_number: {
         Args: { p_restaurant_id: string }
         Returns: string
@@ -23593,6 +23627,26 @@ export type Database = {
           success_count: number
           success_rate_percent: number
           total_attempts: number
+        }[]
+      }
+      fn_inventory_item_card: {
+        Args: {
+          p_from?: string
+          p_item_id: string
+          p_sub_warehouse_id: string
+          p_to?: string
+        }
+        Returns: {
+          movement_date: string
+          movement_id: string
+          movement_type: string
+          quantity: number
+          reference_number: string
+          reference_type: string
+          running_quantity: number
+          running_value: number
+          total_cost: number
+          unit_cost: number
         }[]
       }
       fn_log_posting_failure: {
@@ -24247,6 +24301,52 @@ export type Database = {
         Returns: undefined
       }
       restore_warehouse: { Args: { p_warehouse_id: string }; Returns: Json }
+      rpc_inventory_adjust: {
+        Args: {
+          p_item_id: string
+          p_new_quantity: number
+          p_reason?: string
+          p_sub_warehouse_id: string
+          p_unit_cost?: number
+        }
+        Returns: Json
+      }
+      rpc_inventory_issue: {
+        Args: {
+          p_allow_negative?: boolean
+          p_item_id: string
+          p_movement_type?: string
+          p_quantity: number
+          p_reference_id?: string
+          p_reference_number?: string
+          p_reference_type?: string
+          p_sub_warehouse_id: string
+        }
+        Returns: Json
+      }
+      rpc_inventory_receive: {
+        Args: {
+          p_item_id: string
+          p_movement_type?: string
+          p_quantity: number
+          p_reference_id?: string
+          p_reference_number?: string
+          p_reference_type?: string
+          p_sub_warehouse_id: string
+          p_unit_cost: number
+        }
+        Returns: Json
+      }
+      rpc_inventory_transfer: {
+        Args: {
+          p_from_sub_warehouse_id: string
+          p_item_id: string
+          p_notes?: string
+          p_quantity: number
+          p_to_sub_warehouse_id: string
+        }
+        Returns: Json
+      }
       save_payment_voucher: {
         Args: {
           p_account_id?: string
