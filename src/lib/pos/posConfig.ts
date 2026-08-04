@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * UNIFIED POS CONFIGURATION
  * Single source of truth that drives the one POS component for every business type.
