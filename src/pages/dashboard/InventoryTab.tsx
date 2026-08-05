@@ -30,6 +30,7 @@ import { ItemMovementReport } from '@/components/inventory/ItemMovementReport';
 import { StockLocationsManager } from '@/components/inventory/StockLocationsManager';
 import { StockMovesManager } from '@/components/inventory/StockMovesManager';
 import { ReorderingRulesManager } from '@/components/inventory/ReorderingRulesManager';
+import { receiveStock, issueStock } from '@/services/inventoryService';
 
 interface Warehouse {
   id: string;
@@ -305,21 +306,15 @@ export function InventoryTab({ restaurantId, currency, businessType }: Props) {
   const handleMovement = async () => {
     if (!showMovement || !movementQty) return;
     const qty = Number(movementQty);
-    const newQty = movementType === 'in' ? showMovement.quantity + qty : Math.max(0, showMovement.quantity - qty);
-    
     try {
-      const { error: updErr } = await supabase.from('products').update({ quantity: newQty }).eq('id', showMovement.id);
-      if (updErr) throw updErr;
-      
-      const { error: mvErr } = await supabase.from('stock_movements').insert({
-        product_id: showMovement.id, 
-        restaurant_id: restaurantId,
-        type: movementType, 
-        quantity: qty, 
-        reason: movementReason,
-        warehouse_id: showMovement.warehouse_id || null,
-      });
-      if (mvErr) console.warn('stock_movements log failed (continuing):', mvErr.message);
+      const warehouseId = activeWarehouse !== 'all' && activeWarehouse !== 'unassigned'
+        ? activeWarehouse
+        : showMovement.warehouse_id;
+      if (!warehouseId) throw new Error('اختر مخزناً محدداً قبل تسجيل الحركة');
+      const result = movementType === 'in'
+        ? await receiveStock({ itemId: showMovement.id, subWarehouseId: warehouseId, quantity: qty, unitCost: showMovement.cost_price, referenceType: 'manual_adjustment', referenceNumber: movementReason, movementType: 'ADJUSTMENT_IN' })
+        : await issueStock({ itemId: showMovement.id, subWarehouseId: warehouseId, quantity: qty, referenceType: 'manual_adjustment', referenceNumber: movementReason, movementType: 'ADJUSTMENT_OUT' });
+      if (!result.success) throw new Error(result.error || 'فشل تحديث المخزون');
 
       // Advanced Accounting: Auto-post Journal Entry if enabled
       if (hasFeature(businessType, 'advanced_accounting')) {
@@ -372,39 +367,19 @@ export function InventoryTab({ restaurantId, currency, businessType }: Props) {
     const totalCost = qty * costPerUnit;
 
     try {
-      // Check if product uses warehouse_stock system
-      const { data: warehouseStock } = await supabase
-        .from('warehouse_stock')
-        .select('*')
-        .eq('product_id', showDeductionModal.id)
-        .eq('restaurant_id', restaurantId)
-        .maybeSingle();
-
-      if (warehouseStock) {
-        // Update warehouse_stock
-        const { error: whErr } = await supabase
-          .from('warehouse_stock')
-          .update({ quantity: Math.max(0, Number(warehouseStock.quantity) - qty) })
-          .eq('id', warehouseStock.id);
-        if (whErr) throw whErr;
-      }
-
-      // Update product quantity (fallback or for products without warehouse_stock)
-      const { error: updErr } = await supabase.from('products').update({ quantity: newQty }).eq('id', showDeductionModal.id);
-      if (updErr) throw updErr;
-
-      // Log stock movement
-      const { error: mvErr } = await supabase.from('stock_movements').insert({
-        product_id: showDeductionModal.id,
-        restaurant_id: restaurantId,
-        type: 'out',
+      const warehouseId = activeWarehouse !== 'all' && activeWarehouse !== 'unassigned'
+        ? activeWarehouse
+        : showDeductionModal.warehouse_id;
+      if (!warehouseId) throw new Error('اختر مخزناً محدداً قبل الخصم');
+      const result = await issueStock({
+        itemId: showDeductionModal.id,
+        subWarehouseId: warehouseId,
         quantity: qty,
-        reason: deductionType === 'direct' 
-          ? `خصم مباشر: ${deductionReason} (تكلفة: ${costPerUnit})` 
-          : `هلاك/تلف (COGS): ${deductionReason} (تكلفة: ${costPerUnit})`,
-        warehouse_id: showDeductionModal.warehouse_id || null,
+        referenceType: deductionType === 'cogs' ? 'inventory_loss' : 'manual_issue',
+        referenceNumber: deductionReason,
+        movementType: 'ADJUSTMENT_OUT',
       });
-      if (mvErr) console.warn('stock_movements log failed:', mvErr.message);
+      if (!result.success) throw new Error(result.error || 'فشل خصم المخزون');
 
       // If COGS expense, create expense record
       if (deductionType === 'cogs' && hasFeature(businessType, 'advanced_accounting')) {
@@ -1552,48 +1527,16 @@ function WarehousesManager({ restaurantId, warehouses, onRefresh, products, curr
     if (addCost < 0) return toast.error('التكلفة يجب أن تكون رقم صحيح');
     setAddingQty(true);
     try {
-      // Update warehouse stock quantity
-      if (stockItem.id) {
-        await supabase.from('warehouse_stock')
-          .update({ quantity: Number(stockItem.quantity || 0) + addAmt })
-          .eq('id', stockItem.id);
-      } else {
-        await supabase.from('warehouse_stock').upsert({
-          restaurant_id: restaurantId,
-          warehouse_id: addQtyTarget.warehouse.id,
-          product_id: stockItem.product_id,
-          quantity: Number(stockItem.quantity || 0) + addAmt,
-        }, { onConflict: 'warehouse_id,product_id' });
-      }
-
-      // Calculate new average cost based on costing method
-      const curQty = Number(stockItem.product?.quantity || 0);
-      const curCost = Number(stockItem.product?.cost_price || 0);
-      const newQty = curQty + addAmt;
-      let newCost = curCost;
-
-      if (addCost > 0) {
-        if (costingMethod === 'wac' || costingMethod === 'average') {
-          // Weighted Average Cost: (old total + new total) / new quantity
-          const oldTotal = curQty * curCost;
-          const newTotal = addAmt * addCost;
-          newCost = newQty > 0 ? (oldTotal + newTotal) / newQty : addCost;
-        } else if (costingMethod === 'fifo' || costingMethod === 'lifo') {
-          // FIFO/LIFO: update to the new cost as reference (layers handled separately)
-          newCost = addCost;
-        } else {
-          // Specific or other: use the new cost
-          newCost = addCost;
-        }
-      }
-
-      // Update product with new quantity and cost
-      await supabase.from('products')
-        .update({
-          quantity: newQty,
-          cost_price: newCost
-        })
-        .eq('id', stockItem.product_id);
+      const result = await receiveStock({
+        itemId: stockItem.product_id,
+        subWarehouseId: addQtyTarget.warehouse.id,
+        quantity: addAmt,
+        unitCost: addCost || Number(stockItem.product?.cost_price || 0),
+        referenceType: 'physical_count',
+        referenceNumber: 'إضافة من الجرد الفعلي',
+        movementType: 'ADJUSTMENT_IN',
+      });
+      if (!result.success) throw new Error(result.error || 'فشل تحديث رصيد المخزن');
 
       toast.success(`تم إضافة ${addAmt} ${stockItem.product?.unit || 'وحدة'} من الجرد الفعلي${addCost > 0 ? ` بتكلفة ${addCost} ${currency}` : ''}`);
       setAddQtyTarget(null);

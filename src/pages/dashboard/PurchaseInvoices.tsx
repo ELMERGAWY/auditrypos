@@ -14,8 +14,7 @@ import {
   FileText, Plus, Search, Clock, Eye, RefreshCcw, Trash2,
   TrendingUp, TrendingDown, Package, Warehouse, Banknote, CheckCircle2, X, Barcode, Minus
 } from 'lucide-react';
-import { journalService } from '@/lib/accounting/journalService';
-import { inventoryCosting } from '@/lib/accounting/inventoryCosting';
+import { receiveStock } from '@/services/inventoryService';
 
 interface PurchaseInvoice {
   id: string;
@@ -467,38 +466,19 @@ export function PurchaseInvoices({ restaurantId, currency }: Props) {
           warehouse_location: l.warehouse_id || null,
         } as any);
 
-        // Apply costing method via service (using new inventoryCosting)
-        try {
-          // Use sub_warehouse_id if provided, otherwise use warehouse_id
-          const subWarehouseId = l.sub_warehouse_id || l.warehouse_id;
-          if (subWarehouseId) {
-            await inventoryCosting.addCostLayer(
-              l.product_id,
-              subWarehouseId,
-              Number(l.quantity),
-              Number(l.unit_cost),
-              'PURCHASE',
-              'PURCHASE_INVOICE',
-              receipt.id,
-              receipt.invoice_number,
-              'IFRS'
-            );
-          }
-        } catch (e) { console.warn('cost layer:', e); }
-
-        // Update product on-hand quantity + new cost (WAC) or last cost (FIFO/LIFO)
-        const { data: cur } = await supabase.from('products').select('quantity, cost_price').eq('id', l.product_id).single();
-        const curQty = Number(cur?.quantity || 0);
-        const curCost = Number(cur?.cost_price || 0);
-        const newQty = curQty + Number(l.quantity);
-        let newCost = curCost;
-        if (costingMethod === 'wac') {
-          newCost = newQty > 0 ? ((curQty * curCost) + (Number(l.quantity) * Number(l.unit_cost))) / newQty : Number(l.unit_cost);
-        } else {
-          // FIFO/LIFO: keep last cost as reference; layers used at sale time
-          newCost = Number(l.unit_cost);
-        }
-        await supabase.from('products').update({ quantity: newQty, cost_price: newCost }).eq('id', l.product_id);
+        const warehouseId = l.warehouse_id || l.sub_warehouse_id;
+        if (!warehouseId) throw new Error(`حدد المخزن للبند ${product?.name || l.description}`);
+        const stockResult = await receiveStock({
+          itemId: l.product_id,
+          subWarehouseId: warehouseId,
+          quantity: Number(l.quantity),
+          unitCost: Number(l.unit_cost),
+          referenceType: 'purchase_invoice',
+          referenceId: inv.id,
+          referenceNumber: inv.invoice_number,
+          movementType: 'RECEIPT',
+        });
+        if (!stockResult.success) throw new Error(stockResult.error || `فشل استلام ${product?.name || l.description}`);
       }
 
       await supabase.from('purchase_invoices').update({

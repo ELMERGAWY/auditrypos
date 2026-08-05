@@ -151,11 +151,18 @@ export default function OAuthCallback() {
           }, 1500);
           return;
         }
-        console.warn('OAuth broker exchange failed, falling back:', brokerData?.error || brokerError?.message);
+        throw new Error(brokerData?.error || brokerError?.message || 'فشل تبادل رمز المصادقة');
       } catch (brokerErr) {
-        console.warn('OAuth broker unavailable, falling back:', brokerErr);
+        const brokerMessage = brokerErr instanceof Error ? brokerErr.message : 'تعذر الاتصال بخدمة المصادقة';
+        console.error('OAuth broker exchange failed:', brokerMessage);
+        setStatus('error');
+        setMessage('فشل في إكمال المصادقة');
+        setDetails(brokerMessage);
+        return;
       }
 
+      /* Legacy browser-side token exchange is intentionally disabled: OAuth
+         secrets and access tokens must never be exposed to the browser. */
       try {
         console.log('OAuth Callback - Starting callback process');
         console.log('OAuth Callback - Platform:', storedPlatform);

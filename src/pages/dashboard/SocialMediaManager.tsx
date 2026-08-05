@@ -117,32 +117,14 @@ export function SocialMediaManager({ restaurantId }: Props) {
         window.location.href = data.authUrl;
         return;
       }
-      if (data?.error) console.warn('social-oauth start:', data.error);
+      const brokerMessage = data?.error || error?.message;
+      if (brokerMessage) throw new Error(brokerMessage);
     } catch (e) {
-      console.warn('social-oauth broker unavailable, falling back', e);
+      const message = e instanceof Error ? e.message : 'تعذر بدء المصادقة';
+      console.error('social-oauth start failed:', message);
+      toast.error(message);
     }
-
-    // Fallback: legacy client-side flow (needs locally configured secrets)
-    const secrets = platformSecrets[platform];
-    if (!secrets || !secrets.clientId || !secrets.clientSecret) {
-      toast.error('يجب إعداد بيانات OAuth لهذه المنصة أولاً');
-      setSelectedPlatform(platform);
-      setShowConnectModal(true);
-      return;
-    }
-
-    oauthService.setPlatformConfig(platform, {
-      clientId: secrets.clientId,
-      clientSecret: secrets.clientSecret,
-      redirectUri,
-    });
-
-    const statePayload = {
-      stateId: Math.random().toString(36).substring(7),
-      restaurantId: restaurantId,
-      platform: platform
-    };
-    const state = btoa(JSON.stringify(statePayload));
+    return;
     const authUrl = oauthService.generateAuthUrl(platform, state);
     localStorage.setItem('oauth_platform', platform);
     localStorage.setItem('oauth_restaurant_id', restaurantId);
