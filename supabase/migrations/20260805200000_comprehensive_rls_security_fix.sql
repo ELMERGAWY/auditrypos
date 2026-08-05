@@ -55,16 +55,16 @@ CREATE POLICY "je_tenant_access" ON public.journal_entries
   FOR ALL TO authenticated
   USING (
     restaurant_id IN (
-      SELECT id FROM public.restaurants
-      WHERE user_id = auth.uid()
-         OR id IN (SELECT restaurant_id FROM public.company_users WHERE user_id = auth.uid())
+      SELECT r.id FROM public.restaurants r
+      WHERE r.owner_id = auth.uid()
+         OR r.company_id IN (SELECT cu.company_id FROM public.company_users cu WHERE cu.user_id = auth.uid() AND cu.is_active = true)
     )
   )
   WITH CHECK (
     restaurant_id IN (
-      SELECT id FROM public.restaurants
-      WHERE user_id = auth.uid()
-         OR id IN (SELECT restaurant_id FROM public.company_users WHERE user_id = auth.uid())
+      SELECT r.id FROM public.restaurants r
+      WHERE r.owner_id = auth.uid()
+         OR r.company_id IN (SELECT cu.company_id FROM public.company_users cu WHERE cu.user_id = auth.uid() AND cu.is_active = true)
     )
   );
 
@@ -76,9 +76,9 @@ CREATE POLICY "jel_tenant_access" ON public.journal_entry_lines
     journal_entry_id IN (
       SELECT id FROM public.journal_entries
       WHERE restaurant_id IN (
-        SELECT id FROM public.restaurants
-        WHERE user_id = auth.uid()
-           OR id IN (SELECT restaurant_id FROM public.company_users WHERE user_id = auth.uid())
+        SELECT r.id FROM public.restaurants r
+        WHERE r.owner_id = auth.uid()
+           OR r.company_id IN (SELECT cu.company_id FROM public.company_users cu WHERE cu.user_id = auth.uid() AND cu.is_active = true)
       )
     )
   )
@@ -86,9 +86,9 @@ CREATE POLICY "jel_tenant_access" ON public.journal_entry_lines
     journal_entry_id IN (
       SELECT id FROM public.journal_entries
       WHERE restaurant_id IN (
-        SELECT id FROM public.restaurants
-        WHERE user_id = auth.uid()
-           OR id IN (SELECT restaurant_id FROM public.company_users WHERE user_id = auth.uid())
+        SELECT r.id FROM public.restaurants r
+        WHERE r.owner_id = auth.uid()
+           OR r.company_id IN (SELECT cu.company_id FROM public.company_users cu WHERE cu.user_id = auth.uid() AND cu.is_active = true)
       )
     )
   );
@@ -100,16 +100,16 @@ CREATE POLICY "coa_tenant_access" ON public.chart_of_accounts
   FOR ALL TO authenticated
   USING (
     restaurant_id IN (
-      SELECT id FROM public.restaurants
-      WHERE user_id = auth.uid()
-         OR id IN (SELECT restaurant_id FROM public.company_users WHERE user_id = auth.uid())
+      SELECT r.id FROM public.restaurants r
+      WHERE r.owner_id = auth.uid()
+         OR r.company_id IN (SELECT cu.company_id FROM public.company_users cu WHERE cu.user_id = auth.uid() AND cu.is_active = true)
     )
   )
   WITH CHECK (
     restaurant_id IN (
-      SELECT id FROM public.restaurants
-      WHERE user_id = auth.uid()
-         OR id IN (SELECT restaurant_id FROM public.company_users WHERE user_id = auth.uid())
+      SELECT r.id FROM public.restaurants r
+      WHERE r.owner_id = auth.uid()
+         OR r.company_id IN (SELECT cu.company_id FROM public.company_users cu WHERE cu.user_id = auth.uid() AND cu.is_active = true)
       )
   );
 
@@ -157,16 +157,16 @@ CREATE POLICY "wh_tenant_access" ON public.warehouses
   FOR ALL TO authenticated
   USING (
     restaurant_id IN (
-      SELECT id FROM public.restaurants
-      WHERE user_id = auth.uid()
-         OR id IN (SELECT restaurant_id FROM public.company_users WHERE user_id = auth.uid())
+      SELECT r.id FROM public.restaurants r
+      WHERE r.owner_id = auth.uid()
+         OR r.company_id IN (SELECT cu.company_id FROM public.company_users cu WHERE cu.user_id = auth.uid() AND cu.is_active = true)
     )
   )
   WITH CHECK (
     restaurant_id IN (
-      SELECT id FROM public.restaurants
-      WHERE user_id = auth.uid()
-         OR id IN (SELECT restaurant_id FROM public.company_users WHERE user_id = auth.uid())
+      SELECT r.id FROM public.restaurants r
+      WHERE r.owner_id = auth.uid()
+         OR r.company_id IN (SELECT cu.company_id FROM public.company_users cu WHERE cu.user_id = auth.uid() AND cu.is_active = true)
     )
   );
 
@@ -176,16 +176,16 @@ CREATE POLICY "ws_tenant_access" ON public.warehouse_stock
   FOR ALL TO authenticated
   USING (
     restaurant_id IN (
-      SELECT id FROM public.restaurants
-      WHERE user_id = auth.uid()
-         OR id IN (SELECT restaurant_id FROM public.company_users WHERE user_id = auth.uid())
+      SELECT r.id FROM public.restaurants r
+      WHERE r.owner_id = auth.uid()
+         OR r.company_id IN (SELECT cu.company_id FROM public.company_users cu WHERE cu.user_id = auth.uid() AND cu.is_active = true)
     )
   )
   WITH CHECK (
     restaurant_id IN (
-      SELECT id FROM public.restaurants
-      WHERE user_id = auth.uid()
-         OR id IN (SELECT restaurant_id FROM public.company_users WHERE user_id = auth.uid())
+      SELECT r.id FROM public.restaurants r
+      WHERE r.owner_id = auth.uid()
+         OR r.company_id IN (SELECT cu.company_id FROM public.company_users cu WHERE cu.user_id = auth.uid() AND cu.is_active = true)
     )
   );
 
@@ -195,16 +195,16 @@ CREATE POLICY "it_tenant_access" ON public.inventory_transfers
   FOR ALL TO authenticated
   USING (
     restaurant_id IN (
-      SELECT id FROM public.restaurants
-      WHERE user_id = auth.uid()
-         OR id IN (SELECT restaurant_id FROM public.company_users WHERE user_id = auth.uid())
+      SELECT r.id FROM public.restaurants r
+      WHERE r.owner_id = auth.uid()
+         OR r.company_id IN (SELECT cu.company_id FROM public.company_users cu WHERE cu.user_id = auth.uid() AND cu.is_active = true)
     )
   )
   WITH CHECK (
     restaurant_id IN (
-      SELECT id FROM public.restaurants
-      WHERE user_id = auth.uid()
-         OR id IN (SELECT restaurant_id FROM public.company_users WHERE user_id = auth.uid())
+      SELECT r.id FROM public.restaurants r
+      WHERE r.owner_id = auth.uid()
+         OR r.company_id IN (SELECT cu.company_id FROM public.company_users cu WHERE cu.user_id = auth.uid() AND cu.is_active = true)
     )
   );
 
@@ -216,9 +216,9 @@ CREATE POLICY "iti_tenant_access" ON public.inventory_transfer_items
     transfer_id IN (
       SELECT id FROM public.inventory_transfers
       WHERE restaurant_id IN (
-        SELECT id FROM public.restaurants
-        WHERE user_id = auth.uid()
-           OR id IN (SELECT restaurant_id FROM public.company_users WHERE user_id = auth.uid())
+        SELECT r.id FROM public.restaurants r
+        WHERE r.owner_id = auth.uid()
+           OR r.company_id IN (SELECT cu.company_id FROM public.company_users cu WHERE cu.user_id = auth.uid() AND cu.is_active = true)
       )
     )
   );
@@ -231,9 +231,9 @@ CREATE POLICY "wsl_tenant_access" ON public.warehouse_stock_locations
     warehouse_id IN (
       SELECT id FROM public.warehouses
       WHERE restaurant_id IN (
-        SELECT id FROM public.restaurants
-        WHERE user_id = auth.uid()
-           OR id IN (SELECT restaurant_id FROM public.company_users WHERE user_id = auth.uid())
+        SELECT r.id FROM public.restaurants r
+        WHERE r.owner_id = auth.uid()
+           OR r.company_id IN (SELECT cu.company_id FROM public.company_users cu WHERE cu.user_id = auth.uid() AND cu.is_active = true)
       )
     )
   );
@@ -243,9 +243,9 @@ CREATE POLICY "sl_tenant_access" ON public.stock_locations
   FOR ALL TO authenticated
   USING (
     restaurant_id IN (
-      SELECT id FROM public.restaurants
-      WHERE user_id = auth.uid()
-         OR id IN (SELECT restaurant_id FROM public.company_users WHERE user_id = auth.uid())
+      SELECT r.id FROM public.restaurants r
+      WHERE r.owner_id = auth.uid()
+         OR r.company_id IN (SELECT cu.company_id FROM public.company_users cu WHERE cu.user_id = auth.uid() AND cu.is_active = true)
     )
   );
 
@@ -255,16 +255,16 @@ CREATE POLICY "sm_tenant_access" ON public.stock_moves
   FOR ALL TO authenticated
   USING (
     restaurant_id IN (
-      SELECT id FROM public.restaurants
-      WHERE user_id = auth.uid()
-         OR id IN (SELECT restaurant_id FROM public.company_users WHERE user_id = auth.uid())
+      SELECT r.id FROM public.restaurants r
+      WHERE r.owner_id = auth.uid()
+         OR r.company_id IN (SELECT cu.company_id FROM public.company_users cu WHERE cu.user_id = auth.uid() AND cu.is_active = true)
     )
   )
   WITH CHECK (
     restaurant_id IN (
-      SELECT id FROM public.restaurants
-      WHERE user_id = auth.uid()
-         OR id IN (SELECT restaurant_id FROM public.company_users WHERE user_id = auth.uid())
+      SELECT r.id FROM public.restaurants r
+      WHERE r.owner_id = auth.uid()
+         OR r.company_id IN (SELECT cu.company_id FROM public.company_users cu WHERE cu.user_id = auth.uid() AND cu.is_active = true)
     )
   );
 
@@ -278,16 +278,16 @@ CREATE POLICY "mp_tenant_access" ON public.marketing_projects
   FOR ALL TO authenticated
   USING (
     restaurant_id IN (
-      SELECT id FROM public.restaurants
-      WHERE user_id = auth.uid()
-         OR id IN (SELECT restaurant_id FROM public.company_users WHERE user_id = auth.uid())
+      SELECT r.id FROM public.restaurants r
+      WHERE r.owner_id = auth.uid()
+         OR r.company_id IN (SELECT cu.company_id FROM public.company_users cu WHERE cu.user_id = auth.uid() AND cu.is_active = true)
     )
   )
   WITH CHECK (
     restaurant_id IN (
-      SELECT id FROM public.restaurants
-      WHERE user_id = auth.uid()
-         OR id IN (SELECT restaurant_id FROM public.company_users WHERE user_id = auth.uid())
+      SELECT r.id FROM public.restaurants r
+      WHERE r.owner_id = auth.uid()
+         OR r.company_id IN (SELECT cu.company_id FROM public.company_users cu WHERE cu.user_id = auth.uid() AND cu.is_active = true)
     )
   );
 
@@ -297,16 +297,16 @@ CREATE POLICY "ac_tenant_access" ON public.ad_campaigns
   FOR ALL TO authenticated
   USING (
     restaurant_id IN (
-      SELECT id FROM public.restaurants
-      WHERE user_id = auth.uid()
-         OR id IN (SELECT restaurant_id FROM public.company_users WHERE user_id = auth.uid())
+      SELECT r.id FROM public.restaurants r
+      WHERE r.owner_id = auth.uid()
+         OR r.company_id IN (SELECT cu.company_id FROM public.company_users cu WHERE cu.user_id = auth.uid() AND cu.is_active = true)
     )
   )
   WITH CHECK (
     restaurant_id IN (
-      SELECT id FROM public.restaurants
-      WHERE user_id = auth.uid()
-         OR id IN (SELECT restaurant_id FROM public.company_users WHERE user_id = auth.uid())
+      SELECT r.id FROM public.restaurants r
+      WHERE r.owner_id = auth.uid()
+         OR r.company_id IN (SELECT cu.company_id FROM public.company_users cu WHERE cu.user_id = auth.uid() AND cu.is_active = true)
     )
   );
 
@@ -318,9 +318,9 @@ CREATE POLICY "apm_tenant_access" ON public.ad_performance_metrics
     campaign_id IN (
       SELECT id FROM public.ad_campaigns
       WHERE restaurant_id IN (
-        SELECT id FROM public.restaurants
-        WHERE user_id = auth.uid()
-           OR id IN (SELECT restaurant_id FROM public.company_users WHERE user_id = auth.uid())
+        SELECT r.id FROM public.restaurants r
+        WHERE r.owner_id = auth.uid()
+           OR r.company_id IN (SELECT cu.company_id FROM public.company_users cu WHERE cu.user_id = auth.uid() AND cu.is_active = true)
       )
     )
   );
@@ -331,9 +331,9 @@ CREATE POLICY "ase_tenant_access" ON public.ad_spend_expenses
   FOR ALL TO authenticated
   USING (
     restaurant_id IN (
-      SELECT id FROM public.restaurants
-      WHERE user_id = auth.uid()
-         OR id IN (SELECT restaurant_id FROM public.company_users WHERE user_id = auth.uid())
+      SELECT r.id FROM public.restaurants r
+      WHERE r.owner_id = auth.uid()
+         OR r.company_id IN (SELECT cu.company_id FROM public.company_users cu WHERE cu.user_id = auth.uid() AND cu.is_active = true)
     )
   );
 
@@ -343,16 +343,16 @@ CREATE POLICY "ae_tenant_access" ON public.agency_employees
   FOR ALL TO authenticated
   USING (
     restaurant_id IN (
-      SELECT id FROM public.restaurants
-      WHERE user_id = auth.uid()
-         OR id IN (SELECT restaurant_id FROM public.company_users WHERE user_id = auth.uid())
+      SELECT r.id FROM public.restaurants r
+      WHERE r.owner_id = auth.uid()
+         OR r.company_id IN (SELECT cu.company_id FROM public.company_users cu WHERE cu.user_id = auth.uid() AND cu.is_active = true)
     )
   )
   WITH CHECK (
     restaurant_id IN (
-      SELECT id FROM public.restaurants
-      WHERE user_id = auth.uid()
-         OR id IN (SELECT restaurant_id FROM public.company_users WHERE user_id = auth.uid())
+      SELECT r.id FROM public.restaurants r
+      WHERE r.owner_id = auth.uid()
+         OR r.company_id IN (SELECT cu.company_id FROM public.company_users cu WHERE cu.user_id = auth.uid() AND cu.is_active = true)
     )
   );
 
@@ -362,9 +362,9 @@ CREATE POLICY "ml_tenant_access" ON public.marketing_leads
   FOR ALL TO authenticated
   USING (
     restaurant_id IN (
-      SELECT id FROM public.restaurants
-      WHERE user_id = auth.uid()
-         OR id IN (SELECT restaurant_id FROM public.company_users WHERE user_id = auth.uid())
+      SELECT r.id FROM public.restaurants r
+      WHERE r.owner_id = auth.uid()
+         OR r.company_id IN (SELECT cu.company_id FROM public.company_users cu WHERE cu.user_id = auth.uid() AND cu.is_active = true)
     )
   );
 
@@ -373,9 +373,9 @@ CREATE POLICY "mcl_tenant_access" ON public.marketing_crm_leads
   FOR ALL TO authenticated
   USING (
     restaurant_id IN (
-      SELECT id FROM public.restaurants
-      WHERE user_id = auth.uid()
-         OR id IN (SELECT restaurant_id FROM public.company_users WHERE user_id = auth.uid())
+      SELECT r.id FROM public.restaurants r
+      WHERE r.owner_id = auth.uid()
+         OR r.company_id IN (SELECT cu.company_id FROM public.company_users cu WHERE cu.user_id = auth.uid() AND cu.is_active = true)
     )
   );
 
@@ -385,16 +385,16 @@ CREATE POLICY "fl_tenant_access" ON public.freelancers
   FOR ALL TO authenticated
   USING (
     restaurant_id IN (
-      SELECT id FROM public.restaurants
-      WHERE user_id = auth.uid()
-         OR id IN (SELECT restaurant_id FROM public.company_users WHERE user_id = auth.uid())
+      SELECT r.id FROM public.restaurants r
+      WHERE r.owner_id = auth.uid()
+         OR r.company_id IN (SELECT cu.company_id FROM public.company_users cu WHERE cu.user_id = auth.uid() AND cu.is_active = true)
     )
   )
   WITH CHECK (
     restaurant_id IN (
-      SELECT id FROM public.restaurants
-      WHERE user_id = auth.uid()
-         OR id IN (SELECT restaurant_id FROM public.company_users WHERE user_id = auth.uid())
+      SELECT r.id FROM public.restaurants r
+      WHERE r.owner_id = auth.uid()
+         OR r.company_id IN (SELECT cu.company_id FROM public.company_users cu WHERE cu.user_id = auth.uid() AND cu.is_active = true)
     )
   );
 
@@ -404,9 +404,9 @@ CREATE POLICY "st_tenant_access" ON public.staff_timesheets
   FOR ALL TO authenticated
   USING (
     restaurant_id IN (
-      SELECT id FROM public.restaurants
-      WHERE user_id = auth.uid()
-         OR id IN (SELECT restaurant_id FROM public.company_users WHERE user_id = auth.uid())
+      SELECT r.id FROM public.restaurants r
+      WHERE r.owner_id = auth.uid()
+         OR r.company_id IN (SELECT cu.company_id FROM public.company_users cu WHERE cu.user_id = auth.uid() AND cu.is_active = true)
     )
   );
 
@@ -416,9 +416,9 @@ CREATE POLICY "rc_tenant_access" ON public.retainer_contracts
   FOR ALL TO authenticated
   USING (
     restaurant_id IN (
-      SELECT id FROM public.restaurants
-      WHERE user_id = auth.uid()
-         OR id IN (SELECT restaurant_id FROM public.company_users WHERE user_id = auth.uid())
+      SELECT r.id FROM public.restaurants r
+      WHERE r.owner_id = auth.uid()
+         OR r.company_id IN (SELECT cu.company_id FROM public.company_users cu WHERE cu.user_id = auth.uid() AND cu.is_active = true)
     )
   );
 
@@ -428,9 +428,9 @@ CREATE POLICY "rr_tenant_access" ON public.revenue_recognition
   FOR ALL TO authenticated
   USING (
     restaurant_id IN (
-      SELECT id FROM public.restaurants
-      WHERE user_id = auth.uid()
-         OR id IN (SELECT restaurant_id FROM public.company_users WHERE user_id = auth.uid())
+      SELECT r.id FROM public.restaurants r
+      WHERE r.owner_id = auth.uid()
+         OR r.company_id IN (SELECT cu.company_id FROM public.company_users cu WHERE cu.user_id = auth.uid() AND cu.is_active = true)
     )
   );
 
@@ -442,9 +442,9 @@ CREATE POLICY "epa_tenant_access" ON public.employee_project_access
     project_id IN (
       SELECT id FROM public.marketing_projects
       WHERE restaurant_id IN (
-        SELECT id FROM public.restaurants
-        WHERE user_id = auth.uid()
-           OR id IN (SELECT restaurant_id FROM public.company_users WHERE user_id = auth.uid())
+        SELECT r.id FROM public.restaurants r
+        WHERE r.owner_id = auth.uid()
+           OR r.company_id IN (SELECT cu.company_id FROM public.company_users cu WHERE cu.user_id = auth.uid() AND cu.is_active = true)
       )
     )
   );
@@ -458,16 +458,16 @@ CREATE POLICY "ps_tenant_access" ON public.pipeline_stages
   FOR ALL TO authenticated
   USING (
     restaurant_id IN (
-      SELECT id FROM public.restaurants
-      WHERE user_id = auth.uid()
-         OR id IN (SELECT restaurant_id FROM public.company_users WHERE user_id = auth.uid())
+      SELECT r.id FROM public.restaurants r
+      WHERE r.owner_id = auth.uid()
+         OR r.company_id IN (SELECT cu.company_id FROM public.company_users cu WHERE cu.user_id = auth.uid() AND cu.is_active = true)
     )
   )
   WITH CHECK (
     restaurant_id IN (
-      SELECT id FROM public.restaurants
-      WHERE user_id = auth.uid()
-         OR id IN (SELECT restaurant_id FROM public.company_users WHERE user_id = auth.uid())
+      SELECT r.id FROM public.restaurants r
+      WHERE r.owner_id = auth.uid()
+         OR r.company_id IN (SELECT cu.company_id FROM public.company_users cu WHERE cu.user_id = auth.uid() AND cu.is_active = true)
     )
   );
 
@@ -476,16 +476,16 @@ CREATE POLICY "wfs_tenant_access" ON public.workflow_stages
   FOR ALL TO authenticated
   USING (
     restaurant_id IN (
-      SELECT id FROM public.restaurants
-      WHERE user_id = auth.uid()
-         OR id IN (SELECT restaurant_id FROM public.company_users WHERE user_id = auth.uid())
+      SELECT r.id FROM public.restaurants r
+      WHERE r.owner_id = auth.uid()
+         OR r.company_id IN (SELECT cu.company_id FROM public.company_users cu WHERE cu.user_id = auth.uid() AND cu.is_active = true)
     )
   )
   WITH CHECK (
     restaurant_id IN (
-      SELECT id FROM public.restaurants
-      WHERE user_id = auth.uid()
-         OR id IN (SELECT restaurant_id FROM public.company_users WHERE user_id = auth.uid())
+      SELECT r.id FROM public.restaurants r
+      WHERE r.owner_id = auth.uid()
+         OR r.company_id IN (SELECT cu.company_id FROM public.company_users cu WHERE cu.user_id = auth.uid() AND cu.is_active = true)
     )
   );
 
@@ -502,18 +502,18 @@ CREATE POLICY "er_write_tenant" ON public.exchange_rates
   FOR INSERT TO authenticated
   WITH CHECK (
     restaurant_id IS NULL OR restaurant_id IN (
-      SELECT id FROM public.restaurants
-      WHERE user_id = auth.uid()
-         OR id IN (SELECT restaurant_id FROM public.company_users WHERE user_id = auth.uid())
+      SELECT r.id FROM public.restaurants r
+      WHERE r.owner_id = auth.uid()
+         OR r.company_id IN (SELECT cu.company_id FROM public.company_users cu WHERE cu.user_id = auth.uid() AND cu.is_active = true)
     )
   );
 CREATE POLICY "er_update_tenant" ON public.exchange_rates
   FOR UPDATE TO authenticated
   USING (
     restaurant_id IS NULL OR restaurant_id IN (
-      SELECT id FROM public.restaurants
-      WHERE user_id = auth.uid()
-         OR id IN (SELECT restaurant_id FROM public.company_users WHERE user_id = auth.uid())
+      SELECT r.id FROM public.restaurants r
+      WHERE r.owner_id = auth.uid()
+         OR r.company_id IN (SELECT cu.company_id FROM public.company_users cu WHERE cu.user_id = auth.uid() AND cu.is_active = true)
     )
   );
 
@@ -527,16 +527,16 @@ CREATE POLICY "foc_tenant_access" ON public.facebook_oauth_configs
   FOR ALL TO authenticated
   USING (
     restaurant_id IN (
-      SELECT id FROM public.restaurants
-      WHERE user_id = auth.uid()
-         OR id IN (SELECT restaurant_id FROM public.company_users WHERE user_id = auth.uid())
+      SELECT r.id FROM public.restaurants r
+      WHERE r.owner_id = auth.uid()
+         OR r.company_id IN (SELECT cu.company_id FROM public.company_users cu WHERE cu.user_id = auth.uid() AND cu.is_active = true)
     )
   )
   WITH CHECK (
     restaurant_id IN (
-      SELECT id FROM public.restaurants
-      WHERE user_id = auth.uid()
-         OR id IN (SELECT restaurant_id FROM public.company_users WHERE user_id = auth.uid())
+      SELECT r.id FROM public.restaurants r
+      WHERE r.owner_id = auth.uid()
+         OR r.company_id IN (SELECT cu.company_id FROM public.company_users cu WHERE cu.user_id = auth.uid() AND cu.is_active = true)
     )
   );
 
@@ -546,16 +546,16 @@ CREATE POLICY "faa_tenant_access" ON public.facebook_ad_accounts
   FOR ALL TO authenticated
   USING (
     restaurant_id IN (
-      SELECT id FROM public.restaurants
-      WHERE user_id = auth.uid()
-         OR id IN (SELECT restaurant_id FROM public.company_users WHERE user_id = auth.uid())
+      SELECT r.id FROM public.restaurants r
+      WHERE r.owner_id = auth.uid()
+         OR r.company_id IN (SELECT cu.company_id FROM public.company_users cu WHERE cu.user_id = auth.uid() AND cu.is_active = true)
     )
   )
   WITH CHECK (
     restaurant_id IN (
-      SELECT id FROM public.restaurants
-      WHERE user_id = auth.uid()
-         OR id IN (SELECT restaurant_id FROM public.company_users WHERE user_id = auth.uid())
+      SELECT r.id FROM public.restaurants r
+      WHERE r.owner_id = auth.uid()
+         OR r.company_id IN (SELECT cu.company_id FROM public.company_users cu WHERE cu.user_id = auth.uid() AND cu.is_active = true)
     )
   );
 
