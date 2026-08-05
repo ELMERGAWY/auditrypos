@@ -73,7 +73,7 @@ ALTER TABLE IF EXISTS public.journal_entry_lines ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "jel_tenant_access" ON public.journal_entry_lines
   FOR ALL TO authenticated
   USING (
-    journal_entry_id IN (
+    entry_id IN (
       SELECT id FROM public.journal_entries
       WHERE restaurant_id IN (
         SELECT r.id FROM public.restaurants r
@@ -83,7 +83,7 @@ CREATE POLICY "jel_tenant_access" ON public.journal_entry_lines
     )
   )
   WITH CHECK (
-    journal_entry_id IN (
+    entry_id IN (
       SELECT id FROM public.journal_entries
       WHERE restaurant_id IN (
         SELECT r.id FROM public.restaurants r
