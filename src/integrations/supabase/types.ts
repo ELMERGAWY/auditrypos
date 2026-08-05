@@ -6448,7 +6448,7 @@ export type Database = {
             foreignKeyName: "inventory_balances_sub_warehouse_id_fkey"
             columns: ["sub_warehouse_id"]
             isOneToOne: false
-            referencedRelation: "sub_warehouses"
+            referencedRelation: "warehouses"
             referencedColumns: ["id"]
           },
         ]
@@ -23138,6 +23138,23 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      _inventory_assert_access: {
+        Args: { p_item_id: string; p_warehouse_id: string }
+        Returns: string
+      }
+      _inventory_sync_compatibility: {
+        Args: { p_item_id: string }
+        Returns: undefined
+      }
+      _inventory_sync_warehouse_stock: {
+        Args: {
+          p_item_id: string
+          p_quantity: number
+          p_restaurant_id: string
+          p_warehouse_id: string
+        }
+        Returns: undefined
+      }
       _next_journal_number: {
         Args: { p_restaurant_id: string }
         Returns: string
@@ -23578,6 +23595,18 @@ export type Database = {
       fn_default_workspace_id: {
         Args: { p_restaurant_id: string }
         Returns: string
+      }
+      fn_financial_account_balances: {
+        Args: { p_as_of?: string; p_restaurant_id: string }
+        Returns: {
+          account_id: string
+          account_type: string
+          balance: number
+          code: string
+          credit: number
+          debit: number
+          name: string
+        }[]
       }
       fn_get_profile_code: {
         Args: { p_company_id: string; p_workspace_id: string }
