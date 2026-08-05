@@ -2,7 +2,12 @@
 // Keeps client_secret server-side and can read global (restaurant_id IS NULL) configs
 // that RLS hides from the browser.
 import { createClient } from 'npm:@supabase/supabase-js@2';
-import { corsHeaders } from 'npm:@supabase/supabase-js@2/cors';
+
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Methods': 'POST, OPTIONS',
+};
 
 const PLATFORMS: Record<string, { authUrl: string; tokenUrl: string; scopes: string[] }> = {
   facebook: {
