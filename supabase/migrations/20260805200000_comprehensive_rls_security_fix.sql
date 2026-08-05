@@ -603,12 +603,6 @@ END$$;
 -- SECTION 9: ANON ACCESS — Revoke public execute on sensitive RPCs
 -- ══════════════════════════════════════════════════════════════
 
-REVOKE EXECUTE ON FUNCTION IF EXISTS public.seed_global_coa(uuid) FROM anon;
-REVOKE EXECUTE ON FUNCTION IF EXISTS public.execute_inventory_transfer(uuid, uuid, uuid, uuid, numeric, text) FROM anon;
-REVOKE EXECUTE ON FUNCTION IF EXISTS public.upsert_pos_order FROM anon;
-REVOKE EXECUTE ON FUNCTION IF EXISTS public.save_receipt_voucher FROM anon;
-REVOKE EXECUTE ON FUNCTION IF EXISTS public.post_journal_entry FROM anon;
-
 -- Ensure only authenticated can call SECURITY DEFINER functions
 DO $$
 DECLARE
