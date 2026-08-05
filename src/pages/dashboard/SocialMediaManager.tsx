@@ -125,10 +125,6 @@ export function SocialMediaManager({ restaurantId }: Props) {
       toast.error(message);
     }
     return;
-    const authUrl = oauthService.generateAuthUrl(platform, state);
-    localStorage.setItem('oauth_platform', platform);
-    localStorage.setItem('oauth_restaurant_id', restaurantId);
-    window.location.href = authUrl;
   };
 
 
