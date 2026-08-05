@@ -741,7 +741,8 @@ export function SupplierManager({ restaurantId, currency }: Props) {
     try {
       const { error } = await supabase.rpc('save_receipt_voucher', {
         p_restaurant_id: restaurantId,
-        p_customer_id: receiptVoucherForm.actor_id,
+        p_actor_id: receiptVoucherForm.actor_id,
+        p_actor_type: 'supplier',
         p_amount: amount,
         p_payment_method: receiptVoucherForm.payment_method,
         p_voucher_date: receiptVoucherForm.voucher_date,

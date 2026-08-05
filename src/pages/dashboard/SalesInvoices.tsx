@@ -124,26 +124,66 @@ export function SalesInvoices({ restaurantId, currency, restaurant, isSuperAdmin
   const loadInvoices = async () => {
     try {
       setLoading(true);
-      const { data, error } = await supabase
+      
+      // 1. Fetch POS / Storefront / Standard Orders
+      const { data: ordersData, error: ordersError } = await supabase
         .from('orders')
         .select('*')
         .eq('restaurant_id', restaurantId)
         .order('created_at', { ascending: false })
         .limit(500);
 
-      if (error) {
-        console.error('Error loading invoices:', error);
-        throw error;
+      if (ordersError) {
+        console.error('Error loading orders:', ordersError);
       }
-      console.log('Loaded invoices:', data?.length || 0);
-      
-      // Log the first invoice data for debugging
-      if (data && data.length > 0) {
-        console.log('First invoice data:', data[0]);
-        toast.info(`تم تحميل ${data.length} فاتورة، أول فاتورة: المبلغ=${data[0].total}`);
+
+      // 2. Fetch B2B / Contracting / Marketing / Direct Sales Invoices
+      const { data: salesInvoicesData, error: salesInvoicesError } = await supabase
+        .from('sales_invoices')
+        .select('*')
+        .or(`restaurant_id.eq.${restaurantId},company_id.eq.${restaurantId}`)
+        .order('created_at', { ascending: false })
+        .limit(500);
+
+      if (salesInvoicesError) {
+        console.warn('Note: sales_invoices query returned notice:', salesInvoicesError?.message);
       }
-      
-      setInvoices(data || []);
+
+      const formattedOrders = (ordersData || []).map(o => ({
+        ...o,
+        order_number: o.order_number || o.invoice_number || `ORD-${o.id.slice(0, 6)}`,
+        total: Number(o.total || o.total_amount || 0),
+        paid_amount: Number(o.paid_amount || 0),
+        status: o.status || 'completed',
+        source: 'orders'
+      }));
+
+      // Convert sales_invoices to matching format if not already in orders
+      const formattedSalesInvoices = (salesInvoicesData || [])
+        .filter(si => !formattedOrders.some(o => o.id === si.id || o.id === si.order_id || o.id === si.source_reference_id))
+        .map(si => ({
+          id: si.id,
+          order_number: si.invoice_number || si.order_number || `INV-${si.id.slice(0, 6)}`,
+          created_at: si.created_at || si.invoice_date || new Date().toISOString(),
+          customer_name: si.customer_name || 'عميل',
+          customer_ref: si.customer_ref,
+          customer_phone: si.customer_phone,
+          total: Number(si.total_amount || si.total || 0),
+          paid_amount: Number(si.paid_amount || 0),
+          discount: Number(si.discount_amount || si.discount || 0),
+          notes: si.notes || si.description,
+          status: si.status || 'completed',
+          payment_method: si.payment_method || 'cash',
+          journal_entry_id: si.journal_entry_id,
+          source: 'sales_invoices'
+        }));
+
+      const combined = [...formattedOrders, ...formattedSalesInvoices].sort((a, b) => 
+        new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+      );
+
+      console.log(`Loaded invoices total: ${combined.length} (${formattedOrders.length} orders, ${formattedSalesInvoices.length} sales_invoices)`);
+      setInvoices(combined);
     } catch (error: any) {
       console.error('Failed to load invoices:', error);
       toast.error('فشل تحميل الفواتير: ' + error.message);

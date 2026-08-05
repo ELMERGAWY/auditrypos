@@ -13,19 +13,37 @@ export function TradingAccount({ restaurantId, currency }: Props) {
 
   useEffect(() => {
     const load = async () => {
-      // 1. Load Sales
+      // 1. Load Sales from Orders and Sales Invoices
       const { data: orders } = await supabase.from('orders')
-        .select('total, status')
+        .select('id, total, status')
         .eq('restaurant_id', restaurantId)
         .neq('status', 'cancelled');
 
-      // 2. Load COGS from Order Items
-      const { data: items } = await supabase.from('order_items')
-        .select('quantity, price, cost_price_snapshot, unit_factor')
-        .eq('orders.restaurant_id', restaurantId);
+      const { data: salesInvoices } = await supabase.from('sales_invoices')
+        .select('total_amount, total, status')
+        .or(`restaurant_id.eq.${restaurantId},company_id.eq.${restaurantId}`)
+        .neq('status', 'cancelled');
 
-      const sales = (orders || []).reduce((s, o) => s + Number(o.total), 0);
-      const cogs = (items || []).reduce((s, i) => s + (Number(i.cost_price_snapshot || 0) * Number(i.quantity) * Number(i.unit_factor || 1)), 0);
+      const ordersTotal = (orders || []).reduce((s, o) => s + Number(o.total || 0), 0);
+      const invoicesTotal = (salesInvoices || []).reduce((s, si) => s + Number(si.total_amount || si.total || 0), 0);
+      const sales = ordersTotal + invoicesTotal;
+
+      // 2. Load COGS from Order Items
+      const orderIds = (orders || []).map(o => o.id);
+      let cogs = 0;
+
+      if (orderIds.length > 0) {
+        const { data: items } = await supabase.from('order_items')
+          .select('quantity, price, cost_price_snapshot, unit_factor')
+          .in('order_id', orderIds.slice(0, 500));
+
+        cogs = (items || []).reduce((s, i) => {
+          const qty = Number(i.quantity || 0);
+          const factor = Number(i.unit_factor || 1);
+          const cost = Number(i.cost_price_snapshot || 0);
+          return s + (cost * qty * factor);
+        }, 0);
+      }
 
       setData({ sales, cogs, grossProfit: sales - cogs });
       setLoading(false);

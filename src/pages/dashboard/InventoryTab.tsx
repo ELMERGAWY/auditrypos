@@ -532,39 +532,23 @@ export function InventoryTab({ restaurantId, currency, businessType }: Props) {
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4" dir="rtl">
-        <TabsList className="bg-secondary/50 p-1 rounded-2xl w-full sm:w-auto flex flex-wrap gap-1">
-          <TabsTrigger value="products" className="rounded-xl flex items-center gap-2 data-[state=active]:gradient-bg data-[state=active]:text-white">
+        {/* ── Primary 4-group navigation ── */}
+        <TabsList className="bg-secondary/50 p-1.5 rounded-2xl grid grid-cols-2 sm:grid-cols-4 gap-1 w-full">
+          <TabsTrigger value="products"
+            className="rounded-xl flex items-center justify-center gap-2 py-2.5 text-sm font-bold data-[state=active]:gradient-bg data-[state=active]:text-white data-[state=active]:shadow-lg transition-all">
             <Boxes className="w-4 h-4" /> الأصناف
           </TabsTrigger>
-          <TabsTrigger value="warehouses" className="rounded-xl flex items-center gap-2 data-[state=active]:gradient-bg data-[state=active]:text-white">
-            <Truck className="w-4 h-4" /> الفروع والمخازن
+          <TabsTrigger value="warehouses"
+            className="rounded-xl flex items-center justify-center gap-2 py-2.5 text-sm font-bold data-[state=active]:gradient-bg data-[state=active]:text-white data-[state=active]:shadow-lg transition-all">
+            <Truck className="w-4 h-4" /> المخازن والتقارير
           </TabsTrigger>
-          <TabsTrigger value="transfers" className="rounded-xl flex items-center gap-2 data-[state=active]:gradient-bg data-[state=active]:text-white">
-            <History className="w-4 h-4" /> حركات التحويل
+          <TabsTrigger value="movements"
+            className="rounded-xl flex items-center justify-center gap-2 py-2.5 text-sm font-bold data-[state=active]:gradient-bg data-[state=active]:text-white data-[state=active]:shadow-lg transition-all">
+            <ArrowRightLeft className="w-4 h-4" /> الحركات والتحويلات
           </TabsTrigger>
-          <TabsTrigger value="landed_costs" className="rounded-xl flex items-center gap-2 data-[state=active]:gradient-bg data-[state=active]:text-white">
-            <Calculator className="w-4 h-4" /> التكاليف المباشرة
-          </TabsTrigger>
-          <TabsTrigger value="reorder" className="rounded-xl flex items-center gap-2 data-[state=active]:gradient-bg data-[state=active]:text-white">
-            <Bell className="w-4 h-4" /> إعادة الطلب الذكي
-          </TabsTrigger>
-          <TabsTrigger value="wac" className="rounded-xl flex items-center gap-2 data-[state=active]:gradient-bg data-[state=active]:text-white">
-            <Scale className="w-4 h-4" /> المتوسط المرجح
-          </TabsTrigger>
-          <TabsTrigger value="warehouse_report" className="rounded-xl flex items-center gap-2 data-[state=active]:gradient-bg data-[state=active]:text-white">
-            <FileSpreadsheet className="w-4 h-4" /> تقارير المخازن
-          </TabsTrigger>
-          <TabsTrigger value="item_movement" className="rounded-xl flex items-center gap-2 data-[state=active]:gradient-bg data-[state=active]:text-white">
-            <Activity className="w-4 h-4" /> حركة صنف
-          </TabsTrigger>
-          <TabsTrigger value="stock_locations" className="rounded-xl flex items-center gap-2 data-[state=active]:gradient-bg data-[state=active]:text-white">
-            <MapPin className="w-4 h-4" /> المواقع
-          </TabsTrigger>
-          <TabsTrigger value="stock_moves" className="rounded-xl flex items-center gap-2 data-[state=active]:gradient-bg data-[state=active]:text-white">
-            <ArrowRightLeft className="w-4 h-4" /> حركات المخزون
-          </TabsTrigger>
-          <TabsTrigger value="reordering_rules" className="rounded-xl flex items-center gap-2 data-[state=active]:gradient-bg data-[state=active]:text-white">
-            <RefreshCw2 className="w-4 h-4" /> قواعد إعادة الطلب
+          <TabsTrigger value="analytics"
+            className="rounded-xl flex items-center justify-center gap-2 py-2.5 text-sm font-bold data-[state=active]:gradient-bg data-[state=active]:text-white data-[state=active]:shadow-lg transition-all">
+            <BarChart3 className="w-4 h-4" /> التحليلات والتكاليف
           </TabsTrigger>
         </TabsList>
 
@@ -699,46 +683,92 @@ export function InventoryTab({ restaurantId, currency, businessType }: Props) {
           </div>
         </TabsContent>
 
+
+        {/* ── Group 2: المخازن والتقارير ── */}
         <TabsContent value="warehouses" className="space-y-4">
-          <WarehousesManager restaurantId={restaurantId} warehouses={warehouses} products={products} currency={currency} onRefresh={load} />
+          <Tabs defaultValue="wh_manage" dir="rtl">
+            <TabsList className="bg-secondary/30 p-1 rounded-xl flex gap-1 w-full sm:w-auto">
+              <TabsTrigger value="wh_manage" className="rounded-lg text-xs flex items-center gap-1.5 data-[state=active]:bg-white data-[state=active]:shadow data-[state=active]:text-primary">
+                <Truck className="w-3.5 h-3.5" /> إدارة المخازن
+              </TabsTrigger>
+              <TabsTrigger value="wh_report" className="rounded-lg text-xs flex items-center gap-1.5 data-[state=active]:bg-white data-[state=active]:shadow data-[state=active]:text-primary">
+                <FileSpreadsheet className="w-3.5 h-3.5" /> تقرير مخزن
+              </TabsTrigger>
+              <TabsTrigger value="wh_locations" className="rounded-lg text-xs flex items-center gap-1.5 data-[state=active]:bg-white data-[state=active]:shadow data-[state=active]:text-primary">
+                <MapPin className="w-3.5 h-3.5" /> مواقع التخزين
+              </TabsTrigger>
+            </TabsList>
+            <TabsContent value="wh_manage" className="space-y-4 mt-4">
+              <WarehouseManager restaurantId={restaurantId} warehouses={warehouses} onRefresh={load} />
+            </TabsContent>
+            <TabsContent value="wh_report" className="space-y-4 mt-4">
+              <WarehouseReportTab products={products} warehouses={warehouses} currency={currency} restaurantId={restaurantId} />
+            </TabsContent>
+            <TabsContent value="wh_locations" className="space-y-4 mt-4">
+              <StockLocationsManager restaurantId={restaurantId} currency={currency} />
+            </TabsContent>
+          </Tabs>
         </TabsContent>
 
-        <TabsContent value="transfers" className="space-y-4">
-          <InventoryTransfersManager restaurantId={restaurantId} warehouses={warehouses} products={products} onRefresh={load} />
+        {/* ── Group 3: الحركات والتحويلات ── */}
+        <TabsContent value="movements" className="space-y-4">
+          <Tabs defaultValue="transfers" dir="rtl">
+            <TabsList className="bg-secondary/30 p-1 rounded-xl flex gap-1 w-full sm:w-auto flex-wrap">
+              <TabsTrigger value="transfers" className="rounded-lg text-xs flex items-center gap-1.5 data-[state=active]:bg-white data-[state=active]:shadow data-[state=active]:text-primary">
+                <History className="w-3.5 h-3.5" /> تحويلات المخازن
+              </TabsTrigger>
+              <TabsTrigger value="stock_moves" className="rounded-lg text-xs flex items-center gap-1.5 data-[state=active]:bg-white data-[state=active]:shadow data-[state=active]:text-primary">
+                <ArrowRightLeft className="w-3.5 h-3.5" /> حركات المخزون
+              </TabsTrigger>
+              <TabsTrigger value="item_movement" className="rounded-lg text-xs flex items-center gap-1.5 data-[state=active]:bg-white data-[state=active]:shadow data-[state=active]:text-primary">
+                <Activity className="w-3.5 h-3.5" /> حركة صنف
+              </TabsTrigger>
+              <TabsTrigger value="landed_costs" className="rounded-lg text-xs flex items-center gap-1.5 data-[state=active]:bg-white data-[state=active]:shadow data-[state=active]:text-primary">
+                <Calculator className="w-3.5 h-3.5" /> تكاليف الشحن
+              </TabsTrigger>
+            </TabsList>
+            <TabsContent value="transfers" className="space-y-4 mt-4">
+              <InventoryTransfersManager restaurantId={restaurantId} warehouses={warehouses} products={products} onRefresh={load} />
+            </TabsContent>
+            <TabsContent value="stock_moves" className="space-y-4 mt-4">
+              <StockMovesManager restaurantId={restaurantId} currency={currency} />
+            </TabsContent>
+            <TabsContent value="item_movement" className="space-y-4 mt-4">
+              <ItemMovementReport restaurantId={restaurantId} currency={currency} />
+            </TabsContent>
+            <TabsContent value="landed_costs" className="space-y-4 mt-4">
+              <LandedCostsManager restaurantId={restaurantId} currency={currency} products={products} onRefresh={load} />
+            </TabsContent>
+          </Tabs>
         </TabsContent>
 
-        <TabsContent value="landed_costs" className="space-y-4">
-          <LandedCostsManager restaurantId={restaurantId} currency={currency} products={products} onRefresh={load} />
-        </TabsContent>
-
-        <TabsContent value="reorder" className="space-y-4">
-          <SmartReorderTab products={products} currency={currency} restaurantId={restaurantId} />
-        </TabsContent>
-
-        <TabsContent value="wac" className="space-y-4">
-          <WACTab products={products} currency={currency} />
-        </TabsContent>
-
-        <TabsContent value="warehouse_report" className="space-y-4">
-          <WarehouseReportTab products={products} warehouses={warehouses} currency={currency} restaurantId={restaurantId} />
-        </TabsContent>
-
-        <TabsContent value="item_movement" className="space-y-4">
-          <ItemMovementReport restaurantId={restaurantId} currency={currency} />
-        </TabsContent>
-
-        <TabsContent value="stock_locations" className="space-y-4">
-          <StockLocationsManager restaurantId={restaurantId} currency={currency} />
-        </TabsContent>
-
-        <TabsContent value="stock_moves" className="space-y-4">
-          <StockMovesManager restaurantId={restaurantId} currency={currency} />
-        </TabsContent>
-
-        <TabsContent value="reordering_rules" className="space-y-4">
-          <ReorderingRulesManager restaurantId={restaurantId} currency={currency} />
+        {/* ── Group 4: التحليلات والتكاليف ── */}
+        <TabsContent value="analytics" className="space-y-4">
+          <Tabs defaultValue="wac" dir="rtl">
+            <TabsList className="bg-secondary/30 p-1 rounded-xl flex gap-1 w-full sm:w-auto">
+              <TabsTrigger value="wac" className="rounded-lg text-xs flex items-center gap-1.5 data-[state=active]:bg-white data-[state=active]:shadow data-[state=active]:text-primary">
+                <Scale className="w-3.5 h-3.5" /> المتوسط المرجح WAC
+              </TabsTrigger>
+              <TabsTrigger value="reorder" className="rounded-lg text-xs flex items-center gap-1.5 data-[state=active]:bg-white data-[state=active]:shadow data-[state=active]:text-primary">
+                <Bell className="w-3.5 h-3.5" /> إعادة الطلب الذكي
+              </TabsTrigger>
+              <TabsTrigger value="reordering_rules" className="rounded-lg text-xs flex items-center gap-1.5 data-[state=active]:bg-white data-[state=active]:shadow data-[state=active]:text-primary">
+                <RefreshCw2 className="w-3.5 h-3.5" /> قواعد الإعادة
+              </TabsTrigger>
+            </TabsList>
+            <TabsContent value="wac" className="space-y-4 mt-4">
+              <WACTab products={products} currency={currency} restaurantId={restaurantId} />
+            </TabsContent>
+            <TabsContent value="reorder" className="space-y-4 mt-4">
+              <SmartReorderTab products={products} currency={currency} restaurantId={restaurantId} />
+            </TabsContent>
+            <TabsContent value="reordering_rules" className="space-y-4 mt-4">
+              <ReorderingRulesManager restaurantId={restaurantId} currency={currency} />
+            </TabsContent>
+          </Tabs>
         </TabsContent>
       </Tabs>
+
 
       {/* Modals from original code updated to fit new design */}
       <AnimatePresence>

@@ -142,6 +142,39 @@ export function InventoryTransfersManager({
         return;
       }
 
+      // ── Double-Entry Journal for Inventory Transfer ──
+      // Debit: Inventory at receiving warehouse (1300)
+      // Credit: Inventory at sending warehouse (1300)
+      try {
+        const product = products.find(p => p.id === form.product_id);
+        const fromWh = warehouses.find(w => w.id === form.from_wh);
+        const toWh = warehouses.find(w => w.id === form.to_wh);
+        const unitCost = Number(product?.cost_price || 0);
+        const transferValue = qty * unitCost;
+
+        if (transferValue > 0 && product) {
+          const { journalService } = await import('@/lib/accounting/journalService');
+          const inventoryAcc = await journalService.getAccountByCode(restaurantId, '1300');
+          if (inventoryAcc) {
+            const description = `تحويل مخزون: ${product.name} (${qty} وحدة) من ${fromWh?.name || 'مخزن'} إلى ${toWh?.name || 'مخزن'}`;
+            await journalService.createJournalEntry(restaurantId, {
+              entry_date: new Date(),
+              description,
+              source: 'inventory',
+              reference_number: `XFER-${Date.now()}`,
+              lines: [
+                // Debit: receiving warehouse inventory
+                { account_id: inventoryAcc.id, debit: transferValue, credit: 0, description: `استلام مخزون — ${toWh?.name || 'مخزن وجهة'}` },
+                // Credit: sending warehouse inventory
+                { account_id: inventoryAcc.id, debit: 0, credit: transferValue, description: `إرسال مخزون — ${fromWh?.name || 'مخزن مصدر'}` },
+              ]
+            });
+          }
+        }
+      } catch (journalErr: any) {
+        console.warn('Journal posting for transfer skipped:', journalErr.message);
+      }
+
       toast.success('تم تنفيذ التحويل بنجاح وتحديث أرصدة المستودعات');
       setShowTransfer(false);
       setForm({ from_wh: '', to_wh: '', product_id: '', quantity: '', notes: '' });
@@ -152,6 +185,7 @@ export function InventoryTransfersManager({
       toast.error('فشل التحويل: ' + (error.message || 'خطأ غير معروف'));
     }
   };
+
 
   const handleDeleteTransfer = async (id: string) => {
     if (!confirm('هل أنت متأكد من حذف هذا التحويل؟ (لن يتم استرجاع الكميات تلقائياً، هذا الإجراء يحذف السجل فقط)')) return;
