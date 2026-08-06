@@ -347,6 +347,12 @@ export function TreasuryTab({ restaurantId, currency }: TreasuryTabProps) {
           <Button variant="outline" onClick={loadData} size="icon">
             <RefreshCcw className={loading ? 'animate-spin' : ''} />
           </Button>
+          <Button variant="outline" className="gap-2 text-emerald-600 border-emerald-500/30 hover:bg-emerald-500/10" onClick={() => openVoucher('receipt')}>
+            <TrendingUp className="w-4 h-4" /> سند قبض
+          </Button>
+          <Button variant="outline" className="gap-2 text-destructive border-destructive/30 hover:bg-destructive/10" onClick={() => openVoucher('payment')}>
+            <TrendingDown className="w-4 h-4" /> إذن صرف
+          </Button>
           <Button variant="outline" className="gap-2" onClick={() => setShowReconciliation(true)}>
             <ShieldCheck className="w-4 h-4" /> المطابقة البنكية
           </Button>
