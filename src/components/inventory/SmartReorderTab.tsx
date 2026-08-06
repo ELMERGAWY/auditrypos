@@ -44,11 +44,12 @@ export function SmartReorderTab({
       const reorderQty = Math.max(product.min_quantity * 2, 10);
 
       // Insert a purchase order draft
-      const { data: poData, error: poError } = await supabase
+      const { data: poData, error: poError } = await (supabase as any)
         .from('purchase_orders')
         .insert({
           restaurant_id: restaurantId,
           status: 'draft',
+          po_number: `PO-${Date.now()}`,
           notes: `أمر شراء تلقائي - مخزون منخفض للصنف: ${product.name}`,
           total_amount: reorderQty * Number(product.cost_price || product.price),
           created_at: new Date().toISOString(),
@@ -59,13 +60,14 @@ export function SmartReorderTab({
       if (poError) throw poError;
 
       // Insert line item
-      await supabase.from('purchase_order_items').insert({
+      await (supabase as any).from('purchase_order_items').insert({
         purchase_order_id: poData.id,
         product_id: product.id,
         quantity: reorderQty,
         unit_price: Number(product.cost_price || product.price),
         total_price: reorderQty * Number(product.cost_price || product.price),
       });
+
 
       toast.success(`✅ تم إنشاء أمر شراء مسودة لـ ${product.name} (${reorderQty} ${product.unit})`);
     } catch (e: any) {
