@@ -23238,12 +23238,7 @@ export type Database = {
         }
         Returns: boolean
       }
-      auth_restaurant_ids: {
-        Args: never
-        Returns: {
-          restaurant_id: string
-        }[]
-      }
+      auth_restaurant_ids: { Args: never; Returns: string[] }
       calculate_contractor_payment: {
         Args: {
           p_payment_type: string
