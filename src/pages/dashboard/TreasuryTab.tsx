@@ -68,6 +68,15 @@ export function TreasuryTab({ restaurantId, currency }: TreasuryTabProps) {
 
       setBanks(banksRes.data || []);
       setCashAccounts(accountsRes.data || []);
+
+      // Full chart of accounts (for vouchers linked to the GL tree)
+      const { data: coaAll } = await supabase
+        .from('chart_of_accounts')
+        .select('id, code, name, account_type, is_cash_account, is_bank_account')
+        .eq('restaurant_id', restaurantId)
+        .eq('is_active', true)
+        .order('code');
+      setAllAccounts(coaAll || []);
       
       // Fetch names separately for receipts
       const receiptData = receiptsRes.data || [];
