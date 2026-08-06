@@ -3,6 +3,7 @@
 // The accountant must approve the suggestion before it is posted.
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { requireRestaurantAccess } from "../_shared/auth.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -71,29 +72,17 @@ Deno.serve(async (req) => {
     });
   }
 
-  const standard = body.standard || 'EAS';
-  const supabase = createClient(supabaseUrl, supabaseServiceKey);
-
-  // Resolve user_id from auth header (required by ai_journal_suggestions.user_id NOT NULL)
-  let userId: string | null = null;
-  const authHeader = req.headers.get('Authorization');
-  if (authHeader) {
-    try {
-      const token = authHeader.replace('Bearer ', '');
-      const { data: userData } = await supabase.auth.getUser(token);
-      userId = userData?.user?.id ?? null;
-    } catch (e) { console.error('getUser failed', e); }
-  }
-  if (!userId) {
-    // fallback: restaurant owner
-    const { data: r } = await supabase.from('restaurants').select('owner_id').eq('id', body.restaurant_id).maybeSingle();
-    userId = (r as any)?.owner_id ?? null;
-  }
-  if (!userId) {
-    return new Response(JSON.stringify({ error: 'Unable to resolve user_id' }), {
-      status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+  // Require an authenticated caller with access to this tenant
+  const auth = await requireRestaurantAccess(req, body.restaurant_id);
+  if (!auth.ok) {
+    return new Response(JSON.stringify({ error: auth.error }), {
+      status: auth.status, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
   }
+  const userId: string = auth.userId;
+
+  const standard = body.standard || 'EAS';
+  const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
   // Load chart of accounts for context
   const { data: accounts } = await supabase

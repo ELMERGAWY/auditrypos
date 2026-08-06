@@ -3,6 +3,7 @@
 // recommendations & detected issues.
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { requireRestaurantAccess } from "../_shared/auth.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -35,6 +36,15 @@ Deno.serve(async (req) => {
   if (!body.restaurant_id) {
     return new Response(JSON.stringify({ error: 'restaurant_id required' }), { status: 400, headers: corsHeaders });
   }
+
+  // Require an authenticated caller with access to this tenant
+  const auth = await requireRestaurantAccess(req, body.restaurant_id);
+  if (!auth.ok) {
+    return new Response(JSON.stringify({ error: auth.error }), {
+      status: auth.status, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    });
+  }
+
 
   const standard = body.standard || 'EAS';
   const supabase = createClient(supabaseUrl, supabaseServiceKey);

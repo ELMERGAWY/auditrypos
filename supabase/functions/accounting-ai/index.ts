@@ -1,4 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { requireRestaurantAccess } from "../_shared/auth.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -66,6 +67,11 @@ Deno.serve(async (req) => {
     if (!body?.restaurant_id || !body?.message) {
       return jsonResponse({ error: "Missing restaurant_id or message" }, 400);
     }
+
+    // Require an authenticated caller with access to this tenant
+    const auth = await requireRestaurantAccess(req, body.restaurant_id);
+    if (!auth.ok) return jsonResponse({ error: auth.error }, auth.status);
+
 
     // Build instruction: output strictly JSON suggestion
     const systemInstruction = `
