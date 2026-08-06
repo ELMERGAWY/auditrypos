@@ -19,13 +19,14 @@ export function TradingAccount({ restaurantId, currency }: Props) {
         .eq('restaurant_id', restaurantId)
         .neq('status', 'cancelled');
 
-      const { data: salesInvoices } = await supabase.from('sales_invoices')
+      const { data: salesInvoices } = await (supabase as any).from('sales_invoices')
         .select('total_amount, total, status')
         .or(`restaurant_id.eq.${restaurantId},company_id.eq.${restaurantId}`)
         .neq('status', 'cancelled');
 
       const ordersTotal = (orders || []).reduce((s, o) => s + Number(o.total || 0), 0);
-      const invoicesTotal = (salesInvoices || []).reduce((s, si) => s + Number(si.total_amount || si.total || 0), 0);
+      const invoicesTotal = ((salesInvoices || []) as any[]).reduce((s, si) => s + Number(si.total_amount || si.total || 0), 0);
+
       const sales = ordersTotal + invoicesTotal;
 
       // 2. Load COGS from Order Items
