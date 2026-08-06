@@ -276,6 +276,66 @@ export function TreasuryTab({ restaurantId, currency }: TreasuryTabProps) {
     }
   };
 
+  const treasuryAccounts = allAccounts.filter(a => a.is_cash_account || a.is_bank_account);
+  const counterAccounts = allAccounts.filter(a => !a.is_cash_account && !a.is_bank_account);
+
+  const openVoucher = (mode: 'receipt' | 'payment') => {
+    setVoucherForm({
+      treasuryAccountId: treasuryAccounts[0]?.id || '',
+      counterAccountId: '',
+      amount: '',
+      date: new Date().toISOString().slice(0, 10),
+      notes: ''
+    });
+    setVoucherMode(mode);
+  };
+
+  const handleSaveVoucher = async () => {
+    const amount = parseFloat(voucherForm.amount);
+    if (!voucherForm.treasuryAccountId || !voucherForm.counterAccountId || !amount || amount <= 0) {
+      toast.error('يرجى اختيار الحسابات وإدخال مبلغ صحيح');
+      return;
+    }
+    setVoucherSaving(true);
+    try {
+      const isReceipt = voucherMode === 'receipt';
+      const treasury = allAccounts.find(a => a.id === voucherForm.treasuryAccountId);
+      const counter = allAccounts.find(a => a.id === voucherForm.counterAccountId);
+      const label = isReceipt
+        ? `سند قبض - ${counter?.name || ''}`
+        : `إذن صرف - ${counter?.name || ''}`;
+
+      const result = await journalService.createJournalEntry(restaurantId, {
+        entry_date: new Date(voucherForm.date),
+        reference_type: isReceipt ? 'receipt_voucher' : 'payment_voucher',
+        description: `${label}${voucherForm.notes ? ` - ${voucherForm.notes}` : ''}`,
+        source: 'manual',
+        is_posted: true,
+        lines: isReceipt
+          ? [
+              { account_id: treasury.id, debit: amount, credit: 0, description: `تحصيل نقدي - ${treasury?.name}` },
+              { account_id: counter.id, debit: 0, credit: amount, description: counter?.name }
+            ]
+          : [
+              { account_id: counter.id, debit: amount, credit: 0, description: counter?.name },
+              { account_id: treasury.id, debit: 0, credit: amount, description: `صرف نقدي - ${treasury?.name}` }
+            ]
+      });
+
+      if (result) {
+        toast.success(isReceipt ? 'تم تسجيل سند القبض وترحيله ✅' : 'تم تسجيل إذن الصرف وترحيله ✅');
+        setVoucherMode(null);
+        loadData();
+      }
+    } catch (e: any) {
+      toast.error(`فشل حفظ السند: ${e?.message || 'خطأ غير معروف'}`);
+    } finally {
+      setVoucherSaving(false);
+    }
+  };
+
+
+
   return (
     <div className="space-y-6 fade-in p-4">
       <header className="flex justify-between items-center">
