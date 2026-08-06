@@ -111,7 +111,15 @@ export function ExpensesTab({ restaurantId, currency }: Props) {
       .eq('is_active', true);
 
     if (coa) {
-      setExpenseAccounts(coa.filter(a => a.account_type === 'expense'));
+      // Full chart of accounts available for expense posting (expenses first, then the rest)
+      const typeOrder: Record<string, number> = { expense: 0, cogs: 1, asset: 2, liability: 3, equity: 4, revenue: 5 };
+      const sorted = [...coa].sort((a, b) => {
+        const ta = typeOrder[a.account_type] ?? 9;
+        const tb = typeOrder[b.account_type] ?? 9;
+        if (ta !== tb) return ta - tb;
+        return String(a.code).localeCompare(String(b.code));
+      });
+      setExpenseAccounts(sorted);
       setPaymentAccounts(coa.filter(a => a.is_cash_account || a.is_bank_account));
       setRevenueAccounts(coa.filter(a => a.account_type === 'revenue'));
     }
