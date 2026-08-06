@@ -49,7 +49,7 @@ export function WACTab({ products, currency, restaurantId }: WACTabProps) {
     setLoading(true);
     try {
       // Fetch all IN movements (type='in') with unit cost to compute WAC per product
-      let movementsQuery = supabase
+      let movementsQuery = (supabase as any)
         .from('stock_movements')
         .select('product_id, quantity, unit_cost, type')
         .eq('type', 'in');
@@ -62,9 +62,10 @@ export function WACTab({ products, currency, restaurantId }: WACTabProps) {
 
       const data: WACData[] = products.map(p => {
         // Only look at receipt (in) movements with a unit_cost
-        const inMoves = (movements || []).filter(
+        const inMoves = ((movements || []) as any[]).filter(
           m => m.product_id === p.id && Number(m.quantity) > 0
         );
+
 
         let wac_cost = p.cost_price; // fallback to stored cost
         if (inMoves.length > 0) {
