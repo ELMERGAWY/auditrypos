@@ -609,6 +609,88 @@ export function TreasuryTab({ restaurantId, currency }: TreasuryTabProps) {
           </motion.div>
         </div>
       )}
+
+      {/* Receipt / Payment Voucher Modal (GL linked) */}
+      {voucherMode && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+          <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="glass-card p-8 max-w-lg w-full">
+            <h3 className="text-2xl font-black mb-6 flex items-center gap-2">
+              {voucherMode === 'receipt'
+                ? <><TrendingUp className="text-emerald-500" /> سند قبض (إيراد / تحصيل)</>
+                : <><TrendingDown className="text-destructive" /> إذن صرف (مصروف / سداد)</>}
+            </h3>
+
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label>{voucherMode === 'receipt' ? 'إلى خزينة / بنك' : 'من خزينة / بنك'}</Label>
+                  <select
+                    className="w-full bg-secondary p-2 rounded-lg text-sm"
+                    value={voucherForm.treasuryAccountId}
+                    onChange={e => setVoucherForm({ ...voucherForm, treasuryAccountId: e.target.value })}
+                  >
+                    <option value="">اختر الحساب</option>
+                    {treasuryAccounts.map(a => (
+                      <option key={a.id} value={a.id}>[{a.code}] {a.name}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <Label>{voucherMode === 'receipt' ? 'حساب الإيراد / المدين' : 'حساب المصروف / الدائن'}</Label>
+                  <select
+                    className="w-full bg-secondary p-2 rounded-lg text-sm"
+                    value={voucherForm.counterAccountId}
+                    onChange={e => setVoucherForm({ ...voucherForm, counterAccountId: e.target.value })}
+                  >
+                    <option value="">اختر من شجرة الحسابات</option>
+                    {Object.entries(
+                      counterAccounts.reduce((acc: Record<string, any[]>, a: any) => {
+                        const key = a.account_type || 'other';
+                        (acc[key] ||= []).push(a);
+                        return acc;
+                      }, {})
+                    ).map(([type, accs]: any) => (
+                      <optgroup
+                        key={type}
+                        label={{ expense: 'المصروفات', revenue: 'الإيرادات', asset: 'الأصول', liability: 'الالتزامات', equity: 'حقوق الملكية', cogs: 'تكلفة المبيعات' }[type] || 'حسابات أخرى'}
+                      >
+                        {accs.map((a: any) => <option key={a.id} value={a.id}>[{a.code}] {a.name}</option>)}
+                      </optgroup>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label>المبلغ</Label>
+                  <Input type="number" placeholder="0.00" value={voucherForm.amount} onChange={e => setVoucherForm({ ...voucherForm, amount: e.target.value })} />
+                </div>
+                <div>
+                  <Label>التاريخ</Label>
+                  <Input type="date" value={voucherForm.date} onChange={e => setVoucherForm({ ...voucherForm, date: e.target.value })} />
+                </div>
+              </div>
+
+              <div>
+                <Label>البيان / ملاحظات</Label>
+                <Input placeholder="مثال: سداد فاتورة كهرباء" value={voucherForm.notes} onChange={e => setVoucherForm({ ...voucherForm, notes: e.target.value })} />
+              </div>
+
+              <div className="flex gap-3 pt-4">
+                <Button
+                  className={`flex-1 h-12 text-lg font-bold text-white border-0 ${voucherMode === 'receipt' ? 'bg-emerald-500 hover:bg-emerald-600' : 'bg-destructive hover:bg-destructive/90'}`}
+                  disabled={voucherSaving}
+                  onClick={handleSaveVoucher}
+                >
+                  {voucherSaving ? 'جاري الحفظ...' : 'حفظ وترحيل القيد'}
+                </Button>
+                <Button variant="outline" className="h-12" onClick={() => setVoucherMode(null)}>إلغاء</Button>
+              </div>
+            </div>
+          </motion.div>
+        </div>
+      )}
     </div>
   );
 }
