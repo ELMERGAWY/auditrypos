@@ -209,7 +209,9 @@ export const ProfessionalSidebar = memo(function ProfessionalSidebar({
   };
 
   const navItems = useMemo(() => {
-    const displayTabs = tabs || config.tabs;
+    const baseTabs = tabs || config.tabs;
+    // Always expose core accounting tabs (fixed assets & depreciation)
+    const displayTabs = baseTabs.includes('fixed_assets') ? baseTabs : [...baseTabs, 'fixed_assets'];
     return displayTabs
       .map(tabId => {
         const item = allNavItems[tabId];
