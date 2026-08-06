@@ -17,30 +17,84 @@ function jsonResponse(body: unknown, status = 200) {
   });
 }
 
+async function hmacSha256Hex(secret: string, payload: string): Promise<string> {
+  const key = await crypto.subtle.importKey(
+    "raw",
+    new TextEncoder().encode(secret),
+    { name: "HMAC", hash: "SHA-256" },
+    false,
+    ["sign"],
+  );
+  const sig = await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(payload));
+  return Array.from(new Uint8Array(sig)).map((b) => b.toString(16).padStart(2, "0")).join("");
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
-  
+
   const url = new URL(req.url);
-  const platform = url.searchParams.get("platform"); // 'meta', 'google', 'tiktok'
+  const platform = url.searchParams.get("platform"); // 'meta', 'google', 'tiktok', 'linkedin'
   const restaurantId = url.searchParams.get("restaurant_id");
 
-  // Meta (Facebook) Webhook Verification
+  const supabaseUrl = Deno.env.get("SUPABASE_URL");
+  const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+  if (!supabaseUrl || !serviceKey) return jsonResponse({ error: "Server not configured" }, 500);
+  const supabase = createClient(supabaseUrl, serviceKey);
+
+  if (!platform || !restaurantId) {
+    return jsonResponse({ error: "platform and restaurant_id are required" }, 400);
+  }
+
+  // Load the tenant's configured credentials for this platform (fail closed)
+  const { data: config } = await supabase
+    .from("crm_platform_configs")
+    .select("api_secret, webhook_verify_token, is_active")
+    .eq("restaurant_id", restaurantId)
+    .eq("platform", platform)
+    .maybeSingle();
+
+  if (!config || (config as any).is_active === false) {
+    return jsonResponse({ error: "Webhook not configured" }, 403);
+  }
+  const appSecret = (config as any).api_secret as string | null;
+  const verifyToken = (config as any).webhook_verify_token as string | null;
+
+  // Meta (Facebook) subscription handshake — must match the stored verify token
   if (req.method === "GET" && platform === "meta") {
     const hubMode = url.searchParams.get("hub.mode");
     const hubToken = url.searchParams.get("hub.verify_token");
     const hubChallenge = url.searchParams.get("hub.challenge");
-
-    if (hubMode === "subscribe" && hubChallenge) {
+    if (hubMode === "subscribe" && hubChallenge && verifyToken && hubToken === verifyToken) {
       return new Response(hubChallenge, { status: 200 });
+    }
+    return jsonResponse({ error: "Verification failed" }, 403);
+  }
+
+  if (req.method !== "POST") return jsonResponse({ error: "Method not allowed" }, 405);
+
+  // Read the raw body so signatures can be validated over the exact bytes
+  const rawBody = await req.text();
+
+  if (platform === "meta") {
+    // Meta signs each delivery with the app secret
+    const header = req.headers.get("x-hub-signature-256") ?? "";
+    if (!appSecret || !header.startsWith("sha256=")) {
+      return jsonResponse({ error: "Invalid signature" }, 401);
+    }
+    const expected = await hmacSha256Hex(appSecret, rawBody);
+    if (header.slice(7).toLowerCase() !== expected) {
+      return jsonResponse({ error: "Invalid signature" }, 401);
+    }
+  } else {
+    // Other providers: require the tenant's shared secret token
+    const provided = req.headers.get("x-webhook-token") ?? url.searchParams.get("token") ?? "";
+    if (!verifyToken || provided !== verifyToken) {
+      return jsonResponse({ error: "Unauthorized" }, 401);
     }
   }
 
-  const supabaseUrl = Deno.env.get("SUPABASE_URL");
-  const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
-  const supabase = createClient(supabaseUrl!, serviceKey!);
-
   try {
-    const body = await req.json();
+    const body = JSON.parse(rawBody);
     console.log(`Incoming ${platform} webhook for restaurant ${restaurantId}:`, body);
 
     let leadData: any = null;

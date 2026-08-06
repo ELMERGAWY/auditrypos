@@ -4,6 +4,7 @@
 // ============================================================
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { requireRestaurantAccess } from "../_shared/auth.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -282,6 +283,11 @@ Deno.serve(async (req) => {
     if (!chatBody?.restaurant_id || !chatBody?.message) {
       return jsonResponse({ error: "Missing restaurant_id or message" }, 400);
     }
+
+    // Verify the caller is authenticated and belongs to this tenant
+    const auth = await requireRestaurantAccess(req, chatBody.restaurant_id);
+    if (!auth.ok) return jsonResponse({ error: auth.error }, auth.status);
+    chatBody.user_id = auth.userId;
 
     const messageType = chatBody.message_type || 'general';
     const systemPrompt = SYSTEM_PROMPTS[messageType];
