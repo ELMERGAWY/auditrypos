@@ -39,6 +39,16 @@ export function TreasuryTab({ restaurantId, currency }: TreasuryTabProps) {
   const [showAddBank, setShowAddBank] = useState(false);
   const [showAddCash, setShowAddCash] = useState(false);
   const [newAccountForm, setNewAccountForm] = useState({ name: '', number: '', initialBalance: '' });
+  const [allAccounts, setAllAccounts] = useState<any[]>([]);
+  const [voucherMode, setVoucherMode] = useState<null | 'receipt' | 'payment'>(null);
+  const [voucherSaving, setVoucherSaving] = useState(false);
+  const [voucherForm, setVoucherForm] = useState({
+    treasuryAccountId: '',
+    counterAccountId: '',
+    amount: '',
+    date: new Date().toISOString().slice(0, 10),
+    notes: ''
+  });
 
   const loadData = async () => {
     try {
