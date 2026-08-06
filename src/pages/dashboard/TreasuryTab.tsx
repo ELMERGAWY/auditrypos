@@ -39,6 +39,16 @@ export function TreasuryTab({ restaurantId, currency }: TreasuryTabProps) {
   const [showAddBank, setShowAddBank] = useState(false);
   const [showAddCash, setShowAddCash] = useState(false);
   const [newAccountForm, setNewAccountForm] = useState({ name: '', number: '', initialBalance: '' });
+  const [allAccounts, setAllAccounts] = useState<any[]>([]);
+  const [voucherMode, setVoucherMode] = useState<null | 'receipt' | 'payment'>(null);
+  const [voucherSaving, setVoucherSaving] = useState(false);
+  const [voucherForm, setVoucherForm] = useState({
+    treasuryAccountId: '',
+    counterAccountId: '',
+    amount: '',
+    date: new Date().toISOString().slice(0, 10),
+    notes: ''
+  });
 
   const loadData = async () => {
     try {
@@ -58,6 +68,15 @@ export function TreasuryTab({ restaurantId, currency }: TreasuryTabProps) {
 
       setBanks(banksRes.data || []);
       setCashAccounts(accountsRes.data || []);
+
+      // Full chart of accounts (for vouchers linked to the GL tree)
+      const { data: coaAll } = await supabase
+        .from('chart_of_accounts')
+        .select('id, code, name, account_type, is_cash_account, is_bank_account')
+        .eq('restaurant_id', restaurantId)
+        .eq('is_active', true)
+        .order('code');
+      setAllAccounts(coaAll || []);
       
       // Fetch names separately for receipts
       const receiptData = receiptsRes.data || [];
@@ -257,6 +276,66 @@ export function TreasuryTab({ restaurantId, currency }: TreasuryTabProps) {
     }
   };
 
+  const treasuryAccounts = allAccounts.filter(a => a.is_cash_account || a.is_bank_account);
+  const counterAccounts = allAccounts.filter(a => !a.is_cash_account && !a.is_bank_account);
+
+  const openVoucher = (mode: 'receipt' | 'payment') => {
+    setVoucherForm({
+      treasuryAccountId: treasuryAccounts[0]?.id || '',
+      counterAccountId: '',
+      amount: '',
+      date: new Date().toISOString().slice(0, 10),
+      notes: ''
+    });
+    setVoucherMode(mode);
+  };
+
+  const handleSaveVoucher = async () => {
+    const amount = parseFloat(voucherForm.amount);
+    if (!voucherForm.treasuryAccountId || !voucherForm.counterAccountId || !amount || amount <= 0) {
+      toast.error('يرجى اختيار الحسابات وإدخال مبلغ صحيح');
+      return;
+    }
+    setVoucherSaving(true);
+    try {
+      const isReceipt = voucherMode === 'receipt';
+      const treasury = allAccounts.find(a => a.id === voucherForm.treasuryAccountId);
+      const counter = allAccounts.find(a => a.id === voucherForm.counterAccountId);
+      const label = isReceipt
+        ? `سند قبض - ${counter?.name || ''}`
+        : `إذن صرف - ${counter?.name || ''}`;
+
+      const result = await journalService.createJournalEntry(restaurantId, {
+        entry_date: new Date(voucherForm.date),
+        reference_type: isReceipt ? 'receipt_voucher' : 'payment_voucher',
+        description: `${label}${voucherForm.notes ? ` - ${voucherForm.notes}` : ''}`,
+        source: 'manual',
+        is_posted: true,
+        lines: isReceipt
+          ? [
+              { account_id: treasury.id, debit: amount, credit: 0, description: `تحصيل نقدي - ${treasury?.name}` },
+              { account_id: counter.id, debit: 0, credit: amount, description: counter?.name }
+            ]
+          : [
+              { account_id: counter.id, debit: amount, credit: 0, description: counter?.name },
+              { account_id: treasury.id, debit: 0, credit: amount, description: `صرف نقدي - ${treasury?.name}` }
+            ]
+      });
+
+      if (result) {
+        toast.success(isReceipt ? 'تم تسجيل سند القبض وترحيله ✅' : 'تم تسجيل إذن الصرف وترحيله ✅');
+        setVoucherMode(null);
+        loadData();
+      }
+    } catch (e: any) {
+      toast.error(`فشل حفظ السند: ${e?.message || 'خطأ غير معروف'}`);
+    } finally {
+      setVoucherSaving(false);
+    }
+  };
+
+
+
   return (
     <div className="space-y-6 fade-in p-4">
       <header className="flex justify-between items-center">
@@ -267,6 +346,12 @@ export function TreasuryTab({ restaurantId, currency }: TreasuryTabProps) {
         <div className="flex gap-2">
           <Button variant="outline" onClick={loadData} size="icon">
             <RefreshCcw className={loading ? 'animate-spin' : ''} />
+          </Button>
+          <Button variant="outline" className="gap-2 text-emerald-600 border-emerald-500/30 hover:bg-emerald-500/10" onClick={() => openVoucher('receipt')}>
+            <TrendingUp className="w-4 h-4" /> سند قبض
+          </Button>
+          <Button variant="outline" className="gap-2 text-destructive border-destructive/30 hover:bg-destructive/10" onClick={() => openVoucher('payment')}>
+            <TrendingDown className="w-4 h-4" /> إذن صرف
           </Button>
           <Button variant="outline" className="gap-2" onClick={() => setShowReconciliation(true)}>
             <ShieldCheck className="w-4 h-4" /> المطابقة البنكية
@@ -519,6 +604,88 @@ export function TreasuryTab({ restaurantId, currency }: TreasuryTabProps) {
               <div className="flex gap-3 pt-4">
                 <Button className="flex-1 gradient-bg text-white" onClick={handleAddCash}>إضافة الخزينة</Button>
                 <Button variant="outline" onClick={() => setShowAddCash(false)}>إلغاء</Button>
+              </div>
+            </div>
+          </motion.div>
+        </div>
+      )}
+
+      {/* Receipt / Payment Voucher Modal (GL linked) */}
+      {voucherMode && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+          <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="glass-card p-8 max-w-lg w-full">
+            <h3 className="text-2xl font-black mb-6 flex items-center gap-2">
+              {voucherMode === 'receipt'
+                ? <><TrendingUp className="text-emerald-500" /> سند قبض (إيراد / تحصيل)</>
+                : <><TrendingDown className="text-destructive" /> إذن صرف (مصروف / سداد)</>}
+            </h3>
+
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label>{voucherMode === 'receipt' ? 'إلى خزينة / بنك' : 'من خزينة / بنك'}</Label>
+                  <select
+                    className="w-full bg-secondary p-2 rounded-lg text-sm"
+                    value={voucherForm.treasuryAccountId}
+                    onChange={e => setVoucherForm({ ...voucherForm, treasuryAccountId: e.target.value })}
+                  >
+                    <option value="">اختر الحساب</option>
+                    {treasuryAccounts.map(a => (
+                      <option key={a.id} value={a.id}>[{a.code}] {a.name}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <Label>{voucherMode === 'receipt' ? 'حساب الإيراد / المدين' : 'حساب المصروف / الدائن'}</Label>
+                  <select
+                    className="w-full bg-secondary p-2 rounded-lg text-sm"
+                    value={voucherForm.counterAccountId}
+                    onChange={e => setVoucherForm({ ...voucherForm, counterAccountId: e.target.value })}
+                  >
+                    <option value="">اختر من شجرة الحسابات</option>
+                    {Object.entries(
+                      counterAccounts.reduce((acc: Record<string, any[]>, a: any) => {
+                        const key = a.account_type || 'other';
+                        (acc[key] ||= []).push(a);
+                        return acc;
+                      }, {})
+                    ).map(([type, accs]: any) => (
+                      <optgroup
+                        key={type}
+                        label={{ expense: 'المصروفات', revenue: 'الإيرادات', asset: 'الأصول', liability: 'الالتزامات', equity: 'حقوق الملكية', cogs: 'تكلفة المبيعات' }[type] || 'حسابات أخرى'}
+                      >
+                        {accs.map((a: any) => <option key={a.id} value={a.id}>[{a.code}] {a.name}</option>)}
+                      </optgroup>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label>المبلغ</Label>
+                  <Input type="number" placeholder="0.00" value={voucherForm.amount} onChange={e => setVoucherForm({ ...voucherForm, amount: e.target.value })} />
+                </div>
+                <div>
+                  <Label>التاريخ</Label>
+                  <Input type="date" value={voucherForm.date} onChange={e => setVoucherForm({ ...voucherForm, date: e.target.value })} />
+                </div>
+              </div>
+
+              <div>
+                <Label>البيان / ملاحظات</Label>
+                <Input placeholder="مثال: سداد فاتورة كهرباء" value={voucherForm.notes} onChange={e => setVoucherForm({ ...voucherForm, notes: e.target.value })} />
+              </div>
+
+              <div className="flex gap-3 pt-4">
+                <Button
+                  className={`flex-1 h-12 text-lg font-bold text-white border-0 ${voucherMode === 'receipt' ? 'bg-emerald-500 hover:bg-emerald-600' : 'bg-destructive hover:bg-destructive/90'}`}
+                  disabled={voucherSaving}
+                  onClick={handleSaveVoucher}
+                >
+                  {voucherSaving ? 'جاري الحفظ...' : 'حفظ وترحيل القيد'}
+                </Button>
+                <Button variant="outline" className="h-12" onClick={() => setVoucherMode(null)}>إلغاء</Button>
               </div>
             </div>
           </motion.div>

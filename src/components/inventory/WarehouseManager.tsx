@@ -256,8 +256,6 @@ export function WarehouseManager({ restaurantId, warehouses: propsWarehouses, on
     setDetailsDialogOpen(true);
 
     try {
-      alert(`جاري جلب المنتجات للمخزن: ${warehouse.name_ar}\nID: ${warehouse.id}`);
-
       // Get products in this warehouse using warehouse_stock table
       const { data: stockData, error } = await supabase
         .from('warehouse_stock')
@@ -278,19 +276,13 @@ export function WarehouseManager({ restaurantId, warehouses: propsWarehouses, on
         .eq('warehouse_id', warehouse.id);
 
       if (error) {
-        alert(`خطأ في الاستعلام: ${error.message}`);
         toast.error('فشل في تحميل المنتجات');
         setWarehouseProducts([]);
         return;
       }
 
-      alert(`عدد السجلات المسترجعة: ${stockData?.length || 0}`);
-
-      // Verify each record's warehouse_id
-      const verifiedData = (stockData || []).map((item: any) => {
-        alert(`المنتج: ${item.product.name}\nwarehouse_id: ${item.warehouse_id}\nالمستهدف: ${warehouse.id}\nمطابق: ${item.warehouse_id === warehouse.id}`);
-        return item;
-      });
+      // Strict warehouse isolation: only rows belonging to this warehouse
+      const verifiedData = (stockData || []).filter((item: any) => item.warehouse_id === warehouse.id);
 
       const products = verifiedData.map((item: any) => ({
         ...item.product,
@@ -299,12 +291,9 @@ export function WarehouseManager({ restaurantId, warehouses: propsWarehouses, on
         is_sub_warehouse: warehouse.type === 'SUB'
       }));
 
-      alert(`العدد النهائي للمنتجات: ${products.length}`);
-
       setWarehouseProducts(products);
-      toast.success(`المخزن: ${warehouse.name_ar} - عدد المنتجات: ${products.length} (ID: ${warehouse.id})`);
+      toast.success(`${warehouse.name_ar}: ${products.length} صنف`);
     } catch (error: any) {
-      alert(`خطأ عام: ${error?.message || 'خطأ غير معروف'}`);
       console.error('Error fetching warehouse products:', error);
       toast.error('فشل في تحميل المنتجات');
       setWarehouseProducts([]);
