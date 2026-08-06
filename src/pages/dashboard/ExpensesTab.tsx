@@ -547,7 +547,22 @@ export function ExpensesTab({ restaurantId, currency }: Props) {
                       }}
                       className="w-full px-3 py-2 rounded-lg bg-secondary text-secondary-foreground border border-border text-sm">
                       <option value="">اختر الحساب...</option>
-                      {expenseAccounts.map(a => <option key={a.code} value={a.code}>[{a.code}] {a.name}</option>)}
+                      {Object.entries(
+                        expenseAccounts.reduce((acc: Record<string, any[]>, a: any) => {
+                          const key = a.account_type || 'other';
+                          (acc[key] ||= []).push(a);
+                          return acc;
+                        }, {})
+                      ).map(([type, accs]: any) => (
+                        <optgroup
+                          key={type}
+                          label={
+                            { expense: 'المصروفات', cogs: 'تكلفة المبيعات', asset: 'الأصول', liability: 'الالتزامات', equity: 'حقوق الملكية', revenue: 'الإيرادات' }[type] || 'حسابات أخرى'
+                          }
+                        >
+                          {accs.map((a: any) => <option key={a.code} value={a.code}>[{a.code}] {a.name}</option>)}
+                        </optgroup>
+                      ))}
                     </select>
                   </>
                 ) : (
