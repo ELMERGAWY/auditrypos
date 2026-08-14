@@ -107,6 +107,48 @@ import type {
   DashboardTab, OrderStatus, OrderType, MenuItem, Order, OrderItem, HeldInvoice, ChartOfAccount
 } from './dashboard/types';
 import { STATUS_CONFIG, extractCustomerRef } from './dashboard/types';
+import { opsHealthIssueCount, opsHealthStatus } from '@/lib/opsHealth';
+
+function OpsHealthIndicator({ restaurantId, workspaceId }: { restaurantId?: string; workspaceId?: string | null }) {
+  const [health, setHealth] = useState<any>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    const loadHealth = async () => {
+      if (!workspaceId) { setHealth(null); return; }
+      const { data, error } = await (supabase as any)
+        .from('v_ops_health_dashboard')
+        .select('*')
+        .eq('workspace_id', workspaceId)
+        .maybeSingle();
+      if (!cancelled && !error) setHealth(data || null);
+    };
+    void loadHealth();
+    const interval = window.setInterval(() => void loadHealth(), 60_000);
+    return () => { cancelled = true; window.clearInterval(interval); };
+  }, [workspaceId]);
+
+  if (!health) return null;
+  const healthy = opsHealthStatus(health) === 'healthy';
+  const runReconciliation = async () => {
+    if (!restaurantId) return;
+    const { error } = await (supabase as any).rpc('run_ops_reconciliation', {
+      p_restaurant_id: restaurantId,
+      p_workspace_id: workspaceId || null,
+      p_run_type: 'full',
+    });
+    if (error) toast.error(`فشل فحص النظام: ${error.message}`);
+    else toast.success('تم تشغيل فحص الاتساق — لم يتم تعديل أي بيانات');
+  };
+  const issueCount = opsHealthIssueCount(health);
+
+  return (
+    <button type="button" onClick={() => void runReconciliation()} title="تشغيل فحص اتساق آمن" className={`fixed bottom-3 left-3 z-40 flex items-center gap-2 rounded-full border px-3 py-1.5 text-[11px] shadow-lg backdrop-blur transition hover:scale-[1.02] ${healthy ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300' : 'border-amber-500/40 bg-amber-500/10 text-amber-800 dark:text-amber-200'}`}>
+      {healthy ? <CheckCircle className="h-3.5 w-3.5" /> : <AlertCircle className="h-3.5 w-3.5" />}
+      <span>{healthy ? 'النظام سليم' : `يحتاج مراجعة (${issueCount})`}</span>
+    </button>
+  );
+}
 
 export default function Dashboard() {
   const navigate = useNavigate();
@@ -1169,6 +1211,7 @@ export default function Dashboard() {
             </Select>
           </div>
         )}
+        <OpsHealthIndicator restaurantId={restaurant.id} workspaceId={activeWorkspaceId} />
         <main className="flex-1 pt-16 h-[100dvh] overflow-hidden">
           <div className="h-full overflow-auto custom-scrollbar p-2 sm:p-4">
             {!canAccessTab(activeTab) && activeTab !== 'home' && activeTab !== 'settings' ? (
