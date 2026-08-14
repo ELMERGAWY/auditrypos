@@ -19,6 +19,7 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Card } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { QRCodeSVG } from 'qrcode.react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
@@ -114,7 +115,7 @@ export default function Dashboard() {
   const dir = getLanguageDir(i18n.language);
   const { isDark, toggleDarkMode } = useDarkMode(true);
   const {
-    user, authLoading, isOnline, restaurant, menuItems, setMenuItems,
+    user, authLoading, isOnline, restaurant, workspaces, activeWorkspaceId, selectWorkspace, menuItems, setMenuItems,
     servicePackages,
     orders, setOrders, waiterCalls, setWaiterCalls, agents, setAgents,
     currentShift, setCurrentShift, profileName, dataLoaded, loadData, handleLogout,
@@ -306,45 +307,18 @@ export default function Dashboard() {
         o.notes?.toLowerCase().includes(q)
       );
     }
-    // إزالة تكرار الواجهة: نفس id / نفس client_order_id / نفس الرقم+الثانية+الإجمالي
+    // Deduplicate only by stable business identifiers.
+    // Do not collapse different orders by amount/time/customer: those can be legitimate POS sales.
     const seenIds = new Set<string>();
     const seenClient = new Set<string>();
-    const seenNear = new Set<string>();
-    const deduped: typeof result = [];
-    for (const o of result) {
-      if (!o?.id || seenIds.has(o.id)) continue;
+    return result.filter((o) => {
+      if (!o?.id || seenIds.has(o.id)) return false;
       const cid = (o as any).client_order_id as string | undefined;
-      if (cid && seenClient.has(cid)) continue;
-      const nearKey = [
-        o.order_number?.slice(-4) || '',
-        o.total,
-        o.created_at ? new Date(o.created_at).toISOString().slice(0, 19) : '',
-        o.customer_name || '',
-      ].join('|');
-      if (seenNear.has(nearKey)) {
-        // احتفظ بالنسخة ذات المدفوع الأعلى
-        const idx = deduped.findIndex(x => {
-          const k = [
-            x.order_number?.slice(-4) || '',
-            x.total,
-            x.created_at ? new Date(x.created_at).toISOString().slice(0, 19) : '',
-            x.customer_name || '',
-          ].join('|');
-          return k === nearKey;
-        });
-        if (idx >= 0 && Number(o.paid_amount || 0) > Number(deduped[idx].paid_amount || 0)) {
-          seenIds.delete(deduped[idx].id);
-          deduped[idx] = o;
-          seenIds.add(o.id);
-        }
-        continue;
-      }
+      if (cid && seenClient.has(cid)) return false;
       seenIds.add(o.id);
       if (cid) seenClient.add(cid);
-      seenNear.add(nearKey);
-      deduped.push(o);
-    }
-    return deduped;
+      return true;
+    });
   }, [orders, orderFilter, orderSearchQuery]);
   const categories = useMemo(() => ['all', ...new Set((menuItems || []).filter(i => i && i.category).map(item => item.category))], [menuItems]);
   const filteredItems = useMemo(() => (menuItems || []).filter(item => {
@@ -775,7 +749,7 @@ export default function Dashboard() {
     const checkoutClientOrderId = getClientOrderIdForCheckout();
     try {
       const result = await checkoutIntegration.processCheckout(
-        { restaurantId: restaurant.id, businessType: businessType as any, currency, isOnline, userId: user?.id, skipPreparation: !sendToPrep },
+        { restaurantId: restaurant.id, workspaceId: activeWorkspaceId || undefined, businessType: businessType as any, currency, isOnline, userId: user?.id, skipPreparation: !sendToPrep },
         { cart: cart.map(c => ({
             ...c.item,
             price: Number(c.price),
@@ -786,7 +760,8 @@ export default function Dashboard() {
             variables: c.variables || null
           })),
           customerName, customerPhone, customerRef, orderType: orderType as any, deliveryAddress, deliveryDate, deliveryAgentId: selectedDeliveryAgent, paymentMethod: paymentMethod as any, paidAmount: paidNum, discount: discountAmount, discountType: discountType === 'percent' ? 'percentage' : 'fixed', notes: orderNotes, destinationAccountId: selectedAccountId, customOrderNumber: customOrderNumber || undefined,
-          clientOrderId: checkoutClientOrderId
+          clientOrderId: checkoutClientOrderId,
+          workspaceId: activeWorkspaceId || undefined
         }
       );
       if (result.success && result.order) {
@@ -861,7 +836,7 @@ export default function Dashboard() {
   // Performance Optimization: Memoize the active tab content
   const activeTabContent = useMemo(() => {
     if (!restaurant?.id) return null;
-    const commonProps = { restaurantId: restaurant.id, currency, restaurant, isSuperAdmin, isOwner: profileName === restaurant.owner_name };
+    const commonProps = { restaurantId: restaurant.id, workspaceId: activeWorkspaceId || undefined, currency, restaurant, isSuperAdmin, isOwner: profileName === restaurant.owner_name };
 
     return (
       <Suspense fallback={
@@ -1088,20 +1063,26 @@ export default function Dashboard() {
         {activeTab === 'qr' && restaurant?.id && (
           <div className="p-10 flex flex-col items-center justify-center space-y-8 h-full">
             <div className="p-8 bg-white rounded-3xl shadow-2xl scale-110">
-              <QRCodeSVG value={`${window.location.origin}/menu/${restaurant.id}`} size={250} level="H" />
+              <QRCodeSVG value={`${window.location.origin}/qr-menu/${restaurant.id}`} size={250} level="H" />
             </div>
             <div className="text-center space-y-4">
               <h3 className="text-3xl font-black">كود المنيو الذكي (QR Menu)</h3>
               <p className="text-muted-foreground max-w-md">وجه الكاميرا لمسح الكود واستعراض المنيو.</p>
-              <Button className="gradient-bg border-0 text-white rounded-xl px-8" onClick={() => window.open(`${window.location.origin}/menu/${restaurant.id}`, '_blank')}>معاينة القائمة</Button>
+              <Button className="gradient-bg border-0 text-white rounded-xl px-8" onClick={() => window.open(`${window.location.origin}/qr-menu/${restaurant.id}`, '_blank')}>معاينة القائمة</Button>
             </div>
           </div>
         )}
       </Suspense>
     );
-  }, [activeTab, restaurant, currency, businessType, cart, orders, orderFilter, orderSearchQuery, agents, currentShift, menuItems, taxes, selectedAccountId, customerName, customerPhone, customerRef, deliveryAddress, selectedDeliveryAgent, orderNotes, discount, discountType, paidAmount, isProcessingCheckout, categories, filteredItems, accountingAccounts, cartSubtotal, cartTotal, remaining, filteredOrders, holdCurrentInvoice, clearCart, selectCustomerFromSearch, updateQty, getUnitOptions, todayRevenue, todayOrdersList, avgOrderValue, pendingOrders, deliveryOrders, handleEditOrder, handleDeleteOrder, user?.id, config]);
+  }, [activeTab, restaurant, activeWorkspaceId, currency, businessType, cart, orders, orderFilter, orderSearchQuery, agents, currentShift, menuItems, taxes, selectedAccountId, customerName, customerPhone, customerRef, deliveryAddress, selectedDeliveryAgent, orderNotes, discount, discountType, paidAmount, isProcessingCheckout, categories, filteredItems, accountingAccounts, cartSubtotal, cartTotal, remaining, filteredOrders, holdCurrentInvoice, clearCart, selectCustomerFromSearch, updateQty, getUnitOptions, todayRevenue, todayOrdersList, avgOrderValue, pendingOrders, deliveryOrders, handleEditOrder, handleDeleteOrder, user?.id, config]);
 
   // Effects
+  useEffect(() => {
+    if (isSuperAdmin && adminChecked) {
+      navigate('/super-admin-portal');
+    }
+  }, [isSuperAdmin, adminChecked, navigate]);
+
   useEffect(() => {
     if (!restaurant?.id) return;
     const fetchAccountingAccounts = async () => {
@@ -1136,8 +1117,6 @@ export default function Dashboard() {
   // If user is super admin, redirect to SuperAdmin page instead of showing CreateRestaurantForm
   // This check must happen BEFORE the restaurant check to avoid showing CreateRestaurantForm to Super Admins
   if (isSuperAdmin) {
-    console.log('🔍 [Dashboard] User is Super Admin, redirecting to /super-admin-portal');
-    navigate('/super-admin-portal');
     return null;
   }
   // Only show CreateRestaurantForm if user is NOT Super Admin and has no restaurant
@@ -1173,6 +1152,23 @@ export default function Dashboard() {
           planLabel={planLabel}
           onUpgrade={() => navigate('/payment')}
         />
+        {workspaces.length > 1 && (
+          <div className="fixed top-2 right-2 z-50 w-56 rounded-xl border border-primary/20 bg-background/95 p-2 shadow-lg backdrop-blur">
+            <Label className="mb-1 block text-[10px] font-bold text-muted-foreground">الفرع النشط</Label>
+            <Select value={activeWorkspaceId || undefined} onValueChange={(value) => void selectWorkspace(value)}>
+              <SelectTrigger className="h-9 text-xs">
+                <SelectValue placeholder="اختر الفرع" />
+              </SelectTrigger>
+              <SelectContent>
+                {workspaces.map((workspace) => (
+                  <SelectItem key={workspace.id} value={workspace.id}>
+                    {workspace.name || workspace.code}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        )}
         <main className="flex-1 pt-16 h-[100dvh] overflow-hidden">
           <div className="h-full overflow-auto custom-scrollbar p-2 sm:p-4">
             {!canAccessTab(activeTab) && activeTab !== 'home' && activeTab !== 'settings' ? (

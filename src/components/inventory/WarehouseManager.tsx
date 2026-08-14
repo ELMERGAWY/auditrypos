@@ -66,11 +66,12 @@ const accountingStandardLabels: Record<AccountingStandard, string> = {
 
 interface WarehouseManagerProps {
   restaurantId: string;
+  workspaceId?: string;
   warehouses: Warehouse[];
   onRefresh: () => void;
 }
 
-export function WarehouseManager({ restaurantId, warehouses: propsWarehouses, onRefresh }: WarehouseManagerProps) {
+export function WarehouseManager({ restaurantId, workspaceId, warehouses: propsWarehouses, onRefresh }: WarehouseManagerProps) {
   const [loading, setLoading] = useState(false);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [detailsDialogOpen, setDetailsDialogOpen] = useState(false);
@@ -179,62 +180,23 @@ export function WarehouseManager({ restaurantId, warehouses: propsWarehouses, on
     try {
       setLoading(true);
 
-      // Get current warehouse stock
-      const { data: currentStock } = await supabase
-        .from('warehouse_stock')
-        .select('*')
-        .eq('warehouse_id', selectedWarehouse.id)
-        .eq('product_id', selectedProduct.id)
-        .single();
-
-      if (!currentStock) {
-        toast.error('لم يتم العثور على المخزون الحالي');
+      if (!workspaceId) {
+        toast.error('لم يتم تحديد الفرع النشط؛ أعد تحميل الصفحة ثم حاول مرة أخرى');
         return;
       }
 
-      // Update source warehouse stock
-      const newSourceQty = Number(currentStock.quantity) - qty;
-      await supabase
-        .from('warehouse_stock')
-        .update({ quantity: newSourceQty })
-        .eq('id', currentStock.id);
-
-      // Get or create target warehouse stock
-      const { data: targetStock } = await supabase
-        .from('warehouse_stock')
-        .select('*')
-        .eq('warehouse_id', targetWarehouseId)
-        .eq('product_id', selectedProduct.id)
-        .maybeSingle();
-
-      if (targetStock) {
-        // Update existing target stock
-        await supabase
-          .from('warehouse_stock')
-          .update({ quantity: Number(targetStock.quantity) + qty })
-          .eq('id', targetStock.id);
-      } else {
-        // Create new target stock record
-        await supabase
-          .from('warehouse_stock')
-          .insert({
-            restaurant_id: restaurantId,
-            warehouse_id: targetWarehouseId,
-            product_id: selectedProduct.id,
-            quantity: qty,
-            min_quantity: 0,
-          });
-      }
-
-      // Log the transfer
-      await supabase.from('stock_movements').insert({
-        restaurant_id: restaurantId,
-        product_id: selectedProduct.id,
-        type: 'transfer' as any,
-        quantity: qty,
-        reason: `تحويل من ${selectedWarehouse.name_ar} إلى ${(propsWarehouses || []).find(w => w.id === targetWarehouseId)?.name_ar}`,
-        warehouse_id: selectedWarehouse.id,
+      const { data: result, error: transferError } = await (supabase as any).rpc('execute_inventory_transfer_v2', {
+        p_restaurant_id: restaurantId,
+        p_workspace_id: workspaceId,
+        p_from_warehouse_id: selectedWarehouse.id,
+        p_to_warehouse_id: targetWarehouseId,
+        p_product_id: selectedProduct.id,
+        p_quantity: qty,
+        p_notes: `تحويل من ${selectedWarehouse.name_ar} إلى ${(propsWarehouses || []).find(w => w.id === targetWarehouseId)?.name_ar || ''}`,
+        p_idempotency_key: crypto.randomUUID(),
       });
+      if (transferError) throw transferError;
+      if (!result?.success) throw new Error(result?.error || 'فشل التحويل الذري');
 
       toast.success('تم التحويل بنجاح');
       setTransferDialogOpen(false);
@@ -257,7 +219,7 @@ export function WarehouseManager({ restaurantId, warehouses: propsWarehouses, on
 
     try {
       // Get products in this warehouse using warehouse_stock table
-      const { data: stockData, error } = await supabase
+      let warehouseStockQuery = supabase
         .from('warehouse_stock')
         .select(`
           id,
@@ -274,6 +236,8 @@ export function WarehouseManager({ restaurantId, warehouses: propsWarehouses, on
           )
         `)
         .eq('warehouse_id', warehouse.id);
+      if (workspaceId) warehouseStockQuery = warehouseStockQuery.eq('workspace_id', workspaceId);
+      const { data: stockData, error } = await warehouseStockQuery;
 
       if (error) {
         toast.error('فشل في تحميل المنتجات');

@@ -39,6 +39,7 @@ interface Transfer {
 
 interface InventoryTransfersManagerProps {
   restaurantId: string;
+  workspaceId?: string;
   warehouses: Warehouse[];
   products: Product[];
   onRefresh: () => void;
@@ -46,6 +47,7 @@ interface InventoryTransfersManagerProps {
 
 export function InventoryTransfersManager({
   restaurantId,
+  workspaceId,
   warehouses,
   products,
   onRefresh
@@ -57,15 +59,21 @@ export function InventoryTransfersManager({
   const loadTransfers = async () => {
     try {
       const [transfersRes, itemsRes] = await Promise.all([
-        supabase
-          .from('inventory_transfers')
-          .select('*')
-          .eq('restaurant_id', restaurantId)
-          .order('created_at', { ascending: false }),
-        supabase
-          .from('inventory_transfer_items')
-          .select('*')
-          .eq('restaurant_id', restaurantId)
+        (() => {
+          let query = supabase
+            .from('inventory_transfers')
+            .select('*')
+            .eq('restaurant_id', restaurantId)
+            .order('created_at', { ascending: false });
+          return workspaceId ? query.eq('workspace_id', workspaceId) : query;
+        })(),
+        (() => {
+          let query = supabase
+            .from('inventory_transfer_items')
+            .select('*')
+            .eq('restaurant_id', restaurantId);
+          return workspaceId ? query.eq('workspace_id', workspaceId) : query;
+        })()
       ]);
 
       if (transfersRes.error) throw transfersRes.error;
@@ -112,7 +120,7 @@ export function InventoryTransfersManager({
     if (restaurantId && warehouses.length > 0 && products.length > 0) {
       loadTransfers();
     }
-  }, [restaurantId, warehouses, products]);
+  }, [restaurantId, workspaceId, warehouses, products]);
 
   const handleTransfer = async () => {
     if (!form.from_wh || !form.to_wh || !form.product_id || !form.quantity)
@@ -124,14 +132,21 @@ export function InventoryTransfersManager({
     if (!qty || qty <= 0) return toast.error('الكمية يجب أن تكون أكبر من صفر');
 
     try {
-      // Use SECURITY DEFINER RPC to execute transfer atomically (bypasses RLS)
-      const { data: result, error: rpcError } = await supabase.rpc('execute_inventory_transfer', {
+      if (!workspaceId) {
+        toast.error('لم يتم تحديد الفرع النشط؛ أعد تحميل الصفحة ثم حاول مرة أخرى');
+        return;
+      }
+
+      // Use the workspace-aware SECURITY DEFINER RPC to execute transfer atomically.
+      const { data: result, error: rpcError } = await (supabase as any).rpc('execute_inventory_transfer_v2', {
         p_restaurant_id: restaurantId,
+        p_workspace_id: workspaceId,
         p_from_warehouse_id: form.from_wh,
         p_to_warehouse_id: form.to_wh,
         p_product_id: form.product_id,
         p_quantity: qty,
-        p_notes: form.notes || null
+        p_notes: form.notes || null,
+        p_idempotency_key: crypto.randomUUID(),
       });
 
       if (rpcError) throw rpcError;
