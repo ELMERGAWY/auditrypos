@@ -37,6 +37,7 @@ interface Invoice {
 
 interface Props {
   restaurantId: string;
+  workspaceId?: string;
   currency: string;
   restaurant?: any;
   isSuperAdmin?: boolean;
@@ -126,24 +127,28 @@ export function SalesInvoices({ restaurantId, currency, restaurant, isSuperAdmin
       setLoading(true);
       
       // 1. Fetch POS / Storefront / Standard Orders
-      const { data: ordersData, error: ordersError } = await supabase
+      let ordersQuery = supabase
         .from('orders')
         .select('*')
         .eq('restaurant_id', restaurantId)
         .order('created_at', { ascending: false })
         .limit(500);
+      if (workspaceId) ordersQuery = ordersQuery.eq('workspace_id', workspaceId);
+      const { data: ordersData, error: ordersError } = await ordersQuery;
 
       if (ordersError) {
         console.error('Error loading orders:', ordersError);
       }
 
       // 2. Fetch B2B / Contracting / Marketing / Direct Sales Invoices
-      const { data: salesInvoicesData, error: salesInvoicesError } = await supabase
+      let salesInvoicesQuery = supabase
         .from('sales_invoices')
         .select('*')
         .or(`restaurant_id.eq.${restaurantId},company_id.eq.${restaurantId}`)
         .order('created_at', { ascending: false })
         .limit(500);
+      if (workspaceId) salesInvoicesQuery = salesInvoicesQuery.eq('workspace_id', workspaceId);
+      const { data: salesInvoicesData, error: salesInvoicesError } = await salesInvoicesQuery;
 
       if (salesInvoicesError) {
         console.warn('Note: sales_invoices query returned notice:', salesInvoicesError?.message);
@@ -175,6 +180,7 @@ export function SalesInvoices({ restaurantId, currency, restaurant, isSuperAdmin
           status: si.status || 'completed',
           payment_method: si.payment_method || 'cash',
           journal_entry_id: si.journal_entry_id,
+          reconciliation_state: si.order_id || si.source_reference_id ? 'linked' : 'invoice_without_order_link',
           source: 'sales_invoices'
         }));
 

@@ -23,6 +23,15 @@ export interface TaxRate {
 
 const CACHE_KEY_PREFIX = 'dashboard_';
 
+export interface WorkspaceSummary {
+  id: string;
+  name: string;
+  code: string;
+  type?: string | null;
+  is_default?: boolean;
+  restaurant_id: string;
+}
+
 export function useDashboardData() {
   useDarkMode();
   const navigate = useNavigate();
@@ -36,6 +45,8 @@ export function useDashboardData() {
   useEffect(() => { requestNotificationPermission(); }, []);
 
   const [restaurant, setRestaurant] = useState<Restaurant | null>(null);
+  const [workspaces, setWorkspaces] = useState<WorkspaceSummary[]>([]);
+  const [activeWorkspaceId, setActiveWorkspaceId] = useState<string | null>(null);
   const [menuItems, setMenuItems] = useState<MenuItem[]>([]);
   const [servicePackages, setServicePackages] = useState<any[]>([]);
   const [orders, setOrders] = useState<Order[]>([]);
@@ -283,17 +294,57 @@ export function useDashboardData() {
     const businessType = (rest.business_type || 'restaurant') as BusinessType;
     const usesProductsCatalog = isInventoryDrivenBusiness(businessType);
 
-    // Parallel fetch all other resources with optimized queries
+    // Resolve the active branch before loading operational data. Existing restaurants
+    // always have a default workspace after the additive repair migration.
+    const { data: workspaceRows, error: workspaceError } = await supabase
+      .from('workspaces')
+      .select('id,name,code,type,is_default,restaurant_id')
+      .eq('restaurant_id', rest.id)
+      .eq('is_active', true)
+      .order('is_default', { ascending: false })
+      .order('created_at', { ascending: true });
+    if (workspaceError) {
+      console.warn('[loadData] workspace scope unavailable; using legacy restaurant scope:', workspaceError.message);
+    }
+    const loadedWorkspaces = (workspaceRows || []) as WorkspaceSummary[];
+    const storedWorkspaceId = localStorage.getItem(getUserKey(`current_workspace_id_${rest.id}`, user.id));
+    const selectedWorkspace = loadedWorkspaces.find(w => w.id === storedWorkspaceId)
+      || loadedWorkspaces.find(w => w.is_default)
+      || loadedWorkspaces[0]
+      || null;
+    const selectedWorkspaceId = selectedWorkspace?.id || null;
+    setWorkspaces(loadedWorkspaces);
+    setActiveWorkspaceId(selectedWorkspaceId);
+    if (selectedWorkspaceId) {
+      localStorage.setItem(getUserKey(`current_workspace_id_${rest.id}`, user.id), selectedWorkspaceId);
+    }
+
+    // Parallel fetch all other resources with workspace-aware queries.
     const [itemsRes, ordersRes, callsRes, agentsRes, shiftRes, taxesRes, warehousesRes] = await Promise.all([
       usesProductsCatalog
-        ? supabase.from('products').select('id,name,price,category,image,available,restaurant_id,sort_order,barcode,sku,unit,quantity,warehouse_id').eq('restaurant_id', rest.id).order('sort_order')
-        : supabase.from('menu_items').select('*').eq('restaurant_id', rest.id).order('sort_order'),
-      supabase.from('orders').select('*').eq('restaurant_id', rest.id).order('created_at', { ascending: false }).limit(100),
+        ? (() => {
+            const query = supabase.from('products').select('id,name,price,category,image,available,restaurant_id,sort_order,barcode,sku,unit,quantity,warehouse_id,workspace_id').eq('restaurant_id', rest.id).order('sort_order');
+            return selectedWorkspaceId ? query.eq('workspace_id', selectedWorkspaceId) : query;
+          })()
+        : (() => {
+            const query = supabase.from('menu_items').select('*').eq('restaurant_id', rest.id).order('sort_order');
+            return selectedWorkspaceId ? query.eq('workspace_id', selectedWorkspaceId) : query;
+          })(),
+      // Keep the bounded fetch for stability while ensuring all visible orders belong to the active workspace.
+      (() => {
+        const query = supabase.from('orders').select('*').eq('restaurant_id', rest.id).order('created_at', { ascending: false }).limit(500);
+        return selectedWorkspaceId ? query.eq('workspace_id', selectedWorkspaceId) : query;
+      })(),
       supabase.from('waiter_calls').select('*').eq('restaurant_id', rest.id).eq('acknowledged', false).order('created_at', { ascending: false }),
       supabase.from('delivery_agents').select('*').eq('restaurant_id', rest.id),
       supabase.from('shifts').select('*').eq('restaurant_id', rest.id).eq('status', 'open').maybeSingle(),
       supabase.from('tax_rates').select('*').eq('restaurant_id', rest.id).eq('is_active', true),
-      usesProductsCatalog ? supabase.from('warehouses').select('id,name_ar,name').eq('restaurant_id', rest.id) : Promise.resolve({ data: [] })
+      usesProductsCatalog
+        ? (() => {
+            const query = supabase.from('warehouses').select('id,name_ar,name,workspace_id').eq('restaurant_id', rest.id);
+            return selectedWorkspaceId ? query.eq('workspace_id', selectedWorkspaceId) : query;
+          })()
+        : Promise.resolve({ data: [] })
     ]);
 
     const warehousesMap = new Map((warehousesRes.data || []).map((w: any) => [w.id, w.name || w.name_ar]));
@@ -338,6 +389,15 @@ export function useDashboardData() {
     setTaxes(loadedTaxes);
     setCurrentShift(loadedShift);
     setWaiterCalls(loadedCalls);
+
+    // Do not replace a previously loaded order list with an empty array on a transient query error.
+    // The user can retry through the existing refresh/sync flow without losing the visible state.
+    if (ordersRes.error) {
+      console.error('[loadData] Failed to load orders:', ordersRes.error);
+      toast.error('تعذر تحميل الطلبات مؤقتاً؛ تم الاحتفاظ بالبيانات الحالية. حاول التحديث مرة أخرى.');
+      setDataLoaded(true);
+      return !!suspended;
+    }
 
     // Load order items in parallel batches
     const ordersWithItems: Order[] = [];
@@ -580,6 +640,15 @@ export function useDashboardData() {
     return () => { supabase.removeChannel(channel); };
   }, [restaurant, isOnline, soundEnabled, playOrderSound, playWaiterSound, justBack]);
 
+  const selectWorkspace = useCallback(async (workspaceId: string) => {
+    if (!restaurant || !user || !workspaces.some(w => w.id === workspaceId)) return;
+    localStorage.setItem(getUserKey(`current_workspace_id_${restaurant.id}`, user.id), workspaceId);
+    setActiveWorkspaceId(workspaceId);
+    // Do not leave the previous branch's orders/products interactive while reloading.
+    setDataLoaded(false);
+    await loadData();
+  }, [restaurant, user, workspaces, getUserKey, loadData]);
+
   const handleLogout = async () => { await signOut(); navigate('/'); };
 
   // Auto-sync and reconnect realtime when network is restored
@@ -591,8 +660,8 @@ export function useDashboardData() {
   }, [justBack, user, runPendingSync]);
 
   return {
-    user, authLoading, isOnline, restaurant, menuItems, setMenuItems,
-    servicePackages, setServicePackages,
+    user, authLoading, isOnline, restaurant, workspaces, activeWorkspaceId, selectWorkspace,
+    menuItems, setMenuItems, servicePackages, setServicePackages,
     orders, setOrders, waiterCalls, setWaiterCalls, agents, setAgents, taxes,
     currentShift, setCurrentShift, profileName, dataLoaded, loadData, handleLogout,
     soundEnabled, setSoundEnabled, isSuspended

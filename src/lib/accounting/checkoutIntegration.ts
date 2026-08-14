@@ -16,6 +16,8 @@ import { actorCreateFields } from '@/lib/actor';
 
 export interface CheckoutContext {
   restaurantId: string;
+  workspaceId?: string;
+  warehouseId?: string;
   businessType: BusinessType;
   currency: string;
   isOnline: boolean;
@@ -61,6 +63,8 @@ class CheckoutIntegration {
       // مُعرّف ثابت يمر من الواجهة لمنع إنشاء طلبين لنفس العملية
       // (مهم خصوصاً عند Retry/Double Click/تذبذب اتصال)
       clientOrderId?: string;
+      workspaceId?: string;
+      warehouseId?: string;
     }
   ): Promise<CheckoutResult> {
     // 7. Prepare order data first (so it's available in catch)
@@ -119,6 +123,7 @@ class CheckoutIntegration {
 
     let orderPayload: Record<string, unknown> = {
       restaurant_id: context.restaurantId,
+      workspace_id: orderData.workspaceId || context.workspaceId || null,
       order_number: orderNum,
       total: 0,
       discount: 0,
@@ -202,7 +207,7 @@ class CheckoutIntegration {
       const [taxCalculation, cogsResult] = await Promise.all([safeTax, safeCogs]);
 
       const deliveryFee = isDelivery ? await this.getDeliveryFee(context.restaurantId).catch(() => 0) : 0;
-      const cogs = cogsResult.totalCOGS;
+      let cogs = cogsResult.totalCOGS;
 
       // 2. Calculate subtotal
       const subtotal = orderData.cart.reduce(
@@ -270,6 +275,7 @@ class CheckoutIntegration {
         paid_amount: orderPayload.paid_amount,
         notes: orderPayload.notes,
         client_order_id: clientOrderId,
+        workspace_id: orderPayload.workspace_id,
         customer_id: orderPayload.customer_id,
         created_by_name: actorFields.created_by_name,
         updated_by_name: actorFields.updated_by_name,
@@ -411,7 +417,39 @@ class CheckoutIntegration {
         }
       }
 
-      // 12. Create journal entries (Double Entry) — once per order
+      // 12. Consume inventory atomically when the workspace-aware RPC is available.
+      // If the migration is not deployed yet, retain the legacy path instead of breaking checkout.
+      let inventoryWasConsumedAtomically = false;
+      if (context.isOnline && inventoryItemsForCosting.length > 0) {
+        const atomicItems = inventoryItemsForCosting
+          .filter((item: any) => item.product_id)
+          .map((item: any) => ({
+            product_id: item.product_id,
+            quantity: item.quantity,
+            unit_factor: item.unitFactor || 1,
+          }));
+        if (atomicItems.length > 0) {
+          const { data: atomicCost, error: atomicInventoryError } = await (supabase as any).rpc('consume_pos_inventory_v2', {
+            p_restaurant_id: context.restaurantId,
+            p_workspace_id: context.workspaceId || null,
+            p_warehouse_id: orderData.warehouseId || context.warehouseId || null,
+            p_order_id: order.id,
+            p_items: atomicItems,
+          });
+          if (!atomicInventoryError) {
+            inventoryWasConsumedAtomically = true;
+            if (Number(atomicCost || 0) > 0) cogs = Number(atomicCost);
+          } else if (!String(atomicInventoryError.message || '').includes('consume_pos_inventory_v2') && atomicInventoryError.code !== 'PGRST202') {
+            // A real stock/scope error must stop the sale; do not fall back and bypass isolation.
+            await supabase.from('orders').update({ status: 'cancelled', notes: `${order.notes || ''} | فشل خصم المخزون الذري: ${atomicInventoryError.message}` }).eq('id', order.id);
+            throw atomicInventoryError;
+          } else {
+            console.warn('[checkout] atomic inventory RPC unavailable; using legacy compatibility path');
+          }
+        }
+      }
+
+      // 13. Create journal entries (Double Entry) — once per order
       let journalEntryId: string | undefined;
 
       if (context.isOnline) {
@@ -484,12 +522,12 @@ class CheckoutIntegration {
           .eq('id', orderData.deliveryAgentId);
       }
 
-      // 15. Record inventory consumption
-      if (cogs > 0) {
+      // 16. Compatibility inventory consumption only when the atomic RPC is unavailable.
+      if (cogs > 0 && !inventoryWasConsumedAtomically) {
         await this.recordInventoryConsumption(order.id, context.restaurantId, inventoryItemsForCosting);
       }
 
-      // 16. CRITICAL: أعِد تثبيت المدفوع في النهاية — بعض الـ triggers كانت تصفّر paid_amount
+      // 17. CRITICAL: أعِد تثبيت المدفوع في النهاية — بعض الـ triggers كانت تصفّر paid_amount
       // بعد الإدراج/مزامنة الفاتورة. بدون هذه الخطوة الواجهة تظهر المدفوع من الذاكرة ثم يختفي بعد الريفريش.
       if (paidAmount > 0) {
         const { data: paidFixed, error: paidFixErr } = await supabase

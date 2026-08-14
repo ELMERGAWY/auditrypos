@@ -98,11 +98,12 @@ interface ItemType {
 
 interface Props {
   restaurantId: string;
+  workspaceId?: string;
   currency: string;
   businessType: BusinessType;
 }
 
-export function InventoryTab({ restaurantId, currency, businessType }: Props) {
+export function InventoryTab({ restaurantId, workspaceId, currency, businessType }: Props) {
   const [activeTab, setActiveTab] = useState('products');
   const [products, setProducts] = useState<Product[]>([]);
   const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
@@ -141,11 +142,15 @@ export function InventoryTab({ restaurantId, currency, businessType }: Props) {
   const [itemTypes, setItemTypes] = useState<ItemType[]>([]);
 
   const load = async () => {
-    // Load Products
-    const { data: prodData } = await supabase.from('products').select('*').eq('restaurant_id', restaurantId).order('created_at', { ascending: false });
+    // Load Products in the active workspace.
+    let productsQuery = supabase.from('products').select('*').eq('restaurant_id', restaurantId).order('created_at', { ascending: false });
+    if (workspaceId) productsQuery = productsQuery.eq('workspace_id', workspaceId);
+    const { data: prodData } = await productsQuery;
 
-    // Load Warehouse Stocks to aggregate quantities
-    const { data: stockData } = await supabase.from('warehouse_stock').select('product_id, quantity, warehouse_id').eq('restaurant_id', restaurantId);
+    // Load Warehouse Stocks to aggregate quantities within the active workspace.
+    let stockQuery = supabase.from('warehouse_stock').select('product_id, quantity, warehouse_id, workspace_id').eq('restaurant_id', restaurantId);
+    if (workspaceId) stockQuery = stockQuery.eq('workspace_id', workspaceId);
+    const { data: stockData } = await stockQuery;
     setWarehouseStocks(stockData || []);
 
     const aggregatedProducts = ((prodData || []) as Product[]).map(p => {
@@ -162,8 +167,10 @@ export function InventoryTab({ restaurantId, currency, businessType }: Props) {
 
     setProducts(aggregatedProducts);
 
-    // Load Warehouses (filtered by restaurant to respect RLS correctly)
-    const { data: whData } = await supabase.from('warehouses').select('*').eq('restaurant_id', restaurantId).is('deleted_at', null).order('name');
+    // Load Warehouses (filtered by restaurant and active workspace)
+    let warehousesQuery = supabase.from('warehouses').select('*').eq('restaurant_id', restaurantId).is('deleted_at', null).order('name');
+    if (workspaceId) warehousesQuery = warehousesQuery.eq('workspace_id', workspaceId);
+    const { data: whData } = await warehousesQuery;
     setWarehouses((whData || []) as Warehouse[]);
 
     // Load Item Types
@@ -187,9 +194,11 @@ export function InventoryTab({ restaurantId, currency, businessType }: Props) {
       const { data: projData } = await supabase.from('projects').select('id, name').eq('restaurant_id', restaurantId);
       setProjects(projData || []);
     }
-  };
+    };
 
-  useEffect(() => { load(); }, [restaurantId]);
+  useEffect(() => {
+    load();
+  }, [restaurantId, workspaceId]);
 
   useEffect(() => {
     if (restaurantId) localStorage.setItem(`inv_active_wh_${restaurantId}`, activeWarehouse);
@@ -228,6 +237,7 @@ export function InventoryTab({ restaurantId, currency, businessType }: Props) {
     if (!form.name) { toast.error('أدخل اسم المنتج'); return; }
     const data: any = {
       restaurant_id: restaurantId,
+      workspace_id: workspaceId || null,
       name: form.name, barcode: form.barcode, sku: form.sku, category: form.category,
       price: Number(form.price) || 0, cost_price: Number(form.cost_price) || 0,
       quantity: Number(form.quantity) || 0, min_quantity: Number(form.min_quantity) || 5,
@@ -253,13 +263,16 @@ export function InventoryTab({ restaurantId, currency, businessType }: Props) {
       // If warehouse is selected, assign to warehouse using warehouse_stock table
       if (form.warehouse_id) {
         // First, remove any existing warehouse_stock records for this product
-        await supabase.from('warehouse_stock').delete().eq('product_id', productId);
+        let existingStockQuery = supabase.from('warehouse_stock').delete().eq('product_id', productId);
+        if (workspaceId) existingStockQuery = existingStockQuery.eq('workspace_id', workspaceId);
+        await existingStockQuery;
 
         // Then, create a new warehouse_stock record for the selected warehouse
         const { error: stockError } = await supabase
           .from('warehouse_stock')
           .insert({
             restaurant_id: restaurantId,
+            workspace_id: workspaceId || null,
             warehouse_id: form.warehouse_id,
             product_id: productId,
             quantity: Number(form.quantity) || 0,
@@ -285,15 +298,21 @@ export function InventoryTab({ restaurantId, currency, businessType }: Props) {
     
     try {
       // First delete related stock_movements
-      const { error: mvErr } = await supabase.from('stock_movements').delete().eq('product_id', id);
+      let movementDeleteQuery = supabase.from('stock_movements').delete().eq('product_id', id);
+      if (workspaceId) movementDeleteQuery = movementDeleteQuery.eq('workspace_id', workspaceId);
+      const { error: mvErr } = await movementDeleteQuery;
       if (mvErr) console.warn('Failed to delete stock_movements:', mvErr.message);
       
       // Delete warehouse_stock records
-      const { error: whErr } = await supabase.from('warehouse_stock').delete().eq('product_id', id);
+      let stockDeleteQuery = supabase.from('warehouse_stock').delete().eq('product_id', id);
+      if (workspaceId) stockDeleteQuery = stockDeleteQuery.eq('workspace_id', workspaceId);
+      const { error: whErr } = await stockDeleteQuery;
       if (whErr) console.warn('Failed to delete warehouse_stock:', whErr.message);
       
       // Then delete the product
-      const { error } = await supabase.from('products').delete().eq('id', id);
+      let productDeleteQuery = supabase.from('products').delete().eq('id', id);
+      if (workspaceId) productDeleteQuery = productDeleteQuery.eq('workspace_id', workspaceId);
+      const { error } = await productDeleteQuery;
       if (error) { toast.error(`فشل الحذف: ${error.message}`); return; }
       
       toast.success('تم الحذف');
@@ -699,7 +718,7 @@ export function InventoryTab({ restaurantId, currency, businessType }: Props) {
               </TabsTrigger>
             </TabsList>
             <TabsContent value="wh_manage" className="space-y-4 mt-4">
-              <WarehouseManager restaurantId={restaurantId} warehouses={warehouses} onRefresh={load} />
+              <WarehouseManager restaurantId={restaurantId} workspaceId={workspaceId} warehouses={warehouses} onRefresh={load} />
             </TabsContent>
             <TabsContent value="wh_report" className="space-y-4 mt-4">
               <WarehouseReportTab products={products} warehouses={warehouses} currency={currency} restaurantId={restaurantId} />
@@ -728,7 +747,7 @@ export function InventoryTab({ restaurantId, currency, businessType }: Props) {
               </TabsTrigger>
             </TabsList>
             <TabsContent value="transfers" className="space-y-4 mt-4">
-              <InventoryTransfersManager restaurantId={restaurantId} warehouses={warehouses} products={products} onRefresh={load} />
+              <InventoryTransfersManager restaurantId={restaurantId} workspaceId={workspaceId} warehouses={warehouses} products={products} onRefresh={load} />
             </TabsContent>
             <TabsContent value="stock_moves" className="space-y-4 mt-4">
               <StockMovesManager restaurantId={restaurantId} currency={currency} />
