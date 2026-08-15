@@ -15,6 +15,20 @@ interface MenuItem {
 
 interface CartItem { item: MenuItem; qty: number; }
 
+interface StorefrontConfig {
+  theme?: string;
+  hero_title?: string | null;
+  hero_subtitle?: string | null;
+  hero_image_url?: string | null;
+  primary_color?: string | null;
+  secondary_color?: string | null;
+  cta_text?: string | null;
+  show_search?: boolean;
+  show_categories?: boolean;
+  meta_title?: string | null;
+  meta_description?: string | null;
+}
+
 const StoreFront = () => {
   const { restaurantId } = useParams();
   const [items, setItems] = useState<MenuItem[]>([]);
@@ -31,6 +45,8 @@ const StoreFront = () => {
   const [loading, setLoading] = useState(false);
   const [customerForm, setCustomerForm] = useState({ name: '', phone: '', address: '', notes: '' });
   const [trackingPixels, setTrackingPixels] = useState<any[]>([]);
+  const trackingPixelsRef = useRef<any[]>([]);
+  const [storefrontConfig, setStorefrontConfig] = useState<StorefrontConfig>({});
   const [selectedProduct, setSelectedProduct] = useState<MenuItem | null>(null);
 
   // ── Anonymous visitor ID (for retargeting & cart persistence) ──────────────
@@ -94,6 +110,17 @@ const StoreFront = () => {
       setRestaurantName(rest.name || '');
       setRestaurantLogo(rest.logo_url || '');
       setCurrency(rest.currency || 'ج.م');
+      setStorefrontConfig((rest as any).storefront_config || {});
+      if ((rest as any).storefront_config?.meta_title) document.title = (rest as any).storefront_config.meta_title;
+      if ((rest as any).storefront_config?.meta_description) {
+        let description = document.querySelector('meta[name="description"]');
+        if (!description) {
+          description = document.createElement('meta');
+          description.setAttribute('name', 'description');
+          document.head.appendChild(description);
+        }
+        description.setAttribute('content', (rest as any).storefront_config.meta_description);
+      }
 
       const bizType = (rest as any).business_type || 'restaurant';
       // Inventory-driven businesses (retail/wholesale/grocery/warehouse/pharmacy/other) use products table.
@@ -147,6 +174,7 @@ const StoreFront = () => {
       });
       if (pixelsError) console.error('get_tracking_pixels error:', pixelsError);
       else {
+        trackingPixelsRef.current = pixelsData || [];
         setTrackingPixels(pixelsData || []);
       }
       
@@ -164,7 +192,21 @@ const StoreFront = () => {
   // Event tracking helper across all active platforms
   const trackPixelEvent = (eventName: string, eventData: any = {}) => {
     try {
-      trackingPixels.forEach(pixel => {
+      const activePixels = trackingPixelsRef.current;
+      const eventId = `${eventName.toLowerCase()}-${visitorId.current}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+      void supabase.rpc('record_storefront_event', {
+        p_restaurant_id: restaurantId,
+        p_event_name: eventName,
+        p_event_id: eventId,
+        p_visitor_id: visitorId.current,
+        p_value: eventData.value ?? null,
+        p_currency: eventData.currency ?? currency,
+        p_payload: eventData,
+      }).then(({ error }) => {
+        if (error) console.warn('[Storefront event ledger]', error.message);
+      });
+
+      activePixels.forEach(pixel => {
         if (!pixel.is_active || !pixel.pixel_id) return;
         const { platform } = pixel;
 
@@ -511,12 +553,33 @@ const StoreFront = () => {
         </div>
         <div className="relative">
           <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-          <Input placeholder="ابحث عن منتج..." value={search} onChange={e => setSearch(e.target.value)} className="pr-10 bg-background/90 border-0 shadow-lg" />
+          {storefrontConfig.show_search !== false && (
+            <Input placeholder="ابحث عن منتج..." value={search} onChange={e => setSearch(e.target.value)} onBlur={() => {
+              if (search.trim().length > 1) trackPixelEvent('Search', { search_string: search.trim() });
+            }} className="pr-10 bg-background/90 border-0 shadow-lg" />
+          )}
         </div>
       </div>
 
+      {/* Configurable storefront hero / landing block */}
+      {(storefrontConfig.hero_title || storefrontConfig.hero_subtitle || storefrontConfig.hero_image_url) && (
+        <section className="mx-4 mt-5 overflow-hidden rounded-3xl border border-border/60 bg-card shadow-lg">
+          <div className="grid md:grid-cols-[1.25fr_1fr] items-center">
+            <div className="p-6 md:p-8 space-y-3">
+              <p className="text-xs font-bold uppercase tracking-[0.2em] text-primary">{restaurantName}</p>
+              <h2 className="text-2xl md:text-4xl font-black leading-tight">{storefrontConfig.hero_title || 'اكتشف منتجاتنا'}</h2>
+              {storefrontConfig.hero_subtitle && <p className="text-muted-foreground leading-7">{storefrontConfig.hero_subtitle}</p>}
+              <Button onClick={() => document.getElementById('storefront-catalog')?.scrollIntoView({ behavior: 'smooth' })} className="gradient-bg text-primary-foreground border-0">
+                {storefrontConfig.cta_text || 'اطلب الآن'}
+              </Button>
+            </div>
+            {storefrontConfig.hero_image_url && <img src={storefrontConfig.hero_image_url} alt={storefrontConfig.hero_title || restaurantName} className="w-full h-52 md:h-64 object-cover" />}
+          </div>
+        </section>
+      )}
+
       {/* Categories */}
-      <div className="flex gap-2 px-4 -mt-4 overflow-x-auto pb-2">
+      {storefrontConfig.show_categories !== false && <div className="flex gap-2 px-4 -mt-4 overflow-x-auto pb-2">
         <button onClick={() => setSelectedCat('all')}
           className={`px-4 py-2 rounded-full text-sm whitespace-nowrap shadow-sm transition-colors ${selectedCat === 'all' ? 'gradient-bg text-primary-foreground' : 'bg-card text-card-foreground border border-border'}`}>
           الكل
@@ -527,10 +590,10 @@ const StoreFront = () => {
             {cat}
           </button>
         ))}
-      </div>
+      </div>}
 
       {/* Items Grid */}
-      <div className="px-4 mt-4 grid grid-cols-2 gap-4">
+      <div id="storefront-catalog" className="px-4 mt-4 grid grid-cols-2 gap-4">
         {filtered.map((item, i) => (
           <motion.div key={item.id} initial={{ opacity: 0, y: 15 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.03 }}
             onClick={() => setSelectedProduct(item)}

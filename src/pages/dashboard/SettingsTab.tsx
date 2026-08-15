@@ -1,8 +1,10 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { Store, Shield, Percent, Lock, Building2, BookOpen, Share2, Printer } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { useNavigate } from 'react-router-dom';
 import { BUSINESS_TYPES, type BusinessType } from '@/lib/businessTypes';
@@ -35,8 +37,33 @@ export function SettingsTab({
   loadData
 }: SettingsTabProps) {
   const navigate = useNavigate();
-  const [activeSubTab, setActiveSubTab] = useState<'profile' | 'roles' | 'taxes' | 'accounting' | 'marketing' | 'audit' | 'print'>('profile');
+  const [activeSubTab, setActiveSubTab] = useState<'profile' | 'roles' | 'taxes' | 'accounting' | 'marketing' | 'storefront' | 'audit' | 'print'>('profile');
+  const [storefrontSaving, setStorefrontSaving] = useState(false);
+  const [storefrontConfig, setStorefrontConfig] = useState<any>({});
 
+  useEffect(() => {
+    setStorefrontConfig(restaurant?.storefront_config || {});
+  }, [restaurant?.storefront_config]);
+
+
+  const handleSaveStorefront = async () => {
+    if (!restaurant?.id) return;
+    setStorefrontSaving(true);
+    try {
+      const { data, error } = await (supabase as any).rpc('update_storefront_config', {
+        p_restaurant_id: restaurant.id,
+        p_config: storefrontConfig,
+      });
+      if (error) throw error;
+      setStorefrontConfig(data || storefrontConfig);
+      toast.success('تم حفظ تخصيص المتجر والصفحة العامة');
+      loadData();
+    } catch (error: any) {
+      toast.error('تعذر حفظ إعدادات المتجر: ' + (error?.message || 'تحقق من migration المتجر'));
+    } finally {
+      setStorefrontSaving(false);
+    }
+  };
 
   const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -84,6 +111,12 @@ export function SettingsTab({
           className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm transition-colors whitespace-nowrap ${activeSubTab === 'marketing' ? 'gradient-bg text-primary-foreground' : 'bg-secondary hover:bg-secondary/80'}`}
         >
           <Share2 className="w-4 h-4" /> التسويق والبيكسل
+        </button>
+        <button
+          onClick={() => setActiveSubTab('storefront')}
+          className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm transition-colors whitespace-nowrap ${activeSubTab === 'storefront' ? 'gradient-bg text-primary-foreground' : 'bg-secondary hover:bg-secondary/80'}`}
+        >
+          <Store className="w-4 h-4" /> المتجر والصفحة العامة
         </button>
         <button
           onClick={() => setActiveSubTab('audit')}
@@ -207,6 +240,32 @@ export function SettingsTab({
         {activeSubTab === 'marketing' && (
           <div className="max-w-4xl">
             <MarketingSettings restaurant={restaurant} />
+          </div>
+        )}
+        {activeSubTab === 'storefront' && restaurant?.id && (
+          <div className="max-w-4xl space-y-4">
+            <div>
+              <h2 className="font-display text-xl font-bold">تخصيص المتجر والـLanding Page</h2>
+              <p className="text-sm text-muted-foreground mt-1">تحكم في الواجهة العامة والرابط الحالي للمتجر. لا يتم حفظ HTML أو JavaScript خام من الموظفين.</p>
+            </div>
+            <div className="glass-card p-5 grid gap-4 md:grid-cols-2">
+              <div className="space-y-2 md:col-span-2"><Label>العنوان الرئيسي</Label><Input value={storefrontConfig.hero_title || ''} onChange={(e) => setStorefrontConfig({ ...storefrontConfig, hero_title: e.target.value })} placeholder="مثال: اختياراتك اليومية في مكان واحد" /></div>
+              <div className="space-y-2 md:col-span-2"><Label>الوصف المختصر</Label><Input value={storefrontConfig.hero_subtitle || ''} onChange={(e) => setStorefrontConfig({ ...storefrontConfig, hero_subtitle: e.target.value })} placeholder="رسالة واضحة للعميل قبل تصفح المنتجات" /></div>
+              <div className="space-y-2"><Label>رابط صورة الـHero</Label><Input value={storefrontConfig.hero_image_url || ''} onChange={(e) => setStorefrontConfig({ ...storefrontConfig, hero_image_url: e.target.value })} placeholder="رابط صورة من Storage" /></div>
+              <div className="space-y-2"><Label>نص زر الدعوة</Label><Input value={storefrontConfig.cta_text || ''} onChange={(e) => setStorefrontConfig({ ...storefrontConfig, cta_text: e.target.value })} placeholder="اطلب الآن" /></div>
+              <div className="space-y-2"><Label>عنوان الصفحة لمحركات البحث</Label><Input value={storefrontConfig.meta_title || ''} onChange={(e) => setStorefrontConfig({ ...storefrontConfig, meta_title: e.target.value })} /></div>
+              <div className="space-y-2"><Label>وصف الصفحة لمحركات البحث</Label><Input value={storefrontConfig.meta_description || ''} onChange={(e) => setStorefrontConfig({ ...storefrontConfig, meta_description: e.target.value })} /></div>
+              <div className="md:col-span-2 flex flex-wrap gap-2 text-sm">
+                <Button type="button" variant={storefrontConfig.show_search !== false ? 'default' : 'outline'} onClick={() => setStorefrontConfig({ ...storefrontConfig, show_search: storefrontConfig.show_search === false })}>البحث {storefrontConfig.show_search !== false ? 'مفعل' : 'مغلق'}</Button>
+                <Button type="button" variant={storefrontConfig.show_categories !== false ? 'default' : 'outline'} onClick={() => setStorefrontConfig({ ...storefrontConfig, show_categories: storefrontConfig.show_categories === false })}>التصنيفات {storefrontConfig.show_categories !== false ? 'مفعلة' : 'مغلقة'}</Button>
+                <Button type="button" onClick={handleSaveStorefront} disabled={storefrontSaving}>{storefrontSaving ? 'جاري الحفظ...' : 'حفظ تخصيص المتجر'}</Button>
+              </div>
+            </div>
+            <div className="glass-card p-4 space-y-2">
+              <p className="font-semibold">الرابط الحالي</p>
+              <code className="block bg-secondary/50 rounded-lg p-3 text-xs break-all">{window.location.origin}/store/{restaurant.id}</code>
+              <p className="text-xs text-muted-foreground">بعد حفظ الإعدادات، تظهر الصفحة العامة مباشرة على نفس الرابط، وتستمر إعدادات Pixels في تبويب التسويق والبيكسل.</p>
+            </div>
           </div>
         )}
         {activeSubTab === 'audit' && (
