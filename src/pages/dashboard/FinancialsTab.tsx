@@ -32,11 +32,12 @@ const STANDARD_LABELS: Record<AccountingStandard, string> = {
 
 interface Props {
   restaurantId: string;
+  workspaceId?: string;
   currency: string;
   businessType: BusinessType;
 }
 
-export function FinancialsTab({ restaurantId, currency, businessType }: Props) {
+export function FinancialsTab({ restaurantId, workspaceId, currency, businessType }: Props) {
   const [activeTab, setActiveTab] = useState<FinancialTab>(() => {
     const saved = sessionStorage.getItem('financial_active_tab');
     if (saved) {
@@ -47,6 +48,7 @@ export function FinancialsTab({ restaurantId, currency, businessType }: Props) {
   });
   const [orders, setOrders] = useState<any[]>([]);
   const [orderItems, setOrderItems] = useState<any[]>([]);
+  const [serviceInvoices, setServiceInvoices] = useState<any[]>([]);
   const [expenses, setExpenses] = useState<any[]>([]);
   const [products, setProducts] = useState<any[]>([]);
   const [customers, setCustomers] = useState<any[]>([]);
@@ -60,10 +62,11 @@ export function FinancialsTab({ restaurantId, currency, businessType }: Props) {
   const [loaded, setLoaded] = useState(false);
 
   const load = async () => {
-    const [{ data: restaurant }, ordersRes, orderItemsRes, expensesRes, productsRes, customersRes, projectsRes] = await Promise.all([
+    const [{ data: restaurant }, ordersRes, orderItemsRes, serviceInvoicesRes, expensesRes, productsRes, customersRes, projectsRes] = await Promise.all([
       supabase.from('restaurants').select('company_id').eq('id', restaurantId).maybeSingle(),
-      supabase.from('orders').select('id, total, status, created_at, paid_amount, discount, payment_method').eq('restaurant_id', restaurantId).limit(5000),
+      supabase.from('orders').select('id, total, total_cost, status, created_at, paid_amount, discount, payment_method, workspace_id').eq('restaurant_id', restaurantId).limit(5000),
       supabase.from('order_items').select('order_id, quantity, price, cost_price_snapshot, unit_factor').order('order_id').limit(10000),
+      supabase.from('service_invoices').select('*').eq('restaurant_id', restaurantId).limit(5000),
       supabase.from('expenses').select('amount, category, date, project_id').eq('restaurant_id', restaurantId).limit(5000),
       supabase.from('products').select('price, cost_price, quantity').eq('restaurant_id', restaurantId).limit(5000),
       supabase.from('customers').select('balance').eq('restaurant_id', restaurantId).limit(5000),
@@ -71,8 +74,15 @@ export function FinancialsTab({ restaurantId, currency, businessType }: Props) {
     ]);
     const resolvedCompanyId = restaurant?.company_id || null;
     setCompanyId(resolvedCompanyId);
-    setOrders(ordersRes.data || []);
+    const scopedOrders = workspaceId
+      ? (ordersRes.data || []).filter((row: any) => !('workspace_id' in row) || row.workspace_id === workspaceId)
+      : (ordersRes.data || []);
+    const scopedServices = workspaceId
+      ? ((serviceInvoicesRes.data || []).filter((row: any) => !('workspace_id' in row) || row.workspace_id === workspaceId))
+      : (serviceInvoicesRes.data || []);
+    setOrders(scopedOrders);
     setOrderItems(orderItemsRes.data || []);
+    setServiceInvoices(scopedServices);
     setExpenses(expensesRes.data || []);
     setProducts(productsRes.data || []);
     setCustomers(customersRes.data || []);
@@ -102,7 +112,7 @@ export function FinancialsTab({ restaurantId, currency, businessType }: Props) {
     setLoaded(true);
   };
 
-  useEffect(() => { void load(); }, [restaurantId]);
+  useEffect(() => { void load(); }, [restaurantId, workspaceId]);
 
   const periodLabels: Record<string, string> = { today: 'اليوم', week: 'هذا الأسبوع', month: 'هذا الشهر', all: 'الكل' };
 
@@ -134,14 +144,17 @@ export function FinancialsTab({ restaurantId, currency, businessType }: Props) {
   };
 
   const filteredOrders = orders.filter(o => o.status !== 'cancelled' && filterDate(o.created_at));
+  const filteredServices = serviceInvoices.filter(s => s.status !== 'cancelled' && filterDate(s.invoice_date || s.created_at));
   const filteredExpenses = expenses.filter(e => filterDate(e.date));
 
-  const totalRevenue = filteredOrders.reduce((s, o) => s + Number(o.total || 0), 0);
+  const totalRevenue = filteredOrders.reduce((s, o) => s + Number(o.total || 0), 0)
+    + filteredServices.reduce((s, inv) => s + Number(inv.total_amount ?? inv.amount ?? 0), 0);
+  const totalCOGS = filteredOrders.reduce((s, o) => s + Math.max(0, Number(o.total_cost || 0)), 0)
+    + filteredServices.reduce((s, inv) => s + Math.max(0, Number(inv.cost_amount || 0)), 0);
   const totalExpenses = filteredExpenses.reduce((s, e) => s + Number(e.amount || 0), 0);
   const collectedAmount = filteredOrders.reduce((s, o) => s + Math.min(Number(o.total || 0), Math.max(0, Number(o.paid_amount ?? o.total ?? 0))), 0);
-  const netIncome = standardReport?.income_statement?.net_income != null
-    ? Number(standardReport.income_statement.net_income)
-    : totalRevenue - totalExpenses;
+  // KPI uses the selected UI period and operational sources. The standard report is annual/YTD and remains for formal statements only.
+  const netIncome = totalRevenue - totalCOGS - totalExpenses;
   const collectionRate = totalRevenue > 0 ? Math.min(100, Math.max(0, (collectedAmount / totalRevenue) * 100)) : 0;
 
   const paymentTotals = filteredOrders.reduce<Record<string, number>>((acc, order) => {
@@ -165,8 +178,10 @@ export function FinancialsTab({ restaurantId, currency, businessType }: Props) {
     };
     return {
       name: monthDate.toLocaleDateString('ar-EG', { month: 'short' }),
-      revenue: orders.filter(order => order.status !== 'cancelled' && inMonth(order.created_at)).reduce((sum, order) => sum + Number(order.total || 0), 0),
-      expense: expenses.filter(expense => inMonth(expense.date)).reduce((sum, expense) => sum + Number(expense.amount || 0), 0),
+      revenue: orders.filter(order => order.status !== 'cancelled' && inMonth(order.created_at)).reduce((sum, order) => sum + Number(order.total || 0), 0)
+        + serviceInvoices.filter(inv => inv.status !== 'cancelled' && inMonth(inv.invoice_date || inv.created_at)).reduce((sum, inv) => sum + Number(inv.total_amount ?? inv.amount ?? 0), 0),
+      expense: expenses.filter(expense => inMonth(expense.date)).reduce((sum, expense) => sum + Number(expense.amount || 0), 0)
+        + serviceInvoices.filter(inv => inv.status !== 'cancelled' && inMonth(inv.invoice_date || inv.created_at)).reduce((sum, inv) => sum + Math.max(0, Number(inv.cost_amount || 0)), 0),
     };
   });
 
