@@ -7,7 +7,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Plus, X, Calendar, Clock, Send, BarChart3, Image as ImageIcon, 
   Video, FileText, Trash2, Edit2, Eye, Share2, TrendingUp, Users,
-  MessageCircle, Heart, ArrowUp, ArrowDown
+  MessageCircle, Heart, ArrowUp, ArrowDown, Inbox
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -41,6 +41,17 @@ interface SocialPost {
   social_media_accounts?: { platform?: string; account_name?: string };
 }
 
+interface InboxMessage {
+  id: string;
+  sender_name?: string | null;
+  sender_external_id?: string | null;
+  message_content?: string | null;
+  platform?: string | null;
+  status?: string | null;
+  message_type?: string | null;
+  created_at: string;
+}
+
 interface SocialAnalytics {
   followers_count: number;
   engagement_rate: number;
@@ -54,6 +65,7 @@ interface SocialAnalytics {
 
 export function SocialMediaDashboard({ restaurantId }: Props) {
   const [posts, setPosts] = useState<SocialPost[]>([]);
+  const [inboxMessages, setInboxMessages] = useState<InboxMessage[]>([]);
   const [analytics, setAnalytics] = useState<Record<string, SocialAnalytics>>({});
   const [loading, setLoading] = useState(true);
   const [showPostModal, setShowPostModal] = useState(false);
@@ -71,6 +83,7 @@ export function SocialMediaDashboard({ restaurantId }: Props) {
   useEffect(() => {
     void loadAccounts();
     void loadPosts();
+    void loadInbox();
   }, [restaurantId]);
 
   useEffect(() => {
@@ -85,6 +98,21 @@ export function SocialMediaDashboard({ restaurantId }: Props) {
     } catch (error: any) {
       console.error('Failed to load accounts:', error);
     }
+  };
+
+  const loadInbox = async () => {
+    const { data, error } = await supabase
+      .from('crm_social_messages')
+      .select('id, sender_name, sender_external_id, message_content, platform, status, message_type, created_at')
+      .eq('restaurant_id', restaurantId)
+      .order('created_at', { ascending: false })
+      .limit(100);
+    if (!error) setInboxMessages((data || []) as InboxMessage[]);
+  };
+
+  const markInboxRead = async (messageId: string) => {
+    const { error } = await supabase.from('crm_social_messages').update({ status: 'read' }).eq('id', messageId).eq('restaurant_id', restaurantId);
+    if (!error) setInboxMessages((current) => current.map((message) => message.id === messageId ? { ...message, status: 'read' } : message));
   };
 
   const loadPosts = async () => {
@@ -331,6 +359,7 @@ export function SocialMediaDashboard({ restaurantId }: Props) {
       <Tabs value={activeTab} onValueChange={setActiveTab}>
         <TabsList>
           <TabsTrigger value="posts">المنشورات</TabsTrigger>
+          <TabsTrigger value="inbox">Inbox ({inboxMessages.filter((message) => message.status !== 'read').length})</TabsTrigger>
           <TabsTrigger value="analytics">الإحصائيات</TabsTrigger>
           <TabsTrigger value="scheduled">المجدول</TabsTrigger>
         </TabsList>
@@ -424,6 +453,36 @@ export function SocialMediaDashboard({ restaurantId }: Props) {
                 </Card>
               ))}
             </div>
+          )}
+        </TabsContent>
+
+        <TabsContent value="inbox" className="space-y-4">
+          {inboxMessages.length === 0 ? (
+            <Card className="p-8 text-center">
+              <Inbox className="w-12 h-12 mx-auto mb-4 text-muted-foreground" />
+              <p className="text-muted-foreground">لا توجد رسائل أو تعليقات واردة</p>
+            </Card>
+          ) : (
+            inboxMessages.map((message) => (
+              <Card key={message.id} className={`p-4 ${message.status !== 'read' ? 'border-primary/50' : ''}`}>
+                <div className="flex items-start justify-between gap-4">
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2">
+                      <MessageCircle className="w-4 h-4 text-primary" />
+                      <p className="font-semibold">{message.sender_name || 'Meta user'}</p>
+                      <Badge variant="outline">{message.message_type === 'comment' ? 'تعليق' : 'رسالة'}</Badge>
+                    </div>
+                    <p className="mt-2 whitespace-pre-wrap text-sm">{message.message_content}</p>
+                    <p className="mt-2 text-xs text-muted-foreground">{new Date(message.created_at).toLocaleString('ar-EG')}</p>
+                  </div>
+                  {message.status !== 'read' && (
+                    <Button size="sm" variant="outline" onClick={() => markInboxRead(message.id)}>
+                      تمّت القراءة
+                    </Button>
+                  )}
+                </div>
+              </Card>
+            ))
           )}
         </TabsContent>
 
