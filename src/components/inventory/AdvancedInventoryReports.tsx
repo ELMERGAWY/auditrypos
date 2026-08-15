@@ -48,7 +48,8 @@ export function AdvancedInventoryReports({ restaurantId, currency }: Props) {
               stock_locations(name, location_type)
             `)
             .eq('restaurant_id', restaurantId)
-            .gt('in_date', startDate.toISOString());
+            .gt('in_date', startDate.toISOString())
+            .limit(500);
           break;
 
         case 'stock_moves':
@@ -61,7 +62,8 @@ export function AdvancedInventoryReports({ restaurantId, currency }: Props) {
               stock_locations_dest:stock_locations!stock_moves_location_dest_id_fkey(name)
             `)
             .eq('restaurant_id', restaurantId)
-            .gt('date', startDate.toISOString());
+            .gt('date', startDate.toISOString())
+            .limit(500);
           break;
 
         case 'low_stock':
@@ -77,11 +79,12 @@ export function AdvancedInventoryReports({ restaurantId, currency }: Props) {
               *,
               stock_locations(name, location_type)
             `)
-            .eq('restaurant_id', restaurantId);
+            .eq('restaurant_id', restaurantId)
+            .limit(500);
           break;
 
         default:
-          query = supabase.from('products').select('*').eq('restaurant_id', restaurantId);
+          query = supabase.from('products').select('*').eq('restaurant_id', restaurantId).limit(500);
       }
 
       const { data: reportData, error } = await query;

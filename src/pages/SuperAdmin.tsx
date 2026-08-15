@@ -24,6 +24,7 @@ import { BUSINESS_TYPES, type BusinessType } from '@/lib/businessTypes';
 import { StaffAccessApprovals } from './dashboard/StaffAccessApprovals';
 import { GlobalDashboard } from '@/components/superadmin/GlobalDashboard';
 import { AdminNotificationsPanel } from '@/components/superadmin/AdminNotificationsPanel';
+import { SuperAdminControlPlane } from '@/components/superadmin/SuperAdminControlPlane';
 import { LanguageSwitcher } from '@/components/global/LanguageSwitcher';
 import { useTranslation } from 'react-i18next';
 import { getLanguageDir } from '@/lib/i18n';
@@ -486,12 +487,15 @@ const SuperAdmin = () => {
         </div>
 
         {tab === 'overview' && (
-          <GlobalDashboard
-            restaurants={restaurants}
-            orders={orders}
-            globalUsers={globalUsers}
-            adminNotifications={adminNotifications}
-          />
+          <>
+            <GlobalDashboard
+              restaurants={restaurants}
+              orders={orders}
+              globalUsers={globalUsers}
+              adminNotifications={adminNotifications}
+            />
+            <SuperAdminControlPlane />
+          </>
         )}
 
         {tab === 'notifications' && (

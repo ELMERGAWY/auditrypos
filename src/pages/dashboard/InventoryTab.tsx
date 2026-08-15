@@ -20,7 +20,6 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContaine
 
 import { hasFeature, type BusinessType } from '@/lib/businessTypes';
 import { WarehouseManager } from '@/components/inventory/WarehouseManager';
-import { ItemWarehouseAssignments } from '@/components/inventory/ItemWarehouseAssignments';
 import { InventoryTransfersManager } from '@/components/inventory/InventoryTransfersManager';
 import { LandedCostsManager } from '@/components/inventory/LandedCostsManager';
 import { SmartReorderTab } from '@/components/inventory/SmartReorderTab';
@@ -30,6 +29,7 @@ import { ItemMovementReport } from '@/components/inventory/ItemMovementReport';
 import { StockLocationsManager } from '@/components/inventory/StockLocationsManager';
 import { StockMovesManager } from '@/components/inventory/StockMovesManager';
 import { ReorderingRulesManager } from '@/components/inventory/ReorderingRulesManager';
+import { ProductWarehouseBalances } from '@/components/inventory/ProductWarehouseBalances';
 import { receiveStock, issueStock } from '@/services/inventoryService';
 
 interface Warehouse {
@@ -77,6 +77,7 @@ interface Product {
   available: boolean;
   secondary_unit: string;
   unit_conversion_factor: number;
+  warehouse_id?: string | null;
 }
 
 interface StockMovement {
@@ -140,6 +141,7 @@ export function InventoryTab({ restaurantId, workspaceId, currency, businessType
   const [projects, setProjects] = useState<any[]>([]);
   const [selectedProjectId, setSelectedProjectId] = useState<string>('');
   const [itemTypes, setItemTypes] = useState<ItemType[]>([]);
+  const [savingProduct, setSavingProduct] = useState(false);
 
   const load = async () => {
     // Load Products in the active workspace.
@@ -234,62 +236,94 @@ export function InventoryTab({ restaurantId, workspaceId, currency, businessType
 
 
   const handleSave = async () => {
-    if (!form.name) { toast.error('أدخل اسم المنتج'); return; }
+    if (!form.name.trim()) { toast.error('أدخل اسم المنتج'); return; }
+    if (!editingProduct && form.warehouse_id && !workspaceId) {
+      toast.error('اختر الفرع النشط قبل ربط الصنف بمخزن');
+      return;
+    }
+
+    setSavingProduct(true);
     const data: any = {
       restaurant_id: restaurantId,
       workspace_id: workspaceId || null,
-      name: form.name, barcode: form.barcode, sku: form.sku, category: form.category,
-      price: Number(form.price) || 0, cost_price: Number(form.cost_price) || 0,
-      quantity: Number(form.quantity) || 0, min_quantity: Number(form.min_quantity) || 5,
-      unit: form.unit, image: form.image,
+      name: form.name.trim(),
+      barcode: form.barcode.trim(),
+      sku: form.sku.trim(),
+      category: form.category,
+      price: Number(form.price) || 0,
+      cost_price: Number(form.cost_price) || 0,
+      unit: form.unit,
+      image: form.image || '📦',
       expiry_date: form.expiry_date || null,
       secondary_unit: form.secondary_unit || '',
       unit_conversion_factor: Number(form.unit_conversion_factor) || 1,
+      item_type_id: form.item_type_id || null,
+      batch_number: form.batch_number || null,
     };
+
     try {
       let productId: string;
       if (editingProduct) {
-        const { error } = await supabase.from('products').update(data).eq('id', editingProduct.id);
+        let productUpdate = supabase
+          .from('products')
+          .update(data)
+          .eq('id', editingProduct.id)
+          .eq('restaurant_id', restaurantId);
+        if (workspaceId) productUpdate = productUpdate.eq('workspace_id', workspaceId);
+        const { error } = await productUpdate;
         if (error) throw error;
         productId = editingProduct.id;
-        toast.success('تم تحديث المنتج');
+        toast.success('تم تحديث بيانات الصنف دون تغيير أرصدة المخازن');
       } else {
-        const { data: newProduct, error } = await supabase.from('products').insert(data).select().single();
+        const { data: newProduct, error } = await supabase
+          .from('products')
+          .insert({
+            ...data,
+            quantity: Number(form.quantity) || 0,
+            min_quantity: Number(form.min_quantity) || 5,
+            warehouse_id: form.warehouse_id || null,
+          })
+          .select()
+          .single();
         if (error) throw error;
         productId = newProduct.id;
         toast.success('تم إضافة المنتج');
       }
 
-      // If warehouse is selected, assign to warehouse using warehouse_stock table
-      if (form.warehouse_id) {
-        // First, remove any existing warehouse_stock records for this product
-        let existingStockQuery = supabase.from('warehouse_stock').delete().eq('product_id', productId);
-        if (workspaceId) existingStockQuery = existingStockQuery.eq('workspace_id', workspaceId);
-        await existingStockQuery;
-
-        // Then, create a new warehouse_stock record for the selected warehouse
-        const { error: stockError } = await supabase
-          .from('warehouse_stock')
-          .insert({
-            restaurant_id: restaurantId,
-            workspace_id: workspaceId || null,
-            warehouse_id: form.warehouse_id,
-            product_id: productId,
-            quantity: Number(form.quantity) || 0,
-            min_quantity: Number(form.min_quantity) || 5,
+      // Product editing must never delete or collapse other warehouse balances.
+      // Initial stock for a new product is written only to the selected warehouse.
+      if (!editingProduct && form.warehouse_id) {
+        if (workspaceId) {
+          const { error: stockError } = await (supabase as any).rpc('upsert_product_warehouse_stock', {
+            p_restaurant_id: restaurantId,
+            p_workspace_id: workspaceId,
+            p_product_id: productId,
+            p_warehouse_id: form.warehouse_id,
+            p_quantity: Number(form.quantity) || 0,
+            p_min_quantity: Number(form.min_quantity) || 5,
           });
-
-        if (stockError) {
-          console.error('Failed to assign product to warehouse_stock:', stockError);
-          toast.warning('تم حفظ المنتج ولكن فشل ربطه بالمخزن');
+          if (stockError) throw stockError;
+        } else {
+          const { error: stockError } = await supabase
+            .from('warehouse_stock')
+            .upsert({
+              restaurant_id: restaurantId,
+              warehouse_id: form.warehouse_id,
+              product_id: productId,
+              quantity: Number(form.quantity) || 0,
+              min_quantity: Number(form.min_quantity) || 5,
+            }, { onConflict: 'warehouse_id,product_id' });
+          if (stockError) throw stockError;
         }
       }
 
       resetForm();
-      load();
+      await load();
     } catch (e: any) {
       console.error('Product save error:', e);
       toast.error(`فشل الحفظ: ${e?.message || 'تحقق من الصلاحيات والاتصال'}`);
+    } finally {
+      setSavingProduct(false);
     }
   };
 
@@ -490,17 +524,19 @@ export function InventoryTab({ restaurantId, workspaceId, currency, businessType
   const startEdit = async (p: Product) => {
     setEditingProduct(p);
     
-    // Get warehouse_id from warehouse_stock instead of products.warehouse_id
-    let warehouseId = '';
+    // A product can legitimately have balances in multiple warehouses.
+    // Never use maybeSingle() here; it throws when more than one balance exists.
+    let warehouseId = p.warehouse_id || '';
     try {
-      const { data: stockData } = await supabase
+      let stockQuery = supabase
         .from('warehouse_stock')
         .select('warehouse_id')
         .eq('product_id', p.id)
-        .maybeSingle();
-      if (stockData) {
-        warehouseId = stockData.warehouse_id;
-      }
+        .order('quantity', { ascending: false })
+        .limit(1);
+      if (workspaceId) stockQuery = stockQuery.eq('workspace_id', workspaceId);
+      const { data: stockRows } = await stockQuery;
+      warehouseId = stockRows?.[0]?.warehouse_id || warehouseId;
     } catch (e) {
       console.error('Error fetching warehouse assignment:', e);
     }
@@ -721,7 +757,7 @@ export function InventoryTab({ restaurantId, workspaceId, currency, businessType
               <WarehouseManager restaurantId={restaurantId} workspaceId={workspaceId} warehouses={warehouses} onRefresh={load} />
             </TabsContent>
             <TabsContent value="wh_report" className="space-y-4 mt-4">
-              <WarehouseReportTab products={products} warehouses={warehouses} currency={currency} restaurantId={restaurantId} />
+              <WarehouseReportTab products={products} warehouses={warehouses} currency={currency} restaurantId={restaurantId} workspaceId={workspaceId} />
             </TabsContent>
             <TabsContent value="wh_locations" className="space-y-4 mt-4">
               <StockLocationsManager restaurantId={restaurantId} currency={currency} />
@@ -1132,24 +1168,35 @@ export function InventoryTab({ restaurantId, workspaceId, currency, businessType
                     </SelectContent>
                   </Select>
                 </div>
-                <div>
-                  <Label className="text-xs mb-1 block">المخزن</Label>
-                  <Select
-                    value={form.warehouse_id}
-                    onValueChange={(value) => setForm(f => ({ ...f, warehouse_id: value }))}
-                  >
-                    <SelectTrigger className="h-11 rounded-xl">
-                      <SelectValue placeholder="اختر المخزن" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {warehouses.map(wh => (
-                        <SelectItem key={wh.id} value={wh.id}>
-                          {wh.name_ar || wh.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
+                {!editingProduct ? (
+                  <div>
+                    <Label className="text-xs mb-1 block">المخزن الافتتاحي</Label>
+                    <Select
+                      value={form.warehouse_id}
+                      onValueChange={(value) => setForm(f => ({ ...f, warehouse_id: value }))}
+                    >
+                      <SelectTrigger className="h-11 rounded-xl">
+                        <SelectValue placeholder="اختر المخزن" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {warehouses.map(wh => (
+                          <SelectItem key={wh.id} value={wh.id}>
+                            {wh.name_ar || wh.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                ) : (
+                  <div className="col-span-2">
+                    <ProductWarehouseBalances
+                      productId={editingProduct.id}
+                      workspaceId={workspaceId}
+                      warehouses={warehouses}
+                      unit={form.unit}
+                    />
+                  </div>
+                )}
                 <div>
                   <Label className="text-xs mb-1 block">وحدة القياس</Label>
                   <Input placeholder="كيلو، علبة، لتر" value={form.unit} onChange={e => setForm(f => ({ ...f, unit: e.target.value }))} className="h-11 rounded-xl" />
@@ -1207,47 +1254,17 @@ export function InventoryTab({ restaurantId, workspaceId, currency, businessType
                 </div>
               </div>
 
-              {/* Warehouse Management Components */}
+              {/* Warehouse balances are intentionally managed outside the product master form.
+                  Editing product metadata must not mutate stock in another warehouse. */}
               {editingProduct && (
-                <div className="space-y-6 pt-4 border-t border-border">
-                  <div>
-                    <h4 className="font-bold text-sm mb-3 flex items-center gap-2 text-primary">
-                      <Truck className="w-4 h-4" /> إدارة المخازن
-                    </h4>
-                    <WarehouseManager />
-                  </div>
-                  
-                  <div>
-                    <h4 className="font-bold text-sm mb-3 flex items-center gap-2 text-primary">
-                      <Package className="w-4 h-4" /> ارتباطات الصنف بالمخازن
-                    </h4>
-                    {(() => {
-                      const selectedItemType = itemTypes.find(t => t.id === form.item_type_id);
-                      const shouldHideWarehouseAssignments = selectedItemType && 
-                        (selectedItemType.code === 'NON_INVENTORY' || selectedItemType.code === 'SERVICE');
-                      
-                      if (shouldHideWarehouseAssignments) {
-                        return (
-                          <div className="text-sm text-muted-foreground p-3 bg-secondary/30 rounded-xl">
-                            هذا النوع من الأصناف لا يتطلب إدارة مخزون
-                          </div>
-                        );
-                      }
-                      
-                      return (
-                        <ItemWarehouseAssignments 
-                          itemId={editingProduct.id} 
-                          itemName={editingProduct.name} 
-                        />
-                      );
-                    })()}
-                  </div>
+                <div className="pt-4 border-t border-border rounded-2xl bg-secondary/20 p-3 text-xs text-muted-foreground">
+                  أرصدة الصنف موزعة حسب المخزن ولا يتم تغييرها من نموذج بيانات الصنف. استخدم التحويلات أو حركة المخزون لتعديل الكميات بأثر تدقيقي.
                 </div>
               )}
               
               <div className="flex gap-3 pt-4">
-                <Button onClick={handleSave} className="flex-1 h-12 rounded-2xl gradient-bg text-primary-foreground border-0 text-sm font-bold shadow-lg shadow-primary/20">
-                  <Save className="w-4 h-4 ml-2" /> {editingProduct ? 'حفظ التعديلات' : 'إضافة الصنف للمخزون'}
+                <Button onClick={handleSave} disabled={savingProduct} className="flex-1 h-12 rounded-2xl gradient-bg text-primary-foreground border-0 text-sm font-bold shadow-lg shadow-primary/20">
+                  {savingProduct ? <RefreshCw className="w-4 h-4 ml-2 animate-spin" /> : <Save className="w-4 h-4 ml-2" />} {savingProduct ? 'جاري الحفظ...' : editingProduct ? 'حفظ التعديلات' : 'إضافة الصنف للمخزون'}
                 </Button>
                 <Button variant="outline" onClick={resetForm} className="flex-1 h-12 rounded-2xl text-sm font-bold">إلغاء</Button>
               </div>

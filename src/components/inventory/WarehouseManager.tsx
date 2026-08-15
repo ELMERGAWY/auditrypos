@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
+import { usePermissions } from '@/hooks/usePermissions';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -72,6 +73,9 @@ interface WarehouseManagerProps {
 }
 
 export function WarehouseManager({ restaurantId, workspaceId, warehouses: propsWarehouses, onRefresh }: WarehouseManagerProps) {
+  const { can } = usePermissions();
+  const canManageWarehouses = can('inventory.warehouse.manage') || can('inventory.edit');
+  const canTransferWarehouses = can('inventory.transfer');
   const [loading, setLoading] = useState(false);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [detailsDialogOpen, setDetailsDialogOpen] = useState(false);
@@ -145,17 +149,17 @@ export function WarehouseManager({ restaurantId, workspaceId, warehouses: propsW
       cogs_account_code: warehouse.cogs_account_code || '',
       notes: warehouse.notes || '',
       // Advanced location fields
-      location_zone: '',
-      aisle: '',
-      bin: '',
-      floor: '',
-      building: '',
+      location_zone: warehouse.location_zone || '',
+      aisle: warehouse.aisle || '',
+      bin: warehouse.bin || '',
+      floor: warehouse.floor || '',
+      building: warehouse.building || '',
       // Capacity and control fields
-      capacity_quantity: '',
-      capacity_volume: '',
-      temperature_control: false,
-      humidity_control: false,
-      security_level: 'normal'
+      capacity_quantity: warehouse.capacity_quantity != null ? String(warehouse.capacity_quantity) : '',
+      capacity_volume: warehouse.capacity_volume != null ? String(warehouse.capacity_volume) : '',
+      temperature_control: Boolean(warehouse.temperature_control),
+      humidity_control: Boolean(warehouse.humidity_control),
+      security_level: warehouse.security_level || 'normal'
     });
     setDialogOpen(true);
   };
@@ -235,6 +239,7 @@ export function WarehouseManager({ restaurantId, workspaceId, warehouses: propsW
             price
           )
         `)
+        .eq('restaurant_id', restaurantId)
         .eq('warehouse_id', warehouse.id);
       if (workspaceId) warehouseStockQuery = warehouseStockQuery.eq('workspace_id', workspaceId);
       const { data: stockData, error } = await warehouseStockQuery;
@@ -268,6 +273,7 @@ export function WarehouseManager({ restaurantId, workspaceId, warehouses: propsW
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!canManageWarehouses) { toast.error('ليس لديك صلاحية إدارة المخازن'); return; }
     
     if (!formData.code || !formData.name || !formData.name_ar) {
       toast.error('يرجى ملء جميع الحقول المطلوبة');
@@ -279,7 +285,7 @@ export function WarehouseManager({ restaurantId, workspaceId, warehouses: propsW
       
       if (isEditing && editingWarehouseId) {
         // Update existing warehouse
-        const { error } = await supabase
+        let warehouseUpdate = supabase
           .from('warehouses')
           .update({
             code: formData.code,
@@ -299,9 +305,22 @@ export function WarehouseManager({ restaurantId, workspaceId, warehouses: propsW
             accounting_account_code: formData.accounting_account_code || null,
             inventory_account_code: formData.inventory_account_code || null,
             cogs_account_code: formData.cogs_account_code || null,
-            notes: formData.notes || null
+            notes: formData.notes || null,
+            location_zone: formData.location_zone || null,
+            aisle: formData.aisle || null,
+            bin: formData.bin || null,
+            floor: formData.floor || null,
+            building: formData.building || null,
+            capacity_quantity: formData.capacity_quantity ? Number(formData.capacity_quantity) : null,
+            capacity_volume: formData.capacity_volume ? Number(formData.capacity_volume) : null,
+            temperature_control: formData.temperature_control,
+            humidity_control: formData.humidity_control,
+            security_level: formData.security_level || 'normal'
           })
-          .eq('id', editingWarehouseId);
+          .eq('id', editingWarehouseId)
+          .eq('restaurant_id', restaurantId);
+        if (workspaceId) warehouseUpdate = warehouseUpdate.eq('workspace_id', workspaceId);
+        const { error } = await warehouseUpdate;
 
         if (error) throw error;
         toast.success('تم تحديث المخزن بنجاح');
@@ -311,6 +330,7 @@ export function WarehouseManager({ restaurantId, workspaceId, warehouses: propsW
           .from('warehouses')
           .insert({
             restaurant_id: restaurantId,
+            workspace_id: workspaceId || null,
             code: formData.code,
             name: formData.name,
             name_ar: formData.name_ar,
@@ -328,7 +348,17 @@ export function WarehouseManager({ restaurantId, workspaceId, warehouses: propsW
             accounting_account_code: formData.accounting_account_code || null,
             inventory_account_code: formData.inventory_account_code || null,
             cogs_account_code: formData.cogs_account_code || null,
-            notes: formData.notes || null
+            notes: formData.notes || null,
+            location_zone: formData.location_zone || null,
+            aisle: formData.aisle || null,
+            bin: formData.bin || null,
+            floor: formData.floor || null,
+            building: formData.building || null,
+            capacity_quantity: formData.capacity_quantity ? Number(formData.capacity_quantity) : null,
+            capacity_volume: formData.capacity_volume ? Number(formData.capacity_volume) : null,
+            temperature_control: formData.temperature_control,
+            humidity_control: formData.humidity_control,
+            security_level: formData.security_level || 'normal'
           });
 
         if (error) throw error;
@@ -380,18 +410,20 @@ export function WarehouseManager({ restaurantId, workspaceId, warehouses: propsW
   };
 
   const handleDelete = async (id: string) => {
-    if (!confirm('هل أنت متأكد من حذف هذا المخزن؟')) return;
+    if (!canManageWarehouses) { toast.error('ليس لديك صلاحية إدارة المخازن'); return; }
+    if (!confirm('هل أنت متأكد من تعطيل هذا المخزن؟')) return;
 
     try {
       setLoading(true);
       const { error } = await supabase
         .from('warehouses')
-        .delete()
-        .eq('id', id);
+        .update({ deleted_at: new Date().toISOString(), is_active: false })
+        .eq('id', id)
+        .eq('restaurant_id', restaurantId);
 
       if (error) throw error;
 
-      toast.success('تم حذف المخزن بنجاح');
+      toast.success('تم تعطيل المخزن بأمان مع الحفاظ على السجلات');
       onRefresh();
     } catch (error) {
       console.error('Error deleting warehouse:', error);
@@ -727,6 +759,7 @@ export function WarehouseManager({ restaurantId, workspaceId, warehouses: propsW
                                 variant="ghost"
                                 size="icon"
                                 onClick={() => handleEdit(warehouse)}
+                                disabled={!canManageWarehouses}
                               >
                                 <Edit className="h-4 w-4" />
                               </Button>
@@ -734,6 +767,7 @@ export function WarehouseManager({ restaurantId, workspaceId, warehouses: propsW
                                 variant="ghost"
                                 size="icon"
                                 onClick={() => handleDelete(warehouse.id)}
+                                disabled={!canManageWarehouses}
                                 className="text-destructive hover:text-destructive"
                               >
                                 <Trash2 className="h-4 w-4" />
@@ -801,7 +835,7 @@ export function WarehouseManager({ restaurantId, workspaceId, warehouses: propsW
                     <TableCell>{Number(product.cost_price).toLocaleString('ar-EG')} ج.م</TableCell>
                     <TableCell>{Number(product.price).toLocaleString('ar-EG')} ج.م</TableCell>
                     <TableCell>
-                      {selectedWarehouse && selectedWarehouse.type === 'MAIN' && (
+                      {selectedWarehouse && canTransferWarehouses && (
                         <Button
                           variant="ghost"
                           size="sm"
@@ -869,7 +903,7 @@ export function WarehouseManager({ restaurantId, workspaceId, warehouses: propsW
             <Button variant="outline" onClick={() => setTransferDialogOpen(false)}>
               إلغاء
             </Button>
-            <Button onClick={handleTransferProduct} disabled={loading}>
+            <Button onClick={handleTransferProduct} disabled={loading || !canTransferWarehouses}>
               {loading ? 'جاري التحويل...' : 'تحويل'}
             </Button>
           </DialogFooter>

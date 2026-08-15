@@ -323,11 +323,11 @@ export function useDashboardData() {
     const [itemsRes, ordersRes, callsRes, agentsRes, shiftRes, taxesRes, warehousesRes] = await Promise.all([
       usesProductsCatalog
         ? (() => {
-            const query = supabase.from('products').select('id,name,price,category,image,available,restaurant_id,sort_order,barcode,sku,unit,quantity,warehouse_id,workspace_id').eq('restaurant_id', rest.id).order('sort_order');
+            const query = supabase.from('products').select('id,name,price,category,image,available,restaurant_id,sort_order,barcode,sku,unit,quantity,warehouse_id,workspace_id').eq('restaurant_id', rest.id).order('sort_order').limit(500);
             return selectedWorkspaceId ? query.eq('workspace_id', selectedWorkspaceId) : query;
           })()
         : (() => {
-            const query = supabase.from('menu_items').select('*').eq('restaurant_id', rest.id).order('sort_order');
+            const query = supabase.from('menu_items').select('*').eq('restaurant_id', rest.id).order('sort_order').limit(500);
             return selectedWorkspaceId ? query.eq('workspace_id', selectedWorkspaceId) : query;
           })(),
       // Keep the bounded fetch for stability while ensuring all visible orders belong to the active workspace.
@@ -335,13 +335,13 @@ export function useDashboardData() {
         const query = supabase.from('orders').select('*').eq('restaurant_id', rest.id).order('created_at', { ascending: false }).limit(500);
         return selectedWorkspaceId ? query.eq('workspace_id', selectedWorkspaceId) : query;
       })(),
-      supabase.from('waiter_calls').select('*').eq('restaurant_id', rest.id).eq('acknowledged', false).order('created_at', { ascending: false }),
-      supabase.from('delivery_agents').select('*').eq('restaurant_id', rest.id),
+      supabase.from('waiter_calls').select('*').eq('restaurant_id', rest.id).eq('acknowledged', false).order('created_at', { ascending: false }).limit(200),
+      supabase.from('delivery_agents').select('*').eq('restaurant_id', rest.id).limit(200),
       supabase.from('shifts').select('*').eq('restaurant_id', rest.id).eq('status', 'open').maybeSingle(),
-      supabase.from('tax_rates').select('*').eq('restaurant_id', rest.id).eq('is_active', true),
+      supabase.from('tax_rates').select('*').eq('restaurant_id', rest.id).eq('is_active', true).limit(200),
       usesProductsCatalog
         ? (() => {
-            const query = supabase.from('warehouses').select('id,name_ar,name,workspace_id').eq('restaurant_id', rest.id);
+            const query = supabase.from('warehouses').select('id,name_ar,name,workspace_id').eq('restaurant_id', rest.id).limit(200);
             return selectedWorkspaceId ? query.eq('workspace_id', selectedWorkspaceId) : query;
           })()
         : Promise.resolve({ data: [] })
@@ -404,7 +404,7 @@ export function useDashboardData() {
     const ordersBatch = ordersRes.data || [];
     if (ordersBatch.length > 0) {
       const orderIds = ordersBatch.map(o => o.id);
-      const { data: allItems } = await supabase.from('order_items').select('*').in('order_id', orderIds);
+      const { data: allItems } = await supabase.from('order_items').select('*').in('order_id', orderIds).limit(10000);
       const itemsByOrderId = new Map<string, OrderItem[]>();
 
       for (const item of allItems || []) {
@@ -551,7 +551,7 @@ export function useDashboardData() {
         )
         .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'orders', filter: `restaurant_id=eq.${restaurant.id}` },
           async (payload) => {
-            const { data: items } = await supabase.from('order_items').select('*').eq('order_id', payload.new.id);
+            const { data: items } = await supabase.from('order_items').select('*').eq('order_id', payload.new.id).limit(200);
             const newOrder = { ...payload.new, items: (items || []) as OrderItem[] } as unknown as Order;
             setOrders(prev => {
               if (prev.some(order => order.id === newOrder.id)) {

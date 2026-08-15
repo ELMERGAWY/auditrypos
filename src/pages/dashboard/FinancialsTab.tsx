@@ -22,6 +22,13 @@ import { cn } from '@/lib/utils';
 import { hasFeature, type BusinessType } from '@/lib/businessTypes';
 
 type FinancialTab = 'overview' | 'ledger' | 'trial_balance' | 'cash_flow' | 'equity' | 'balance_sheet' | 'trading' | 'projects';
+type AccountingStandard = 'EAS' | 'IFRS' | 'US_GAAP';
+
+const STANDARD_LABELS: Record<AccountingStandard, string> = {
+  EAS: 'المعايير المصرية EAS',
+  IFRS: 'المعايير الدولية IFRS',
+  US_GAAP: 'المعايير الأمريكية US GAAP',
+};
 
 interface Props {
   restaurantId: string;
@@ -45,23 +52,45 @@ export function FinancialsTab({ restaurantId, currency, businessType }: Props) {
   const [customers, setCustomers] = useState<any[]>([]);
   const [projectStats, setProjectStats] = useState<any[]>([]);
   const [period, setPeriod] = useState<'today' | 'week' | 'month' | 'all'>('month');
+  const [companyId, setCompanyId] = useState<string | null>(null);
+  const [accountingStandard, setAccountingStandard] = useState<AccountingStandard>('IFRS');
+  const [standardReport, setStandardReport] = useState<any>(null);
+  const [standardSaving, setStandardSaving] = useState(false);
+  const [standardReportLoading, setStandardReportLoading] = useState(false);
   const [loaded, setLoaded] = useState(false);
 
   const load = async () => {
-    const [ordersRes, orderItemsRes, expensesRes, productsRes, customersRes, projectsRes] = await Promise.all([
-      supabase.from('orders').select('id, total, status, created_at, paid_amount, discount, payment_method').eq('restaurant_id', restaurantId),
-      supabase.from('order_items').select('order_id, quantity, price, cost_price_snapshot, unit_factor').order('order_id'),
-      supabase.from('expenses').select('amount, category, date, project_id').eq('restaurant_id', restaurantId),
-      supabase.from('products').select('price, cost_price, quantity').eq('restaurant_id', restaurantId),
-      supabase.from('customers').select('balance').eq('restaurant_id', restaurantId),
-      hasFeature(businessType, 'projects') ? supabase.from('projects').select('id, name, total_budget').eq('restaurant_id', restaurantId) : Promise.resolve({ data: [] }),
+    const [{ data: restaurant }, ordersRes, orderItemsRes, expensesRes, productsRes, customersRes, projectsRes] = await Promise.all([
+      supabase.from('restaurants').select('company_id').eq('id', restaurantId).maybeSingle(),
+      supabase.from('orders').select('id, total, status, created_at, paid_amount, discount, payment_method').eq('restaurant_id', restaurantId).limit(5000),
+      supabase.from('order_items').select('order_id, quantity, price, cost_price_snapshot, unit_factor').order('order_id').limit(10000),
+      supabase.from('expenses').select('amount, category, date, project_id').eq('restaurant_id', restaurantId).limit(5000),
+      supabase.from('products').select('price, cost_price, quantity').eq('restaurant_id', restaurantId).limit(5000),
+      supabase.from('customers').select('balance').eq('restaurant_id', restaurantId).limit(5000),
+      hasFeature(businessType, 'projects') ? supabase.from('projects').select('id, name, total_budget').eq('restaurant_id', restaurantId).limit(500) : Promise.resolve({ data: [] }),
     ]);
+    const resolvedCompanyId = restaurant?.company_id || null;
+    setCompanyId(resolvedCompanyId);
     setOrders(ordersRes.data || []);
     setOrderItems(orderItemsRes.data || []);
     setExpenses(expensesRes.data || []);
     setProducts(productsRes.data || []);
     setCustomers(customersRes.data || []);
-    
+
+    if (resolvedCompanyId) {
+      const [{ data: settings }, { data: report }] = await Promise.all([
+        (supabase as any).rpc('get_accounting_standard_settings', { p_company_id: resolvedCompanyId }),
+        (supabase as any).rpc('get_financial_report_by_standard', {
+          p_company_id: resolvedCompanyId,
+          p_standard: null,
+          p_period: { start_date: new Date(new Date().getFullYear(), 0, 1).toISOString().slice(0, 10), end_date: new Date().toISOString().slice(0, 10) },
+        }),
+      ]);
+      const selected = (settings?.[0]?.reporting_standard || 'IFRS').toUpperCase().replace('-', '_') as AccountingStandard;
+      if (['EAS', 'IFRS', 'US_GAAP'].includes(selected)) setAccountingStandard(selected);
+      if (report) setStandardReport(report);
+    }
+
     if (projectsRes.data) {
       const stats = projectsRes.data.map(p => {
         const pExpenses = (expensesRes.data || []).filter(e => e.project_id === p.id);
@@ -73,7 +102,7 @@ export function FinancialsTab({ restaurantId, currency, businessType }: Props) {
     setLoaded(true);
   };
 
-  useEffect(() => { load(); }, [restaurantId]);
+  useEffect(() => { void load(); }, [restaurantId]);
 
   const periodLabels: Record<string, string> = { today: 'اليوم', week: 'هذا الأسبوع', month: 'هذا الشهر', all: 'الكل' };
 
@@ -107,9 +136,69 @@ export function FinancialsTab({ restaurantId, currency, businessType }: Props) {
   const filteredOrders = orders.filter(o => o.status !== 'cancelled' && filterDate(o.created_at));
   const filteredExpenses = expenses.filter(e => filterDate(e.date));
 
-  const totalRevenue = filteredOrders.reduce((s, o) => s + Number(o.total), 0);
-  const totalExpenses = filteredExpenses.reduce((s, e) => s + Number(e.amount), 0);
-  const netIncome = totalRevenue - totalExpenses; // Simplified for overview
+  const totalRevenue = filteredOrders.reduce((s, o) => s + Number(o.total || 0), 0);
+  const totalExpenses = filteredExpenses.reduce((s, e) => s + Number(e.amount || 0), 0);
+  const collectedAmount = filteredOrders.reduce((s, o) => s + Math.min(Number(o.total || 0), Math.max(0, Number(o.paid_amount ?? o.total ?? 0))), 0);
+  const netIncome = standardReport?.income_statement?.net_income != null
+    ? Number(standardReport.income_statement.net_income)
+    : totalRevenue - totalExpenses;
+  const collectionRate = totalRevenue > 0 ? Math.min(100, Math.max(0, (collectedAmount / totalRevenue) * 100)) : 0;
+
+  const paymentTotals = filteredOrders.reduce<Record<string, number>>((acc, order) => {
+    const method = order.payment_method || 'غير محدد';
+    acc[method] = (acc[method] || 0) + Number(order.total || 0);
+    return acc;
+  }, {});
+  const paymentTotal = Object.values(paymentTotals).reduce((sum, value) => sum + value, 0);
+  const paymentBreakdown = Object.entries(paymentTotals)
+    .sort(([, a], [, b]) => b - a)
+    .slice(0, 4)
+    .map(([label, value]) => ({ label, value: paymentTotal > 0 ? (value / paymentTotal) * 100 : 0 }));
+
+  const monthlyTrend = Array.from({ length: 6 }, (_, index) => {
+    const monthDate = new Date(now.getFullYear(), now.getMonth() - (5 - index), 1);
+    const month = monthDate.getMonth();
+    const year = monthDate.getFullYear();
+    const inMonth = (value: string) => {
+      const date = new Date(value);
+      return date.getMonth() === month && date.getFullYear() === year;
+    };
+    return {
+      name: monthDate.toLocaleDateString('ar-EG', { month: 'short' }),
+      revenue: orders.filter(order => order.status !== 'cancelled' && inMonth(order.created_at)).reduce((sum, order) => sum + Number(order.total || 0), 0),
+      expense: expenses.filter(expense => inMonth(expense.date)).reduce((sum, expense) => sum + Number(expense.amount || 0), 0),
+    };
+  });
+
+  const loadStandardReport = async (nextStandard: AccountingStandard) => {
+    if (!companyId) return;
+    setStandardSaving(true);
+    setStandardReportLoading(true);
+    try {
+      const { error: saveError } = await (supabase as any).rpc('update_accounting_standard_settings', {
+        p_company_id: companyId,
+        p_reporting_standard: nextStandard,
+        p_inventory_cost_method: nextStandard === 'US_GAAP' ? 'AVERAGE' : 'AVERAGE',
+        p_inventory_write_down_policy: 'LOWER_OF_COST_AND_NRV',
+        p_fiscal_year_start_month: 1,
+        p_effective_from: new Date().toISOString().slice(0, 10),
+      });
+      if (saveError) throw saveError;
+      const { data: report, error: reportError } = await (supabase as any).rpc('get_financial_report_by_standard', {
+        p_company_id: companyId,
+        p_standard: nextStandard,
+        p_period: { start_date: new Date(new Date().getFullYear(), 0, 1).toISOString().slice(0, 10), end_date: new Date().toISOString().slice(0, 10) },
+      });
+      if (reportError) throw reportError;
+      setAccountingStandard(nextStandard);
+      setStandardReport(report);
+    } catch (error: any) {
+      toast.error('تعذر حفظ المعيار المحاسبي: ' + (error?.message || 'تحقق من migration المعايير'));
+    } finally {
+      setStandardSaving(false);
+      setStandardReportLoading(false);
+    }
+  };
 
   return (
     <div className="space-y-8 fade-in">
@@ -119,19 +208,36 @@ export function FinancialsTab({ restaurantId, currency, businessType }: Props) {
           <p className="text-muted-foreground font-medium">الشفافية الكاملة والذكاء المالي لعملك</p>
         </div>
         
-        <div className="flex items-center gap-2 p-1.5 glass-card !rounded-2xl bg-white/5">
-          {(['today', 'week', 'month', 'all'] as const).map(p => (
-            <button 
-              key={p} 
-              onClick={() => setPeriod(p)}
-              className={cn(
-                "px-5 py-2 rounded-xl text-xs font-bold transition-all",
-                period === p ? "gradient-bg text-white shadow-lg" : "text-muted-foreground hover:bg-white/10"
-              )}
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="flex items-center gap-2 p-1.5 glass-card !rounded-2xl bg-white/5">
+            {(['today', 'week', 'month', 'all'] as const).map(p => (
+              <button
+                key={p}
+                onClick={() => setPeriod(p)}
+                className={cn(
+                  "px-5 py-2 rounded-xl text-xs font-bold transition-all",
+                  period === p ? "gradient-bg text-white shadow-lg" : "text-muted-foreground hover:bg-white/10"
+                )}
+              >
+                {periodLabels[p]}
+              </button>
+            ))}
+          </div>
+          <div className="flex items-center gap-2 rounded-2xl border border-indigo-500/20 bg-indigo-500/5 px-3 py-2">
+            <label htmlFor="accounting-standard" className="text-xs font-bold text-muted-foreground">المعيار</label>
+            <select
+              id="accounting-standard"
+              value={accountingStandard}
+              onChange={(event) => void loadStandardReport(event.target.value as AccountingStandard)}
+              disabled={!companyId || standardSaving}
+              className="bg-transparent text-xs font-bold outline-none"
             >
-              {periodLabels[p]}
-            </button>
-          ))}
+              {(Object.keys(STANDARD_LABELS) as AccountingStandard[]).map((standard) => (
+                <option key={standard} value={standard}>{STANDARD_LABELS[standard]}</option>
+              ))}
+            </select>
+            {standardReportLoading && <span className="text-[10px] text-muted-foreground">جاري التحديث...</span>}
+          </div>
         </div>
       </header>
 
@@ -167,7 +273,7 @@ export function FinancialsTab({ restaurantId, currency, businessType }: Props) {
                 { label: 'إجمالي الإيرادات', value: totalRevenue, icon: TrendingUp, color: 'emerald' },
                 { label: 'إجمالي المصروفات', value: totalExpenses, icon: TrendingDown, color: 'rose' },
                 { label: 'صافي الربح', value: netIncome, icon: DollarSign, color: 'indigo' },
-                { label: 'قوة السيولة', value: 85, icon: ShieldCheck, color: 'amber', isPercent: true },
+                { label: 'نسبة التحصيل', value: collectionRate, icon: ShieldCheck, color: 'amber', isPercent: true },
               ].map(kpi => (
                 <div key={kpi.label} className="glass-card p-6 flex flex-col gap-4">
                   <div className={cn("w-12 h-12 rounded-2xl flex items-center justify-center glow-soft", `bg-${kpi.color}-500/10 text-${kpi.color}-500`)}>
@@ -192,14 +298,7 @@ export function FinancialsTab({ restaurantId, currency, businessType }: Props) {
                 <div className="h-[350px]">
                   {/* Chart component logic here... simplified for now */}
                   <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={[
-                      { name: 'يناير', revenue: 4000, expense: 2400 },
-                      { name: 'فبراير', revenue: 3000, expense: 1398 },
-                      { name: 'مارس', revenue: 2000, expense: 9800 },
-                      { name: 'ابريل', revenue: 2780, expense: 3908 },
-                      { name: 'مايو', revenue: 1890, expense: 4800 },
-                      { name: 'يونيو', revenue: 2390, expense: 3800 },
-                    ]}>
+                    <BarChart data={monthlyTrend}>
                       <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(255,255,255,0.05)" />
                       <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: 'gray' }} />
                       <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: 'gray' }} />
@@ -223,22 +322,18 @@ export function FinancialsTab({ restaurantId, currency, businessType }: Props) {
               <div className="glass-card p-8 flex flex-col gap-6">
                 <h3 className="text-xl font-black flex items-center gap-2"><ArrowRightLeft className="w-6 h-6 text-indigo-500" /> ميزان المدفوعات</h3>
                 <div className="space-y-6">
-                  {[
-                    { label: 'كاش (نقدي)', value: 65, color: '#10b981' },
-                    { label: 'إنستاباي', value: 25, color: '#6366f1' },
-                    { label: 'آجل', value: 10, color: '#f59e0b' },
-                  ].map(payment => (
+                  {(paymentBreakdown.length > 0 ? paymentBreakdown : [{ label: 'لا توجد بيانات', value: 0 }]).map((payment, index) => (
                     <div key={payment.label} className="space-y-2">
                       <div className="flex justify-between text-xs font-bold">
                         <span>{payment.label}</span>
-                        <span>{payment.value}%</span>
+                        <span>{payment.value.toFixed(1)}%</span>
                       </div>
                       <div className="h-2 w-full bg-white/5 rounded-full overflow-hidden">
-                        <motion.div 
+                        <motion.div
                           initial={{ width: 0 }}
                           animate={{ width: `${payment.value}%` }}
                           className="h-full rounded-full"
-                          style={{ backgroundColor: payment.color }}
+                          style={{ backgroundColor: ['#10b981', '#6366f1', '#f59e0b', '#f43f5e'][index] }}
                         />
                       </div>
                     </div>
@@ -246,8 +341,8 @@ export function FinancialsTab({ restaurantId, currency, businessType }: Props) {
                 </div>
                 
                 <div className="mt-auto p-4 rounded-[2rem] bg-indigo-500/5 border border-indigo-500/10 text-center">
-                  <p className="text-xs text-muted-foreground">السيولة النقدية المتوفرة حالياً</p>
-                  <p className="text-2xl font-black text-indigo-600 mt-1">45,200 {currency}</p>
+                  <p className="text-xs text-muted-foreground">التحصيل المسجل خلال الفترة</p>
+                  <p className="text-2xl font-black text-indigo-600 mt-1">{collectedAmount.toLocaleString()} {currency}</p>
                 </div>
               </div>
             </div>

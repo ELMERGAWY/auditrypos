@@ -1,7 +1,7 @@
 // @ts-nocheck
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Plus, History, X, ArrowRightLeft, Package, Trash2 } from 'lucide-react';
+import { Plus, History, X, ArrowRightLeft, Package, Trash2, Search, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -55,6 +55,10 @@ export function InventoryTransfersManager({
   const [transfers, setTransfers] = useState<Transfer[]>([]);
   const [showTransfer, setShowTransfer] = useState(false);
   const [form, setForm] = useState({ from_wh: '', to_wh: '', product_id: '', quantity: '', notes: '' });
+  const [productSearch, setProductSearch] = useState('');
+  const [sourceStock, setSourceStock] = useState<Record<string, number>>({});
+  const [loadingSourceStock, setLoadingSourceStock] = useState(false);
+  const [processingTransfer, setProcessingTransfer] = useState(false);
 
   const loadTransfers = async () => {
     try {
@@ -117,10 +121,45 @@ export function InventoryTransfersManager({
   };
 
   useEffect(() => {
-    if (restaurantId && warehouses.length > 0 && products.length > 0) {
-      loadTransfers();
-    }
-  }, [restaurantId, workspaceId, warehouses, products]);
+    if (restaurantId && warehouses.length > 0) loadTransfers();
+  }, [restaurantId, workspaceId, warehouses.length, products.length]);
+
+  useEffect(() => {
+    let cancelled = false;
+    const loadSourceStock = async () => {
+      if (!form.from_wh) {
+        setSourceStock({});
+        return;
+      }
+      setLoadingSourceStock(true);
+      let query = supabase
+        .from('warehouse_stock')
+        .select('product_id, quantity')
+        .eq('restaurant_id', restaurantId)
+        .eq('warehouse_id', form.from_wh);
+      if (workspaceId) query = query.eq('workspace_id', workspaceId);
+      const { data, error } = await query;
+      if (!cancelled) {
+        if (error) {
+          toast.error('تعذر تحميل رصيد المخزن المصدر');
+          setSourceStock({});
+        } else {
+          setSourceStock(Object.fromEntries((data || []).map((row: any) => [row.product_id, Number(row.quantity || 0)])));
+        }
+        setLoadingSourceStock(false);
+      }
+    };
+    loadSourceStock();
+    return () => { cancelled = true; };
+  }, [restaurantId, workspaceId, form.from_wh]);
+
+  const availableProducts = products
+    .filter(product => {
+      const sourceQuantity = form.from_wh ? (sourceStock[product.id] || 0) : 0;
+      const haystack = `${product.name} ${product.barcode || ''} ${product.id}`.toLowerCase();
+      return sourceQuantity > 0 && haystack.includes(productSearch.trim().toLowerCase());
+    })
+    .sort((a, b) => a.name.localeCompare(b.name, 'ar'));
 
   const handleTransfer = async () => {
     if (!form.from_wh || !form.to_wh || !form.product_id || !form.quantity)
@@ -137,6 +176,7 @@ export function InventoryTransfersManager({
         return;
       }
 
+      setProcessingTransfer(true);
       // Use the workspace-aware SECURITY DEFINER RPC to execute transfer atomically.
       const { data: result, error: rpcError } = await (supabase as any).rpc('execute_inventory_transfer_v2', {
         p_restaurant_id: restaurantId,
@@ -157,74 +197,40 @@ export function InventoryTransfersManager({
         return;
       }
 
-      // ── Double-Entry Journal for Inventory Transfer ──
-      // Debit: Inventory at receiving warehouse (1300)
-      // Credit: Inventory at sending warehouse (1300)
-      try {
-        const product = products.find(p => p.id === form.product_id);
-        const fromWh = warehouses.find(w => w.id === form.from_wh);
-        const toWh = warehouses.find(w => w.id === form.to_wh);
-        const unitCost = Number(product?.cost_price || 0);
-        const transferValue = qty * unitCost;
-
-        if (transferValue > 0 && product) {
-          const { journalService } = await import('@/lib/accounting/journalService');
-          const inventoryAcc = await journalService.getAccountByCode(restaurantId, '1300');
-          if (inventoryAcc) {
-            const description = `تحويل مخزون: ${product.name} (${qty} وحدة) من ${fromWh?.name || 'مخزن'} إلى ${toWh?.name || 'مخزن'}`;
-            await journalService.createJournalEntry(restaurantId, {
-              entry_date: new Date(),
-              description,
-              source: 'inventory',
-              reference_number: `XFER-${Date.now()}`,
-              lines: [
-                // Debit: receiving warehouse inventory
-                { account_id: inventoryAcc.id, debit: transferValue, credit: 0, description: `استلام مخزون — ${toWh?.name || 'مخزن وجهة'}` },
-                // Credit: sending warehouse inventory
-                { account_id: inventoryAcc.id, debit: 0, credit: transferValue, description: `إرسال مخزون — ${fromWh?.name || 'مخزن مصدر'}` },
-              ]
-            });
-          }
-        }
-      } catch (journalErr: any) {
-        console.warn('Journal posting for transfer skipped:', journalErr.message);
-      }
-
       toast.success('تم تنفيذ التحويل بنجاح وتحديث أرصدة المستودعات');
       setShowTransfer(false);
+      setProductSearch('');
       setForm({ from_wh: '', to_wh: '', product_id: '', quantity: '', notes: '' });
-      loadTransfers();
+      await loadTransfers();
       onRefresh();
     } catch (error: any) {
       console.error('Transfer error:', error);
       toast.error('فشل التحويل: ' + (error.message || 'خطأ غير معروف'));
+    } finally {
+      setProcessingTransfer(false);
     }
   };
 
-
-  const handleDeleteTransfer = async (id: string) => {
-    if (!confirm('هل أنت متأكد من حذف هذا التحويل؟ (لن يتم استرجاع الكميات تلقائياً، هذا الإجراء يحذف السجل فقط)')) return;
+  const handleVoidTransfer = async (id: string) => {
+    if (!workspaceId) return toast.error('لا يوجد فرع نشط لعكس التحويل');
+    if (!confirm('سيتم عكس حركة المخزون وإنشاء أثر محاسبي. هل تريد المتابعة؟')) return;
     try {
-      // 1. Delete transfer items
-      const { error: itemsError } = await supabase
-        .from('inventory_transfer_items')
-        .delete()
-        .eq('transfer_id', id);
-      if (itemsError) throw itemsError;
-
-      // 2. Delete transfer log
-      const { error: transferError } = await supabase
-        .from('inventory_transfers')
-        .delete()
-        .eq('id', id);
-      if (transferError) throw transferError;
-
-      toast.success('تم حذف سجل التحويل بنجاح');
-      loadTransfers();
+      setProcessingTransfer(true);
+      const { data, error } = await (supabase as any).rpc('void_inventory_transfer_v2', {
+        p_restaurant_id: restaurantId,
+        p_workspace_id: workspaceId,
+        p_transfer_id: id,
+        p_reason: 'عكس التحويل من شاشة إدارة المخزون',
+      });
+      if (error) throw error;
+      if (!data?.success) throw new Error(data?.error || 'فشل عكس التحويل');
+      toast.success(data.replayed ? 'التحويل معكوس بالفعل' : 'تم عكس التحويل وتحديث الأرصدة');
+      await loadTransfers();
       onRefresh();
     } catch (error: any) {
-      console.error('Delete transfer error:', error);
-      toast.error('فشل الحذف: ' + error.message);
+      toast.error('فشل عكس التحويل: ' + (error.message || 'خطأ غير معروف'));
+    } finally {
+      setProcessingTransfer(false);
     }
   };
 
@@ -270,7 +276,10 @@ export function InventoryTransfersManager({
                     ))}
                   </td>
                   <td className="p-3">
-                    <Badge className="bg-success/10 text-success border-0 text-[10px]">مكتمل</Badge>
+                                          <Badge className={t.status === 'voided' ? 'bg-destructive/10 text-destructive border-0 text-[10px]' : 'bg-success/10 text-success border-0 text-[10px]'}>
+                        {t.status === 'voided' ? 'معكوس' : t.status === 'shipped' ? 'مشحون' : 'مكتمل'}
+                      </Badge>
+
                   </td>
                   <td className="p-3 text-muted-foreground truncate max-w-[150px]">{t.notes || '---'}</td>
                   <td className="p-3 text-center">
@@ -278,10 +287,11 @@ export function InventoryTransfersManager({
                       size="sm"
                       variant="ghost"
                       className="h-7 w-7 p-0 text-destructive hover:bg-destructive/10 rounded-lg"
-                      onClick={() => handleDeleteTransfer(t.id)}
-                      title="حذف سجل التحويل"
+                      onClick={() => handleVoidTransfer(t.id)}
+                      disabled={processingTransfer || t.status === 'voided'}
+                      title="عكس التحويل مع استرجاع الكمية"
                     >
-                      <Trash2 className="w-3.5 h-3.5" />
+                      {processingTransfer ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
                     </Button>
                   </td>
                 </tr>
@@ -319,7 +329,7 @@ export function InventoryTransfersManager({
                   <Label className="text-[10px] mb-1 block mr-1">من مستودع</Label>
                   <select
                     value={form.from_wh}
-                    onChange={e => setForm({ ...form, from_wh: e.target.value })}
+                    onChange={e => setForm({ ...form, from_wh: e.target.value, product_id: '', quantity: '' })}
                     className="w-full h-11 rounded-xl border border-input bg-background px-3 text-sm"
                   >
                     <option value="">-- اختر المصدر --</option>
@@ -345,18 +355,32 @@ export function InventoryTransfersManager({
 
                 <div>
                   <Label className="text-[10px] mb-1 block mr-1">الصنف المراد تحويله</Label>
+                  <div className="relative mb-2">
+                    <Search className="w-4 h-4 absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                    <Input
+                      value={productSearch}
+                      onChange={e => setProductSearch(e.target.value)}
+                      placeholder="ابحث بالاسم أو الباركود..."
+                      className="pr-9 h-10 rounded-xl"
+                      disabled={!form.from_wh}
+                    />
+                  </div>
                   <select
                     value={form.product_id}
                     onChange={e => setForm({ ...form, product_id: e.target.value })}
                     className="w-full h-11 rounded-xl border border-input bg-background px-3 text-sm"
+                    disabled={!form.from_wh || loadingSourceStock}
                   >
-                    <option value="">-- اختر الصنف --</option>
-                    {products.map(p => (
+                    <option value="">{!form.from_wh ? '-- اختر المخزن المصدر أولاً --' : loadingSourceStock ? 'جاري تحميل الرصيد...' : '-- اختر الصنف المتاح --'}</option>
+                    {availableProducts.map(p => (
                       <option key={p.id} value={p.id}>
-                        {p.name} ({p.quantity ?? 0} {p.unit || 'وحدة'})
+                        {p.name} ({sourceStock[p.id] || 0} {p.unit || 'وحدة'})
                       </option>
                     ))}
                   </select>
+                  {form.from_wh && !loadingSourceStock && availableProducts.length === 0 && (
+                    <p className="text-[10px] text-muted-foreground mt-1">لا يوجد صنف برصيد موجب يطابق البحث في المخزن المصدر.</p>
+                  )}
                 </div>
 
                 <Input
@@ -377,6 +401,7 @@ export function InventoryTransfersManager({
               <div className="flex gap-2">
                 <Button
                   onClick={handleTransfer}
+                  disabled={processingTransfer || loadingSourceStock || !form.from_wh || !form.to_wh || !form.product_id}
                   className="flex-1 h-11 gradient-bg text-primary-foreground border-0 rounded-xl font-bold"
                 >
                   تنفيذ التحويل

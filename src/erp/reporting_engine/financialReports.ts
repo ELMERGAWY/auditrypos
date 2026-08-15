@@ -11,6 +11,7 @@
  */
 
 import { supabase } from '@/integrations/supabase/client';
+import { signedProfitBalance, safeNetProfit } from '@/lib/analytics/profitability';
 
 export interface TrialBalanceReport {
   as_of_date: string;
@@ -317,9 +318,7 @@ export class FinancialReportingEngine {
       lines?.forEach((l: any) => {
         const acc = (accounts || []).find(a => a.id === l.account_id);
         if (!acc) return;
-        const isRev = acc.account_type === 'revenue';
-        // revenue normal credit -> credit-debit; expense normal debit -> debit-credit
-        const delta = isRev ? (l.credit - l.debit) : (l.debit - l.credit);
+        const delta = signedProfitBalance(acc.account_type, l.debit, l.credit);
         balanceMap.set(l.account_id, (balanceMap.get(l.account_id) || 0) + delta);
       });
     }
@@ -364,28 +363,23 @@ export class FinancialReportingEngine {
     };
 
     for (const acc of accounts || []) {
-      const balance = Math.abs((acc as any).current_balance || 0);
+      const balance = Number((acc as any).current_balance || 0);
+      if (!Number.isFinite(balance) || Math.abs(balance) < 0.005) continue;
 
-      // Revenue classification
+      // Revenue classification follows the current chart template: 4.01 = sales, 4.02 = other revenue.
       if (acc.account_type === 'revenue') {
-        if (acc.code.startsWith('4.01')) report.revenue.service_revenue += balance;
-        else if (acc.code.startsWith('4.02')) report.revenue.sales_revenue += balance;
-        else if (acc.code.startsWith('4.03')) report.revenue.food_revenue += balance;
+        if (acc.code.startsWith('4.01')) report.revenue.sales_revenue += balance;
         else report.revenue.other_revenue += balance;
         report.revenue.total += balance;
       }
-      // COGS classification
-      else if (acc.code.startsWith('5.01')) {
-        if (acc.name.toLowerCase().includes('food')) {
-          report.cogs.food_cost += balance;
-        } else if (acc.name.toLowerCase().includes('material')) {
-          report.cogs.materials += balance;
-        } else {
-          report.cogs.other += balance;
-        }
+      // COGS is an expense subtype under 5.01 and remains debit-positive.
+      else if (acc.account_type === 'expense' && acc.code.startsWith('5.01')) {
+        if (acc.name.toLowerCase().includes('food')) report.cogs.food_cost += balance;
+        else if (acc.name.toLowerCase().includes('material')) report.cogs.materials += balance;
+        else report.cogs.other += balance;
         report.cogs.total += balance;
       }
-      // Expense classification
+      // Operating expense classification.
       else if (acc.account_type === 'expense') {
         if (acc.code.startsWith('6.01')) report.operating_expenses.salaries += balance;
         else if (acc.code.startsWith('6.02')) report.operating_expenses.rent += balance;
@@ -409,7 +403,14 @@ export class FinancialReportingEngine {
       : 0;
     
     report.net_profit_before_tax = report.operating_profit + report.other_income - report.other_expenses;
-    report.net_profit = report.net_profit_before_tax - report.tax;
+    report.net_profit = safeNetProfit(
+      report.revenue.total,
+      report.cogs.total,
+      report.operating_expenses.total,
+      report.other_income,
+      report.other_expenses,
+      report.tax,
+    );
     report.net_margin = report.revenue.total > 0 
       ? (report.net_profit / report.revenue.total) * 100 
       : 0;

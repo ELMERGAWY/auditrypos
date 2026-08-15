@@ -44,7 +44,7 @@ interface Props {
   isOwner?: boolean;
 }
 
-export function SalesInvoices({ restaurantId, currency, restaurant, isSuperAdmin, isOwner }: Props) {
+export function SalesInvoices({ restaurantId, workspaceId, currency, restaurant, isSuperAdmin, isOwner }: Props) {
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [loading, setLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -80,7 +80,7 @@ export function SalesInvoices({ restaurantId, currency, restaurant, isSuperAdmin
       loadMenuItems();
       loadProducts();
     }
-  }, [restaurantId]);
+  }, [restaurantId, workspaceId]);
 
   // Auto-update price when item is selected
   useEffect(() => {
@@ -91,16 +91,21 @@ export function SalesInvoices({ restaurantId, currency, restaurant, isSuperAdmin
   }, [selectedItem]);
 
   const loadMenuItems = async () => {
-    const { data } = await supabase.from('menu_items').select('*').eq('restaurant_id', restaurantId);
+    let query = supabase.from('menu_items').select('*').eq('restaurant_id', restaurantId).limit(1000);
+    if (workspaceId) query = query.eq('workspace_id', workspaceId);
+    const { data } = await query;
     setMenuItems(data || []);
   };
 
   const loadProducts = async () => {
-    const { data } = await supabase.from('products').select('*').eq('restaurant_id', restaurantId);
+    let productsQuery = supabase.from('products').select('*').eq('restaurant_id', restaurantId).limit(1000);
+    let stockQuery = supabase.from('warehouse_stock').select('product_id, quantity, warehouse_id, workspace_id').eq('restaurant_id', restaurantId).limit(2000);
+    if (workspaceId) {
+      productsQuery = productsQuery.eq('workspace_id', workspaceId);
+      stockQuery = stockQuery.eq('workspace_id', workspaceId);
+    }
+    const [{ data }, { data: stockData }] = await Promise.all([productsQuery, stockQuery]);
     setProducts(data || []);
-    
-    // Load warehouse stocks for inventory display
-    const { data: stockData } = await supabase.from('warehouse_stock').select('product_id, quantity, warehouse_id').eq('restaurant_id', restaurantId);
     setWarehouseStocks(stockData || []);
   };
 
@@ -120,7 +125,7 @@ export function SalesInvoices({ restaurantId, currency, restaurant, isSuperAdmin
 
   useEffect(() => {
     loadInvoices();
-  }, [restaurantId]);
+  }, [restaurantId, workspaceId]);
 
   const loadInvoices = async () => {
     try {
@@ -215,6 +220,7 @@ export function SalesInvoices({ restaurantId, currency, restaurant, isSuperAdmin
         .from('orders')
         .insert({
           restaurant_id: restaurantId,
+          workspace_id: workspaceId || null,
           order_number: orderNumber,
           customer_name: form.customer_name,
           total: amount,
@@ -281,8 +287,9 @@ export function SalesInvoices({ restaurantId, currency, restaurant, isSuperAdmin
     const { data: freshInvoice } = await supabase
       .from('orders')
       .select('*')
-      .eq('id', invoice.id)
-      .single();
+        .eq('id', invoice.id)
+        .eq('restaurant_id', restaurantId)
+        .single();
 
     if (freshInvoice) {
       setForm({

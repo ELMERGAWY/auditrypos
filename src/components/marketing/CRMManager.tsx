@@ -4,7 +4,7 @@ import {
   Users, Plus, Search, Filter, DollarSign, Calendar,
   TrendingUp, Edit2, Trash2, MoreVertical, Phone, Mail,
   Building2, CheckCircle, XCircle, Clock, AlertTriangle,
-  ArrowRight, ArrowLeft
+  ArrowRight, ArrowLeft, RefreshCw
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -43,6 +43,16 @@ interface PipelineStage {
   probability_percentage: number;
 }
 
+interface FollowUp {
+  id: string;
+  lead_id?: string | null;
+  title: string;
+  due_at: string;
+  status: 'pending' | 'in_progress' | 'completed' | 'cancelled' | 'overdue';
+  priority: 'low' | 'medium' | 'high' | 'urgent';
+  assigned_to?: string | null;
+}
+
 interface Props {
   restaurantId: string;
   currency: string;
@@ -79,6 +89,8 @@ export function CRMManager({ restaurantId, currency }: Props) {
   const [showLeadForm, setShowLeadForm] = useState(false);
   const [showStageForm, setShowStageForm] = useState(false);
   const [editingLead, setEditingLead] = useState<Lead | null>(null);
+  const [followUps, setFollowUps] = useState<FollowUp[]>([]);
+  const [automationLoading, setAutomationLoading] = useState(false);
 
   const [leadForm, setLeadForm] = useState({
     company_name: '',
@@ -130,6 +142,56 @@ export function CRMManager({ restaurantId, currency }: Props) {
     }
   };
 
+  const loadFollowUps = async () => {
+    try {
+      const { data, error } = await (supabase as any)
+        .from('marketing_crm_followups')
+        .select('id, lead_id, title, due_at, status, priority, assigned_to')
+        .eq('restaurant_id', restaurantId)
+        .in('status', ['pending', 'in_progress', 'overdue'])
+        .order('due_at', { ascending: true })
+        .limit(12);
+      if (error) throw error;
+      setFollowUps((data || []) as FollowUp[]);
+    } catch (error) {
+      // The CRM remains usable before the additive migration is applied.
+      console.warn('CRM follow-ups are unavailable until migration 20260815060000 is applied.', error);
+      setFollowUps([]);
+    }
+  };
+
+  const runAutomation = async () => {
+    setAutomationLoading(true);
+    try {
+      const { data, error } = await (supabase as any).rpc('run_marketing_crm_automation', {
+        p_restaurant_id: restaurantId,
+        p_limit: 100,
+      });
+      if (error) throw error;
+      toast.success(`تمت معالجة ${Number(data || 0)} متابعة/تعيين`);
+      await Promise.all([loadLeads(), loadFollowUps()]);
+    } catch (error: any) {
+      toast.error('تعذر تشغيل المتابعة التلقائية: ' + (error?.message || 'تحقق من تطبيق migration CRM'));
+    } finally {
+      setAutomationLoading(false);
+    }
+  };
+
+  const completeFollowUp = async (followUpId: string) => {
+    try {
+      const { error } = await (supabase as any)
+        .from('marketing_crm_followups')
+        .update({ status: 'completed', completed_at: new Date().toISOString() })
+        .eq('id', followUpId)
+        .eq('restaurant_id', restaurantId);
+      if (error) throw error;
+      setFollowUps((items) => items.filter((item) => item.id !== followUpId));
+      toast.success('تم إغلاق المتابعة');
+    } catch (error: any) {
+      toast.error('تعذر إغلاق المتابعة: ' + error.message);
+    }
+  };
+
   const loadPipelineStages = async () => {
     try {
       const { data, error } = await supabase
@@ -172,6 +234,7 @@ export function CRMManager({ restaurantId, currency }: Props) {
   useEffect(() => {
     loadLeads();
     loadPipelineStages();
+    loadFollowUps();
   }, [restaurantId]);
 
   const handleSaveLead = async () => {
@@ -407,6 +470,35 @@ export function CRMManager({ restaurantId, currency }: Props) {
           </div>
         </Card>
       </div>
+
+      {/* Automated follow-up workspace */}
+      <Card className="p-4 border-primary/20 bg-primary/5">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
+          <div>
+            <h2 className="font-bold flex items-center gap-2"><RefreshCw className="w-4 h-4 text-primary" /> المتابعات والتعيين التلقائي</h2>
+            <p className="text-xs text-muted-foreground mt-1">يعيّن العملاء غير المملوكين للمندوب الأقل حملاً وينشئ متابعة idempotent دون تعديل الطلبات أو العملاء.</p>
+          </div>
+          <Button variant="outline" onClick={runAutomation} disabled={automationLoading}>
+            <RefreshCw className={`w-4 h-4 ml-2 ${automationLoading ? 'animate-spin' : ''}`} />
+            {automationLoading ? 'جاري المعالجة...' : 'تشغيل المتابعة الآن'}
+          </Button>
+        </div>
+        {followUps.length > 0 ? (
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-2 mt-4">
+            {followUps.slice(0, 6).map((followUp) => (
+              <div key={followUp.id} className="flex items-center justify-between gap-3 rounded-lg border border-border/60 bg-background/50 p-3">
+                <div className="min-w-0">
+                  <p className="font-medium text-sm truncate">{followUp.title}</p>
+                  <p className="text-xs text-muted-foreground">{new Date(followUp.due_at).toLocaleString('ar-EG')} · {followUp.status === 'overdue' ? 'متأخرة' : 'مستحقة'}</p>
+                </div>
+                <Button size="sm" variant="ghost" onClick={() => completeFollowUp(followUp.id)}>إتمام</Button>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <p className="text-xs text-muted-foreground mt-3">لا توجد متابعات مستحقة حالياً.</p>
+        )}
+      </Card>
 
       {/* View Toggle */}
       <div className="flex gap-4">
