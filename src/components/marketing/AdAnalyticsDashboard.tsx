@@ -53,6 +53,9 @@ export function AdAnalyticsDashboard({ restaurantId, currency }: Props) {
   const [loading, setLoading] = useState(false);
   const [syncing, setSyncing] = useState(false);
   const [campaignActionId, setCampaignActionId] = useState<string | null>(null);
+  const [accountingBusy, setAccountingBusy] = useState(false);
+  const [spendCurrency, setSpendCurrency] = useState((currency || '').toUpperCase());
+  const [exchangeRate, setExchangeRate] = useState('1');
   const [dateRange, setDateRange] = useState('30');
   const [selectedPlatform, setSelectedPlatform] = useState('all');
   const [selectedCampaign, setSelectedCampaign] = useState('all');
@@ -118,15 +121,52 @@ export function AdAnalyticsDashboard({ restaurantId, currency }: Props) {
     }
   };
 
+  const getSelectedDateRange = () => {
+    const dateTo = new Date().toISOString().slice(0, 10);
+    const dateFrom = new Date();
+    dateFrom.setDate(dateFrom.getDate() - parseInt(dateRange));
+    return { dateFrom: dateFrom.toISOString().slice(0, 10), dateTo };
+  };
+
+  const materializeSpend = async () => {
+    if (!spendCurrency || !selectedAdAccount) return toast.error('اختر حساب Meta وأدخل عملة الإنفاق');
+    setAccountingBusy(true);
+    try {
+      const { dateFrom, dateTo } = getSelectedDateRange();
+      const { data, error } = await supabase.functions.invoke('social-ads', {
+        body: { action: 'materialize_spend', restaurantId, currency: spendCurrency.toUpperCase(), exchangeRate: Number(exchangeRate), dateFrom, dateTo },
+      });
+      if (error || !data?.success) throw new Error(error?.message || data?.error || 'تعذر تسجيل الإنفاق');
+      toast.success(`تم تسجيل ${data.materialized || 0} مصروف إعلاني للمراجعة المحاسبية`);
+    } catch (error: any) {
+      toast.error(error?.message || 'تعذر تسجيل الإنفاق');
+    } finally {
+      setAccountingBusy(false);
+    }
+  };
+
+  const postAccounting = async () => {
+    setAccountingBusy(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('social-ads', {
+        body: { action: 'post_accounting', restaurantId, batchSize: 25 },
+      });
+      if (error || !data?.success) throw new Error(error?.message || data?.error || 'تعذر ترحيل القيود');
+      toast.success(`تم ترحيل ${data.posted || 0} قيد إعلاني`);
+    } catch (error: any) {
+      toast.error(error?.message || 'تعذر ترحيل القيود');
+    } finally {
+      setAccountingBusy(false);
+    }
+  };
+
   const syncMetaInsights = async () => {
     if (!selectedAdAccount) return toast.error('اختر حساباً إعلانياً متصلاً أولاً');
     setSyncing(true);
     try {
-      const to = new Date().toISOString().slice(0, 10);
-      const fromDate = new Date();
-      fromDate.setDate(fromDate.getDate() - parseInt(dateRange));
+      const { dateFrom, dateTo } = getSelectedDateRange();
       const { data, error } = await supabase.functions.invoke('social-ads', {
-        body: { action: 'sync', restaurantId, socialAccountId: selectedAdAccount, dateFrom: fromDate.toISOString().slice(0, 10), dateTo: to },
+        body: { action: 'sync', restaurantId, socialAccountId: selectedAdAccount, dateFrom, dateTo },
       });
       if (error || !data?.success) throw new Error(error?.message || data?.error || 'فشل مزامنة Meta Insights');
       toast.success(`تمت مزامنة ${data.campaignsSynced || 0} حملة و${data.insightsSynced || 0} سجل Insights`);
@@ -294,6 +334,25 @@ export function AdAnalyticsDashboard({ restaurantId, currency }: Props) {
               </Select>
             </div>
           )}
+        </div>
+      </Card>
+
+      <Card className="p-4 border-amber-500/30">
+        <div className="flex items-center justify-between gap-4 flex-wrap">
+          <div>
+            <h3 className="font-bold">الربط المحاسبي للإنفاق</h3>
+            <p className="text-xs text-muted-foreground">يتم التسجيل والترحيل يدوياً بعد مراجعة العملة وسعر الصرف. لا ينشئ زر المزامنة قيداً تلقائياً.</p>
+          </div>
+          <div className="flex items-center gap-2 flex-wrap">
+            <Input className="w-24" value={spendCurrency} onChange={(event) => setSpendCurrency(event.target.value.toUpperCase())} maxLength={3} placeholder="EGP" aria-label="عملة الإنفاق" />
+            <Input className="w-28" type="number" min="0.000001" step="0.000001" value={exchangeRate} onChange={(event) => setExchangeRate(event.target.value)} aria-label="سعر الصرف" />
+            <Button size="sm" variant="outline" onClick={materializeSpend} disabled={accountingBusy}>
+              تسجيل الإنفاق
+            </Button>
+            <Button size="sm" onClick={postAccounting} disabled={accountingBusy}>
+              ترحيل القيود
+            </Button>
+          </div>
         </div>
       </Card>
 

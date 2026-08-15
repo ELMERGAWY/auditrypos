@@ -249,6 +249,65 @@ Deno.serve(async (req) => {
       return json({ success: true, ...(await syncInsights(admin, restaurantId, user.id, account, from, to)) });
     }
 
+    if (action === 'materialize_spend') {
+      await assertPermission(admin, restaurantId, user.id, 'marketing.ads.manage');
+      await assertPermission(admin, restaurantId, user.id, 'finance.access');
+      const currency = String(body.currency || '').trim().toUpperCase();
+      const exchangeRate = Number(body.exchangeRate || 1);
+      const dateFrom = String(body.dateFrom || '');
+      const dateTo = String(body.dateTo || '');
+      if (!/^[A-Z]{3}$/.test(currency) || !/^\d{4}-\d{2}-\d{2}$/.test(dateFrom) || !/^\d{4}-\d{2}-\d{2}$/.test(dateTo) || dateFrom > dateTo || !Number.isFinite(exchangeRate) || exchangeRate <= 0) {
+        return json({ error: 'Valid currency, date range, and positive exchange rate are required' }, 400);
+      }
+      const { data: performance, error: performanceError } = await admin.from('marketing_ad_performance')
+        .select('id, platform, external_ad_account_id, external_campaign_id, campaign_name, campaign_id, metric_date, spend, raw_data')
+        .eq('restaurant_id', restaurantId)
+        .gte('metric_date', dateFrom)
+        .lte('metric_date', dateTo)
+        .gt('spend', 0);
+      if (performanceError) throw performanceError;
+      let materialized = 0;
+      for (const row of performance || []) {
+        const externalMetricKey = `${row.platform}:${row.external_ad_account_id || 'unknown'}:${row.external_campaign_id || row.campaign_id || 'unknown'}:${row.metric_date}`;
+        const { data: expense, error: expenseError } = await admin.from('marketing_ad_spend_expenses').upsert({
+          restaurant_id: restaurantId,
+          platform: row.platform || 'facebook',
+          platform_account_id: row.external_ad_account_id || null,
+          campaign_name: row.campaign_name || null,
+          campaign_id: row.external_campaign_id || null,
+          spend_amount: Number(row.spend || 0),
+          currency,
+          exchange_rate: exchangeRate,
+          spend_date: row.metric_date,
+          status: 'verified',
+          accounting_status: 'queued',
+          source_metric_id: row.id,
+          external_metric_key: externalMetricKey,
+          metadata: { source: 'meta_insights', performance_id: row.id, raw_data: row.raw_data || {} },
+          updated_at: new Date().toISOString(),
+        }, { onConflict: 'restaurant_id,external_metric_key' }).select('id').single();
+        if (expenseError || !expense) throw expenseError || new Error('Could not materialize ad spend');
+        const { error: outboxError } = await admin.from('marketing_accounting_outbox').upsert({
+          restaurant_id: restaurantId,
+          expense_id: expense.id,
+          status: 'pending',
+          available_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        }, { onConflict: 'expense_id' });
+        if (outboxError) throw outboxError;
+        materialized += 1;
+      }
+      return json({ success: true, materialized });
+    }
+
+    if (action === 'post_accounting') {
+      await assertPermission(admin, restaurantId, user.id, 'finance.access');
+      const batchSize = Math.min(Math.max(Number(body.batchSize || 25), 1), 100);
+      const { data, error } = await admin.rpc('process_marketing_accounting_outbox', { p_batch_size: batchSize });
+      if (error) throw error;
+      return json({ success: true, posted: Number(data || 0) });
+    }
+
     if (action === 'update_status') {
       await assertPermission(admin, restaurantId, user.id, 'marketing.ads.manage');
       const campaignId = String(body.campaignId || '');
