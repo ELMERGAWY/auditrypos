@@ -5,6 +5,7 @@ import {
   ShoppingCart, PieChart, ArrowUpRight, ArrowDownRight, Activity
 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
+import { buildOperationalProfitSummary } from '@/lib/analytics/profitability';
 import { 
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, 
   LineChart, Line, AreaChart, Area, Cell, PieChart as RePieChart, Pie 
@@ -23,7 +24,7 @@ export function AnalyticsTab({ restaurantId, currency }: Props) {
     const load = async () => {
       // Fetching all necessary data for the BI dashboard
       const [salesRes, productsRes, customersRes, expensesRes] = await Promise.all([
-        supabase.from('orders').select('total, created_at').eq('restaurant_id', restaurantId),
+        supabase.from('orders').select('total, total_cost, status, created_at').eq('restaurant_id', restaurantId).neq('status', 'cancelled'),
         supabase.from('products').select('name, quantity, cost_price, price').eq('restaurant_id', restaurantId),
         supabase.from('customers').select('name, balance').eq('restaurant_id', restaurantId),
         supabase.from('expenses').select('amount, category, date').eq('restaurant_id', restaurantId)
@@ -31,21 +32,22 @@ export function AnalyticsTab({ restaurantId, currency }: Props) {
 
       // Simple transformations for charts
       const sales = salesRes.data || [];
-      const totalSales = sales.reduce((s, o) => s + Number(o.total), 0);
-      const totalExpenses = (expensesRes.data || []).reduce((s, e) => s + Number(e.amount), 0);
-      const stockValue = (productsRes.data || []).reduce((s, p) => s + (Number(p.price) * Number(p.quantity)), 0);
+      const expenses = expensesRes.data || [];
+      const summary = buildOperationalProfitSummary(sales, expenses);
+      const stockValue = (productsRes.data || []).reduce((s, p) => s + (Number(p.cost_price || 0) * Number(p.quantity || 0)), 0);
+      const expensesByCategory = Object.entries(expenses.reduce((map: Record<string, number>, expense: any) => {
+        const category = expense.category || 'أخرى';
+        map[category] = (map[category] || 0) + Number(expense.amount || 0);
+        return map;
+      }, {})).map(([name, value]) => ({ name, value }));
 
       setData({
-        totalSales,
-        totalExpenses,
-        netProfit: totalSales - totalExpenses,
+        totalSales: summary.sales,
+        totalExpenses: summary.expenses,
+        netProfit: summary.netProfit,
         stockValue,
-        salesOverTime: sales.slice(-20).map(o => ({ date: new Date(o.created_at).toLocaleDateString(), amount: o.total })),
-        expensesByCategory: [
-          { name: 'رواتب', value: 400 },
-          { name: 'إيجار', value: 300 },
-          { name: 'مشتريات', value: 300 },
-        ]
+        salesOverTime: sales.slice(-20).map(o => ({ date: new Date(o.created_at).toLocaleDateString(), amount: Number(o.total || 0) })),
+        expensesByCategory,
       });
       setLoading(false);
     };
@@ -71,19 +73,18 @@ export function AnalyticsTab({ restaurantId, currency }: Props) {
       {/* KPI Cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         {[
-          { label: 'إجمالي المبيعات', val: data.totalSales, icon: ShoppingCart, color: 'text-primary', trend: '+12%' },
-          { label: 'إجمالي المصروفات', val: data.totalExpenses, icon: TrendingDown, color: 'text-destructive', trend: '-5%' },
-          { label: 'صافي الربح', val: data.netProfit, icon: DollarSign, color: 'text-success', trend: '+8%' },
-          { label: 'قيمة المخزون', val: data.stockValue, icon: Package, color: 'text-accent', trend: 'ثابت' },
+          { label: 'إجمالي المبيعات', val: data.totalSales, icon: ShoppingCart, color: 'text-primary' },
+          { label: 'إجمالي المصروفات', val: data.totalExpenses, icon: TrendingDown, color: 'text-destructive' },
+          { label: 'صافي الربح التشغيلي', val: data.netProfit, icon: DollarSign, color: 'text-success' },
+          { label: 'قيمة المخزون بالتكلفة', val: data.stockValue, icon: Package, color: 'text-accent' },
         ].map(kpi => (
           <div key={kpi.label} className="glass-card p-5 relative overflow-hidden">
             <div className={`absolute top-0 right-0 w-1 h-full ${kpi.color.replace('text', 'bg')}`} />
             <div className="flex justify-between items-start mb-2">
               <kpi.icon className={`w-5 h-5 ${kpi.color}`} />
-              <span className="text-[10px] font-bold text-success flex items-center gap-0.5">
-                {kpi.trend.startsWith('+') ? <ArrowUpRight className="w-3 h-3" /> : <ArrowDownRight className="w-3 h-3" />}
-                {kpi.trend}
-              </span>
+              {kpi.trend && (
+                <span className="text-[10px] font-bold text-muted-foreground flex items-center gap-0.5">{kpi.trend}</span>
+              )}
             </div>
             <p className="text-xs text-muted-foreground">{kpi.label}</p>
             <p className="text-xl font-bold font-display mt-1">{kpi.val.toLocaleString()} {currency}</p>
