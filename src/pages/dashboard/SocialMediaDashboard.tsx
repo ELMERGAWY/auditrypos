@@ -2,7 +2,7 @@
 // Social Media Dashboard Component
 // Provides posting and analytics functionality for connected social media accounts
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, type ChangeEvent } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Plus, X, Calendar, Clock, Send, BarChart3, Image as ImageIcon, 
@@ -28,15 +28,17 @@ interface Props {
 interface SocialPost {
   id: string;
   social_account_id: string;
-  platform: string;
   content: string;
   media_urls: string[];
   post_type: string;
   status: string;
+  approval_status: 'draft' | 'pending_review' | 'approved' | 'rejected';
   scheduled_at: string | null;
   published_at: string | null;
+  error_message?: string | null;
   metrics: any;
   created_at: string;
+  social_media_accounts?: { platform?: string; account_name?: string };
 }
 
 interface SocialAnalytics {
@@ -58,6 +60,7 @@ export function SocialMediaDashboard({ restaurantId }: Props) {
   const [selectedAccounts, setSelectedAccounts] = useState<string[]>([]);
   const [postContent, setPostContent] = useState('');
   const [postMedia, setPostMedia] = useState<string[]>([]);
+  const [uploadingMedia, setUploadingMedia] = useState(false);
   const [postType, setPostType] = useState('post');
   const [scheduledDate, setScheduledDate] = useState('');
   const [scheduledTime, setScheduledTime] = useState('');
@@ -66,10 +69,14 @@ export function SocialMediaDashboard({ restaurantId }: Props) {
   const oauthService = new OAuthService(supabase);
 
   useEffect(() => {
-    loadAccounts();
-    loadPosts();
-    loadAnalytics();
+    void loadAccounts();
+    void loadPosts();
   }, [restaurantId]);
+
+  useEffect(() => {
+    if (accounts.length > 0) void loadAnalytics(accounts);
+    else setAnalytics({});
+  }, [accounts]);
 
   const loadAccounts = async () => {
     try {
@@ -98,24 +105,55 @@ export function SocialMediaDashboard({ restaurantId }: Props) {
     }
   };
 
-  const loadAnalytics = async () => {
+  const loadAnalytics = async (connectedAccounts: any[]) => {
     try {
+      const accountIds = connectedAccounts.map((account) => account.id).filter(Boolean);
+      if (accountIds.length === 0) return;
       const { data, error } = await supabase
         .from('social_media_analytics')
         .select('*')
-        .eq('social_account_id', accounts[0]?.id)
+        .in('social_account_id', accountIds)
         .order('metric_date', { ascending: false })
-        .limit(1);
-
+        .limit(Math.max(accountIds.length * 3, 10));
       if (error) throw error;
-      
-      if (data && data.length > 0) {
-        const analyticsMap: Record<string, SocialAnalytics> = {};
-        analyticsMap[accounts[0]?.id] = data[0];
-        setAnalytics(analyticsMap);
+
+      const analyticsMap: Record<string, SocialAnalytics> = {};
+      for (const row of data || []) {
+        if (!analyticsMap[row.social_account_id]) analyticsMap[row.social_account_id] = row;
       }
+      setAnalytics(analyticsMap);
     } catch (error) {
       console.error('Failed to load analytics:', error);
+    }
+  };
+
+  const handleMediaUpload = async (event: ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(event.target.files || []);
+    if (files.length === 0) return;
+    setUploadingMedia(true);
+    try {
+      const uploadedUrls: string[] = [];
+      for (const file of files) {
+        if (!file.type.startsWith('image/') && !file.type.startsWith('video/')) {
+          throw new Error('يسمح برفع الصور والفيديو فقط');
+        }
+        if (file.size > 100 * 1024 * 1024) {
+          throw new Error('حجم الملف يجب ألا يتجاوز 100 ميجابايت');
+        }
+        const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
+        const path = `marketing/${restaurantId}/${crypto.randomUUID()}-${safeName}`;
+        const { error } = await supabase.storage.from('restaurant-assets').upload(path, file, { upsert: false });
+        if (error) throw error;
+        const { data } = supabase.storage.from('restaurant-assets').getPublicUrl(path);
+        if (data.publicUrl) uploadedUrls.push(data.publicUrl);
+      }
+      setPostMedia((current) => [...current, ...uploadedUrls]);
+      toast.success(`تم رفع ${uploadedUrls.length} ملف`);
+    } catch (error: any) {
+      toast.error(error?.message || 'فشل رفع الوسائط');
+    } finally {
+      setUploadingMedia(false);
+      event.target.value = '';
     }
   };
 
@@ -139,7 +177,8 @@ export function SocialMediaDashboard({ restaurantId }: Props) {
           content: postContent,
           media_urls: postMedia,
           post_type: postType,
-          status: scheduledAt ? 'scheduled' : 'draft',
+          status: 'draft',
+          approval_status: 'draft',
           scheduled_at: scheduledAt,
           created_at: new Date().toISOString(),
         });
@@ -160,16 +199,23 @@ export function SocialMediaDashboard({ restaurantId }: Props) {
     }
   };
 
-  const handlePublishPost = async (postId: string) => {
+  const runPublishingAction = async (postId: string, action: 'submit' | 'approve' | 'reject' | 'publish' | 'retry', note?: string) => {
     try {
-      const post = posts.find(p => p.id === postId);
-      if (!post) return;
-
-      // Publishing is intentionally blocked until the server-side delivery queue
-      // is enabled. The browser must never read or send an access token.
-      toast.info('تم حفظ المنشور. سيتم تفعيل النشر بعد استكمال طابور النشر الآمن.');
+      const { data, error } = await supabase.functions.invoke('social-publish', {
+        body: { action, postId, note },
+      });
+      if (error || !data?.success) throw new Error(error?.message || data?.error || 'تعذر تنفيذ العملية');
+      const messages: Record<string, string> = {
+        submit: 'تم إرسال المنشور للمراجعة',
+        approve: 'تم اعتماد المنشور وإضافته إلى طابور النشر',
+        reject: 'تم رفض المنشور وإعادته للمسودة',
+        publish: 'تم نشر المنشور بنجاح',
+        retry: 'تمت إعادة محاولة النشر',
+      };
+      toast.success(messages[action]);
+      await loadPosts();
     } catch (error: any) {
-      toast.error('فشل نشر المنشور: ' + error.message);
+      toast.error(error?.message || 'تعذر تنفيذ العملية');
     }
   };
 
@@ -197,12 +243,22 @@ export function SocialMediaDashboard({ restaurantId }: Props) {
   const getStatusBadge = (status: string) => {
     const statusConfig: Record<string, { label: string; variant: string }> = {
       draft: { label: 'مسودة', variant: 'secondary' },
-      scheduled: { label: 'مجدول', variant: 'outline' },
+      scheduled: { label: 'في الطابور', variant: 'outline' },
       published: { label: 'منشور', variant: 'default' },
-      failed: { label: 'فشل', variant: 'destructive' },
+      failed: { label: 'فشل النشر', variant: 'destructive' },
     };
     const config = statusConfig[status] || { label: status, variant: 'outline' };
     return <Badge variant={config.variant as any}>{config.label}</Badge>;
+  };
+
+  const getApprovalBadge = (status: SocialPost['approval_status']) => {
+    const config: Record<SocialPost['approval_status'], { label: string; variant: string }> = {
+      draft: { label: 'مسودة', variant: 'secondary' },
+      pending_review: { label: 'بانتظار الاعتماد', variant: 'outline' },
+      approved: { label: 'معتمد', variant: 'default' },
+      rejected: { label: 'مرفوض', variant: 'destructive' },
+    };
+    return <Badge variant={config[status].variant as any}>{config[status].label}</Badge>;
   };
 
   const formatNumber = (num: number) => {
@@ -295,7 +351,7 @@ export function SocialMediaDashboard({ restaurantId }: Props) {
                 <Card key={post.id} className="p-4">
                   <div className="flex items-start justify-between mb-3">
                     <div className="flex items-center gap-3">
-                      <div className="text-2xl">{getPlatformIcon(post.platform)}</div>
+                      <div className="text-2xl">{getPlatformIcon(post.social_media_accounts?.platform || 'facebook')}</div>
                       <div>
                         <p className="font-bold">{post.content.substring(0, 50)}...</p>
                         <p className="text-xs text-muted-foreground">
@@ -303,12 +359,15 @@ export function SocialMediaDashboard({ restaurantId }: Props) {
                         </p>
                       </div>
                     </div>
-                    {getStatusBadge(post.status)}
+                    <div className="flex items-center gap-2">
+                      {getStatusBadge(post.status)}
+                      {getApprovalBadge(post.approval_status)}
+                    </div>
                   </div>
 
-                  {post.media_urls.length > 0 && (
+                  {(post.media_urls || []).length > 0 && (
                     <div className="flex gap-2 mb-3">
-                      {post.media_urls.map((url, index) => (
+                      {(post.media_urls || []).map((url, index) => (
                         <img
                           key={index}
                           src={url}
@@ -319,11 +378,32 @@ export function SocialMediaDashboard({ restaurantId }: Props) {
                     </div>
                   )}
 
-                  <div className="flex items-center gap-2">
-                    {post.status === 'draft' && (
-                      <Button size="sm" onClick={() => handlePublishPost(post.id)}>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    {post.approval_status === 'draft' && (
+                      <Button size="sm" onClick={() => runPublishingAction(post.id, 'submit')}>
                         <Send className="w-3 h-3 mr-1" />
-                        نشر
+                        إرسال للمراجعة
+                      </Button>
+                    )}
+                    {post.approval_status === 'pending_review' && (
+                      <>
+                        <Button size="sm" onClick={() => runPublishingAction(post.id, 'approve')}>
+                          اعتماد وإضافة للطابور
+                        </Button>
+                        <Button size="sm" variant="outline" onClick={() => runPublishingAction(post.id, 'reject', 'يحتاج إلى تعديل قبل النشر')}>
+                          رفض
+                        </Button>
+                      </>
+                    )}
+                    {post.approval_status === 'approved' && post.status !== 'published' && (
+                      <Button size="sm" onClick={() => runPublishingAction(post.id, 'publish')}>
+                        <Send className="w-3 h-3 mr-1" />
+                        نشر الآن
+                      </Button>
+                    )}
+                    {post.status === 'failed' && post.approval_status === 'approved' && (
+                      <Button size="sm" variant="outline" onClick={() => runPublishingAction(post.id, 'retry')}>
+                        إعادة المحاولة
                       </Button>
                     )}
                     <Button size="sm" variant="ghost">
@@ -338,6 +418,9 @@ export function SocialMediaDashboard({ restaurantId }: Props) {
                       <Trash2 className="w-3 h-3" />
                     </Button>
                   </div>
+                  {post.error_message && (
+                    <p className="mt-3 text-xs text-destructive">{post.error_message}</p>
+                  )}
                 </Card>
               ))}
             </div>
@@ -351,11 +434,28 @@ export function SocialMediaDashboard({ restaurantId }: Props) {
           </Card>
         </TabsContent>
 
-        <TabsContent value="scheduled">
-          <Card className="p-8 text-center">
-            <Calendar className="w-12 h-12 mx-auto mb-4 text-muted-foreground" />
-            <p className="text-muted-foreground">المنشورات المجدولة قريباً</p>
-          </Card>
+        <TabsContent value="scheduled" className="space-y-4">
+          {posts.filter((post) => post.scheduled_at && post.approval_status === 'approved' && post.status !== 'published').length === 0 ? (
+            <Card className="p-8 text-center">
+              <Calendar className="w-12 h-12 mx-auto mb-4 text-muted-foreground" />
+              <p className="text-muted-foreground">لا توجد منشورات معتمدة مجدولة حالياً</p>
+            </Card>
+          ) : (
+            posts.filter((post) => post.scheduled_at && post.approval_status === 'approved' && post.status !== 'published').map((post) => (
+              <Card key={post.id} className="p-4 flex items-center justify-between gap-4">
+                <div>
+                  <p className="font-medium">{post.content.substring(0, 80)}{post.content.length > 80 ? '...' : ''}</p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    {post.scheduled_at ? new Date(post.scheduled_at).toLocaleString('ar-EG') : ''}
+                  </p>
+                </div>
+                <Button size="sm" onClick={() => runPublishingAction(post.id, 'publish')}>
+                  <Send className="w-3 h-3 mr-1" />
+                  نشر الآن
+                </Button>
+              </Card>
+            ))
+          )}
         </TabsContent>
       </Tabs>
 
@@ -445,11 +545,27 @@ export function SocialMediaDashboard({ restaurantId }: Props) {
                 {/* Media Upload */}
                 <div>
                   <Label className="text-sm mb-2 block">الوسائط (اختياري)</Label>
-                  <div className="border-2 border-dashed rounded-lg p-8 text-center">
-                    <ImageIcon className="w-8 h-8 mx-auto mb-2 text-muted-foreground" />
-                    <p className="text-sm text-muted-foreground">
-                      اسحب الصور والفيديوهات هنا أو انقر للتحميل
+                  <div className="border-2 border-dashed rounded-lg p-5 text-center space-y-3">
+                    <ImageIcon className="w-8 h-8 mx-auto text-muted-foreground" />
+                    <Input
+                      type="file"
+                      accept="image/*,video/*"
+                      multiple
+                      onChange={handleMediaUpload}
+                      disabled={uploadingMedia}
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      {uploadingMedia ? 'جارٍ رفع الملفات...' : `${postMedia.length} ملف مرفوع. الحد الأقصى للملف 100 ميجابايت.`}
                     </p>
+                    {postMedia.length > 0 && (
+                      <div className="flex flex-wrap gap-2 text-xs text-muted-foreground">
+                        {postMedia.map((url, index) => (
+                          <button key={url} type="button" className="underline" onClick={() => setPostMedia((current) => current.filter((_, i) => i !== index))}>
+                            حذف ملف {index + 1}
+                          </button>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 </div>
 
