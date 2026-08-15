@@ -13,7 +13,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { supabase } from '@/integrations/supabase/client';
-import { createFinancialReporting } from '@/erp/reporting_engine/financialReports';
+import { buildOperationalProfitSummary } from '@/lib/analytics/profitability';
 import { 
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   LineChart, Line, PieChart as RePieChart, Pie, Cell, AreaChart, Area
@@ -154,6 +154,9 @@ export function HomeDashboard({ restaurantId, currency, onNavigate, userId }: Ho
         todayOrdersRes,
         monthOrdersRes,
         yesterdayOrdersRes,
+        todayExpensesRes,
+        monthExpensesRes,
+        yesterdayExpensesRes,
         customersRes,
         newCustomersRes,
         suppliersRes,
@@ -171,6 +174,10 @@ export function HomeDashboard({ restaurantId, currency, onNavigate, userId }: Ho
         supabase.from('orders').select('total, total_cost, status, created_at').eq('restaurant_id', restaurantId).gte('created_at', monthStart).lte('created_at', todayTo).neq('status', 'cancelled'),
         // Yesterday for comparison
         supabase.from('orders').select('total, total_cost, status, created_at').eq('restaurant_id', restaurantId).gte('created_at', yesterday).lte('created_at', yesterdayTo).neq('status', 'cancelled'),
+        // Explicit operating expenses for the same periods. This keeps the dashboard definition auditable.
+        supabase.from('expenses').select('amount, date').eq('restaurant_id', restaurantId).gte('date', today).lte('date', todayTo),
+        supabase.from('expenses').select('amount, date').eq('restaurant_id', restaurantId).gte('date', monthStart).lte('date', todayTo),
+        supabase.from('expenses').select('amount, date').eq('restaurant_id', restaurantId).gte('date', yesterday).lte('date', yesterdayTo),
         // Total customers
         supabase.from('customers').select('*', { count: 'exact' }).eq('restaurant_id', restaurantId),
         // New customers today
@@ -193,41 +200,28 @@ export function HomeDashboard({ restaurantId, currency, onNavigate, userId }: Ho
         supabase.from('order_items').select('menu_item_name, quantity, price, orders!inner(created_at, restaurant_id, status)').eq('orders.restaurant_id', restaurantId).neq('orders.status', 'cancelled').gte('orders.created_at', weekStart).limit(100)
       ]);
 
-      // Accounting reports are useful for profit/balance sheet, but POS sales must
-      // come from operational orders because journal posting can be deferred.
-      // Optimization: skip expensive financial-engine calls when there are no posted journals yet.
-      const { count: jeCount } = await supabase
-        .from('journal_entries')
-        .select('id', { count: 'exact', head: true })
-        .eq('restaurant_id', restaurantId)
-        .eq('is_posted', true)
-        .limit(1);
-
-      const engine = createFinancialReporting(restaurantId);
-      const emptyPL = { revenue: { total: 0 }, cogs: { total: 0 }, operating_expenses: { total: 0 }, net_profit: 0 } as any;
-      const emptyBS = { assets: { current: { inventory: 0, cash: 0, bank: 0 } }, liabilities: { current: { payables: 0 } } } as any;
-
-      const [plToday, plYest, plMonth, bs] = (jeCount && jeCount > 0)
-        ? await Promise.all([
-            engine.generateProfitLoss(todayStart.toISOString().split('T')[0], todayStart.toISOString().split('T')[0]),
-            engine.generateProfitLoss(yesterdayStart.toISOString().split('T')[0], yesterdayStart.toISOString().split('T')[0]),
-            engine.generateProfitLoss(monthStartDate.toISOString().split('T')[0], todayStart.toISOString().split('T')[0]),
-            engine.generateBalanceSheet(todayStart.toISOString().split('T')[0]),
-          ])
-        : [emptyPL, emptyPL, emptyPL, emptyBS];
+      // Dashboard profit KPIs come from operational orders + same-period expenses.
+      // Keep only Balance Sheet here for inventory/payables; full P&L remains in Financials/Reports.
+      const engine = (await import('@/erp/reporting_engine/financialReports')).createFinancialReporting(restaurantId);
+      const bs = await engine.generateBalanceSheet(todayStart.toISOString().split('T')[0]);
 
       const sumOrders = (rows: any[] = []) => rows.reduce((s, o) => s + Number(o.total || 0), 0);
       const sumCost = (rows: any[] = []) => rows.reduce((s, o) => s + Number(o.total_cost || 0), 0);
-      const todaySales = sumOrders(todayOrdersRes.data || []);
+      const todaySummary = buildOperationalProfitSummary(todayOrdersRes.data || [], todayExpensesRes.data || []);
+      const monthSummary = buildOperationalProfitSummary(monthOrdersRes.data || [], monthExpensesRes.data || []);
+      const yesterdaySummary = buildOperationalProfitSummary(yesterdayOrdersRes.data || [], yesterdayExpensesRes.data || []);
+      const todaySales = todaySummary.sales;
       const todayOrdersCount = todayOrdersRes.data?.length || 0;
-      const monthSales = sumOrders(monthOrdersRes.data || []);
-      const yesterdaySales = sumOrders(yesterdayOrdersRes.data || []);
+      const monthSales = monthSummary.sales;
+      const yesterdaySales = yesterdaySummary.sales;
       const salesChange = yesterdaySales > 0 ? ((todaySales - yesterdaySales) / yesterdaySales) * 100 : 0;
 
-      const todayProfit = plToday.net_profit || (todaySales - sumCost(todayOrdersRes.data || []));
-      const monthProfit = plMonth.net_profit || (monthSales - sumCost(monthOrdersRes.data || []));
-      const profitMargin = monthSales > 0 ? (monthProfit / monthSales) * 100 : 0;
-      const yProfit = plYest.net_profit;
+      // Dashboard KPI definition: net operational profit = sales - order COGS - posted operating expenses.
+      // The full accounting P&L remains available in Financials/Reports and is not silently mixed here.
+      const todayProfit = todaySummary.netProfit;
+      const monthProfit = monthSummary.netProfit;
+      const profitMargin = monthSummary.margin;
+      const yProfit = yesterdaySummary.netProfit;
       const profitChange = yProfit !== 0 ? ((todayProfit - yProfit) / Math.abs(yProfit)) * 100 : 0;
 
       // Inventory value from balance sheet
@@ -289,9 +283,9 @@ export function HomeDashboard({ restaurantId, currency, onNavigate, userId }: Ho
       // Category split from real P&L
       setCategoryData([
         { name: 'الإيرادات', value: monthSales, color: '#10b981' },
-        { name: 'تكلفة المبيعات', value: sumCost(monthOrdersRes.data || []) || plMonth.cogs.total, color: '#f59e0b' },
-        { name: 'المصروفات', value: plMonth.operating_expenses.total, color: '#ef4444' },
-        { name: 'صافي الربح', value: Math.max(0, plMonth.net_profit), color: '#3b82f6' }
+        { name: 'تكلفة المبيعات', value: monthSummary.cogs, color: '#f59e0b' },
+        { name: 'المصروفات', value: monthSummary.expenses, color: '#ef4444' },
+        { name: 'صافي الربح التشغيلي', value: Math.max(0, monthSummary.netProfit), color: '#3b82f6' }
       ]);
 
       // Recent activity from journal entries
@@ -503,7 +497,7 @@ export function HomeDashboard({ restaurantId, currency, onNavigate, userId }: Ho
           subtitle={`${stats.todayOrders} طلب`}
         />
         <StatCard
-          title="صافي الربح"
+          title="صافي الربح التشغيلي"
           value={formatCurrency(stats.todayProfit)}
           change={stats.profitChange}
           icon={TrendingUp}
@@ -763,11 +757,11 @@ export function HomeDashboard({ restaurantId, currency, onNavigate, userId }: Ho
               
               <div className="space-y-2">
                 <div className="flex items-center justify-between text-sm">
-                  <span className="text-muted-foreground">صافي الربح</span>
+                  <span className="text-muted-foreground">صافي الربح التشغيلي</span>
                   <span className="font-bold">{formatCurrency(stats.monthProfit)}</span>
                 </div>
                 <Progress value={60} className="h-2" />
-                <p className="text-xs text-muted-foreground">هامش ربح {stats.profitMargin.toFixed(0)}%</p>
+                <p className="text-xs text-muted-foreground">هامش تشغيلي {stats.profitMargin.toFixed(0)}%</p>
               </div>
               
               <div className="space-y-2">
