@@ -30,3 +30,41 @@ describe('profitability calculations', () => {
     expect(safeNetProfit(0, 0, 25)).toBe(-25);
   });
 });
+
+
+  it('normalizes null and non-finite amounts without producing NaN', () => {
+    const summary = buildOperationalProfitSummary(
+      [{ total: null, total_cost: 'not-a-number' }, { total: 50, total_cost: 10 }],
+      [{ amount: undefined }, { amount: 5 }],
+    );
+    expect(summary.sales).toBe(50);
+    expect(summary.cogs).toBe(10);
+    expect(summary.expenses).toBe(5);
+    expect(summary.netProfit).toBe(35);
+    expect(Number.isFinite(summary.margin)).toBe(true);
+  });
+
+  it('does not let negative cost or expense inputs inflate profit', () => {
+    const summary = buildOperationalProfitSummary(
+      [{ total: 100, total_cost: -100 }],
+      [{ amount: -50 }],
+    );
+    expect(summary.cogs).toBe(0);
+    expect(summary.expenses).toBe(0);
+    expect(summary.netProfit).toBe(100);
+  });
+
+  it('returns zero margin when there are no qualifying sales', () => {
+    const summary = buildOperationalProfitSummary(
+      [{ total: 100, total_cost: 10, status: 'cancelled' }],
+      [{ amount: 25 }],
+    );
+    expect(summary.sales).toBe(0);
+    expect(summary.netProfit).toBe(-25);
+    expect(summary.margin).toBe(0);
+  });
+
+  it('preserves reversal direction in signed balances', () => {
+    expect(signedProfitBalance('revenue', '20', '0')).toBe(-20);
+    expect(signedProfitBalance('expense', '0', '20')).toBe(-20);
+  });
