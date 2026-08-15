@@ -33,6 +33,15 @@ The `schema_migrations_pkey` conflict is primarily a local migration-folder prob
 - `.env` was tracked in Git and present in GitHub at the time of inspection. It contained only the frontend Supabase URL, project ID, and publishable key according to key-name inspection; no service-role key was found.
 - The remediation removes `.env` from Git tracking, adds `.env` and `.env.*` to `.gitignore`, and keeps the local file on disk. This does not rewrite old Git history; if the publishable key is considered exposed, rotate it from the new Supabase project after Vercel is updated.
 
+## Migration normalization performed locally
+
+- Archived 243 rollback/template files under `supabase/migration_archive/rollbacks/`; they are no longer parsed as forward migrations.
+- Archived six superseded forward alternatives under `supabase/migration_archive/forward-alternatives/`.
+- Kept one forward file per timestamp; the local duplicate check reports `duplicate_groups=0`.
+- Renamed three distinct feature migrations that had reused timestamps to unique pending versions: `20260619000013_marketing_services_contracts_quotes.sql`, `20260619000014_lock_business_type.sql`, `20260619000015_custom_business_types.sql`, and renamed the global platform upgrade to `20260716000001_global_platform_upgrade.sql`.
+- This is a repository-only change. No remote SQL, migration history row, customer data, or transaction was modified.
+- A local CLI `migration list` still requires `supabase link` in the sandbox; the attached list from the user's linked terminal remains the source for the remote history comparison.
+
 ## Safety decision
 
 Do not delete rows from `supabase_migrations.schema_migrations` blindly. Do not run `db push`, `db reset --linked`, or any migration containing `DROP ... CASCADE` until the remote migration list and live schema are backed up and compared. Prefer a clean forward-only migration directory plus `migration repair` only for verified history mismatches.
