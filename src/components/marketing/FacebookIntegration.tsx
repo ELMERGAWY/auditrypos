@@ -51,12 +51,6 @@ export function FacebookIntegration({ restaurantId, currency }: Props) {
   const [showPageForm, setShowPageForm] = useState(false);
   const [selectedAccount, setSelectedAccount] = useState<FacebookAccount | null>(null);
 
-  const [accountForm, setAccountForm] = useState({
-    business_id: '',
-    account_name: '',
-    access_token: '',
-  });
-
   const [pageForm, setPageForm] = useState({
     page_id: '',
     page_name: '',
@@ -73,7 +67,7 @@ export function FacebookIntegration({ restaurantId, currency }: Props) {
     try {
       const { data, error } = await supabase
         .from('marketing_facebook_accounts')
-        .select('*')
+        .select('id, business_id, account_name, token_expires_at, is_active, is_connected, permissions, metadata, created_at, updated_at, created_by')
         .eq('restaurant_id', restaurantId)
         .order('created_at', { ascending: false });
 

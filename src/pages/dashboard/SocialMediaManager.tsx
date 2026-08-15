@@ -8,11 +8,9 @@ import { useLocation } from 'react-router-dom';
 import { 
   Facebook, Instagram, Youtube, Linkedin, Music, Twitter, Pin, 
   Plus, X, CheckCircle, AlertCircle, RefreshCw, Calendar, BarChart3, 
-  Settings, Trash2, Link2, Eye, EyeOff
+  Settings, Trash2, Link2
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Card } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -25,34 +23,57 @@ interface Props {
   restaurantId: string;
 }
 
+interface DiscoveredAsset {
+  id: string;
+  platform: string;
+  external_id: string;
+  asset_type: string;
+  asset_name: string;
+  asset_handle?: string | null;
+  parent_external_id?: string | null;
+  scopes?: string[];
+  status: string;
+  metadata?: Record<string, unknown>;
+  token_expires_at?: string | null;
+}
+
 export function SocialMediaManager({ restaurantId }: Props) {
   const location = useLocation();
   const [accounts, setAccounts] = useState<SocialAccount[]>([]);
   const [loading, setLoading] = useState(true);
   const [showConnectModal, setShowConnectModal] = useState(false);
-  const [selectedPlatform, setSelectedPlatform] = useState<string>('');
+  const [pendingAssets, setPendingAssets] = useState<DiscoveredAsset[]>([]);
+  const [connectingAssetId, setConnectingAssetId] = useState<string | null>(null);
   const [oauthService] = useState(() => new OAuthService(supabase));
-  const [showSecrets, setShowSecrets] = useState(false);
-  const [platformSecrets, setPlatformSecrets] = useState<Record<string, { clientId: string; clientSecret: string }>>({});
   const [activeTab, setActiveTab] = useState('accounts');
 
   useEffect(() => {
     loadAccounts();
-    loadPlatformSecrets();
   }, [restaurantId]);
 
   // Handle OAuth callback results
   useEffect(() => {
-    if (location.state?.oauthSuccess) {
-      toast.success(`تم ربط حساب ${location.state.platform} بنجاح!`);
-      loadAccounts();
-    } else if (location.state?.oauthError) {
-      toast.error(`فشل ربط الحساب: ${location.state.message}`);
-      if (location.state.details) {
-        console.error('OAuth Error Details:', location.state.details);
+    const oauthState = location.state as any;
+    if (oauthState?.oauthSuccess) {
+      toast.success(`تم ربط حساب ${oauthState.platform} بنجاح!`);
+      void loadAccounts();
+    } else if (oauthState?.oauthAssetsDiscovered) {
+      setPendingAssets(Array.isArray(oauthState.assets) ? oauthState.assets : []);
+      void loadPendingAssets();
+    } else if (oauthState?.oauthError) {
+      toast.error(`فشل ربط الحساب: ${oauthState.message}`);
+      if (oauthState.details) {
+        console.error('OAuth Error Details:', oauthState.details);
       }
     }
   }, [location.state]);
+
+  const loadPendingAssets = async () => {
+    const { data, error } = await supabase.functions.invoke('social-oauth', {
+      body: { action: 'list_assets', restaurantId },
+    });
+    if (!error && Array.isArray(data?.assets)) setPendingAssets(data.assets as DiscoveredAsset[]);
+  };
 
   const loadAccounts = async () => {
     try {
@@ -65,43 +86,6 @@ export function SocialMediaManager({ restaurantId }: Props) {
     }
   };
 
-  const loadPlatformSecrets = async () => {
-    try {
-      // Try restaurant-specific config first
-      const { data: restaurantData } = await supabase
-        .from('social_media_oauth_config')
-        .select('platform, client_id, client_secret')
-        .eq('restaurant_id', restaurantId);
-
-      // Fallback to global config (restaurant_id IS NULL)
-      const { data: globalData } = await supabase
-        .from('social_media_oauth_config')
-        .select('platform, client_id, client_secret')
-        .is('restaurant_id', null);
-
-      // Merge configs, restaurant-specific takes precedence
-      const allConfigs = [...(restaurantData || []), ...(globalData || [])];
-      
-      if (allConfigs) {
-        const secrets: Record<string, { clientId: string; clientSecret: string }> = {};
-        allConfigs.forEach((config: any) => {
-          // Only use if not already set (restaurant-specific takes precedence)
-          if (!secrets[config.platform]) {
-            secrets[config.platform] = {
-              clientId: config.client_id,
-              clientSecret: config.client_secret,
-            };
-          }
-        });
-        setPlatformSecrets(secrets);
-      }
-    } catch (error) {
-      console.error('Failed to load platform secrets:', error);
-    }
-  };
-
-  const [debugUrl, setDebugUrl] = useState<string>('');
-
   const handleConnect = async (platform: string) => {
     const redirectUri = `${window.location.origin}/oauth/callback`;
 
@@ -112,8 +96,6 @@ export function SocialMediaManager({ restaurantId }: Props) {
         body: { action: 'start', platform, restaurantId, redirectUri },
       });
       if (!error && data?.authUrl) {
-        localStorage.setItem('oauth_platform', platform);
-        localStorage.setItem('oauth_restaurant_id', restaurantId);
         window.location.href = data.authUrl;
         return;
       }
@@ -128,6 +110,30 @@ export function SocialMediaManager({ restaurantId }: Props) {
   };
 
 
+  const handleConnectAsset = async (assetId: string) => {
+    setConnectingAssetId(assetId);
+    try {
+      const { data, error } = await supabase.functions.invoke('social-oauth', {
+        body: { action: 'connect_asset', restaurantId, assetId },
+      });
+      if (error || !data?.success) throw new Error(error?.message || data?.error || 'تعذر ربط الأصل');
+      setPendingAssets((current) => current.filter((asset) => asset.id !== assetId));
+      await loadAccounts();
+      toast.success('تم ربط الأصل بنجاح');
+    } catch (error: any) {
+      toast.error(error?.message || 'تعذر ربط الأصل');
+    } finally {
+      setConnectingAssetId(null);
+    }
+  };
+
+  const getAssetTypeLabel = (asset: DiscoveredAsset) => {
+    if (asset.asset_type === 'facebook_page') return 'صفحة Facebook';
+    if (asset.asset_type === 'instagram_professional') return 'حساب Instagram احترافي';
+    if (asset.asset_type === 'meta_ad_account') return 'حساب إعلاني Meta';
+    return 'أصل اجتماعي';
+  };
+
   const handleDisconnect = async (accountId: string) => {
     if (!confirm('هل أنت متأكد من فصل هذا الحساب؟')) return;
 
@@ -137,26 +143,6 @@ export function SocialMediaManager({ restaurantId }: Props) {
       loadAccounts();
     } catch (error: any) {
       toast.error('فشل فصل الحساب: ' + error.message);
-    }
-  };
-
-  const handleSaveSecrets = async () => {
-    try {
-      for (const [platform, secrets] of Object.entries(platformSecrets)) {
-        if (secrets.clientId && secrets.clientSecret) {
-          await supabase.from('social_media_oauth_config').upsert({
-            restaurant_id: restaurantId,
-            platform: platform,
-            client_id: secrets.clientId,
-            client_secret: secrets.clientSecret,
-            updated_at: new Date().toISOString(),
-          });
-        }
-      }
-      toast.success('تم حفظ إعدادات OAuth بنجاح');
-      setShowConnectModal(false);
-    } catch (error: any) {
-      toast.error('فشل حفظ الإعدادات: ' + error.message);
     }
   };
 
@@ -197,44 +183,10 @@ export function SocialMediaManager({ restaurantId }: Props) {
         {activeTab === 'accounts' && (
           <Button onClick={() => setShowConnectModal(true)}>
             <Plus className="w-4 h-4 mr-2" />
-            إعداد OAuth
+            ربط حساب
           </Button>
         )}
       </div>
-
-      {/* Debug URL Display */}
-      {debugUrl && (
-        <Card className="p-4 bg-yellow-50 border-yellow-200">
-          <div className="space-y-2">
-            <p className="text-sm font-semibold text-yellow-800">رابط OAuth للتصحيح:</p>
-            <div className="flex gap-2">
-              <input
-                type="text"
-                value={debugUrl}
-                readOnly
-                className="flex-1 text-xs p-2 border rounded bg-white"
-              />
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() => {
-                  navigator.clipboard.writeText(debugUrl);
-                  toast.success('تم نسخ الرابط');
-                }}
-              >
-                نسخ
-              </Button>
-              <Button
-                size="sm"
-                variant="ghost"
-                onClick={() => setDebugUrl('')}
-              >
-                إغلاق
-              </Button>
-            </div>
-          </div>
-        </Card>
-      )}
 
       {/* Tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab}>
@@ -244,6 +196,38 @@ export function SocialMediaManager({ restaurantId }: Props) {
         </TabsList>
 
         <TabsContent value="accounts">
+          {pendingAssets.length > 0 && (
+            <Card className="p-4 mb-6 border-primary/30 bg-primary/5">
+              <div className="flex items-start justify-between gap-4 mb-4">
+                <div>
+                  <h3 className="font-bold">أصول Meta المكتشفة</h3>
+                  <p className="text-sm text-muted-foreground">
+                    اختر فقط الصفحات والحسابات الإعلانية التي تريد منح النظام صلاحية إدارتها. لا تظهر أي كلمات مرور أو توكنات.
+                  </p>
+                </div>
+                <Badge variant="outline">{pendingAssets.length} أصل</Badge>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                {pendingAssets.map((asset) => (
+                  <div key={asset.id} className="rounded-lg border bg-background p-3 flex items-center justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="font-medium truncate">{asset.asset_name}</p>
+                      <p className="text-xs text-muted-foreground">{getAssetTypeLabel(asset)}</p>
+                      {asset.asset_handle && <p className="text-xs text-muted-foreground truncate">{asset.asset_handle}</p>}
+                    </div>
+                    <Button
+                      size="sm"
+                      onClick={() => handleConnectAsset(asset.id)}
+                      disabled={connectingAssetId === asset.id}
+                    >
+                      {connectingAssetId === asset.id ? 'جارٍ الربط...' : 'ربط'}
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            </Card>
+          )}
+
           {/* Connected Accounts */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {accounts.map((account) => {
@@ -304,7 +288,7 @@ export function SocialMediaManager({ restaurantId }: Props) {
                   <div>
                     <p className="font-bold">لا توجد حسابات متصلة</p>
                     <p className="text-sm text-muted-foreground">
-                      قم بإعداد OAuth وربط حسابات التواصل الاجتماعي للبدء
+                      اطلب من مسؤول الربط اعتماد الحساب، ثم اربطه من خلال صفحة المنصة الرسمية
                     </p>
                   </div>
                 </div>
@@ -318,7 +302,7 @@ export function SocialMediaManager({ restaurantId }: Props) {
         </TabsContent>
       </Tabs>
 
-      {/* OAuth Setup Modal */}
+      {/* Secure OAuth Connect Modal: no client secrets or tokens are handled here. */}
       <AnimatePresence>
         {showConnectModal && (
           <motion.div
@@ -335,8 +319,13 @@ export function SocialMediaManager({ restaurantId }: Props) {
               className="bg-card p-6 max-w-2xl w-full rounded-2xl shadow-2xl max-h-[90vh] overflow-y-auto"
               onClick={(e) => e.stopPropagation()}
             >
-              <div className="flex items-center justify-between mb-6">
-                <h3 className="text-xl font-bold">إعداد OAuth للمنصات</h3>
+              <div className="flex items-center justify-between mb-4">
+                <div>
+                  <h3 className="text-xl font-bold">ربط حسابات التواصل</h3>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    ستتم المصادقة من خلال المنصة الرسمية دون إدخال كلمة المرور أو أي Access Token داخل النظام.
+                  </p>
+                </div>
                 <Button variant="ghost" size="sm" onClick={() => setShowConnectModal(false)}>
                   <X className="w-5 h-5" />
                 </Button>
@@ -353,88 +342,25 @@ export function SocialMediaManager({ restaurantId }: Props) {
 
                 {Object.entries(SOCIAL_PLATFORMS).map(([key, platform]) => (
                   <TabsContent key={key} value={key} className="space-y-4">
-                    <div className="flex items-center gap-3 mb-4">
+                    <div className="flex items-center gap-3">
                       <div className="text-3xl">{platform.icon}</div>
                       <div>
                         <p className="font-bold">{platform.displayName}</p>
                         <p className="text-xs text-muted-foreground">
-                          يتطلب {platform.requiresAppSecret ? 'Client ID و Client Secret' : 'Client ID فقط'}
+                          اختر الحساب من صفحة التفويض الرسمية، وسيتم حفظ الصلاحيات الممنوحة فقط.
                         </p>
                       </div>
                     </div>
-
-                    <div className="space-y-3">
-                      <div>
-                        <Label className="text-sm mb-1 block">Client ID</Label>
-                        <Input
-                          placeholder="أدخل Client ID من {platform.displayName} Developer Portal"
-                          value={platformSecrets[key]?.clientId || ''}
-                          onChange={(e) =>
-                            setPlatformSecrets((prev) => ({
-                              ...prev,
-                              [key]: { ...prev[key], clientId: e.target.value },
-                            }))
-                          }
-                        />
-                      </div>
-
-                      {platform.requiresAppSecret && (
-                        <div>
-                          <Label className="text-sm mb-1 block">Client Secret</Label>
-                          <div className="relative">
-                            <Input
-                              type={showSecrets ? 'text' : 'password'}
-                              placeholder="أدخل Client Secret"
-                              value={platformSecrets[key]?.clientSecret || ''}
-                              onChange={(e) =>
-                                setPlatformSecrets((prev) => ({
-                                  ...prev,
-                                  [key]: { ...prev[key], clientSecret: e.target.value },
-                                }))
-                              }
-                            />
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              className="absolute left-2 top-1/2 -translate-y-1/2 h-8 w-8 p-0"
-                              onClick={() => setShowSecrets(!showSecrets)}
-                            >
-                              {showSecrets ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                            </Button>
-                          </div>
-                        </div>
-                      )}
-
-                      <Button
-                        onClick={() => handleConnect(key)}
-                        className="w-full"
-                        disabled={!platformSecrets[key]?.clientId || (platform.requiresAppSecret && !platformSecrets[key]?.clientSecret)}
-                      >
-                        <Link2 className="w-4 h-4 mr-2" />
-                        ربط حساب {platform.displayName}
-                      </Button>
-                    </div>
-
-                    <div className="p-3 bg-blue-500/10 rounded-lg text-xs text-blue-700">
-                      <p className="font-bold mb-1">كيفية الحصول على بيانات OAuth:</p>
-                      <ol className="list-decimal list-inside space-y-1">
-                        <li>اذهب إلى {platform.displayName} Developer Portal</li>
-                        <li>أنشئ تطبيق جديد</li>
-                        <li>أضف Redirect URI: {window.location.origin}/oauth/callback</li>
-                        <li>انسخ Client ID و Client Secret</li>
-                      </ol>
-                    </div>
+                    <Button onClick={() => handleConnect(key)} className="w-full">
+                      <Link2 className="w-4 h-4 mr-2" />
+                      متابعة ربط {platform.displayName}
+                    </Button>
                   </TabsContent>
                 ))}
               </Tabs>
 
-              <div className="flex justify-end gap-2 mt-6 pt-4 border-t">
-                <Button variant="outline" onClick={() => setShowConnectModal(false)}>
-                  إلغاء
-                </Button>
-                <Button onClick={handleSaveSecrets}>
-                  حفظ الإعدادات
-                </Button>
+              <div className="mt-5 p-3 bg-amber-500/10 rounded-lg text-xs text-amber-800">
+                إعدادات تطبيق OAuth وClient Secret أصبحت مسؤولية مدير النظام فقط، ولن تظهر للموظفين داخل هذه الشاشة.
               </div>
             </motion.div>
           </motion.div>
