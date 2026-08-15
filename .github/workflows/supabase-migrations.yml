@@ -11,20 +11,15 @@ jobs:
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - name: Configure Git
-        run: |
-          git config --global --add safe.directory "$GITHUB_WORKSPACE"
 
       - name: Setup Supabase CLI
         uses: supabase/setup-cli@v1
         with:
           version: latest
 
-      - name: Run Migrations
+      - name: Link and Push Migrations
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
         run: |
-          supabase db push --project-ref ${{ secrets.SUPABASE_PROJECT_ID }} --include-all
+          supabase link --project-ref ${{ secrets.SUPABASE_PROJECT_ID }} -p "${{ secrets.SUPABASE_DB_PASSWORD }}"
+          supabase db push -p "${{ secrets.SUPABASE_DB_PASSWORD }}"
