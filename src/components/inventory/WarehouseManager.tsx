@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
+import { usePermissions } from '@/hooks/usePermissions';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -72,6 +73,9 @@ interface WarehouseManagerProps {
 }
 
 export function WarehouseManager({ restaurantId, workspaceId, warehouses: propsWarehouses, onRefresh }: WarehouseManagerProps) {
+  const { can } = usePermissions();
+  const canManageWarehouses = can('inventory.warehouse.manage') || can('inventory.edit');
+  const canTransferWarehouses = can('inventory.transfer');
   const [loading, setLoading] = useState(false);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [detailsDialogOpen, setDetailsDialogOpen] = useState(false);
@@ -269,6 +273,7 @@ export function WarehouseManager({ restaurantId, workspaceId, warehouses: propsW
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!canManageWarehouses) { toast.error('ليس لديك صلاحية إدارة المخازن'); return; }
     
     if (!formData.code || !formData.name || !formData.name_ar) {
       toast.error('يرجى ملء جميع الحقول المطلوبة');
@@ -405,7 +410,8 @@ export function WarehouseManager({ restaurantId, workspaceId, warehouses: propsW
   };
 
   const handleDelete = async (id: string) => {
-    if (!confirm('هل أنت متأكد من حذف هذا المخزن؟')) return;
+    if (!canManageWarehouses) { toast.error('ليس لديك صلاحية إدارة المخازن'); return; }
+    if (!confirm('هل أنت متأكد من تعطيل هذا المخزن؟')) return;
 
     try {
       setLoading(true);
@@ -753,6 +759,7 @@ export function WarehouseManager({ restaurantId, workspaceId, warehouses: propsW
                                 variant="ghost"
                                 size="icon"
                                 onClick={() => handleEdit(warehouse)}
+                                disabled={!canManageWarehouses}
                               >
                                 <Edit className="h-4 w-4" />
                               </Button>
@@ -760,6 +767,7 @@ export function WarehouseManager({ restaurantId, workspaceId, warehouses: propsW
                                 variant="ghost"
                                 size="icon"
                                 onClick={() => handleDelete(warehouse.id)}
+                                disabled={!canManageWarehouses}
                                 className="text-destructive hover:text-destructive"
                               >
                                 <Trash2 className="h-4 w-4" />
@@ -827,7 +835,7 @@ export function WarehouseManager({ restaurantId, workspaceId, warehouses: propsW
                     <TableCell>{Number(product.cost_price).toLocaleString('ar-EG')} ج.م</TableCell>
                     <TableCell>{Number(product.price).toLocaleString('ar-EG')} ج.م</TableCell>
                     <TableCell>
-                      {selectedWarehouse && (
+                      {selectedWarehouse && canTransferWarehouses && (
                         <Button
                           variant="ghost"
                           size="sm"
@@ -895,7 +903,7 @@ export function WarehouseManager({ restaurantId, workspaceId, warehouses: propsW
             <Button variant="outline" onClick={() => setTransferDialogOpen(false)}>
               إلغاء
             </Button>
-            <Button onClick={handleTransferProduct} disabled={loading}>
+            <Button onClick={handleTransferProduct} disabled={loading || !canTransferWarehouses}>
               {loading ? 'جاري التحويل...' : 'تحويل'}
             </Button>
           </DialogFooter>
