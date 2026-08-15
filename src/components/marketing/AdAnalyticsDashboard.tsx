@@ -47,7 +47,12 @@ const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884D8', '#82CA9D'
 
 export function AdAnalyticsDashboard({ restaurantId, currency }: Props) {
   const [adPerformance, setAdPerformance] = useState<AdPerformance[]>([]);
+  const [campaigns, setCampaigns] = useState<any[]>([]);
+  const [adAccounts, setAdAccounts] = useState<any[]>([]);
+  const [selectedAdAccount, setSelectedAdAccount] = useState('');
   const [loading, setLoading] = useState(false);
+  const [syncing, setSyncing] = useState(false);
+  const [campaignActionId, setCampaignActionId] = useState<string | null>(null);
   const [dateRange, setDateRange] = useState('30');
   const [selectedPlatform, setSelectedPlatform] = useState('all');
   const [selectedCampaign, setSelectedCampaign] = useState('all');
@@ -76,7 +81,68 @@ export function AdAnalyticsDashboard({ restaurantId, currency }: Props) {
     }
   };
 
-  useEffect(() => { loadAdPerformance(); }, [restaurantId, dateRange]);
+  const loadCampaigns = async () => {
+    const { data, error } = await supabase
+      .from('marketing_ad_campaigns')
+      .select('id, campaign_id, campaign_name, platform, campaign_status, daily_budget, lifetime_budget, last_synced_at')
+      .eq('restaurant_id', restaurantId)
+      .order('updated_at', { ascending: false })
+      .limit(100);
+    if (!error) setCampaigns(data || []);
+  };
+
+  const updateCampaignStatus = async (campaign: any) => {
+    const nextStatus = String(campaign.campaign_status).toUpperCase() === 'PAUSED' ? 'ACTIVE' : 'PAUSED';
+    setCampaignActionId(campaign.id);
+    try {
+      const { data, error } = await supabase.functions.invoke('social-ads', {
+        body: { action: 'update_status', restaurantId, campaignId: campaign.id, status: nextStatus },
+      });
+      if (error || !data?.success) throw new Error(error?.message || data?.error || 'تعذر تحديث حالة الحملة');
+      setCampaigns((current) => current.map((item) => item.id === campaign.id ? { ...item, campaign_status: nextStatus } : item));
+      toast.success(nextStatus === 'PAUSED' ? 'تم إيقاف الحملة' : 'تم تشغيل الحملة');
+    } catch (error: any) {
+      toast.error(error?.message || 'تعذر تحديث الحملة');
+    } finally {
+      setCampaignActionId(null);
+    }
+  };
+
+  const loadAdAccounts = async () => {
+    const { data, error } = await supabase.functions.invoke('social-ads', {
+      body: { action: 'list_ad_accounts', restaurantId },
+    });
+    if (!error && Array.isArray(data?.accounts)) {
+      setAdAccounts(data.accounts);
+      if (!selectedAdAccount && data.accounts[0]?.id) setSelectedAdAccount(data.accounts[0].id);
+    }
+  };
+
+  const syncMetaInsights = async () => {
+    if (!selectedAdAccount) return toast.error('اختر حساباً إعلانياً متصلاً أولاً');
+    setSyncing(true);
+    try {
+      const to = new Date().toISOString().slice(0, 10);
+      const fromDate = new Date();
+      fromDate.setDate(fromDate.getDate() - parseInt(dateRange));
+      const { data, error } = await supabase.functions.invoke('social-ads', {
+        body: { action: 'sync', restaurantId, socialAccountId: selectedAdAccount, dateFrom: fromDate.toISOString().slice(0, 10), dateTo: to },
+      });
+      if (error || !data?.success) throw new Error(error?.message || data?.error || 'فشل مزامنة Meta Insights');
+      toast.success(`تمت مزامنة ${data.campaignsSynced || 0} حملة و${data.insightsSynced || 0} سجل Insights`);
+      await loadAdPerformance();
+    } catch (error: any) {
+      toast.error(error?.message || 'فشل مزامنة Meta Insights');
+    } finally {
+      setSyncing(false);
+    }
+  };
+
+  useEffect(() => {
+    void loadAdAccounts();
+    void loadCampaigns();
+    void loadAdPerformance();
+  }, [restaurantId, dateRange]);
 
   const filteredData = adPerformance.filter(perf => {
     const matchesPlatform = selectedPlatform === 'all' || perf.platform === selectedPlatform;
@@ -152,6 +218,10 @@ export function AdAnalyticsDashboard({ restaurantId, currency }: Props) {
           </div>
         </div>
         <div className="flex gap-2">
+          <Button variant="outline" onClick={syncMetaInsights} disabled={syncing || !selectedAdAccount}>
+            <RefreshCw className={`w-4 h-4 ml-2 ${syncing ? 'animate-spin' : ''}`} />
+            مزامنة Meta
+          </Button>
           <Button variant="outline" onClick={loadAdPerformance} disabled={loading}>
             <RefreshCw className={`w-4 h-4 ml-2 ${loading ? 'animate-spin' : ''}`} />
             تحديث
@@ -165,8 +235,21 @@ export function AdAnalyticsDashboard({ restaurantId, currency }: Props) {
 
       {/* Filters */}
       <Card className="p-4">
-        <div className="flex gap-4">
-          <div className="flex-1">
+        <div className="flex gap-4 flex-wrap">
+          <div className="flex-1 min-w-[220px]">
+            <Label>حساب Meta الإعلاني</Label>
+            <Select value={selectedAdAccount} onValueChange={setSelectedAdAccount}>
+              <SelectTrigger>
+                <SelectValue placeholder="اختر الحساب الإعلاني" />
+              </SelectTrigger>
+              <SelectContent>
+                {adAccounts.map((account) => (
+                  <SelectItem key={account.id} value={account.id}>{account.account_name || account.account_id}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="flex-1 min-w-[180px]">
             <Label>الفترة الزمنية</Label>
             <Select value={dateRange} onValueChange={setDateRange}>
               <SelectTrigger>
@@ -213,6 +296,31 @@ export function AdAnalyticsDashboard({ restaurantId, currency }: Props) {
           )}
         </div>
       </Card>
+
+      {campaigns.length > 0 && (
+        <Card className="p-4">
+          <div className="flex items-center justify-between mb-4">
+            <div>
+              <h3 className="font-bold">حملات Meta المتزامنة</h3>
+              <p className="text-xs text-muted-foreground">يمكن تشغيل أو إيقاف الحملة بعد التحقق من صلاحية الإدارة.</p>
+            </div>
+            <Badge variant="outline">{campaigns.length} حملة</Badge>
+          </div>
+          <div className="space-y-2">
+            {campaigns.slice(0, 20).map((campaign) => (
+              <div key={campaign.id} className="flex items-center justify-between gap-4 border-b last:border-0 py-2">
+                <div className="min-w-0">
+                  <p className="font-medium truncate">{campaign.campaign_name}</p>
+                  <p className="text-xs text-muted-foreground">{campaign.campaign_status} {campaign.last_synced_at ? `• ${new Date(campaign.last_synced_at).toLocaleDateString('ar-EG')}` : ''}</p>
+                </div>
+                <Button size="sm" variant="outline" onClick={() => updateCampaignStatus(campaign)} disabled={campaignActionId === campaign.id}>
+                  {campaignActionId === campaign.id ? 'جارٍ التنفيذ...' : String(campaign.campaign_status).toUpperCase() === 'PAUSED' ? 'تشغيل' : 'إيقاف'}
+                </Button>
+              </div>
+            ))}
+          </div>
+        </Card>
+      )}
 
       {/* Stats Grid */}
       <div className="grid grid-cols-1 md:grid-cols-4 lg:grid-cols-8 gap-4">
