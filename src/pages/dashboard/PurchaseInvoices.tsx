@@ -14,7 +14,6 @@ import {
   FileText, Plus, Search, Clock, Eye, RefreshCcw, Trash2,
   TrendingUp, TrendingDown, Package, Warehouse, Banknote, CheckCircle2, X, Barcode, Minus
 } from 'lucide-react';
-import { receiveStock } from '@/services/inventoryService';
 
 interface PurchaseInvoice {
   id: string;
@@ -48,10 +47,11 @@ interface LineItem {
 
 interface Props {
   restaurantId: string;
+  workspaceId?: string;
   currency: string;
 }
 
-export function PurchaseInvoices({ restaurantId, currency }: Props) {
+export function PurchaseInvoices({ restaurantId, workspaceId, currency }: Props) {
   const [invoices, setInvoices] = useState<PurchaseInvoice[]>([]);
   const [loading, setLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -136,7 +136,7 @@ export function PurchaseInvoices({ restaurantId, currency }: Props) {
       }
       setCostingMethod(method);
     });
-  }, [restaurantId]);
+  }, [restaurantId, workspaceId]);
 
   // Auto-open the add modal when navigated from Inventory with a pre-selected product
   useEffect(() => {
@@ -172,11 +172,13 @@ export function PurchaseInvoices({ restaurantId, currency }: Props) {
   const loadInvoices = async () => {
     setLoading(true);
     try {
-      const { data, error } = await supabase
+      let invoiceQuery = supabase
         .from('purchase_invoices')
         .select('*')
         .eq('restaurant_id', restaurantId)
         .order('created_at', { ascending: false });
+      if (workspaceId) invoiceQuery = invoiceQuery.eq('workspace_id', workspaceId);
+      const { data, error } = await invoiceQuery;
       if (error) throw error;
       const mapped = (data || []).map((r: any) => ({
         ...r,
@@ -278,6 +280,7 @@ export function PurchaseInvoices({ restaurantId, currency }: Props) {
         .from('purchase_invoices')
         .insert({
           restaurant_id: restaurantId,
+          workspace_id: workspaceId || null,
           supplier_id: form.supplier_id,
           supplier_contract_id: form.supplier_contract_id || null,
           supplier_name: supplier?.name,
@@ -318,20 +321,8 @@ export function PurchaseInvoices({ restaurantId, currency }: Props) {
         throw new Error('فشل حفظ بنود الفاتورة: ' + linesError.message);
       }
 
-      // Create inventory movements for inventory items
-      for (const l of lines) {
-        if (l.line_type === 'inventory' && l.warehouse_id && l.product_id) {
-          await supabase.from('inventory_movements').insert({
-            product_id: l.product_id,
-            warehouse_id: l.warehouse_id,
-            movement_type: 'IN',
-            quantity: Number(l.quantity),
-            reference_type: 'PURCHASE',
-            reference_id: inv.id,
-            created_at: new Date().toISOString()
-          });
-        }
-      }
+      // Inventory is intentionally not mutated while saving the invoice draft.
+      // It is posted exactly once by post_purchase_invoice_receipt_v2 after goods receipt.
 
       // القيد المحاسبي يتم إنشاؤه وترحيله تلقائياً على مستوى قاعدة البيانات
       // (trg_autopost_purchase_invoice_journal) لضمان توازن القيد وعدم التكرار.
@@ -396,100 +387,61 @@ export function PurchaseInvoices({ restaurantId, currency }: Props) {
   };
 
   const handleDelete = async (inv: PurchaseInvoice) => {
-    if (!confirm(`حذف الفاتورة ${inv.invoice_number}؟`)) return;
+    if (!confirm(`إلغاء الفاتورة ${inv.invoice_number}؟ لن يتم حذف السجل، وسيتم عكس المخزون إذا كانت مستلمة.`)) return;
     try {
-      await supabase.from('purchase_invoices').delete().eq('id', inv.id);
-      toast.success('تم الحذف');
-      loadInvoices();
+      if (inv.goods_received_at || inv.inventory_receipt_id) {
+        if (!workspaceId) throw new Error('اختر الفرع النشط قبل عكس فاتورة مستلمة');
+        const { data, error } = await (supabase as any).rpc('void_purchase_invoice_receipt_v2', {
+          p_restaurant_id: restaurantId,
+          p_workspace_id: workspaceId,
+          p_invoice_id: inv.id,
+          p_reason: 'إلغاء فاتورة الشراء من شاشة الفواتير',
+        });
+        if (error) throw error;
+        if (!data?.success) throw new Error(data?.error || 'فشل عكس الفاتورة');
+        toast.success(data.replayed ? 'الفاتورة ملغاة بالفعل' : 'تم إلغاء الفاتورة وعكس المخزون');
+      } else {
+        const { error } = await supabase
+          .from('purchase_invoices')
+          .update({ status: 'cancelled', updated_at: new Date().toISOString() })
+          .eq('id', inv.id)
+          .eq('restaurant_id', restaurantId);
+        if (error) throw error;
+        toast.success('تم إلغاء مسودة الفاتورة مع الحفاظ على السجل');
+      }
+      await loadInvoices();
     } catch (e: any) {
-      toast.error('فشل الحذف: ' + e.message);
+      toast.error('فشل إلغاء الفاتورة: ' + e.message);
     }
   };
 
   const handleReceiveGoods = async (inv: PurchaseInvoice) => {
-    if (inv.goods_received_at) { toast.info('تم استلام البضاعة بالفعل'); return; }
-    const { data: items, error: itemsError } = await supabase
-      .from('purchase_invoice_items')
-      .select('*')
-      .eq('invoice_id', inv.id)
-      .eq('line_type', 'inventory');
-    
-    if (itemsError) {
-      console.error('Failed to load invoice items:', itemsError);
-      toast.error('فشل تحميل بنود الفاتورة');
+    if (inv.goods_received_at || inv.inventory_receipt_id) {
+      toast.info('تم استلام البضاعة بالفعل');
       return;
     }
-    
-    const invItems = (items || []) as any[];
-    console.log('Invoice items for receiving:', invItems);
-    
-    if (invItems.length === 0) {
-      toast.info('لا توجد بنود مخزون في هذه الفاتورة - تأكد من اختيار نوع "مخزون" عند إضافة البنود');
+    if (!workspaceId) {
+      toast.error('اختر الفرع النشط قبل استلام البضاعة');
       return;
     }
-
     if (!confirm(`استلام البضاعة وإضافتها للمخزون باستخدام طريقة ${costingMethod.toUpperCase()}؟`)) return;
+
     setProcessing(true);
     try {
-      // Create inventory receipt header
-      const receiptNumber = `RC-${Date.now()}`;
-      const totalAmount = invItems.reduce((s, l) => s + Number(l.total), 0);
-      const { data: receipt, error: rErr } = await supabase
-        .from('inventory_receipts')
-        .insert({
-          restaurant_id: restaurantId,
-          receipt_number: receiptNumber,
-          supplier_id: inv.supplier_id,
-          receipt_date: new Date().toISOString().split('T')[0],
-          total_amount: totalAmount,
-          discount_amount: 0,
-          tax_amount: 0,
-          net_amount: totalAmount,
-          paid_amount: 0,
-          status: 'posted',
-          notes: `استلام تلقائي من فاتورة ${inv.invoice_number}`,
-        } as any)
-        .select()
-        .single();
-      if (rErr) throw rErr;
+      const { data, error } = await (supabase as any).rpc('post_purchase_invoice_receipt_v2', {
+        p_restaurant_id: restaurantId,
+        p_workspace_id: workspaceId,
+        p_invoice_id: inv.id,
+      });
+      if (error) throw error;
+      if (!data?.success) throw new Error(data?.error || 'فشل استلام البضاعة');
 
-      // Insert receipt items + add cost layers + update product stock
-      for (const l of invItems) {
-        const product = products.find(p => p.id === l.product_id);
-        await supabase.from('inventory_receipt_items').insert({
-          inventory_receipt_id: receipt.id,
-          product_id: l.product_id,
-          quantity: l.quantity,
-          unit_cost: l.unit_cost,
-          total_cost: l.total,
-          unit: product?.unit || 'piece',
-          warehouse_location: l.warehouse_id || null,
-        } as any);
-
-        const warehouseId = l.warehouse_id || l.sub_warehouse_id;
-        if (!warehouseId) throw new Error(`حدد المخزن للبند ${product?.name || l.description}`);
-        const stockResult = await receiveStock({
-          itemId: l.product_id,
-          subWarehouseId: warehouseId,
-          quantity: Number(l.quantity),
-          unitCost: Number(l.unit_cost),
-          referenceType: 'purchase_invoice',
-          referenceId: inv.id,
-          referenceNumber: inv.invoice_number,
-          movementType: 'RECEIPT',
-        });
-        if (!stockResult.success) throw new Error(stockResult.error || `فشل استلام ${product?.name || l.description}`);
+      toast.success(data.replayed ? 'الفاتورة مستلمة بالفعل' : 'تم استلام البضاعة وتحديث الرصيد والتكلفة والقيد المؤجل');
+      await loadInvoices();
+      if (viewInvoice?.id === inv.id) {
+        const refreshed = { ...inv, goods_received_at: new Date().toISOString(), inventory_receipt_id: data.receipt_id, status: 'received' };
+        await openView(refreshed as PurchaseInvoice);
       }
-
-      await supabase.from('purchase_invoices').update({
-        goods_received_at: new Date().toISOString(),
-        inventory_receipt_id: receipt.id,
-        status: 'received',
-      }).eq('id', inv.id);
-
-      toast.success('تم استلام البضاعة وتحديث المخزون');
-      loadInvoices();
-      if (viewInvoice?.id === inv.id) openView(inv);
     } catch (e: any) {
       toast.error('فشل الاستلام: ' + e.message);
     } finally {

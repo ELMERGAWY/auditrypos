@@ -145,17 +145,17 @@ export function WarehouseManager({ restaurantId, workspaceId, warehouses: propsW
       cogs_account_code: warehouse.cogs_account_code || '',
       notes: warehouse.notes || '',
       // Advanced location fields
-      location_zone: '',
-      aisle: '',
-      bin: '',
-      floor: '',
-      building: '',
+      location_zone: warehouse.location_zone || '',
+      aisle: warehouse.aisle || '',
+      bin: warehouse.bin || '',
+      floor: warehouse.floor || '',
+      building: warehouse.building || '',
       // Capacity and control fields
-      capacity_quantity: '',
-      capacity_volume: '',
-      temperature_control: false,
-      humidity_control: false,
-      security_level: 'normal'
+      capacity_quantity: warehouse.capacity_quantity != null ? String(warehouse.capacity_quantity) : '',
+      capacity_volume: warehouse.capacity_volume != null ? String(warehouse.capacity_volume) : '',
+      temperature_control: Boolean(warehouse.temperature_control),
+      humidity_control: Boolean(warehouse.humidity_control),
+      security_level: warehouse.security_level || 'normal'
     });
     setDialogOpen(true);
   };
@@ -235,6 +235,7 @@ export function WarehouseManager({ restaurantId, workspaceId, warehouses: propsW
             price
           )
         `)
+        .eq('restaurant_id', restaurantId)
         .eq('warehouse_id', warehouse.id);
       if (workspaceId) warehouseStockQuery = warehouseStockQuery.eq('workspace_id', workspaceId);
       const { data: stockData, error } = await warehouseStockQuery;
@@ -279,7 +280,7 @@ export function WarehouseManager({ restaurantId, workspaceId, warehouses: propsW
       
       if (isEditing && editingWarehouseId) {
         // Update existing warehouse
-        const { error } = await supabase
+        let warehouseUpdate = supabase
           .from('warehouses')
           .update({
             code: formData.code,
@@ -299,9 +300,22 @@ export function WarehouseManager({ restaurantId, workspaceId, warehouses: propsW
             accounting_account_code: formData.accounting_account_code || null,
             inventory_account_code: formData.inventory_account_code || null,
             cogs_account_code: formData.cogs_account_code || null,
-            notes: formData.notes || null
+            notes: formData.notes || null,
+            location_zone: formData.location_zone || null,
+            aisle: formData.aisle || null,
+            bin: formData.bin || null,
+            floor: formData.floor || null,
+            building: formData.building || null,
+            capacity_quantity: formData.capacity_quantity ? Number(formData.capacity_quantity) : null,
+            capacity_volume: formData.capacity_volume ? Number(formData.capacity_volume) : null,
+            temperature_control: formData.temperature_control,
+            humidity_control: formData.humidity_control,
+            security_level: formData.security_level || 'normal'
           })
-          .eq('id', editingWarehouseId);
+          .eq('id', editingWarehouseId)
+          .eq('restaurant_id', restaurantId);
+        if (workspaceId) warehouseUpdate = warehouseUpdate.eq('workspace_id', workspaceId);
+        const { error } = await warehouseUpdate;
 
         if (error) throw error;
         toast.success('تم تحديث المخزن بنجاح');
@@ -311,6 +325,7 @@ export function WarehouseManager({ restaurantId, workspaceId, warehouses: propsW
           .from('warehouses')
           .insert({
             restaurant_id: restaurantId,
+            workspace_id: workspaceId || null,
             code: formData.code,
             name: formData.name,
             name_ar: formData.name_ar,
@@ -328,7 +343,17 @@ export function WarehouseManager({ restaurantId, workspaceId, warehouses: propsW
             accounting_account_code: formData.accounting_account_code || null,
             inventory_account_code: formData.inventory_account_code || null,
             cogs_account_code: formData.cogs_account_code || null,
-            notes: formData.notes || null
+            notes: formData.notes || null,
+            location_zone: formData.location_zone || null,
+            aisle: formData.aisle || null,
+            bin: formData.bin || null,
+            floor: formData.floor || null,
+            building: formData.building || null,
+            capacity_quantity: formData.capacity_quantity ? Number(formData.capacity_quantity) : null,
+            capacity_volume: formData.capacity_volume ? Number(formData.capacity_volume) : null,
+            temperature_control: formData.temperature_control,
+            humidity_control: formData.humidity_control,
+            security_level: formData.security_level || 'normal'
           });
 
         if (error) throw error;
@@ -386,12 +411,13 @@ export function WarehouseManager({ restaurantId, workspaceId, warehouses: propsW
       setLoading(true);
       const { error } = await supabase
         .from('warehouses')
-        .delete()
-        .eq('id', id);
+        .update({ deleted_at: new Date().toISOString(), is_active: false })
+        .eq('id', id)
+        .eq('restaurant_id', restaurantId);
 
       if (error) throw error;
 
-      toast.success('تم حذف المخزن بنجاح');
+      toast.success('تم تعطيل المخزن بأمان مع الحفاظ على السجلات');
       onRefresh();
     } catch (error) {
       console.error('Error deleting warehouse:', error);
@@ -801,7 +827,7 @@ export function WarehouseManager({ restaurantId, workspaceId, warehouses: propsW
                     <TableCell>{Number(product.cost_price).toLocaleString('ar-EG')} ج.م</TableCell>
                     <TableCell>{Number(product.price).toLocaleString('ar-EG')} ج.م</TableCell>
                     <TableCell>
-                      {selectedWarehouse && selectedWarehouse.type === 'MAIN' && (
+                      {selectedWarehouse && (
                         <Button
                           variant="ghost"
                           size="sm"
