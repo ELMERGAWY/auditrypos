@@ -33,6 +33,16 @@ interface WarehouseStock {
   warehouse_id: string;
   product_id: string;
   quantity: number;
+  workspace_id?: string | null;
+}
+
+interface InventoryBalanceRow {
+  sub_warehouse_id: string;
+  item_id: string;
+  quantity_on_hand: number;
+  average_cost: number;
+  total_value: number;
+  valuation_method?: string | null;
 }
 
 interface WarehouseReportTabProps {
@@ -40,28 +50,42 @@ interface WarehouseReportTabProps {
   warehouses: WarehouseType[];
   currency: string;
   restaurantId: string;
+  workspaceId?: string;
 }
 
 export function WarehouseReportTab({
   products,
   warehouses,
   currency,
-  restaurantId
+  restaurantId,
+  workspaceId
 }: WarehouseReportTabProps) {
   const [selectedWarehouseId, setSelectedWarehouseId] = useState<string>('all');
   const [reportDate, setReportDate] = useState<string>(new Date().toISOString().split('T')[0]);
   const [warehouseStocks, setWarehouseStocks] = useState<WarehouseStock[]>([]);
+  const [inventoryBalances, setInventoryBalances] = useState<InventoryBalanceRow[]>([]);
   const [loading, setLoading] = useState(false);
 
   const loadWarehouseStocks = async () => {
     setLoading(true);
     try {
-      const { data, error } = await supabase
+      let stockQuery = supabase
         .from('warehouse_stock')
-        .select('warehouse_id, product_id, quantity')
-        .eq('restaurant_id', restaurantId);
+        .select('warehouse_id, product_id, quantity, workspace_id')
+        .eq('restaurant_id', restaurantId)
+        .limit(5000);
+      if (workspaceId) stockQuery = stockQuery.eq('workspace_id', workspaceId);
+      const warehouseIds = warehouses.map(w => w.id);
+      let balanceQuery: any = supabase
+        .from('inventory_balances')
+        .select('sub_warehouse_id, item_id, quantity_on_hand, average_cost, total_value, valuation_method')
+        .limit(5000);
+      if (warehouseIds.length > 0) balanceQuery = balanceQuery.in('sub_warehouse_id', warehouseIds);
+      const [{ data, error }, { data: balanceData, error: balanceError }] = await Promise.all([stockQuery, balanceQuery]);
       if (error) throw error;
+      if (balanceError) console.warn('Inventory balance report fallback:', balanceError.message);
       setWarehouseStocks(data || []);
+      setInventoryBalances(balanceData || []);
     } catch (e: any) {
       toast.error('فشل تحميل بيانات المخازن: ' + e.message);
     } finally {
@@ -71,9 +95,17 @@ export function WarehouseReportTab({
 
   useEffect(() => {
     loadWarehouseStocks();
-  }, [restaurantId]);
+  }, [restaurantId, workspaceId, warehouses.map(w => w.id).join(',')]);
 
-  // Build per-warehouse product list based on real warehouse_stock records
+  const getUnitCost = (productId: string, warehouseId: string, fallback: number) => {
+    const balance = inventoryBalances.find(b => b.item_id === productId && b.sub_warehouse_id === warehouseId);
+    if (balance && Number(balance.quantity_on_hand) > 0) {
+      return Number(balance.total_value || 0) / Number(balance.quantity_on_hand);
+    }
+    return Number(balance?.average_cost || fallback || 0);
+  };
+
+  // Build per-warehouse product list based on real warehouse_stock and inventory balances.
   const getWarehouseProducts = (warehouseId: string) => {
     if (warehouseId === 'all') {
       // Show all products with their total quantities
@@ -82,16 +114,17 @@ export function WarehouseReportTab({
         const qty = stocks.length > 0
           ? stocks.reduce((sum, s) => sum + Number(s.quantity || 0), 0)
           : p.quantity;
-        return { ...p, quantity: qty };
+        const value = stocks.reduce((sum, s) => sum + Number(s.quantity || 0) * getUnitCost(p.id, s.warehouse_id, p.cost_price), 0);
+        return { ...p, quantity: qty, cost_price: qty > 0 && value > 0 ? value / qty : p.cost_price };
       });
     }
     // Filter only products that have stock in the selected warehouse
     const stocksForWh = warehouseStocks.filter(s => s.warehouse_id === warehouseId);
-    return stocksForWh.map(s => {
-      const product = products.find(p => p.id === s.product_id);
-      if (!product) return null;
-      return { ...product, quantity: Number(s.quantity || 0) };
-    }).filter(Boolean);
+      return stocksForWh.map(s => {
+        const product = products.find(p => p.id === s.product_id);
+        if (!product) return null;
+        return { ...product, quantity: Number(s.quantity || 0), cost_price: getUnitCost(s.product_id, warehouseId, product.cost_price) };
+      }).filter(Boolean);
   };
 
   const filteredProducts = getWarehouseProducts(selectedWarehouseId);
@@ -106,7 +139,7 @@ export function WarehouseReportTab({
       const p = products.find(pr => pr.id === s.product_id);
       if (p) {
         const qty = Number(s.quantity || 0);
-        totalCost += qty * Number(p.cost_price || 0);
+        totalCost += qty * getUnitCost(s.product_id, w.id, Number(p.cost_price || 0));
         totalSale += qty * Number(p.price || 0);
       }
     });

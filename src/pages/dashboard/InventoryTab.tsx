@@ -757,7 +757,7 @@ export function InventoryTab({ restaurantId, workspaceId, currency, businessType
               <WarehouseManager restaurantId={restaurantId} workspaceId={workspaceId} warehouses={warehouses} onRefresh={load} />
             </TabsContent>
             <TabsContent value="wh_report" className="space-y-4 mt-4">
-              <WarehouseReportTab products={products} warehouses={warehouses} currency={currency} restaurantId={restaurantId} />
+              <WarehouseReportTab products={products} warehouses={warehouses} currency={currency} restaurantId={restaurantId} workspaceId={workspaceId} />
             </TabsContent>
             <TabsContent value="wh_locations" className="space-y-4 mt-4">
               <StockLocationsManager restaurantId={restaurantId} currency={currency} />
