@@ -11,6 +11,8 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 import { journalService } from '@/lib/accounting/journalService';
+import { TableViewToolbar } from '@/components/dashboard/TableViewToolbar';
+import { useTableViewPreference } from '@/hooks/useTableViewPreference';
 
 interface Customer {
   id: string;
@@ -76,6 +78,7 @@ export function CustomersTab({ restaurantId, currency }: Props) {
   const [showWarningModal, setShowWarningModal] = useState<Customer | null>(null);
   const [warningReason, setWarningReason] = useState('');
   const [warningHistory, setWarningHistory] = useState<WarningHistory[]>([]);
+  const [tableView, setTableView] = useTableViewPreference({ restaurantId, tableKey: 'customers', defaultView: 'table' });
   const [form, setForm] = useState({
     name: '', phone: '', email: '', address: '', customer_type: 'retail',
     credit_limit: '', notes: '', vip_status: false, risk_level: 'normal',
@@ -382,6 +385,7 @@ export function CustomersTab({ restaurantId, currency }: Props) {
           <Search className="w-4 h-4 absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
           <Input value={search} onChange={e => setSearch(e.target.value)} placeholder="بحث بالاسم أو الرقم..." className="pr-10 h-9 text-xs" />
         </div>
+        <TableViewToolbar value={tableView} onChange={setTableView} />
         <Button onClick={loadReports} variant="outline" size="sm">
           <BarChart3 className="w-4 h-4 ml-1" /> تقارير
         </Button>
@@ -732,55 +736,28 @@ export function CustomersTab({ restaurantId, currency }: Props) {
       </Dialog>
 
       {/* Customers List */}
-      <div className="space-y-2">
-        {filtered.map(c => (
-          <motion.div key={c.id} initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="glass-card p-4">
-            <div className="flex items-center gap-3">
-              <div className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold ${
-                c.customer_type === 'vip' ? 'bg-accent/20 text-accent' :
-                c.customer_type === 'wholesale' ? 'bg-primary/20 text-primary' :
-                'bg-secondary text-secondary-foreground'
-              }`}>
-                {c.name.charAt(0)}
+      {tableView === 'table' ? (
+        <div className="glass-card overflow-auto">
+          <table className="w-full text-sm">
+            <thead><tr className="border-b border-border text-right"><th className="p-3">العميل</th><th className="p-3">الهاتف</th><th className="p-3">النوع</th><th className="p-3">الرصيد</th><th className="p-3">الإجراءات</th></tr></thead>
+            <tbody>{filtered.map(c => <tr key={c.id} className="border-b border-border/60 hover:bg-secondary/20"><td className="p-3 font-semibold">{c.name}{c.vip_status && <Star className="inline w-3 h-3 mr-1 text-yellow-500 fill-yellow-500" />}</td><td className="p-3 text-muted-foreground">{c.phone || '-'}</td><td className="p-3">{c.customer_type === 'wholesale' ? 'جملة' : c.customer_type === 'vip' ? 'VIP' : 'تجزئة'}</td><td className={`p-3 font-bold ${c.balance > 0 ? 'text-destructive' : c.balance < 0 ? 'text-success' : ''}`}>{c.balance.toLocaleString()} {currency}</td><td className="p-3"><div className="flex gap-1"><Button size="sm" variant="ghost" onClick={() => setShowPayment(c)} title="سند قبض"><CreditCard className="w-3 h-3" /></Button><Button size="sm" variant="ghost" onClick={() => openLedger(c)} title="كشف حساب"><FileText className="w-3 h-3" /></Button><Button size="sm" variant="ghost" onClick={() => startEdit(c)} title="تعديل"><Edit2 className="w-3 h-3" /></Button></div></td></tr>)}</tbody>
+          </table>
+          {filtered.length === 0 && <p className="text-muted-foreground text-center py-12">لا يوجد عملاء</p>}
+        </div>
+      ) : (
+        <div className={tableView === 'compact' ? 'space-y-1' : 'space-y-2'}>
+          {filtered.map(c => (
+            <motion.div key={c.id} initial={{ opacity: 0 }} animate={{ opacity: 1 }} className={`glass-card ${tableView === 'compact' ? 'p-2' : 'p-4'}`}>
+              <div className="flex items-center gap-3">
+                {tableView !== 'compact' && <div className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold ${c.customer_type === 'vip' ? 'bg-accent/20 text-accent' : c.customer_type === 'wholesale' ? 'bg-primary/20 text-primary' : 'bg-secondary text-secondary-foreground'}`}>{c.name.charAt(0)}</div>}
+                <div className="flex-1 min-w-0"><div className="flex items-center gap-2"><p className="font-bold text-sm">{c.name}</p>{c.vip_status && <Star className="w-3 h-3 text-yellow-500 fill-yellow-500" />}<Badge variant="outline" className="text-[10px]">{c.customer_type === 'wholesale' ? 'جملة' : c.customer_type === 'vip' ? 'VIP' : 'تجزئة'}</Badge>{c.warning_flags > 0 && <Badge variant="outline" className="text-[10px] bg-red-50 text-red-600 border-red-200"><AlertTriangle className="w-2 h-2 mr-1" />{c.warning_flags}</Badge>}</div><div className="flex items-center gap-3 text-xs text-muted-foreground mt-1">{c.phone && <span>📱 {c.phone}</span>}<span className={c.balance > 0 ? 'text-destructive font-bold' : c.balance < 0 ? 'text-success font-bold' : ''}>الرصيد: {c.balance} {currency}</span>{c.credit_limit > 0 && <span>حد الائتمان: {c.credit_limit} {currency}</span>}</div></div>
+                <div className="flex gap-1"><Button size="sm" variant="ghost" onClick={() => { setShowWarningModal(c); loadWarningHistory(c.id); }} title="إدارة التحذيرات"><ShieldAlert className="w-3 h-3" /></Button><Button size="sm" variant="ghost" onClick={() => setShowPayment(c)} title="سند قبض / تسجيل دفعة"><CreditCard className="w-3 h-3" /></Button><Button size="sm" variant="ghost" onClick={() => openLedger(c)} title="كشف حساب"><FileText className="w-3 h-3" /></Button><Button size="sm" variant="ghost" onClick={() => startEdit(c)} title="تعديل"><Edit2 className="w-3 h-3" /></Button><Button size="sm" variant="ghost" className="text-destructive" onClick={() => handleDelete(c.id)} title="حذف"><Trash2 className="w-3 h-3" /></Button></div>
               </div>
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2">
-                  <p className="font-bold text-sm">{c.name}</p>
-                  {c.vip_status && <Star className="w-3 h-3 text-yellow-500 fill-yellow-500" />}
-                  <Badge variant="outline" className="text-[10px]">
-                    {c.customer_type === 'wholesale' ? 'جملة' : c.customer_type === 'vip' ? 'VIP' : 'تجزئة'}
-                  </Badge>
-                  {c.warning_flags > 0 && (
-                    <Badge variant="outline" className="text-[10px] bg-red-50 text-red-600 border-red-200">
-                      <AlertTriangle className="w-2 h-2 mr-1" />
-                      {c.warning_flags}
-                    </Badge>
-                  )}
-                  {c.risk_level === 'high' && <Badge className="text-[10px] bg-red-500">خطر</Badge>}
-                  {c.risk_level === 'blocked' && <Badge className="text-[10px] bg-red-700">محظور</Badge>}
-                </div>
-                <div className="flex items-center gap-3 text-xs text-muted-foreground mt-1">
-                  {c.phone && <span>📱 {c.phone}</span>}
-                  <span className={c.balance > 0 ? 'text-destructive font-bold' : c.balance < 0 ? 'text-success font-bold' : ''}>
-                    الرصيد: {c.balance} {currency}
-                  </span>
-                  {c.credit_limit > 0 && <span>حد الائتمان: {c.credit_limit} {currency}</span>}
-                </div>
-              </div>
-              <div className="flex gap-1">
-                <Button size="sm" variant="ghost" onClick={() => { setShowWarningModal(c); loadWarningHistory(c.id); }} title="إدارة التحذيرات">
-                  <ShieldAlert className="w-3 h-3" />
-                </Button>
-                <Button size="sm" variant="ghost" onClick={() => setShowPayment(c)} title="سند قبض / تسجيل دفعة"><CreditCard className="w-3 h-3" /></Button>
-                <Button size="sm" variant="ghost" onClick={() => openLedger(c)} title="كشف حساب"><FileText className="w-3 h-3" /></Button>
-                <Button size="sm" variant="ghost" onClick={() => startEdit(c)}><Edit2 className="w-3 h-3" /></Button>
-                <Button size="sm" variant="ghost" className="text-destructive" onClick={() => handleDelete(c.id)}><Trash2 className="w-3 h-3" /></Button>
-              </div>
-            </div>
-          </motion.div>
-        ))}
-        {filtered.length === 0 && <p className="text-muted-foreground text-center py-12">لا يوجد عملاء</p>}
-      </div>
+            </motion.div>
+          ))}
+          {filtered.length === 0 && <p className="text-muted-foreground text-center py-12">لا يوجد عملاء</p>}
+        </div>
+      )}
     </div>
   );
 }

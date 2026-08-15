@@ -18,6 +18,8 @@ import { CustomerSearch } from './CustomerSearch';
 import { InvoiceViewer } from '@/components/InvoiceViewer';
 import { extractCustomerRef } from './types';
 import { actorCreateFields, actorUpdateFields, formatActorLabel } from '@/lib/actor';
+import { TableViewToolbar } from '@/components/dashboard/TableViewToolbar';
+import { useTableViewPreference } from '@/hooks/useTableViewPreference';
 
 interface Invoice {
   id: string;
@@ -46,6 +48,7 @@ interface Props {
 
 export function SalesInvoices({ restaurantId, workspaceId, currency, restaurant, isSuperAdmin, isOwner }: Props) {
   const [invoices, setInvoices] = useState<Invoice[]>([]);
+  const [tableView, setTableView] = useTableViewPreference({ restaurantId, tableKey: 'sales_invoices', defaultView: 'cards' });
   const [loading, setLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [showManualForm, setShowManualForm] = useState(false);
@@ -137,6 +140,7 @@ export function SalesInvoices({ restaurantId, workspaceId, currency, restaurant,
         .select('*')
         .eq('restaurant_id', restaurantId)
         .order('created_at', { ascending: false })
+        .order('id', { ascending: false })
         .limit(500);
       if (workspaceId) ordersQuery = ordersQuery.eq('workspace_id', workspaceId);
       const { data: ordersData, error: ordersError } = await ordersQuery;
@@ -151,6 +155,7 @@ export function SalesInvoices({ restaurantId, workspaceId, currency, restaurant,
         .select('*')
         .or(`restaurant_id.eq.${restaurantId},company_id.eq.${restaurantId}`)
         .order('created_at', { ascending: false })
+        .order('id', { ascending: false })
         .limit(500);
       if (workspaceId) salesInvoicesQuery = salesInvoicesQuery.eq('workspace_id', workspaceId);
       const { data: salesInvoicesData, error: salesInvoicesError } = await salesInvoicesQuery;
@@ -189,9 +194,10 @@ export function SalesInvoices({ restaurantId, workspaceId, currency, restaurant,
           source: 'sales_invoices'
         }));
 
-      const combined = [...formattedOrders, ...formattedSalesInvoices].sort((a, b) => 
-        new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
-      );
+      const combined = [...formattedOrders, ...formattedSalesInvoices].sort((a, b) => {
+        const dateDiff = new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+        return dateDiff || String(b.id).localeCompare(String(a.id));
+      });
 
       console.log(`Loaded invoices total: ${combined.length} (${formattedOrders.length} orders, ${formattedSalesInvoices.length} sales_invoices)`);
       setInvoices(combined);
@@ -648,17 +654,23 @@ export function SalesInvoices({ restaurantId, workspaceId, currency, restaurant,
          </Card>
       </div>
 
-      <div className="relative">
-        <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-        <Input 
-          placeholder="البحث برقم الفاتورة أو العميل أو الرقم المرجعي..." 
-          className="pr-10 h-11 bg-card/50" 
-          value={searchQuery}
-          onChange={e => setSearchQuery(e.target.value)}
-        />
+      <div className="flex flex-col md:flex-row gap-3 md:items-center">
+        <div className="relative flex-1">
+          <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+          <Input
+            placeholder="البحث برقم الفاتورة أو العميل أو الرقم المرجعي..."
+            className="pr-10 h-11 bg-card/50"
+            value={searchQuery}
+            onChange={e => setSearchQuery(e.target.value)}
+          />
+        </div>
+        <TableViewToolbar value={tableView} onChange={setTableView} />
       </div>
 
-      <div className="space-y-3">
+      {tableView === 'table' ? (
+        <div className="glass-card overflow-auto"><table className="w-full text-sm"><thead><tr className="border-b border-border text-right"><th className="p-3">الفاتورة</th><th className="p-3">العميل</th><th className="p-3">التاريخ</th><th className="p-3">الإجمالي</th><th className="p-3">الإجراءات</th></tr></thead><tbody>{filteredInvoices.map(inv => <tr key={inv.id} className="border-b border-border/60 hover:bg-secondary/20"><td className="p-3 font-semibold">{inv.order_number}</td><td className="p-3">{inv.customer_name || 'عميل نقدي'}</td><td className="p-3 text-muted-foreground">{new Date(inv.created_at).toLocaleDateString('ar-EG')}</td><td className="p-3 font-bold text-primary">{inv.total.toLocaleString()} {currency}</td><td className="p-3"><div className="flex gap-1"><Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => setViewingId(inv.id)} title="عرض"><Eye className="w-4 h-4" /></Button>{canEditInvoices && <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => handleEditInvoice(inv)} title="تعديل"><Edit className="w-4 h-4" /></Button>}<Button size="icon" variant="ghost" className="h-8 w-8 text-destructive" onClick={() => handleDelete(inv)} title="حذف"><Trash2 className="w-4 h-4" /></Button></div></td></tr>)}</tbody></table>{filteredInvoices.length === 0 && !loading && <div className="text-center py-12 text-muted-foreground">لا توجد فواتير مطابقة للبحث</div>}</div>
+      ) : (
+      <div className={tableView === 'compact' ? 'space-y-1' : 'space-y-3'}>
         {filteredInvoices.map(inv => (
           <div key={inv.id}>
             <Card className="p-4 glass-card hover:border-primary/50 transition-all flex items-center justify-between">
@@ -737,6 +749,7 @@ export function SalesInvoices({ restaurantId, workspaceId, currency, restaurant,
           <div className="text-center py-20 text-muted-foreground italic">لا توجد فواتير مطابقة للبحث</div>
         )}
       </div>
+      )}
 
       {/* Manual Invoice Modal */}
       <AnimatePresence>
