@@ -153,10 +153,41 @@ class CheckoutIntegration {
 
       const isDelivery = orderData.orderType === 'delivery';
       const inventoryItems = orderData.cart.filter(item => (item as any).product_id || item.menu_item_id);
-      const inventoryItemsForCosting = inventoryItems.map(item => ({
-        ...item,
-        quantity: item.quantity * (item.unitFactor || 1),
+      const directProductItems = inventoryItems.filter(item => (item as any).product_id).map(item => ({
+        product_id: (item as any).product_id,
+        quantity: item.quantity * ((item as any).unitFactor || 1),
       }));
+      const menuItemIds = inventoryItems
+        .filter(item => !(item as any).product_id && item.menu_item_id)
+        .map(item => item.menu_item_id as string);
+      const recipeByMenuItem = new Map<string, { product_id: string; quantity_required: number }[]>();
+      if (menuItemIds.length > 0) {
+        const { data: recipeRows, error: recipeError } = await supabase
+          .from('menu_item_components')
+          .select('menu_item_id, product_id, quantity_required')
+          .in('menu_item_id', [...new Set(menuItemIds)])
+          .limit(5000);
+        if (recipeError) {
+          console.warn('[checkout] recipe components unavailable; menu item stock will not be consumed:', recipeError.message);
+        } else {
+          (recipeRows || []).forEach((row: any) => {
+            const list = recipeByMenuItem.get(row.menu_item_id) || [];
+            list.push({ product_id: row.product_id, quantity_required: Number(row.quantity_required || 0) });
+            recipeByMenuItem.set(row.menu_item_id, list);
+          });
+        }
+      }
+      const recipeProductItems = inventoryItems.flatMap(item => {
+        if ((item as any).product_id || !item.menu_item_id) return [];
+        const unitFactor = Number((item as any).unitFactor || 1);
+        return (recipeByMenuItem.get(item.menu_item_id) || [])
+          .filter(component => component.product_id && component.quantity_required > 0)
+          .map(component => ({
+            product_id: component.product_id,
+            quantity: item.quantity * unitFactor * component.quantity_required,
+          }));
+      });
+      const inventoryItemsForCosting = [...directProductItems, ...recipeProductItems];
 
       // 1, 6, 8. Run independent calculations in parallel — each isolated so a single failure does NOT abort the sale
       const safeTax = taxService.calculateOrderTaxes(
