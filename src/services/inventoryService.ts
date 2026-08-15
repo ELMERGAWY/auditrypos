@@ -59,17 +59,22 @@ export async function issueStock(params: {
   referenceId?: string;
   referenceNumber?: string;
   movementType?: 'ISSUE' | 'SALE' | 'CONSUMPTION' | 'RETURN_OUT' | 'ADJUSTMENT_OUT';
+  costingMethod?: 'FIFO' | 'AVERAGE' | 'SPECIFIC' | 'LIFO';
+  accountingStandard?: 'EAS' | 'IFRS' | 'US_GAAP';
+  specificUnitCost?: number;
   allowNegative?: boolean;
 }): Promise<InventoryResult> {
-  const { data, error } = await supabase.rpc('rpc_inventory_issue', {
+  const { data, error } = await (supabase as any).rpc('rpc_inventory_issue_v2', {
     p_item_id: params.itemId,
-    p_sub_warehouse_id: params.subWarehouseId,
+    p_warehouse_id: params.subWarehouseId,
     p_quantity: params.quantity,
-    p_reference_type: params.referenceType ?? null,
+    p_costing_method: params.costingMethod ?? null,
+    p_accounting_standard: params.accountingStandard ?? null,
+    p_reference_type: params.referenceType ?? 'SALE',
     p_reference_id: params.referenceId ?? null,
     p_reference_number: params.referenceNumber ?? null,
-    p_movement_type: params.movementType ?? 'ISSUE',
     p_allow_negative: params.allowNegative ?? false,
+    p_specific_unit_cost: params.specificUnitCost ?? null,
   });
   return unwrap(data, error);
 }
