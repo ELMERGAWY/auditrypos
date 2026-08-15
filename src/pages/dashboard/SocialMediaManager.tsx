@@ -23,11 +23,27 @@ interface Props {
   restaurantId: string;
 }
 
+interface DiscoveredAsset {
+  id: string;
+  platform: string;
+  external_id: string;
+  asset_type: string;
+  asset_name: string;
+  asset_handle?: string | null;
+  parent_external_id?: string | null;
+  scopes?: string[];
+  status: string;
+  metadata?: Record<string, unknown>;
+  token_expires_at?: string | null;
+}
+
 export function SocialMediaManager({ restaurantId }: Props) {
   const location = useLocation();
   const [accounts, setAccounts] = useState<SocialAccount[]>([]);
   const [loading, setLoading] = useState(true);
   const [showConnectModal, setShowConnectModal] = useState(false);
+  const [pendingAssets, setPendingAssets] = useState<DiscoveredAsset[]>([]);
+  const [connectingAssetId, setConnectingAssetId] = useState<string | null>(null);
   const [oauthService] = useState(() => new OAuthService(supabase));
   const [activeTab, setActiveTab] = useState('accounts');
 
@@ -37,16 +53,27 @@ export function SocialMediaManager({ restaurantId }: Props) {
 
   // Handle OAuth callback results
   useEffect(() => {
-    if (location.state?.oauthSuccess) {
-      toast.success(`تم ربط حساب ${location.state.platform} بنجاح!`);
-      loadAccounts();
-    } else if (location.state?.oauthError) {
-      toast.error(`فشل ربط الحساب: ${location.state.message}`);
-      if (location.state.details) {
-        console.error('OAuth Error Details:', location.state.details);
+    const oauthState = location.state as any;
+    if (oauthState?.oauthSuccess) {
+      toast.success(`تم ربط حساب ${oauthState.platform} بنجاح!`);
+      void loadAccounts();
+    } else if (oauthState?.oauthAssetsDiscovered) {
+      setPendingAssets(Array.isArray(oauthState.assets) ? oauthState.assets : []);
+      void loadPendingAssets();
+    } else if (oauthState?.oauthError) {
+      toast.error(`فشل ربط الحساب: ${oauthState.message}`);
+      if (oauthState.details) {
+        console.error('OAuth Error Details:', oauthState.details);
       }
     }
   }, [location.state]);
+
+  const loadPendingAssets = async () => {
+    const { data, error } = await supabase.functions.invoke('social-oauth', {
+      body: { action: 'list_assets', restaurantId },
+    });
+    if (!error && Array.isArray(data?.assets)) setPendingAssets(data.assets as DiscoveredAsset[]);
+  };
 
   const loadAccounts = async () => {
     try {
@@ -82,6 +109,30 @@ export function SocialMediaManager({ restaurantId }: Props) {
     return;
   };
 
+
+  const handleConnectAsset = async (assetId: string) => {
+    setConnectingAssetId(assetId);
+    try {
+      const { data, error } = await supabase.functions.invoke('social-oauth', {
+        body: { action: 'connect_asset', restaurantId, assetId },
+      });
+      if (error || !data?.success) throw new Error(error?.message || data?.error || 'تعذر ربط الأصل');
+      setPendingAssets((current) => current.filter((asset) => asset.id !== assetId));
+      await loadAccounts();
+      toast.success('تم ربط الأصل بنجاح');
+    } catch (error: any) {
+      toast.error(error?.message || 'تعذر ربط الأصل');
+    } finally {
+      setConnectingAssetId(null);
+    }
+  };
+
+  const getAssetTypeLabel = (asset: DiscoveredAsset) => {
+    if (asset.asset_type === 'facebook_page') return 'صفحة Facebook';
+    if (asset.asset_type === 'instagram_professional') return 'حساب Instagram احترافي';
+    if (asset.asset_type === 'meta_ad_account') return 'حساب إعلاني Meta';
+    return 'أصل اجتماعي';
+  };
 
   const handleDisconnect = async (accountId: string) => {
     if (!confirm('هل أنت متأكد من فصل هذا الحساب؟')) return;
@@ -145,6 +196,38 @@ export function SocialMediaManager({ restaurantId }: Props) {
         </TabsList>
 
         <TabsContent value="accounts">
+          {pendingAssets.length > 0 && (
+            <Card className="p-4 mb-6 border-primary/30 bg-primary/5">
+              <div className="flex items-start justify-between gap-4 mb-4">
+                <div>
+                  <h3 className="font-bold">أصول Meta المكتشفة</h3>
+                  <p className="text-sm text-muted-foreground">
+                    اختر فقط الصفحات والحسابات الإعلانية التي تريد منح النظام صلاحية إدارتها. لا تظهر أي كلمات مرور أو توكنات.
+                  </p>
+                </div>
+                <Badge variant="outline">{pendingAssets.length} أصل</Badge>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                {pendingAssets.map((asset) => (
+                  <div key={asset.id} className="rounded-lg border bg-background p-3 flex items-center justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="font-medium truncate">{asset.asset_name}</p>
+                      <p className="text-xs text-muted-foreground">{getAssetTypeLabel(asset)}</p>
+                      {asset.asset_handle && <p className="text-xs text-muted-foreground truncate">{asset.asset_handle}</p>}
+                    </div>
+                    <Button
+                      size="sm"
+                      onClick={() => handleConnectAsset(asset.id)}
+                      disabled={connectingAssetId === asset.id}
+                    >
+                      {connectingAssetId === asset.id ? 'جارٍ الربط...' : 'ربط'}
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            </Card>
+          )}
+
           {/* Connected Accounts */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {accounts.map((account) => {
