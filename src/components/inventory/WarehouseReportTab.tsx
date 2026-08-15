@@ -7,7 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
-import { Warehouse, FileSpreadsheet, DollarSign, TrendingUp, Filter, Package, RefreshCw } from 'lucide-react';
+import { Warehouse, FileSpreadsheet, DollarSign, TrendingUp, Filter, Package, RefreshCw, AlertTriangle, CheckCircle2 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 
@@ -45,6 +45,18 @@ interface InventoryBalanceRow {
   valuation_method?: string | null;
 }
 
+interface ReconciliationRow {
+  product_id: string;
+  warehouse_id: string;
+  product_name: string;
+  warehouse_name: string;
+  warehouse_quantity: number;
+  ledger_quantity: number;
+  quantity_difference: number;
+  value_difference: number;
+  reconciliation_status: string;
+}
+
 interface WarehouseReportTabProps {
   products: Product[];
   warehouses: WarehouseType[];
@@ -64,6 +76,8 @@ export function WarehouseReportTab({
   const [reportDate, setReportDate] = useState<string>(new Date().toISOString().split('T')[0]);
   const [warehouseStocks, setWarehouseStocks] = useState<WarehouseStock[]>([]);
   const [inventoryBalances, setInventoryBalances] = useState<InventoryBalanceRow[]>([]);
+  const [reconciliationRows, setReconciliationRows] = useState<ReconciliationRow[]>([]);
+  const [reconciliationLoading, setReconciliationLoading] = useState(false);
   const [loading, setLoading] = useState(false);
 
   const loadWarehouseStocks = async () => {
@@ -93,8 +107,30 @@ export function WarehouseReportTab({
     }
   };
 
+  const loadReconciliation = async () => {
+    if (!workspaceId) {
+      setReconciliationRows([]);
+      return;
+    }
+    setReconciliationLoading(true);
+    const { data, error } = await (supabase as any).rpc('get_inventory_reconciliation', {
+      p_restaurant_id: restaurantId,
+      p_workspace_id: workspaceId,
+      p_only_differences: true,
+      p_limit: 100,
+    });
+    if (error) {
+      console.warn('Inventory reconciliation unavailable:', error.message);
+      setReconciliationRows([]);
+    } else {
+      setReconciliationRows((data || []) as ReconciliationRow[]);
+    }
+    setReconciliationLoading(false);
+  };
+
   useEffect(() => {
     loadWarehouseStocks();
+    loadReconciliation();
   }, [restaurantId, workspaceId, warehouses.map(w => w.id).join(',')]);
 
   const getUnitCost = (productId: string, warehouseId: string, fallback: number) => {
@@ -190,12 +226,46 @@ export function WarehouseReportTab({
               className="w-[180px] rounded-xl"
             />
           </div>
-          <Button variant="outline" size="sm" className="rounded-xl gap-2" onClick={loadWarehouseStocks} disabled={loading}>
-            <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
+          <Button variant="outline" size="sm" className="rounded-xl gap-2" onClick={() => { loadWarehouseStocks(); loadReconciliation(); }} disabled={loading || reconciliationLoading}>
+            <RefreshCw className={`h-4 w-4 ${loading || reconciliationLoading ? 'animate-spin' : ''}`} />
             تحديث
           </Button>
         </div>
       </div>
+
+      {/* Read-only reconciliation control: discrepancies are reported, never auto-adjusted. */}
+      {workspaceId && (
+        <Card className={`rounded-2xl border ${reconciliationRows.length > 0 ? 'border-amber-300/60' : 'border-emerald-300/60'}`}>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-bold flex items-center gap-2">
+              {reconciliationRows.length > 0 ? <AlertTriangle className="h-4 w-4 text-amber-500" /> : <CheckCircle2 className="h-4 w-4 text-emerald-500" />}
+              مطابقة الرصيد التشغيلي مع سجل التكلفة
+              <Badge variant="outline" className="mr-auto">{reconciliationLoading ? 'جاري الفحص' : `${reconciliationRows.length} فروق`}</Badge>
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {reconciliationRows.length === 0 && !reconciliationLoading ? (
+              <p className="text-xs text-emerald-700">لا توجد فروق كمية أو قيمة ضمن نطاق الفحص الأخير.</p>
+            ) : (
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader><TableRow><TableHead>الصنف</TableHead><TableHead>المخزن</TableHead><TableHead>فرق الكمية</TableHead><TableHead>فرق القيمة</TableHead><TableHead>الحالة</TableHead></TableRow></TableHeader>
+                  <TableBody>{reconciliationRows.slice(0, 20).map(row => (
+                    <TableRow key={`${row.product_id}-${row.warehouse_id}`}>
+                      <TableCell>{row.product_name}</TableCell>
+                      <TableCell>{row.warehouse_name}</TableCell>
+                      <TableCell className="font-bold">{Number(row.quantity_difference || 0).toLocaleString('ar-EG')}</TableCell>
+                      <TableCell>{Number(row.value_difference || 0).toLocaleString('ar-EG', { minimumFractionDigits: 2 })} {currency}</TableCell>
+                      <TableCell><Badge variant="outline" className="text-amber-700">{row.reconciliation_status}</Badge></TableCell>
+                    </TableRow>
+                  ))}</TableBody>
+                </Table>
+                <p className="text-[10px] text-muted-foreground mt-2">هذه شاشة رقابية فقط؛ لا يتم تعديل الأرصدة تلقائياً. عالج الفروق بحركة جرد أو مراجعة migration بعد اعتماد المدير المالي.</p>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
 
       {/* Summary KPIs */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
