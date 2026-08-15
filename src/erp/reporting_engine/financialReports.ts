@@ -366,9 +366,17 @@ export class FinancialReportingEngine {
       const balance = Number((acc as any).current_balance || 0);
       if (!Number.isFinite(balance) || Math.abs(balance) < 0.005) continue;
 
-      // Revenue classification follows the current chart template: 4.01 = sales, 4.02 = other revenue.
+      // Revenue classification: 4.01/41 = sales, 4.02/42 = services, remaining revenue is other.
       if (acc.account_type === 'revenue') {
-        if (acc.code.startsWith('4.01')) report.revenue.sales_revenue += balance;
+        const accountCode = String(acc.code || '');
+        const accountName = String(acc.name || '').toLowerCase();
+        const isServiceRevenue = accountCode.startsWith('4.02')
+          || accountCode.startsWith('42')
+          || accountName.includes('service')
+          || accountName.includes('خدمة')
+          || accountName.includes('خدمات');
+        if (isServiceRevenue) report.revenue.service_revenue += balance;
+        else if (accountCode.startsWith('4.01') || accountCode.startsWith('41')) report.revenue.sales_revenue += balance;
         else report.revenue.other_revenue += balance;
         report.revenue.total += balance;
       }
