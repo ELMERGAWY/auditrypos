@@ -216,9 +216,15 @@ export function HomeDashboard({ restaurantId, workspaceId, currency, onNavigate,
         ? rawServiceInvoices.filter((row: any) => !('workspace_id' in row) || row.workspace_id === workspaceId)
         : rawServiceInvoices;
       const serviceDate = (row: any) => row.invoice_date || row.created_at;
-      const todayServices = scopedServiceInvoices.filter((row: any) => { const d = serviceDate(row); return d >= today && d <= todayTo; });
-      const monthServices = scopedServiceInvoices.filter((row: any) => { const d = serviceDate(row); return d >= monthStart && d <= todayTo; });
-      const yesterdayServices = scopedServiceInvoices.filter((row: any) => { const d = serviceDate(row); return d >= yesterday && d <= yesterdayTo; });
+      const inDateRange = (row: any, start: Date, end: Date) => {
+        const value = serviceDate(row);
+        if (!value) return false;
+        const parsed = new Date(value);
+        return !Number.isNaN(parsed.getTime()) && parsed >= start && parsed <= end;
+      };
+      const todayServices = scopedServiceInvoices.filter((row: any) => inDateRange(row, todayStart, todayEnd));
+      const monthServices = scopedServiceInvoices.filter((row: any) => inDateRange(row, monthStartDate, todayEnd));
+      const yesterdayServices = scopedServiceInvoices.filter((row: any) => inDateRange(row, yesterdayStart, yesterdayEnd));
       const todaySummary = buildOperationalProfitSummary(todayOrdersRes.data || [], todayExpensesRes.data || [], todayServices);
       const monthSummary = buildOperationalProfitSummary(monthOrdersRes.data || [], monthExpensesRes.data || [], monthServices);
       const yesterdaySummary = buildOperationalProfitSummary(yesterdayOrdersRes.data || [], yesterdayExpensesRes.data || [], yesterdayServices);
