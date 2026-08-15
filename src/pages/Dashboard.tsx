@@ -1167,9 +1167,17 @@ export default function Dashboard() {
     return <div className="min-h-screen flex items-center justify-center p-4"><Suspense fallback={null}><CreateRestaurantForm userId={user.id} onCreated={loadData} /></Suspense></div>;
   }
 
+  const savedTheme = (restaurant.theme_settings || {}) as any;
+  const savedLayout = (restaurant.layout_config || {}) as any;
+  const dashboardThemeStyle = {
+    '--primary': savedTheme.primary_hsl || '221 83% 53%',
+    '--accent': savedTheme.accent_hsl || '262 83% 58%',
+  } as any;
+  const dashboardDensityClass = savedLayout.density === 'compact' ? 'dashboard-density-compact' : '';
+
   return (
     <DashboardErrorBoundary>
-      <div className="min-h-screen bg-background flex flex-col" dir={dir}>
+      <div className={`min-h-screen bg-background flex flex-col ${dashboardDensityClass}`} style={dashboardThemeStyle} dir={dir}>
         <ProfessionalSidebar 
           businessType={businessType} 
           activeTab={activeTab} 

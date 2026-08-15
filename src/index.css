@@ -214,3 +214,13 @@
     opacity: 1 !important;
   }
 }
+
+/* Tenant-configurable dashboard density. The comfortable layout remains the default. */
+.dashboard-density-compact .p-6 { padding: 1rem; }
+.dashboard-density-compact .p-5 { padding: 0.875rem; }
+.dashboard-density-compact .p-4 { padding: 0.75rem; }
+.dashboard-density-compact .gap-6 { gap: 1rem; }
+.dashboard-density-compact .gap-4 { gap: 0.75rem; }
+.dashboard-density-compact [class*="text-3xl"] { font-size: 1.5rem; line-height: 2rem; }
+.dashboard-density-compact [class*="text-2xl"] { font-size: 1.25rem; line-height: 1.75rem; }
+.dashboard-density-compact .glass-card { border-radius: 1rem; }

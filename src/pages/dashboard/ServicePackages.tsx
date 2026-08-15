@@ -36,6 +36,7 @@ export const ServicePackages = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingPackage, setEditingPackage] = useState<ServicePackage | null>(null);
   const [loading, setLoading] = useState(true);
+  const [databaseMode, setDatabaseMode] = useState(false);
 
   // Form state
   const [formName, setFormName] = useState('');
@@ -55,20 +56,43 @@ export const ServicePackages = () => {
 
       if (!restaurantData) return;
 
-      // Load menu items
+      // Load menu items with a bounded query.
       const { data: itemsData } = await supabase
         .from('menu_items')
-        .select('*')
+        .select('id, name, price, category')
         .eq('restaurant_id', restaurantData.id)
-        .eq('available', true);
+        .eq('available', true)
+        .limit(1000);
 
       setMenuItems(itemsData || []);
 
-      // Load packages (we'll use a simple table or store in menu_items with a type, but for now let's use localStorage or a new table)
-      // For now, let's use localStorage for demo
-      const savedPackages = localStorage.getItem(`service_packages_${restaurantData.id}`);
-      if (savedPackages) {
-        setPackages(JSON.parse(savedPackages));
+      // Database persistence is authoritative after the service foundation migration.
+      const { data: dbPackages, error: dbError } = await (supabase as any)
+        .from('service_packages')
+        .select('id, restaurant_id, name, description, price, is_active, created_at, service_package_items(id, menu_item_id, service_name, unit_price, quantity)')
+        .eq('restaurant_id', restaurantData.id)
+        .eq('is_active', true)
+        .order('created_at', { ascending: false })
+        .limit(500);
+
+      if (!dbError) {
+        setDatabaseMode(true);
+        setPackages((dbPackages || []).map((pkg: any) => ({
+          ...pkg,
+          price: Number(pkg.price || 0),
+          items: (pkg.service_package_items || []).map((item: any) => ({
+            id: item.menu_item_id || item.id,
+            name: item.service_name,
+            price: Number(item.unit_price || 0),
+            quantity: Number(item.quantity || 1),
+          })),
+        })));
+      } else {
+        // Compatibility fallback for tenants that have not applied the migration yet.
+        setDatabaseMode(false);
+        const savedPackages = localStorage.getItem(`service_packages_${restaurantData.id}`);
+        setPackages(savedPackages ? JSON.parse(savedPackages) : []);
+        console.warn('Service packages database migration unavailable:', dbError.message);
       }
     } catch (error) {
       console.error('Error loading data:', error);
@@ -95,32 +119,64 @@ export const ServicePackages = () => {
 
     if (!restaurantData) return;
 
-    const newPackage: ServicePackage = {
-      id: editingPackage ? editingPackage.id : Date.now().toString(),
-      name: formName,
-      description: formDescription,
-      price: Number(formPrice),
-      items: selectedItems.map(si => {
-        const item = menuItems.find(i => i.id === si.item_id);
-        return {
-          id: item!.id,
-          name: item!.name,
-          price: item!.price,
-          quantity: si.quantity
-        };
-      }),
-      is_active: true,
-      created_at: editingPackage ? editingPackage.created_at : new Date().toISOString(),
-      restaurant_id: restaurantData.id
-    };
+    const selectedPackageItems = selectedItems.map(si => {
+      const item = menuItems.find(i => i.id === si.item_id);
+      return {
+        menu_item_id: item?.id || null,
+        service_name: item?.name || 'خدمة',
+        unit_price: Number(item?.price || 0),
+        quantity: si.quantity,
+      };
+    });
 
-    const updatedPackages = editingPackage
-      ? packages.map(p => p.id === editingPackage.id ? newPackage : p)
-      : [...packages, newPackage];
-
-    setPackages(updatedPackages);
-    localStorage.setItem(`service_packages_${restaurantData.id}`, JSON.stringify(updatedPackages));
-    toast.success(editingPackage ? 'تم تحديث الحزمة بنجاح' : 'تم إنشاء الحزمة بنجاح');
+    if (databaseMode) {
+      let packageId = editingPackage?.id;
+      if (editingPackage) {
+        const { error } = await (supabase as any)
+          .from('service_packages')
+          .update({ name: formName, description: formDescription, price: Number(formPrice), updated_at: new Date().toISOString() })
+          .eq('id', editingPackage.id)
+          .eq('restaurant_id', restaurantData.id);
+        if (error) throw error;
+        await (supabase as any).from('service_package_items').delete().eq('package_id', editingPackage.id);
+      } else {
+        const { data: inserted, error } = await (supabase as any)
+          .from('service_packages')
+          .insert({ restaurant_id: restaurantData.id, name: formName, description: formDescription, price: Number(formPrice), is_active: true })
+          .select('id')
+          .single();
+        if (error) throw error;
+        packageId = inserted.id;
+      }
+      if (selectedPackageItems.length > 0) {
+        const { error: itemError } = await (supabase as any)
+          .from('service_package_items')
+          .insert(selectedPackageItems.map(item => ({ ...item, package_id: packageId })));
+        if (itemError) throw itemError;
+      }
+      toast.success(editingPackage ? 'تم تحديث الحزمة في قاعدة البيانات' : 'تم إنشاء الحزمة في قاعدة البيانات');
+      await loadData();
+    } else {
+      const newPackage: ServicePackage = {
+        id: editingPackage ? editingPackage.id : Date.now().toString(),
+        name: formName,
+        description: formDescription,
+        price: Number(formPrice),
+        items: selectedItems.map(si => {
+          const item = menuItems.find(i => i.id === si.item_id);
+          return { id: item!.id, name: item!.name, price: item!.price, quantity: si.quantity };
+        }),
+        is_active: true,
+        created_at: editingPackage ? editingPackage.created_at : new Date().toISOString(),
+        restaurant_id: restaurantData.id
+      };
+      const updatedPackages = editingPackage
+        ? packages.map(p => p.id === editingPackage.id ? newPackage : p)
+        : [...packages, newPackage];
+      setPackages(updatedPackages);
+      localStorage.setItem(`service_packages_${restaurantData.id}`, JSON.stringify(updatedPackages));
+      toast.success(editingPackage ? 'تم تحديث الحزمة محلياً مؤقتاً' : 'تم إنشاء الحزمة محلياً مؤقتاً');
+    }
     closeModal();
   };
 
@@ -135,10 +191,21 @@ export const ServicePackages = () => {
 
     if (!restaurantData) return;
 
+    if (databaseMode) {
+      const { error } = await (supabase as any)
+        .from('service_packages')
+        .update({ is_active: false, updated_at: new Date().toISOString() })
+        .eq('id', pkg.id)
+        .eq('restaurant_id', restaurantData.id);
+      if (error) { toast.error('فشل تعطيل الحزمة: ' + error.message); return; }
+      setPackages(prev => prev.filter(p => p.id !== pkg.id));
+      toast.success('تم تعطيل الحزمة مع الحفاظ على سجلها');
+      return;
+    }
     const updatedPackages = packages.filter(p => p.id !== pkg.id);
     setPackages(updatedPackages);
     localStorage.setItem(`service_packages_${restaurantData.id}`, JSON.stringify(updatedPackages));
-    toast.success('تم حذف الحزمة بنجاح');
+    toast.success('تم حذف الحزمة محلياً مؤقتاً');
   };
 
   const openModal = (pkg: ServicePackage | null = null) => {

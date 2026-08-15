@@ -12,10 +12,11 @@ import { motion, AnimatePresence } from 'framer-motion';
 
 interface Props {
   restaurantId: string;
+  workspaceId?: string;
   currency: string;
 }
 
-export function ContractingDashboard({ restaurantId, currency }: Props) {
+export function ContractingDashboard({ restaurantId, workspaceId, currency }: Props) {
   const [projects, setProjects] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [showAddProject, setShowAddProject] = useState(false);
@@ -33,31 +34,52 @@ export function ContractingDashboard({ restaurantId, currency }: Props) {
 
   const loadData = async () => {
     setLoading(true);
-    const { data: projectsData } = await supabase
+    let projectsQuery = supabase
       .from('projects')
       .select('*, project_sites(*), project_blocks(*)')
       .eq('restaurant_id', restaurantId)
-      .order('created_at', { ascending: false });
+      .is('archived_at', null)
+      .order('created_at', { ascending: false })
+      .limit(500);
+    let { data: projectsData, error: projectsError } = await projectsQuery;
+    // Compatibility path: before the additive controls migration, keep the old project list visible.
+    if (projectsError && /archived_at|column.*does not exist|schema cache/i.test(projectsError.message || '')) {
+      const legacyResult = await supabase
+        .from('projects')
+        .select('*, project_sites(*), project_blocks(*)')
+        .eq('restaurant_id', restaurantId)
+        .order('created_at', { ascending: false })
+        .limit(500);
+      projectsData = legacyResult.data;
+      projectsError = legacyResult.error;
+    }
+    if (projectsError) console.warn('Contracting projects load warning:', projectsError.message);
+    const scopedProjectsData = workspaceId
+      ? (projectsData || []).filter((p: any) => !p.workspace_id || p.workspace_id === workspaceId)
+      : (projectsData || []);
     
     // Calculate actual costs from expenses
     const { data: expensesData } = await supabase
       .from('expenses')
       .select('project_id, site_id, block_id, amount')
       .eq('restaurant_id', restaurantId)
-      .not('project_id', 'is', null);
+      .not('project_id', 'is', null)
+      .limit(10000);
 
     // Calculate actual revenues from sales_invoices (مستخلصات) + extract orders
     const { data: invoicesData } = await supabase
       .from('sales_invoices')
       .select('project_id, site_id, block_id, grand_total, total_amount')
       .eq('restaurant_id', restaurantId)
-      .not('project_id', 'is', null);
+      .not('project_id', 'is', null)
+      .limit(10000);
 
     const { data: extractItems } = await supabase
       .from('order_items')
       .select('price, quantity, variables, orders!inner(restaurant_id, status)')
       .eq('orders.restaurant_id', restaurantId)
-      .eq('orders.status', 'completed');
+      .eq('orders.status', 'completed')
+      .limit(10000);
 
     // Calculate pass-through purchase invoices for projects
     const { data: passThroughData } = await supabase
@@ -65,9 +87,10 @@ export function ContractingDashboard({ restaurantId, currency }: Props) {
       .select('project_id, site_id, total_amount, client_sales_amount, pass_through_markup_amount')
       .eq('restaurant_id', restaurantId)
       .not('project_id', 'is', null)
-      .eq('is_pass_through_to_client', true);
+      .eq('is_pass_through_to_client', true)
+      .limit(10000);
 
-    const enrichedProjects = (projectsData || []).map(p => {
+    const enrichedProjects = scopedProjectsData.map(p => {
       const pExpenses = expensesData?.filter(e => e.project_id === p.id) || [];
       const pInvoices = invoicesData?.filter(i => i.project_id === p.id) || [];
       const pPassThrough = passThroughData?.filter(pt => pt.project_id === p.id) || [];
@@ -153,6 +176,7 @@ export function ContractingDashboard({ restaurantId, currency }: Props) {
     
     const { error } = await supabase.from('projects').insert({
       restaurant_id: restaurantId,
+      workspace_id: workspaceId || null,
       name: newProject.name,
       client_name: newProject.client,
       total_budget: Number(newProject.budget) || 0,
@@ -176,6 +200,7 @@ export function ContractingDashboard({ restaurantId, currency }: Props) {
     const { error } = await supabase.from('project_sites').insert({
       project_id: showAddSite.projectId,
       restaurant_id: restaurantId,
+      workspace_id: workspaceId || null,
       name: newSite.name,
       location: newSite.location
     });
@@ -196,6 +221,7 @@ export function ContractingDashboard({ restaurantId, currency }: Props) {
     const { error } = await supabase.from('project_blocks').insert({
       project_id: showAddBlock.projectId,
       site_id: showAddBlock.siteId || null,
+      workspace_id: workspaceId || null,
       name: newBlock.name,
       estimated_cost: Number(newBlock.estimatedCost) || 0
     });
@@ -211,15 +237,21 @@ export function ContractingDashboard({ restaurantId, currency }: Props) {
   };
 
   const handleDeleteSite = async (siteId: string) => {
-    if (!confirm('هل أنت متأكد من حذف هذا الموقع؟')) return;
-    const { error } = await supabase.from('project_sites').delete().eq('id', siteId);
-    if (!error) { toast.success('تم الحذف'); loadData(); }
+    if (!confirm('سيتم أرشفة الموقع مع الحفاظ على تكاليفه وفواتيره. هل تريد المتابعة؟')) return;
+    const { error } = await (supabase as any).rpc('archive_contracting_entity', {
+      p_entity: 'site', p_entity_id: siteId, p_restaurant_id: restaurantId, p_reason: 'إيقاف الموقع من شاشة المقاولات',
+    });
+    if (!error) { toast.success('تمت أرشفة الموقع دون حذف البيانات'); loadData(); }
+    else toast.error('فشلت أرشفة الموقع: ' + error.message);
   };
 
   const handleDeleteBlock = async (blockId: string) => {
-    if (!confirm('هل أنت متأكد من حذف هذه المرحلة؟')) return;
-    const { error } = await supabase.from('project_blocks').delete().eq('id', blockId);
-    if (!error) { toast.success('تم الحذف'); loadData(); }
+    if (!confirm('سيتم أرشفة المرحلة مع الحفاظ على تكاليفها وفواتيرها. هل تريد المتابعة؟')) return;
+    const { error } = await (supabase as any).rpc('archive_contracting_entity', {
+      p_entity: 'block', p_entity_id: blockId, p_restaurant_id: restaurantId, p_reason: 'إيقاف المرحلة من شاشة المقاولات',
+    });
+    if (!error) { toast.success('تمت أرشفة المرحلة دون حذف البيانات'); loadData(); }
+    else toast.error('فشلت أرشفة المرحلة: ' + error.message);
   };
 
   const issueExtract = async () => {

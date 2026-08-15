@@ -16,6 +16,8 @@ import {
 import { Label } from '@/components/ui/label';
 import { InvoiceViewer } from '@/components/InvoiceViewer';
 import { findOrCreateCustomer } from '@/lib/customerUtils';
+import { TableViewToolbar } from '@/components/dashboard/TableViewToolbar';
+import { useTableViewPreference } from '@/hooks/useTableViewPreference';
 
 interface SalesOrder {
   id: string;
@@ -35,6 +37,7 @@ interface Props {
 
 export function SalesOrders({ restaurantId, currency }: Props) {
   const [orders, setOrders] = useState<SalesOrder[]>([]);
+  const [tableView, setTableView] = useTableViewPreference({ restaurantId, tableKey: 'orders', defaultView: 'table' });
   const [loading, setLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [viewingId, setViewingId] = useState<string | null>(null);
@@ -385,7 +388,8 @@ export function SalesOrders({ restaurantId, currency }: Props) {
         .from('sales_orders')
         .select('*')
         .eq('restaurant_id', restaurantId)
-        .order('order_date', { ascending: false });
+        .order('order_date', { ascending: false })
+        .order('created_at', { ascending: false });
 
       if (error) {
         console.error('Error loading sales orders:', error);
@@ -442,16 +446,20 @@ export function SalesOrders({ restaurantId, currency }: Props) {
          </Card>
       </div>
 
-      <div className="relative">
-        <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-        <Input 
-          placeholder="البحث برقم الأمر أو العميل..." 
-          className="pr-10 h-11 bg-card/50" 
-          value={searchQuery}
-          onChange={e => setSearchQuery(e.target.value)}
-        />
+      <div className="flex flex-col md:flex-row gap-3 md:items-center">
+        <div className="relative flex-1">
+          <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+          <Input
+            placeholder="البحث برقم الأمر أو العميل..."
+            className="pr-10 h-11 bg-card/50"
+            value={searchQuery}
+            onChange={e => setSearchQuery(e.target.value)}
+          />
+        </div>
+        <TableViewToolbar value={tableView} onChange={setTableView} />
       </div>
 
+      {tableView === 'table' ? (
       <div className="glass-card overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-right text-sm">
@@ -546,6 +554,17 @@ export function SalesOrders({ restaurantId, currency }: Props) {
           </table>
         </div>
       </div>
+      ) : (
+        <div className={tableView === 'compact' ? 'space-y-1' : 'grid gap-3 md:grid-cols-2'}>
+          {filteredOrders.map(order => (
+            <Card key={order.id} className={`glass-card ${tableView === 'compact' ? 'p-3' : 'p-4'}`}>
+              <div className="flex items-start justify-between gap-3"><div><p className="font-mono font-bold text-primary">{order.order_number}</p><p className="text-sm font-semibold mt-1">{order.customer_name || 'عميل نقدي'}</p><p className="text-xs text-muted-foreground mt-1">{new Date(order.order_date).toLocaleDateString('ar-EG')}</p></div><Badge variant="secondary">{order.status === 'draft' ? 'مسودة' : order.status === 'confirmed' ? 'مؤكد' : order.status === 'delivered' ? 'تم التسليم' : 'ملغي'}</Badge></div>
+              <div className="flex items-center justify-between mt-3"><span className="font-bold text-primary">{(order.total_amount || 0).toLocaleString('ar-EG', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} {currency}</span><div className="flex gap-1"><Button variant="ghost" size="sm" title="عرض التفاصيل" onClick={() => setViewingId(order.id)}><Eye className="w-4 h-4" /></Button><Button variant="ghost" size="sm" title="تعديل الأمر" onClick={() => handleEditOrder(order)}><Edit className="w-4 h-4" /></Button><Button variant="ghost" size="sm" title="حذف" className="text-destructive" onClick={() => handleDelete(order)}><Trash2 className="w-4 h-4" /></Button>{order.status === 'confirmed' && <Button variant="ghost" size="sm" title="تحويل لفاتورة" className="text-emerald-500" onClick={() => handleConvertToInvoice(order.id)}><FileText className="w-4 h-4" /></Button>}</div></div>
+            </Card>
+          ))}
+          {filteredOrders.length === 0 && <p className="text-muted-foreground text-center py-12 md:col-span-2">لا توجد أوامر بيع حالياً</p>}
+        </div>
+      )}
 
       <Dialog open={showAddModal} onOpenChange={setShowAddModal}>
         <DialogContent className="max-w-2xl">

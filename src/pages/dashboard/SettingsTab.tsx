@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { Store, Shield, Percent, Lock, Building2, BookOpen, Share2, Printer } from 'lucide-react';
+import { Store, Shield, Percent, Lock, Building2, BookOpen, Share2, Printer, Palette } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -14,6 +14,7 @@ import { AccountingSettings } from './settings/AccountingSettings';
 import { MarketingSettings } from './settings/MarketingSettings';
 import { DatabaseAuditTool } from '@/components/DatabaseAuditTool';
 import { PrintSettingsManager } from './settings/PrintSettingsManager';
+import { AppearanceSettings } from './settings/AppearanceSettings';
 
 interface SettingsTabProps {
   restaurant: any;
@@ -37,7 +38,7 @@ export function SettingsTab({
   loadData
 }: SettingsTabProps) {
   const navigate = useNavigate();
-  const [activeSubTab, setActiveSubTab] = useState<'profile' | 'roles' | 'taxes' | 'accounting' | 'marketing' | 'storefront' | 'audit' | 'print'>('profile');
+  const [activeSubTab, setActiveSubTab] = useState<'profile' | 'roles' | 'taxes' | 'accounting' | 'marketing' | 'storefront' | 'appearance' | 'audit' | 'print'>('profile');
   const [storefrontSaving, setStorefrontSaving] = useState(false);
   const [storefrontConfig, setStorefrontConfig] = useState<any>({});
 
@@ -117,6 +118,12 @@ export function SettingsTab({
           className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm transition-colors whitespace-nowrap ${activeSubTab === 'storefront' ? 'gradient-bg text-primary-foreground' : 'bg-secondary hover:bg-secondary/80'}`}
         >
           <Store className="w-4 h-4" /> المتجر والصفحة العامة
+        </button>
+        <button
+          onClick={() => setActiveSubTab('appearance')}
+          className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm transition-colors whitespace-nowrap ${activeSubTab === 'appearance' ? 'gradient-bg text-primary-foreground' : 'bg-secondary hover:bg-secondary/80'}`}
+        >
+          <Palette className="w-4 h-4" /> المظهر وطرق العرض
         </button>
         <button
           onClick={() => setActiveSubTab('audit')}
@@ -267,6 +274,9 @@ export function SettingsTab({
               <p className="text-xs text-muted-foreground">بعد حفظ الإعدادات، تظهر الصفحة العامة مباشرة على نفس الرابط، وتستمر إعدادات Pixels في تبويب التسويق والبيكسل.</p>
             </div>
           </div>
+        )}
+        {activeSubTab === 'appearance' && restaurant?.id && (
+          <AppearanceSettings restaurant={restaurant} loadData={loadData} />
         )}
         {activeSubTab === 'audit' && (
           <div className="max-w-4xl">

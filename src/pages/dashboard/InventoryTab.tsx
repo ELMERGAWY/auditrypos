@@ -61,6 +61,18 @@ interface Warehouse {
   deleted_at: string | null;
 }
 
+interface PackagingLevel {
+  id?: string;
+  unit_name: string;
+  unit_short_name?: string;
+  units_to_base: number;
+  is_base?: boolean;
+  is_purchase_unit?: boolean;
+  is_sales_unit?: boolean;
+  barcode?: string;
+  sort_order?: number;
+}
+
 interface Product {
   id: string;
   name: string;
@@ -77,6 +89,12 @@ interface Product {
   available: boolean;
   secondary_unit: string;
   unit_conversion_factor: number;
+  item_type_id?: string | null;
+  unit_category?: string | null;
+  base_unit?: string | null;
+  purchase_unit?: string | null;
+  sales_unit?: string | null;
+  packaging_schema?: PackagingLevel[] | null;
   warehouse_id?: string | null;
 }
 
@@ -93,7 +111,10 @@ interface ItemType {
   id: string;
   name: string;
   name_ar: string;
-  code: string;
+  code?: string;
+  type?: string;
+  is_inventory?: boolean;
+  requires_warehouse?: boolean;
   is_active: boolean;
 }
 
@@ -133,6 +154,7 @@ export function InventoryTab({ restaurantId, workspaceId, currency, businessType
     name: '', barcode: '', sku: '', category: 'عام', price: '', cost_price: '',
     quantity: '', min_quantity: '5', unit: 'قطعة', image: '📦', expiry_date: '',
     secondary_unit: '', unit_conversion_factor: '', batch_number: '', item_type_id: '',
+    unit_category: 'count', purchase_unit: 'قطعة', sales_unit: 'قطعة',
     warehouse_id: '',
   });
   const [filterCategory, setFilterCategory] = useState('all');
@@ -141,6 +163,9 @@ export function InventoryTab({ restaurantId, workspaceId, currency, businessType
   const [projects, setProjects] = useState<any[]>([]);
   const [selectedProjectId, setSelectedProjectId] = useState<string>('');
   const [itemTypes, setItemTypes] = useState<ItemType[]>([]);
+  const [packagingLevels, setPackagingLevels] = useState<PackagingLevel[]>([
+    { unit_name: 'قطعة', unit_short_name: 'قطعة', units_to_base: 1, is_base: true, is_sales_unit: true, sort_order: 0 },
+  ]);
   const [savingProduct, setSavingProduct] = useState(false);
 
   const load = async () => {
@@ -176,8 +201,17 @@ export function InventoryTab({ restaurantId, workspaceId, currency, businessType
     setWarehouses((whData || []) as Warehouse[]);
 
     // Load Item Types
-    const { data: itemTypeData } = await supabase.from('item_types').select('*').eq('is_active', true);
-    setItemTypes((itemTypeData || []) as ItemType[]);
+    const { data: itemTypeData, error: itemTypeError } = await supabase
+      .from('item_types')
+      .select('id, name, name_ar, type, is_inventory, requires_warehouse, is_active')
+      .eq('is_active', true)
+      .order('name_ar');
+    if (itemTypeError) {
+      console.warn('Item types are unavailable; apply product types migration:', itemTypeError.message);
+      setItemTypes([]);
+    } else {
+      setItemTypes((itemTypeData || []) as ItemType[]);
+    }
 
     // Load costing method from restaurant settings
     const { data: restaurantData } = await supabase.from('restaurants').select('inventory_method').eq('id', restaurantId).maybeSingle();
@@ -259,6 +293,11 @@ export function InventoryTab({ restaurantId, workspaceId, currency, businessType
       unit_conversion_factor: Number(form.unit_conversion_factor) || 1,
       item_type_id: form.item_type_id || null,
       batch_number: form.batch_number || null,
+      unit_category: form.unit_category || 'count',
+      base_unit: form.unit || 'قطعة',
+      purchase_unit: form.purchase_unit || form.unit || 'قطعة',
+      sales_unit: form.sales_unit || form.unit || 'قطعة',
+      packaging_schema: packagingLevels,
     };
 
     try {
@@ -288,6 +327,30 @@ export function InventoryTab({ restaurantId, workspaceId, currency, businessType
         if (error) throw error;
         productId = newProduct.id;
         toast.success('تم إضافة المنتج');
+      }
+
+      // Persist packaging definitions separately; this never changes stock quantities or transaction history.
+      if (packagingLevels.length > 0) {
+        const packagingPayload = packagingLevels
+          .filter(level => level.unit_name.trim() && Number(level.units_to_base) > 0)
+          .map((level, index) => ({
+            product_id: productId,
+            workspace_id: workspaceId || null,
+            unit_name: level.unit_name.trim(),
+            unit_short_name: level.unit_short_name?.trim() || level.unit_name.trim(),
+            units_to_base: Number(level.units_to_base),
+            is_base: Boolean(level.is_base),
+            is_purchase_unit: Boolean(level.is_purchase_unit),
+            is_sales_unit: Boolean(level.is_sales_unit),
+            barcode: level.barcode?.trim() || null,
+            sort_order: index,
+          }));
+        if (packagingPayload.length > 0) {
+          const { error: packagingError } = await supabase
+            .from('product_packaging_levels')
+            .upsert(packagingPayload as any, { onConflict: 'product_id,unit_name' });
+          if (packagingError) throw packagingError;
+        }
       }
 
       // Product editing must never delete or collapse other warehouse balances.
@@ -511,7 +574,8 @@ export function InventoryTab({ restaurantId, workspaceId, currency, businessType
 
   const resetForm = () => {
     setShowForm(false); setEditingProduct(null); setPricingMode('fixed'); setMarkupValue('');
-    setForm({ name: '', barcode: '', sku: '', category: 'عام', price: '', cost_price: '', quantity: '', min_quantity: '5', unit: 'قطعة', image: '📦', expiry_date: '', secondary_unit: '', unit_conversion_factor: '', batch_number: '', item_type_id: '', warehouse_id: (activeWarehouse !== 'all' && activeWarehouse !== 'unassigned') ? activeWarehouse : '' });
+    setPackagingLevels([{ unit_name: 'قطعة', unit_short_name: 'قطعة', units_to_base: 1, is_base: true, is_sales_unit: true, sort_order: 0 }]);
+    setForm({ name: '', barcode: '', sku: '', category: 'عام', price: '', cost_price: '', quantity: '', min_quantity: '5', unit: 'قطعة', image: '📦', expiry_date: '', secondary_unit: '', unit_conversion_factor: '', batch_number: '', item_type_id: '', unit_category: 'count', purchase_unit: 'قطعة', sales_unit: 'قطعة', warehouse_id: (activeWarehouse !== 'all' && activeWarehouse !== 'unassigned') ? activeWarehouse : '' });
   };
 
   const calcSellingPrice = (costStr: string) => {
@@ -541,6 +605,15 @@ export function InventoryTab({ restaurantId, workspaceId, currency, businessType
       console.error('Error fetching warehouse assignment:', e);
     }
     
+    const { data: packagingData } = await supabase
+      .from('product_packaging_levels')
+      .select('id, unit_name, unit_short_name, units_to_base, is_base, is_purchase_unit, is_sales_unit, barcode, sort_order')
+      .eq('product_id', p.id)
+      .order('sort_order');
+    setPackagingLevels((packagingData && packagingData.length > 0)
+      ? packagingData as PackagingLevel[]
+      : [{ unit_name: p.unit || 'قطعة', unit_short_name: p.unit || 'قطعة', units_to_base: 1, is_base: true, is_sales_unit: true, sort_order: 0 }]);
+
     setForm({
       name: p.name, barcode: p.barcode, sku: p.sku, category: p.category,
       price: String(p.price), cost_price: String(p.cost_price), quantity: String(p.quantity),
@@ -550,6 +623,9 @@ export function InventoryTab({ restaurantId, workspaceId, currency, businessType
       unit_conversion_factor: String(p.unit_conversion_factor || 1),
       batch_number: (p as any).batch_number || '',
       item_type_id: (p as any).item_type_id || '',
+      unit_category: (p as any).unit_category || 'count',
+      purchase_unit: (p as any).purchase_unit || p.unit || 'قطعة',
+      sales_unit: (p as any).sales_unit || p.unit || 'قطعة',
       warehouse_id: warehouseId,
     });
     setShowForm(true);
@@ -1198,8 +1274,44 @@ export function InventoryTab({ restaurantId, workspaceId, currency, businessType
                   </div>
                 )}
                 <div>
-                  <Label className="text-xs mb-1 block">وحدة القياس</Label>
-                  <Input placeholder="كيلو، علبة، لتر" value={form.unit} onChange={e => setForm(f => ({ ...f, unit: e.target.value }))} className="h-11 rounded-xl" />
+                  <Label className="text-xs mb-1 block">الوحدة الأساسية</Label>
+                  <Input placeholder="قطعة، كيلو، لتر" value={form.unit} onChange={e => setForm(f => ({ ...f, unit: e.target.value, base_unit: e.target.value }))} className="h-11 rounded-xl" />
+                </div>
+                <div>
+                  <Label className="text-xs mb-1 block">نوع القياس</Label>
+                  <Select value={form.unit_category} onValueChange={value => setForm(f => ({ ...f, unit_category: value }))}>
+                    <SelectTrigger className="h-11 rounded-xl"><SelectValue placeholder="اختر نوع القياس" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="count">عددي</SelectItem>
+                      <SelectItem value="weight">وزني</SelectItem>
+                      <SelectItem value="volume">حجمي</SelectItem>
+                      <SelectItem value="length">طولي</SelectItem>
+                      <SelectItem value="time">زمني</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="col-span-2 rounded-2xl border border-primary/10 bg-primary/5 p-4 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <Label className="text-xs font-bold text-primary">مستويات التعبئة والتحويل</Label>
+                      <p className="text-[10px] text-muted-foreground">مثال: كرتونة = 12 عموداً، والعمود = 10 قطع. احفظ الكمية دائماً بالوحدة الأساسية.</p>
+                    </div>
+                    <Button type="button" variant="outline" size="sm" onClick={() => setPackagingLevels(levels => [...levels, { unit_name: '', unit_short_name: '', units_to_base: 1, sort_order: levels.length }])}>
+                      <Plus className="w-3 h-3 ml-1" /> إضافة مستوى
+                    </Button>
+                  </div>
+                  <div className="space-y-2">
+                    {packagingLevels.map((level, index) => (
+                      <div key={`${level.id || 'new'}-${index}`} className="grid grid-cols-12 gap-2 items-end">
+                        <div className="col-span-4"><Label className="text-[10px]">اسم الوحدة</Label><Input value={level.unit_name} onChange={e => setPackagingLevels(ls => ls.map((x, i) => i === index ? { ...x, unit_name: e.target.value } : x))} placeholder="كرتونة/عمود/قطعة" /></div>
+                        <div className="col-span-3"><Label className="text-[10px]">تساوي كم أساسي؟</Label><Input type="number" min="0.000001" step="0.000001" value={level.units_to_base} onChange={e => setPackagingLevels(ls => ls.map((x, i) => i === index ? { ...x, units_to_base: Number(e.target.value) || 1 } : x))} /></div>
+                        <div className="col-span-2"><Label className="text-[10px]">باركود</Label><Input value={level.barcode || ''} onChange={e => setPackagingLevels(ls => ls.map((x, i) => i === index ? { ...x, barcode: e.target.value } : x))} /></div>
+                        <div className="col-span-2 flex gap-1 text-[10px]"><label className="flex items-center gap-1"><input type="radio" name="base-packaging-level" checked={Boolean(level.is_base)} onChange={() => setPackagingLevels(ls => ls.map((x, i) => ({ ...x, is_base: i === index })))} />أساسي</label><label className="flex items-center gap-1"><input type="checkbox" checked={Boolean(level.is_sales_unit)} onChange={e => setPackagingLevels(ls => ls.map((x, i) => i === index ? { ...x, is_sales_unit: e.target.checked } : x))} />بيع</label></div>
+                        <Button type="button" variant="ghost" size="icon" className="col-span-1 text-destructive" disabled={packagingLevels.length <= 1} onClick={() => setPackagingLevels(ls => ls.filter((_, i) => i !== index))}><Trash2 className="w-4 h-4" /></Button>
+                      </div>
+                    ))}
+                  </div>
                 </div>
 
                 <div className="col-span-2 grid grid-cols-2 gap-4">

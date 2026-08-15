@@ -68,3 +68,17 @@ describe('profitability calculations', () => {
     expect(signedProfitBalance('revenue', '20', '0')).toBe(-20);
     expect(signedProfitBalance('expense', '0', '20')).toBe(-20);
   });
+
+it('treats service revenue as profit when no service cost or expense exists', () => {
+  const summary = buildOperationalProfitSummary([], [], [{ total_amount: 1250, cost_amount: 0, status: 'paid' }]);
+  expect(summary.sales).toBe(1250);
+  expect(summary.cogs).toBe(0);
+  expect(summary.expenses).toBe(0);
+  expect(summary.netProfit).toBe(1250);
+  expect(summary.margin).toBe(100);
+});
+
+it('subtracts explicit service cost but does not invent a cost', () => {
+  const summary = buildOperationalProfitSummary([], [], [{ total_amount: 1250, cost_amount: 300, status: 'paid' }]);
+  expect(summary.netProfit).toBe(950);
+});

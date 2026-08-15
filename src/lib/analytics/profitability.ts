@@ -9,6 +9,15 @@ export interface ProfitExpenseRow {
   date?: string | null;
 }
 
+export interface ProfitServiceRow {
+  total_amount?: number | string | null;
+  amount?: number | string | null;
+  cost_amount?: number | string | null;
+  status?: string | null;
+  invoice_date?: string | null;
+  created_at?: string | null;
+}
+
 export interface OperationalProfitSummary {
   sales: number;
   cogs: number;
@@ -38,12 +47,25 @@ export function sumOperatingExpenses(rows: ProfitExpenseRow[] = []): number {
   return rows.reduce((sum, row) => sum + Math.max(0, toAmount(row.amount)), 0);
 }
 
+export function sumServiceRevenue(rows: ProfitServiceRow[] = []): number {
+  return rows
+    .filter(row => row.status !== 'cancelled')
+    .reduce((sum, row) => sum + toAmount(row.total_amount ?? row.amount), 0);
+}
+
+export function sumServiceCosts(rows: ProfitServiceRow[] = []): number {
+  return rows
+    .filter(row => row.status !== 'cancelled')
+    .reduce((sum, row) => sum + Math.max(0, toAmount(row.cost_amount)), 0);
+}
+
 export function buildOperationalProfitSummary(
   orders: ProfitOrderRow[] = [],
   expenses: ProfitExpenseRow[] = [],
+  serviceInvoices: ProfitServiceRow[] = [],
 ): OperationalProfitSummary {
-  const sales = sumOperationalSales(orders);
-  const cogs = sumOperationalCogs(orders);
+  const sales = sumOperationalSales(orders) + sumServiceRevenue(serviceInvoices);
+  const cogs = sumOperationalCogs(orders) + sumServiceCosts(serviceInvoices);
   const operatingExpenses = sumOperatingExpenses(expenses);
   const netProfit = sales - cogs - operatingExpenses;
   return {

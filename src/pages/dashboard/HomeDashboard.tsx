@@ -22,6 +22,7 @@ import { toast } from 'sonner';
 
 interface HomeDashboardProps {
   restaurantId: string;
+  workspaceId?: string;
   currency: string;
   onNavigate: (tab: string) => void;
   userId: string;
@@ -95,7 +96,7 @@ const cardHoverVariants = {
   }
 };
 
-export function HomeDashboard({ restaurantId, currency, onNavigate, userId }: HomeDashboardProps) {
+export function HomeDashboard({ restaurantId, workspaceId, currency, onNavigate, userId }: HomeDashboardProps) {
   const [stats, setStats] = useState<DashboardStats>({
     todaySales: 0,
     todayOrders: 0,
@@ -128,7 +129,7 @@ export function HomeDashboard({ restaurantId, currency, onNavigate, userId }: Ho
 
   useEffect(() => {
     loadDashboardData();
-  }, [restaurantId]);
+  }, [restaurantId, workspaceId]);
 
   const loadDashboardData = async () => {
     try {
@@ -166,7 +167,8 @@ export function HomeDashboard({ restaurantId, currency, onNavigate, userId }: Ho
         inventoryValueRes,
         pendingOrdersRes,
         aiSuggestionsRes,
-        topProductsRes
+        topProductsRes,
+        serviceInvoicesRes
       ] = await Promise.all([
         // Today's orders
         supabase.from('orders').select('total, total_cost, status, created_at').eq('restaurant_id', restaurantId).gte('created_at', today).lte('created_at', todayTo).neq('status', 'cancelled'),
@@ -197,7 +199,9 @@ export function HomeDashboard({ restaurantId, currency, onNavigate, userId }: Ho
         // AI suggestions
         supabase.from('ai_journal_suggestions').select('*', { count: 'exact' }).eq('restaurant_id', restaurantId).eq('status', 'pending'),
         // Top products this week
-        supabase.from('order_items').select('menu_item_name, quantity, price, orders!inner(created_at, restaurant_id, status)').eq('orders.restaurant_id', restaurantId).neq('orders.status', 'cancelled').gte('orders.created_at', weekStart).limit(100)
+        supabase.from('order_items').select('menu_item_name, quantity, price, orders!inner(created_at, restaurant_id, status)').eq('orders.restaurant_id', restaurantId).neq('orders.status', 'cancelled').gte('orders.created_at', weekStart).limit(100),
+        // Service invoices are revenue; cost_amount is optional and defaults to zero for legacy rows.
+        supabase.from('service_invoices').select('*').eq('restaurant_id', restaurantId).gte('invoice_date', yesterdayStart.toISOString().slice(0, 10)).lte('invoice_date', todayEnd.toISOString().slice(0, 10)).limit(5000)
       ]);
 
       // Dashboard profit KPIs come from operational orders + same-period expenses.
@@ -207,9 +211,23 @@ export function HomeDashboard({ restaurantId, currency, onNavigate, userId }: Ho
 
       const sumOrders = (rows: any[] = []) => rows.reduce((s, o) => s + Number(o.total || 0), 0);
       const sumCost = (rows: any[] = []) => rows.reduce((s, o) => s + Number(o.total_cost || 0), 0);
-      const todaySummary = buildOperationalProfitSummary(todayOrdersRes.data || [], todayExpensesRes.data || []);
-      const monthSummary = buildOperationalProfitSummary(monthOrdersRes.data || [], monthExpensesRes.data || []);
-      const yesterdaySummary = buildOperationalProfitSummary(yesterdayOrdersRes.data || [], yesterdayExpensesRes.data || []);
+      const rawServiceInvoices = serviceInvoicesRes.data || [];
+      const scopedServiceInvoices = workspaceId
+        ? rawServiceInvoices.filter((row: any) => !('workspace_id' in row) || row.workspace_id === workspaceId)
+        : rawServiceInvoices;
+      const serviceDate = (row: any) => row.invoice_date || row.created_at;
+      const inDateRange = (row: any, start: Date, end: Date) => {
+        const value = serviceDate(row);
+        if (!value) return false;
+        const parsed = new Date(value);
+        return !Number.isNaN(parsed.getTime()) && parsed >= start && parsed <= end;
+      };
+      const todayServices = scopedServiceInvoices.filter((row: any) => inDateRange(row, todayStart, todayEnd));
+      const monthServices = scopedServiceInvoices.filter((row: any) => inDateRange(row, monthStartDate, todayEnd));
+      const yesterdayServices = scopedServiceInvoices.filter((row: any) => inDateRange(row, yesterdayStart, yesterdayEnd));
+      const todaySummary = buildOperationalProfitSummary(todayOrdersRes.data || [], todayExpensesRes.data || [], todayServices);
+      const monthSummary = buildOperationalProfitSummary(monthOrdersRes.data || [], monthExpensesRes.data || [], monthServices);
+      const yesterdaySummary = buildOperationalProfitSummary(yesterdayOrdersRes.data || [], yesterdayExpensesRes.data || [], yesterdayServices);
       const todaySales = todaySummary.sales;
       const todayOrdersCount = todayOrdersRes.data?.length || 0;
       const monthSales = monthSummary.sales;
@@ -262,6 +280,7 @@ export function HomeDashboard({ restaurantId, currency, onNavigate, userId }: Ho
       // Real per-day chart from operational orders.
       const chartData: any[] = [];
       const weeklyOrders = monthOrdersRes.data?.filter((order: any) => new Date(order.created_at) >= weekStartDate) || [];
+      const weeklyServices = scopedServiceInvoices.filter((row: any) => new Date(serviceDate(row)) >= weekStartDate);
       for (let i = 6; i >= 0; i--) {
         const d = new Date();
         d.setDate(d.getDate() - i);
@@ -271,11 +290,15 @@ export function HomeDashboard({ restaurantId, currency, onNavigate, userId }: Ho
           const created = new Date(order.created_at);
           return created >= dayStart && created <= dayEnd;
         });
-        const sales = sumOrders(dayOrders);
+        const dayServices = weeklyServices.filter((row: any) => {
+          const created = new Date(serviceDate(row));
+          return created >= dayStart && created <= dayEnd;
+        });
+        const sales = sumOrders(dayOrders) + dayServices.reduce((sum: number, row: any) => sum + Number(row.total_amount ?? row.amount ?? 0), 0);
         chartData.push({
           name: d.toLocaleDateString('ar-EG', { weekday: 'short' }),
           sales: Math.round(sales),
-          profit: Math.round(sales - sumCost(dayOrders)),
+          profit: Math.round(sales - sumCost(dayOrders) - dayServices.reduce((sum: number, row: any) => sum + Math.max(0, Number(row.cost_amount || 0)), 0)),
         });
       }
       setSalesChartData(chartData);
