@@ -6,23 +6,6 @@ import { Button } from '@/components/ui/button';
 
 type CallbackStatus = 'loading' | 'success' | 'error';
 
-type OAuthState = {
-  platform?: string;
-  restaurantId?: string;
-};
-
-function decodeOAuthState(value: string | null): OAuthState | null {
-  if (!value) return null;
-  try {
-    const decoded = atob(value.replace(/-/g, '+').replace(/_/g, '/'));
-    const parsed = JSON.parse(decoded);
-    if (!parsed || typeof parsed !== 'object') return null;
-    return parsed as OAuthState;
-  } catch {
-    return null;
-  }
-}
-
 export default function OAuthCallback() {
   const navigate = useNavigate();
   const [status, setStatus] = useState<CallbackStatus>('loading');
@@ -36,11 +19,7 @@ export default function OAuthCallback() {
       const code = params.get('code');
       const state = params.get('state');
       const providerError = params.get('error');
-      const statePayload = decodeOAuthState(state);
-      const platform = statePayload?.platform;
-      const restaurantId = statePayload?.restaurantId;
-
-      if (providerError || !code || !state || !platform || !restaurantId) {
+      if (providerError || !code || !state) {
         if (!cancelled) {
           setStatus('error');
           setMessage(providerError ? 'تم رفض المصادقة من المنصة.' : 'سياق المصادقة غير مكتمل.');
@@ -52,8 +31,6 @@ export default function OAuthCallback() {
         const { data, error } = await supabase.functions.invoke('social-oauth', {
           body: {
             action: 'exchange',
-            platform,
-            restaurantId,
             redirectUri: `${window.location.origin}/oauth/callback`,
             code,
             state,
@@ -66,18 +43,23 @@ export default function OAuthCallback() {
 
         if (cancelled) return;
         setStatus('success');
-        setMessage(`تم ربط حساب ${platform} بنجاح.`);
+        const assetsDiscovered = Boolean(data.requiresAssetSelection);
+        setMessage(assetsDiscovered
+          ? 'تم اكتشاف أصول Meta. اختر الصفحات والحسابات التي تريد إدارتها من مركز التسويق.'
+          : `تم ربط حساب ${data.platform || 'التواصل الاجتماعي'} بنجاح.`);
         window.setTimeout(() => {
           if (!cancelled) {
             navigate('/dashboard', {
               state: {
-                oauthSuccess: true,
-                platform,
+                oauthSuccess: !assetsDiscovered,
+                oauthAssetsDiscovered: assetsDiscovered,
+                platform: data.platform,
+                assets: assetsDiscovered ? data.assets : undefined,
                 accountName: data.account?.account_name,
               },
             });
           }
-        }, 1200);
+        }, assetsDiscovered ? 1600 : 1200);
       } catch (error) {
         console.error('OAuth callback failed:', error);
         if (!cancelled) {
