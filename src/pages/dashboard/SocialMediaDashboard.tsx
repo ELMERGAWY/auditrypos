@@ -165,23 +165,9 @@ export function SocialMediaDashboard({ restaurantId }: Props) {
       const post = posts.find(p => p.id === postId);
       if (!post) return;
 
-      // Get access token
-      const accessToken = await oauthService.getAccessToken(post.social_account_id);
-      
-      // Publish to platform (this is platform-specific)
-      // For now, we'll just update the status
-      const { error } = await supabase
-        .from('social_media_posts')
-        .update({ 
-          status: 'published',
-          published_at: new Date().toISOString()
-        })
-        .eq('id', postId);
-
-      if (error) throw error;
-      
-      toast.success('تم نشر المنشور بنجاح');
-      loadPosts();
+      // Publishing is intentionally blocked until the server-side delivery queue
+      // is enabled. The browser must never read or send an access token.
+      toast.info('تم حفظ المنشور. سيتم تفعيل النشر بعد استكمال طابور النشر الآمن.');
     } catch (error: any) {
       toast.error('فشل نشر المنشور: ' + error.message);
     }
