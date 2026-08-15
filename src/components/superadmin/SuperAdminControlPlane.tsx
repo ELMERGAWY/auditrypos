@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { ModuleReadinessPanel } from './ModuleReadinessPanel';
 
 interface TenantHealth {
   restaurant_id: string;
@@ -105,6 +106,8 @@ export function SuperAdminControlPlane() {
         <Card className="p-4"><AlertTriangle className="w-5 h-5 text-orange-500 mb-2" /><p className="text-2xl font-bold">{(stateCounts.expired || 0) + (stateCounts.blocked || 0)}</p><p className="text-xs text-muted-foreground">يحتاج تدخلاً</p></Card>
         <Card className="p-4"><CheckCircle2 className="w-5 h-5 text-primary mb-2" /><p className="text-2xl font-bold">{tenants.length}</p><p className="text-xs text-muted-foreground">إجمالي المستأجرين</p></Card>
       </div>
+
+      {available && <ModuleReadinessPanel />}
 
       {available && (
         <div className="grid grid-cols-1 xl:grid-cols-[1.5fr_1fr] gap-6">

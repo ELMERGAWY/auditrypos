@@ -1,4 +1,3 @@
-// @ts-nocheck
 
 // ============================================================
 // ADVANCED INVENTORY COSTING SYSTEM
@@ -105,6 +104,10 @@ class InventoryCostingService {
     referenceNumber?: string,
     accountingStandard: AccountingStandard = 'IFRS'
   ): Promise<InventoryCostLayer | null> {
+    if (!Number.isFinite(quantity) || quantity <= 0 || !Number.isFinite(unitCost) || unitCost < 0) {
+      console.error('Invalid cost layer quantity or unit cost');
+      return null;
+    }
     const totalCost = quantity * unitCost;
     
     const { data, error } = await supabase
@@ -180,6 +183,7 @@ class InventoryCostingService {
     requestedQty: number,
     accountingStandard: AccountingStandard = 'IFRS'
   ): Promise<{ totalCost: number; avgUnitCost: number; layersConsumed: number; remainingQty: number }> {
+    if (!Number.isFinite(requestedQty) || requestedQty <= 0) return { totalCost: 0, avgUnitCost: 0, layersConsumed: 0, remainingQty: 0 };
     const layers = await this.getCostLayers(itemId, subWarehouseId, 'FIFO');
     
     let totalCost = 0;
@@ -293,12 +297,13 @@ class InventoryCostingService {
   private async consumeFromLayer(layerId: string, qty: number): Promise<void> {
     const { data: layer } = await supabase
       .from('inventory_cost_layers')
-      .select('remaining_quantity')
+      .select('remaining_quantity, consumed_quantity')
       .eq('id', layerId)
       .single();
     
     if (!layer) return;
 
+    if (!Number.isFinite(qty) || qty <= 0 || !Number.isFinite(layer.remaining_quantity)) return;
     const newQty = Math.max(0, layer.remaining_quantity - qty);
     const { error } = await supabase
       .from('inventory_cost_layers')
