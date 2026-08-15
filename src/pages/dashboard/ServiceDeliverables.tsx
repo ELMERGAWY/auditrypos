@@ -174,19 +174,22 @@ export function ServiceDeliverables({ restaurantId }: Props) {
             .from('marketing_service_deliverables')
             .select('*')
             .eq('restaurant_id', restaurantId)
-            .order('expected_delivery_date', { ascending: true }),
+            .order('expected_delivery_date', { ascending: true })
+            .limit(1000),
           supabase
             .from('orders')
-            .select('id, order_number, customer_name, customer_phone, notes, delivery_date, delivery_status, actual_delivery_date, delivery_received_by, delivery_receipt_note, created_at, status, order_items(id, menu_item_name, quantity, sold_unit, variables, is_delivered)')
+            .select('id, restaurant_id, workspace_id, order_number, customer_name, customer_phone, notes, delivery_date, delivery_status, actual_delivery_date, delivery_received_by, delivery_receipt_note, created_at, status, order_items(id, menu_item_name, quantity, sold_unit, variables, is_delivered)')
             .eq('restaurant_id', restaurantId)
             .not('delivery_date', 'is', null)
             .neq('status', 'cancelled')
-            .order('delivery_date', { ascending: true }),
+            .order('delivery_date', { ascending: true })
+            .limit(2000),
           supabase
             .from('delivery_contact_logs')
             .select('*')
             .eq('restaurant_id', restaurantId)
-            .order('created_at', { ascending: false }),
+            .order('created_at', { ascending: false })
+            .limit(5000),
         ]);
 
       if (marketingRes.error) throw marketingRes.error;
@@ -197,11 +200,12 @@ export function ServiceDeliverables({ restaurantId }: Props) {
         // Fallback if new receipt columns not migrated yet
         const fb = await supabase
           .from('orders')
-          .select('id, order_number, customer_name, customer_phone, notes, delivery_date, delivery_status, created_at, status, order_items(id, menu_item_name, quantity, sold_unit, variables)')
+          .select('id, restaurant_id, workspace_id, order_number, customer_name, customer_phone, notes, delivery_date, delivery_status, created_at, status, order_items(id, menu_item_name, quantity, sold_unit, variables)')
           .eq('restaurant_id', restaurantId)
           .not('delivery_date', 'is', null)
           .neq('status', 'cancelled')
-          .order('delivery_date', { ascending: true });
+          .order('delivery_date', { ascending: true })
+          .limit(2000);
         if (fb.error) throw fb.error;
         ordersData = fb.data;
       }
@@ -283,9 +287,9 @@ export function ServiceDeliverables({ restaurantId }: Props) {
     if (!restaurantId) return;
     try {
       const [contractsRes, quotesRes, servicesRes, invoicesRes] = await Promise.all([
-        supabase.from('marketing_contracts').select('id, contract_number, customer_name').eq('restaurant_id', restaurantId),
-        supabase.from('marketing_quotes').select('id, quote_number, customer_name').eq('restaurant_id', restaurantId),
-        supabase.from('marketing_services').select('id, name').eq('restaurant_id', restaurantId),
+        supabase.from('marketing_contracts').select('id, contract_number, customer_name').eq('restaurant_id', restaurantId).limit(500),
+        supabase.from('marketing_quotes').select('id, quote_number, customer_name').eq('restaurant_id', restaurantId).limit(500),
+        supabase.from('marketing_services').select('id, name').eq('restaurant_id', restaurantId).limit(500),
         supabase
           .from('orders')
           .select('id, order_number, customer_name, order_items(*)')
@@ -376,7 +380,8 @@ export function ServiceDeliverables({ restaurantId }: Props) {
         const { error } = await supabase
           .from('orders')
           .update({ delivery_status: toOrderDeliveryStatus(nextStatus) } as any)
-          .eq('id', deliverable.id);
+          .eq('id', deliverable.id)
+          .eq('restaurant_id', restaurantId);
         if (error) throw error;
       } else {
         const payload: any = {
@@ -384,10 +389,11 @@ export function ServiceDeliverables({ restaurantId }: Props) {
           updated_at: new Date().toISOString(),
         };
         if (nextStatus !== 'delivered') payload.actual_delivery_date = null;
-        const { error } = await supabase
-          .from('marketing_service_deliverables')
-          .update(payload)
-          .eq('id', deliverable.id);
+          const { error } = await supabase
+            .from('marketing_service_deliverables')
+            .update(payload)
+            .eq('id', deliverable.id)
+            .eq('restaurant_id', restaurantId);
         if (error) throw error;
       }
       toast.success('تم تحديث الحالة');
