@@ -41,6 +41,8 @@ The `schema_migrations_pkey` conflict is primarily a local migration-folder prob
 - Renamed three distinct feature migrations that had reused timestamps to unique pending versions: `20260619000013_marketing_services_contracts_quotes.sql`, `20260619000014_lock_business_type.sql`, `20260619000015_custom_business_types.sql`, and renamed the global platform upgrade to `20260716000001_global_platform_upgrade.sql`.
 - This is a repository-only change. No remote SQL, migration history row, customer data, or transaction was modified.
 - A local CLI `migration list` still requires `supabase link` in the sandbox; the attached list from the user's linked terminal remains the source for the remote history comparison.
+- The user's dry-run identified two local-only migrations that precede the latest remote migration: `20260426240000_advanced_costing_bom_fixed.sql` and `20260427000000_crm_advanced_features.sql`. The latter was hardened with `DROP POLICY IF EXISTS` guards before its policy creation so a schema that already received the CRM objects manually will not fail solely on duplicate policies.
+- Do not use `--include-all` until a fresh dry-run after pulling this patch confirms only these intended migrations are pending.
 
 ## Safety decision
 

@@ -38,8 +38,10 @@ ALTER TABLE public.customers ADD COLUMN IF NOT EXISTS loyalty_tier VARCHAR(20) D
 ALTER TABLE public.crm_leads ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.crm_communication_logs ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS restaurant_isolation_leads ON public.crm_leads;
 CREATE POLICY restaurant_isolation_leads ON public.crm_leads
   FOR ALL USING (restaurant_id IN (SELECT id FROM public.restaurants WHERE owner_id = auth.uid()));
 
+DROP POLICY IF EXISTS restaurant_isolation_logs ON public.crm_communication_logs;
 CREATE POLICY restaurant_isolation_logs ON public.crm_communication_logs
   FOR ALL USING (restaurant_id IN (SELECT id FROM public.restaurants WHERE owner_id = auth.uid()));
