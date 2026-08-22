@@ -1,4 +1,41 @@
 -- Contracting project controls — additive, scoped, and archive-only.
+-- The remote preflight showed project_sites is missing, so this migration
+-- creates the dependency before adding controls. No existing rows are changed.
+
+CREATE TABLE IF NOT EXISTS public.project_sites (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  project_id uuid NOT NULL REFERENCES public.projects(id) ON DELETE CASCADE,
+  name text NOT NULL,
+  location text,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  restaurant_id uuid NOT NULL REFERENCES public.restaurants(id) ON DELETE CASCADE
+);
+
+ALTER TABLE public.project_sites ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS project_sites_owner_all ON public.project_sites;
+CREATE POLICY project_sites_owner_all ON public.project_sites
+FOR ALL TO authenticated
+USING (
+  public.is_restaurant_owner(auth.uid(), restaurant_id)
+  OR public.has_role(auth.uid(), 'super_admin'::public.app_role)
+  OR public.check_user_permission(
+    auth.uid(),
+    (SELECT r.company_id FROM public.restaurants r WHERE r.id = project_sites.restaurant_id),
+    'projects.manage'
+  )
+)
+WITH CHECK (
+  public.is_restaurant_owner(auth.uid(), restaurant_id)
+  OR public.has_role(auth.uid(), 'super_admin'::public.app_role)
+  OR public.check_user_permission(
+    auth.uid(),
+    (SELECT r.company_id FROM public.restaurants r WHERE r.id = project_sites.restaurant_id),
+    'projects.manage'
+  )
+);
+
+CREATE INDEX IF NOT EXISTS idx_project_sites_project_restaurant
+  ON public.project_sites(project_id, restaurant_id, created_at DESC);
 
 ALTER TABLE IF EXISTS public.projects
   ADD COLUMN IF NOT EXISTS workspace_id uuid REFERENCES public.workspaces(id) ON DELETE SET NULL,
@@ -31,27 +68,8 @@ ON CONFLICT (code) DO UPDATE SET
   description_ar = EXCLUDED.description_ar,
   module = EXCLUDED.module;
 
--- Backfill only the unambiguous branch scope from the owning restaurant.
-UPDATE public.projects p
-SET workspace_id = r.workspace_id
-FROM public.restaurants r
-WHERE p.restaurant_id = r.id
-  AND p.workspace_id IS NULL
-  AND r.workspace_id IS NOT NULL;
-
-UPDATE public.project_sites s
-SET workspace_id = p.workspace_id
-FROM public.projects p
-WHERE s.project_id = p.id
-  AND s.workspace_id IS NULL
-  AND p.workspace_id IS NOT NULL;
-
-UPDATE public.project_blocks b
-SET workspace_id = p.workspace_id
-FROM public.projects p
-WHERE b.project_id = p.id
-  AND b.workspace_id IS NULL
-  AND p.workspace_id IS NOT NULL;
+-- Deliberately no data backfill here. Existing project scope is preserved;
+-- any approved backfill must be reviewed and run as a separate, targeted action.
 
 CREATE OR REPLACE FUNCTION public.archive_contracting_entity(
   p_entity text,
