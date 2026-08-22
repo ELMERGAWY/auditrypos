@@ -78,6 +78,12 @@ END $$;
 ALTER TABLE public.restaurants
   ADD COLUMN IF NOT EXISTS plan_id text;
 
+ALTER TABLE public.restaurants
+  ADD COLUMN IF NOT EXISTS preferred_language text DEFAULT 'ar';
+
+ALTER TABLE public.restaurants
+  ADD COLUMN IF NOT EXISTS preferred_currency text DEFAULT 'egp';
+
 DO $$
 BEGIN
   IF NOT EXISTS (
