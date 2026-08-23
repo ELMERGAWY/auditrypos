@@ -13,6 +13,8 @@ type OutboxRow = {
 
 type Integration = {
   id: string;
+  restaurant_id: string;
+  workspace_id: string | null;
   api_base_url: string;
   token_secret_ref: string;
   enabled: boolean;
@@ -36,6 +38,38 @@ function validateBaseUrl(value: string) {
   );
   if (!allowed || !url.pathname.endsWith('/api2')) throw new Error('unsupported Manager API2 base URL');
   return value.replace(/\/$/, '');
+}
+
+const managerPathByEntity: Record<string, string> = {
+  customer: '/customer-form',
+  supplier: '/supplier-form',
+  inventory_item: '/inventory-item-form',
+  sales_invoice: '/sales-invoice-form',
+  purchase_invoice: '/purchase-invoice-form',
+  receipt: '/receipt-form',
+  payment: '/payment-form',
+  journal_entry: '/journal-entry-form',
+  inventory_transfer: '/inventory-transfer-form',
+  goods_receipt: '/goods-receipt-form',
+  bank_account: '/bank-or-cash-account-form',
+  division: '/division-form',
+  tax_code: '/tax-code-form',
+  account: '/account-form',
+};
+
+function validateManagerEntityPath(entityType: string, operation: string, value: string) {
+  const expected = managerPathByEntity[entityType];
+  if (!expected || !value.startsWith('/')) throw new Error('unsupported Manager entity path');
+  const pathname = value.split('?')[0];
+  const isCollection = pathname === expected;
+  const isItem = pathname.startsWith(`${expected}/`) && /^[A-Za-z0-9_-]+$/.test(pathname.slice(expected.length + 1));
+  if (!isCollection && !isItem) throw new Error('Manager path does not match entity type');
+  if (operation === 'delete' || operation === 'update') {
+    if (!isItem) throw new Error('Manager update/delete requires a mapped key');
+  } else if (operation === 'upsert' && !isCollection && !isItem) {
+    throw new Error('invalid Manager upsert path');
+  }
+  return pathname;
 }
 
 async function managerRequest(baseUrl: string, token: string, path: string, init: RequestInit = {}) {
@@ -71,7 +105,8 @@ Deno.serve(async (req) => {
 
   if (mode === 'health') {
     const { data: integrations, error } = await admin.from('manager_integrations')
-      .select('id,api_base_url,token_secret_ref,enabled,sync_mode').eq('enabled', true).limit(20);
+      .select('id,restaurant_id,workspace_id,api_base_url,token_secret_ref,enabled,sync_mode')
+      .eq('enabled', true).neq('sync_mode', 'disabled').limit(20);
     if (error) return json({ error: 'integration_lookup_failed' }, 500);
     const results = [];
     for (const integration of (integrations || []) as Integration[]) {
@@ -101,8 +136,14 @@ Deno.serve(async (req) => {
   const summary = { claimed: (rows || []).length, posted: 0, failed: 0, dry_run: 0 };
   for (const row of (rows || []) as OutboxRow[]) {
     try {
-      const { data: integration, error: integrationError } = await admin.from('manager_integrations')
-        .select('id,api_base_url,token_secret_ref,enabled,sync_mode').eq('id', row.integration_id).single();
+      let integrationQuery = admin.from('manager_integrations')
+        .select('id,restaurant_id,workspace_id,api_base_url,token_secret_ref,enabled,sync_mode')
+        .eq('id', row.integration_id)
+        .eq('restaurant_id', row.restaurant_id);
+      integrationQuery = row.workspace_id === null
+        ? integrationQuery.is('workspace_id', null)
+        : integrationQuery.eq('workspace_id', row.workspace_id);
+      const { data: integration, error: integrationError } = await integrationQuery.single();
       if (integrationError || !integration) throw new Error('integration_not_found');
       const settings = integration as Integration;
       if (!settings.enabled || settings.sync_mode === 'disabled') throw new Error('integration_disabled');
@@ -114,12 +155,36 @@ Deno.serve(async (req) => {
       const baseUrl = validateBaseUrl(settings.api_base_url);
       const payload = row.payload || {};
       const managerPath = typeof payload.manager_path === 'string' ? payload.manager_path : '';
-      const method = row.operation === 'delete' ? 'DELETE' : 'POST';
+      validateManagerEntityPath(row.entity_type, row.operation, managerPath);
+      const payloadMethod = typeof payload.method === 'string' ? payload.method.toUpperCase() : '';
+      const method = payloadMethod || (row.operation === 'delete' ? 'DELETE' : managerPath.split('?')[0] === managerPathByEntity[row.entity_type] ? 'POST' : 'PUT');
+      if (!['POST', 'PUT', 'DELETE'].includes(method)) throw new Error('unsupported Manager HTTP method');
+      if (method === 'POST' && managerPath.split('?')[0] !== managerPathByEntity[row.entity_type]) throw new Error('POST requires a collection path');
+      if ((method === 'PUT' || method === 'DELETE') && managerPath.split('?')[0] === managerPathByEntity[row.entity_type]) throw new Error('mapped operation requires an item path');
       const body = payload.body && typeof payload.body === 'object' ? JSON.stringify(payload.body) : undefined;
       const result = await managerRequest(baseUrl, managerToken, managerPath, { method, body, headers: body ? { 'Content-Type': 'application/json' } : {} });
       if (!result.ok) throw new Error(`Manager API2 HTTP ${result.status}`);
-      const managerKey = (result.body && typeof result.body === 'object' && 'key' in result.body) ? String((result.body as {key: unknown}).key) : null;
-      await admin.from('manager_sync_outbox').update({ status: 'posted', manager_key: managerKey, response_status: result.status, response_body: result.body, last_error: null, updated_at: new Date().toISOString() }).eq('id', row.id);
+      const managerKey = (result.body && typeof result.body === 'object' && 'key' in result.body) ? String((result.body as {key: unknown}).key) : (typeof payload.manager_key === 'string' ? payload.manager_key : null);
+      const posted = await admin.from('manager_sync_outbox').update({ status: 'posted', manager_key: managerKey, response_status: result.status, response_body: result.body, last_error: null, updated_at: new Date().toISOString() }).eq('id', row.id);
+      if (posted.error) throw new Error('outbox_post_update_failed');
+      if (managerKey && row.source_id && ['customer', 'supplier', 'inventory_item'].includes(row.entity_type)) {
+        const mapping = await admin.from('manager_entity_mappings').upsert({
+          integration_id: row.integration_id,
+          restaurant_id: row.restaurant_id,
+          workspace_id: row.workspace_id,
+          entity_type: row.entity_type,
+          local_table: row.entity_type === 'inventory_item' ? 'products' : `${row.entity_type}s`,
+          local_id: row.source_id,
+          manager_key: managerKey,
+          manager_name: typeof payload.manager_name === 'string' ? payload.manager_name : null,
+          sync_status: row.operation === 'delete' ? 'ignored' : 'synced',
+          source_hash: typeof payload.source_hash === 'string' ? payload.source_hash : null,
+          last_synced_at: new Date().toISOString(),
+          last_error: null,
+          updated_at: new Date().toISOString(),
+        }, { onConflict: 'integration_id,entity_type,local_id' });
+        if (mapping.error) throw new Error('mapping_update_failed');
+      }
       summary.posted += 1;
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Manager sync failed';
