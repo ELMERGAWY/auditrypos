@@ -37,6 +37,10 @@ CREATE TABLE IF NOT EXISTS public.marketing_service_deliverables (
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
+-- The deliverables table may have been created by an earlier migration without invoice_line_id.
+ALTER TABLE public.marketing_service_deliverables
+  ADD COLUMN IF NOT EXISTS invoice_line_id UUID;
+
 -- Create indexes for deliverables
 CREATE INDEX IF NOT EXISTS idx_marketing_deliverables_restaurant ON public.marketing_service_deliverables(restaurant_id);
 CREATE INDEX IF NOT EXISTS idx_marketing_deliverables_invoice ON public.marketing_service_deliverables(invoice_id);
