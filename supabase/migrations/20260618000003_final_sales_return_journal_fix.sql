@@ -5,18 +5,21 @@
 BEGIN;
 
 -- 1) Check if sales_return_items has cost_price_at_return, if not add it
-DO $$
+DO $compat$
 BEGIN
-  IF NOT EXISTS (
-    SELECT 1 FROM information_schema.columns
-    WHERE table_schema = 'public'
-    AND table_name = 'sales_return_items'
-    AND column_name = 'cost_price_at_return'
-  ) THEN
-    ALTER TABLE public.sales_return_items ADD COLUMN cost_price_at_return NUMERIC(15,2) DEFAULT 0;
+  IF to_regclass('public.sales_return_items') IS NOT NULL
+     AND NOT EXISTS (
+       SELECT 1 FROM information_schema.columns
+       WHERE table_schema = 'public'
+         AND table_name = 'sales_return_items'
+         AND column_name = 'cost_price_at_return'
+     ) THEN
+    EXECUTE 'ALTER TABLE public.sales_return_items ADD COLUMN cost_price_at_return NUMERIC(15,2) DEFAULT 0';
+  ELSE
+    RAISE NOTICE 'Skipping sales_return_items compatibility column: table is not present in this module schema';
   END IF;
 END
-$$;
+$compat$;
 
 -- 2) Fix create_sales_return_journal_entry() - insert lines first, then update totals
 CREATE OR REPLACE FUNCTION public.create_sales_return_journal_entry()
