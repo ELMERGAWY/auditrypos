@@ -46,7 +46,7 @@ SELECT
   mi.image,
   mi.available,
   mi.sort_order,
-  mi.product_type,
+  NULL::text AS product_type,
   mi.inventory_mode,
   CASE
     WHEN mi.inventory_mode = 'none' THEN true
