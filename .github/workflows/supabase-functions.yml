@@ -1,0 +1,63 @@
+name: Deploy Supabase Edge Functions
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'supabase/functions/manager-sync/**'
+      - 'supabase/config.toml'
+  workflow_dispatch:
+
+concurrency:
+  group: supabase-production-functions
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  deploy-manager-sync:
+    runs-on: ubuntu-latest
+    environment: production
+    timeout-minutes: 15
+    env:
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      SUPABASE_PROJECT_ID: ${{ secrets.SUPABASE_PROJECT_ID }}
+    steps:
+      - name: Checkout exact commit
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Validate required secrets and production target
+        shell: bash
+        run: |
+          set -euo pipefail
+          for name in SUPABASE_ACCESS_TOKEN SUPABASE_PROJECT_ID; do
+            if [[ -z "${!name:-}" ]]; then
+              echo "Missing required GitHub secret: $name" >&2
+              exit 1
+            fi
+          done
+          if [[ "$SUPABASE_PROJECT_ID" != "uwdjijaqawnlcoyaorcr" ]]; then
+            echo "Refusing to deploy: unexpected production project ref" >&2
+            exit 1
+          fi
+
+      - name: Setup Supabase CLI
+        uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Deploy manager-sync
+        run: supabase functions deploy manager-sync --project-ref "$SUPABASE_PROJECT_ID" --no-verify-jwt
+
+      - name: Confirm deployment target
+        run: |
+          echo "manager-sync deployment submitted for Supabase project $SUPABASE_PROJECT_ID"
+          echo "Runtime secrets are intentionally managed in Supabase and are never stored in GitHub source files."
+
+      # The function itself requires x-manager-sync-secret and also requires
+      # MANAGER_API_TOKEN and MANAGER_SYNC_WORKER_SECRET in Supabase runtime.
+      # Configure those once in Supabase before enabling live processing.

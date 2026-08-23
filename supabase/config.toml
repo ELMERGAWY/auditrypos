@@ -8,3 +8,7 @@ verify_jwt = false
 
 [functions.admin-create-user]
 verify_jwt = true
+
+[functions.manager-sync]
+# The Edge Function performs its own worker-secret authorization.
+verify_jwt = false
