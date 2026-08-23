@@ -620,10 +620,28 @@ CREATE TRIGGER trigger_validate_item_warehouse_assignment
   BEFORE INSERT OR UPDATE ON item_warehouse_assignments
   FOR EACH ROW EXECUTE FUNCTION validate_item_warehouse_assignment();
 
--- 12. CREATE DEFAULT WAREHOUSE (IF NOT EXISTS)
-INSERT INTO warehouses (code, name, name_ar, type, warehouse_category, is_default, is_active, currency, accounting_standard)
-VALUES ('MAIN-001', 'Main Warehouse', 'المخزن الرئيسي', 'MAIN', 'STANDARD', true, true, 'EGP', 'IFRS')
-ON CONFLICT (code) DO NOTHING;
+-- 12. CREATE DEFAULT WAREHOUSE ONLY WHEN THE SCHEMA ALLOWS A GLOBAL ROW.
+-- Tenant schemas commonly require restaurant_id; never create an orphan
+-- warehouse. Tenant-specific defaults are created by the application setup flow.
+DO $default_warehouse$
+DECLARE
+    v_nullable TEXT;
+BEGIN
+    SELECT is_nullable INTO v_nullable
+    FROM information_schema.columns
+    WHERE table_schema = 'public'
+      AND table_name = 'warehouses'
+      AND column_name = 'restaurant_id';
+
+    IF v_nullable = 'YES' THEN
+        INSERT INTO public.warehouses (code, name, name_ar, type, warehouse_category, is_default, is_active, currency, accounting_standard)
+        VALUES ('MAIN-001', 'Main Warehouse', 'المخزن الرئيسي', 'MAIN', 'STANDARD', true, true, 'EGP', 'IFRS')
+        ON CONFLICT (code) DO NOTHING;
+    ELSE
+        RAISE NOTICE 'Skipping global default warehouse because warehouses.restaurant_id is required';
+    END IF;
+END
+$default_warehouse$;
 
 -- Force schema cache reload
 NOTIFY pgrst, 'reload schema';
