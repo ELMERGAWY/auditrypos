@@ -21,9 +21,17 @@ type Integration = {
   sync_mode: 'disabled' | 'dry_run' | 'outbox' | 'live';
 };
 
+const corsHeaders = {
+  'content-type': 'application/json',
+  'cache-control': 'no-store',
+  'access-control-allow-origin': 'https://supabase.com',
+  'access-control-allow-headers': 'content-type, x-manager-sync-secret',
+  'access-control-allow-methods': 'POST, OPTIONS',
+};
+
 const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), {
   status,
-  headers: { 'content-type': 'application/json', 'cache-control': 'no-store' },
+  headers: corsHeaders,
 });
 
 function getWorkerSecret(req: Request) {
@@ -89,6 +97,7 @@ async function managerRequest(baseUrl: string, token: string, path: string, init
 }
 
 Deno.serve(async (req) => {
+  if (req.method === 'OPTIONS') return new Response(null, { status: 204, headers: corsHeaders });
   const expected = Deno.env.get('MANAGER_SYNC_WORKER_SECRET');
   if (!expected || getWorkerSecret(req) !== expected) return json({ error: 'unauthorized' }, 401);
   if (req.method !== 'POST') return json({ error: 'method_not_allowed' }, 405);
