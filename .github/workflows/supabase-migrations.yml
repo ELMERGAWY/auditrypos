@@ -52,13 +52,13 @@ jobs:
           version: latest
 
       - name: Link production project
-        run: supabase link --project-ref "$SUPABASE_PROJECT_ID"
+        run: supabase link --project-ref "$SUPABASE_PROJECT_ID" --password "$SUPABASE_DB_PASSWORD"
 
       - name: Show migration status before deployment
         run: supabase migration list
 
       - name: Apply pending migrations
-        run: supabase db push --linked
+        run: supabase db push --linked --password "$SUPABASE_DB_PASSWORD"
 
       - name: Verify migration status after deployment
         run: supabase migration list
