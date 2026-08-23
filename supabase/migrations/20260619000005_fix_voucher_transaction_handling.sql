@@ -250,19 +250,22 @@ END
 $$;
 
 -- 4. Add reference_type and reference_id to supplier_transactions if not exists
-DO $$
+DO $supplier_tx_compat$
 BEGIN
-  IF NOT EXISTS (
-    SELECT 1 FROM information_schema.columns
-    WHERE table_schema = 'public'
-    AND table_name = 'supplier_transactions'
-    AND column_name = 'reference_type'
-  ) THEN
-    ALTER TABLE public.supplier_transactions ADD COLUMN reference_type TEXT;
-    ALTER TABLE public.supplier_transactions ADD COLUMN reference_id UUID;
+  IF to_regclass('public.supplier_transactions') IS NOT NULL
+     AND NOT EXISTS (
+       SELECT 1 FROM information_schema.columns
+       WHERE table_schema = 'public'
+         AND table_name = 'supplier_transactions'
+         AND column_name = 'reference_type'
+     ) THEN
+    EXECUTE 'ALTER TABLE public.supplier_transactions ADD COLUMN reference_type TEXT';
+    EXECUTE 'ALTER TABLE public.supplier_transactions ADD COLUMN reference_id UUID';
+  ELSE
+    RAISE NOTICE 'Skipping supplier_transactions reference columns: table is not present in this module schema';
   END IF;
 END
-$$;
+$supplier_tx_compat$;
 
 -- 5. Grant execute permissions
 GRANT EXECUTE ON FUNCTION public.save_receipt_voucher TO authenticated;
