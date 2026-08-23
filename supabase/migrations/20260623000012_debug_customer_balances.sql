@@ -33,46 +33,34 @@ FROM public.customer_transactions
 GROUP BY type
 ORDER BY type;
 
--- 3. Check if there are any sales orders or invoices that don't have corresponding transactions
-SELECT 
-  'sales_orders' as source,
-  COUNT(*) as total,
-  (
-    SELECT COUNT(*)
-    FROM public.customer_transactions ct
-    WHERE ct.reference_type = 'sales_order'
-  ) as with_transactions
-FROM public.sales_orders
-UNION ALL
-SELECT 
-  'sales_invoices' as source,
-  COUNT(*) as total,
-  (
-    SELECT COUNT(*)
-    FROM public.customer_transactions ct
-    WHERE ct.reference_type = 'sales_invoice'
-  ) as with_transactions
-FROM public.sales_invoices
-UNION ALL
-SELECT 
-  'sales_returns' as source,
-  COUNT(*) as total,
-  (
-    SELECT COUNT(*)
-    FROM public.customer_transactions ct
-    WHERE ct.reference_type = 'sales_return'
-  ) as with_transactions
-FROM public.sales_returns
-UNION ALL
-SELECT 
-  'receipt_vouchers' as source,
-  COUNT(*) as total,
-  (
-    SELECT COUNT(*)
-    FROM public.customer_transactions ct
-    WHERE ct.reference_type = 'receipt_voucher'
-  ) as with_transactions
-FROM public.receipt_vouchers;
+-- 3. Check optional sales sources without making the migration depend on them.
+DO $diagnostics$
+DECLARE
+  v_table TEXT;
+  v_reference_type TEXT;
+  v_total BIGINT;
+  v_with_transactions BIGINT;
+BEGIN
+  FOR v_table, v_reference_type IN
+    SELECT * FROM (VALUES
+      ('sales_orders', 'sales_order'),
+      ('sales_invoices', 'sales_invoice'),
+      ('sales_returns', 'sales_return'),
+      ('receipt_vouchers', 'receipt_voucher')
+    ) AS sources(table_name, reference_type)
+  LOOP
+    IF to_regclass(format('public.%I', v_table)) IS NOT NULL THEN
+      EXECUTE format('SELECT COUNT(*) FROM public.%I', v_table) INTO v_total;
+      SELECT COUNT(*) INTO v_with_transactions
+      FROM public.customer_transactions
+      WHERE reference_type = v_reference_type;
+      RAISE NOTICE '%: total=%, with_transactions=%', v_table, v_total, v_with_transactions;
+    ELSE
+      RAISE NOTICE '% is not installed; skipped diagnostic check', v_table;
+    END IF;
+  END LOOP;
+END;
+$diagnostics$;
 
 -- 4. Show customers with balance but no transactions
 SELECT 
