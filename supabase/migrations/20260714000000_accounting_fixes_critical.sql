@@ -495,8 +495,16 @@ $$ LANGUAGE plpgsql;
 -- FIX 7: IMPROVED SALES RETURNS WITHOUT EXCEPTION BLOCKS
 -- ============================================================
 
--- 7.1 Drop existing trigger if exists
-DROP TRIGGER IF EXISTS trg_sales_return_journal_entry ON public.sales_returns;
+-- 7.1 Drop existing trigger only when the optional sales_returns table exists.
+DO $sales_return_trigger_drop$
+BEGIN
+  IF to_regclass('public.sales_returns') IS NOT NULL THEN
+    EXECUTE 'DROP TRIGGER IF EXISTS trg_sales_return_journal_entry ON public.sales_returns';
+  ELSE
+    RAISE NOTICE 'sales_returns is not installed; skipped trigger replacement';
+  END IF;
+END;
+$sales_return_trigger_drop$;
 
 -- 7.2 Create improved trigger without EXCEPTION blocks
 CREATE OR REPLACE FUNCTION public.create_sales_return_journal_entry()
@@ -639,12 +647,18 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
--- 7.3 Create trigger
-CREATE TRIGGER trg_sales_return_journal_entry
-AFTER UPDATE OF status ON public.sales_returns
-FOR EACH ROW
-WHEN (NEW.status IN ('approved', 'completed') AND (OLD.status IS DISTINCT FROM NEW.status))
-EXECUTE FUNCTION public.create_sales_return_journal_entry();
+-- 7.3 Create trigger only when the optional sales_returns table exists.
+DO $sales_return_trigger_create$
+BEGIN
+  IF to_regclass('public.sales_returns') IS NOT NULL THEN
+    EXECUTE 'CREATE TRIGGER trg_sales_return_journal_entry
+      AFTER UPDATE OF status ON public.sales_returns
+      FOR EACH ROW
+      WHEN (NEW.status IN (''approved'', ''completed'') AND (OLD.status IS DISTINCT FROM NEW.status))
+      EXECUTE FUNCTION public.create_sales_return_journal_entry()';
+  END IF;
+END;
+$sales_return_trigger_create$;
 
 -- ============================================================
 -- FIX 8: RECALCULATE EXISTING BALANCES
