@@ -16,6 +16,10 @@ BEGIN
   END IF;
 END $$;
 
+-- Legacy sales_invoices tables may predate the paid_amount field.
+ALTER TABLE public.sales_invoices
+  ADD COLUMN IF NOT EXISTS paid_amount NUMERIC(15,4) NOT NULL DEFAULT 0;
+
 -- Step 2: Create function to sync paid_amount from orders to sales_invoices
 CREATE OR REPLACE FUNCTION public.sync_order_paid_amount()
 RETURNS TRIGGER AS $$
