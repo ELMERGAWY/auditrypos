@@ -5,64 +5,54 @@
 
 BEGIN;
 
--- 1. Create missing transactions for sales_returns that don't have them
-INSERT INTO public.customer_transactions (
-  restaurant_id, 
-  customer_id, 
-  type, 
-  amount, 
-  description, 
-  reference_type, 
-  reference_id,
-  created_at
-)
-SELECT 
-  sr.restaurant_id,
-  sr.customer_id,
-  'sales_return',
-  sr.total_amount,
-  'مردود مبيعات - ' || sr.return_number,
-  'sales_return',
-  sr.id,
-  sr.return_date
-FROM public.sales_returns sr
-WHERE sr.customer_id IS NOT NULL
-  AND sr.status = 'completed'
-  AND NOT EXISTS (
-    SELECT 1 
-    FROM public.customer_transactions ct 
-    WHERE ct.reference_type = 'sales_return' 
-      AND ct.reference_id = sr.id
-  );
+-- 1. Create missing sales-return transactions only when that optional source exists.
+DO $sales_return_backfill$
+BEGIN
+  IF to_regclass('public.sales_returns') IS NOT NULL THEN
+    EXECUTE $sql$
+      INSERT INTO public.customer_transactions (
+        restaurant_id, customer_id, type, amount, description,
+        reference_type, reference_id, created_at
+      )
+      SELECT sr.restaurant_id, sr.customer_id, 'sales_return', sr.total_amount,
+             'مردود مبيعات - ' || sr.return_number, 'sales_return', sr.id, sr.return_date
+      FROM public.sales_returns sr
+      WHERE sr.customer_id IS NOT NULL
+        AND sr.status = 'completed'
+        AND NOT EXISTS (
+          SELECT 1 FROM public.customer_transactions ct
+          WHERE ct.reference_type = 'sales_return' AND ct.reference_id = sr.id
+        )
+    $sql$;
+  ELSE
+    RAISE NOTICE 'sales_returns is not installed; skipped sales-return backfill';
+  END IF;
+END;
+$sales_return_backfill$;
 
--- 2. Create missing transactions for receipt_vouchers that don't have them
-INSERT INTO public.customer_transactions (
-  restaurant_id,
-  customer_id,
-  type,
-  amount,
-  description,
-  reference_type,
-  reference_id,
-  created_at
-)
-SELECT
-  rv.restaurant_id,
-  rv.customer_id,
-  'receipt_voucher',
-  rv.amount,
-  'سند قبض - ' || rv.voucher_number,
-  'receipt_voucher',
-  rv.id,
-  rv.voucher_date
-FROM public.receipt_vouchers rv
-WHERE rv.customer_id IS NOT NULL
-  AND NOT EXISTS (
-    SELECT 1
-    FROM public.customer_transactions ct
-    WHERE ct.reference_type = 'receipt_voucher'
-      AND ct.reference_id = rv.id
-  );
+-- 2. Create missing receipt transactions only when that optional source exists.
+DO $receipt_backfill$
+BEGIN
+  IF to_regclass('public.receipt_vouchers') IS NOT NULL THEN
+    EXECUTE $sql$
+      INSERT INTO public.customer_transactions (
+        restaurant_id, customer_id, type, amount, description,
+        reference_type, reference_id, created_at
+      )
+      SELECT rv.restaurant_id, rv.customer_id, 'receipt_voucher', rv.amount,
+             'سند قبض - ' || rv.voucher_number, 'receipt_voucher', rv.id, rv.voucher_date
+      FROM public.receipt_vouchers rv
+      WHERE rv.customer_id IS NOT NULL
+        AND NOT EXISTS (
+          SELECT 1 FROM public.customer_transactions ct
+          WHERE ct.reference_type = 'receipt_voucher' AND ct.reference_id = rv.id
+        )
+    $sql$;
+  ELSE
+    RAISE NOTICE 'receipt_vouchers is not installed; skipped receipt backfill';
+  END IF;
+END;
+$receipt_backfill$;
 
 -- 3. Show how many transactions were created
 DO $$
