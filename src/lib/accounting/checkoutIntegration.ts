@@ -13,6 +13,7 @@ import type { Order, OrderItem } from '@/pages/dashboard/types';
 import type { BusinessType } from '@/lib/businessTypes';
 import { queueOfflineOrder } from '@/lib/offlineEngine';
 import { actorCreateFields } from '@/lib/actor';
+import { getOrCreateCashCustomer, isCashCustomerName } from '@/lib/customerUtils';
 
 export interface CheckoutContext {
   restaurantId: string;
@@ -85,7 +86,9 @@ class CheckoutIntegration {
     // نتذكر إذا تم إنشاء الطلب فعلياً حتى لا نضيفه لطابور الأوفلاين مرة أخرى
     let createdOrder: any = null;
     let customerId: string | null = null;
-    
+    const effectiveCustomerName = orderData.customerName?.trim() || 'عميل نقدي';
+    const effectiveWorkspaceId = orderData.workspaceId || context.workspaceId || null;
+
     let finalNotes = orderData.notes || '';
     if (orderData.customerRef) {
       finalNotes = finalNotes 
@@ -93,21 +96,62 @@ class CheckoutIntegration {
         : `المرجع: ${orderData.customerRef}`;
     }
 
-    // Customer deduplication logic: match by (name + phone)
-    // 1. If customerId is provided from UI (selected from autocomplete), use it directly
-    if (orderData.customerId) {
-      customerId = orderData.customerId;
-      console.log('[checkout] Using customerId from UI:', customerId);
+    // Customer deduplication logic: match by tenant-safe id/ref before name+phone.
+    // Cash sales always receive the deterministic restaurant-level customer before order/journal creation;
+    // a stale customerId from the UI must never override that invariant.
+    if (isCashCustomerName(effectiveCustomerName)) {
+      try {
+        customerId = await getOrCreateCashCustomer(context.restaurantId, effectiveWorkspaceId);
+        if (context.isOnline) {
+          const { error: managerCashError } = await supabase.rpc('manager_enqueue_customer_sync', {
+            p_customer_id: customerId,
+            p_operation: 'upsert',
+          });
+          if (managerCashError && !String(managerCashError.message || '').includes('no enabled Manager integration')) {
+            console.warn('[checkout] Cash customer Manager enqueue skipped:', managerCashError.message);
+          }
+        }
+      } catch (e) {
+        // Online checkout must fail closed: a cash order without the fixed
+        // customer would break customer statements and Manager mapping.
+        if (context.isOnline) throw e;
+        console.warn('[checkout] Cash customer will be resolved during offline sync:', e);
+      }
+    } else if (orderData.customerId) {
+      // Never trust a selected id by itself: verify tenant and active workspace.
+      let selectedCustomerQuery = supabase
+        .from('customers')
+        .select('id, restaurant_id, workspace_id')
+        .eq('id', orderData.customerId)
+        .eq('restaurant_id', context.restaurantId);
+      if (effectiveWorkspaceId) {
+        selectedCustomerQuery = selectedCustomerQuery.eq('workspace_id', effectiveWorkspaceId);
+      } else {
+        selectedCustomerQuery = selectedCustomerQuery.is('workspace_id', null);
+      }
+      const { data: selectedCustomer, error: selectedCustomerError } = await selectedCustomerQuery.maybeSingle();
+      if (selectedCustomerError) {
+        console.warn('[checkout] Selected customer validation failed:', selectedCustomerError.message);
+      } else if (selectedCustomer?.id) {
+        customerId = selectedCustomer.id;
+        console.log('[checkout] Using tenant-validated customerId from UI:', customerId);
+      }
     }
-    // 2. Otherwise, search for existing customer by name and phone
+    // Otherwise, search for an existing customer by name and phone.
     else if (orderData.customerName && orderData.customerPhone) {
       try {
-        const { data: existingCustomer } = await supabase
+        let existingCustomerQuery = supabase
           .from('customers')
           .select('id')
           .eq('restaurant_id', context.restaurantId)
           .eq('name', orderData.customerName)
-          .eq('phone', orderData.customerPhone)
+          .eq('phone', orderData.customerPhone);
+        if (effectiveWorkspaceId) {
+          existingCustomerQuery = existingCustomerQuery.eq('workspace_id', effectiveWorkspaceId);
+        } else {
+          existingCustomerQuery = existingCustomerQuery.is('workspace_id', null);
+        }
+        const { data: existingCustomer } = await existingCustomerQuery
           .limit(1)
           .maybeSingle();
         if (existingCustomer?.id) {
@@ -130,7 +174,7 @@ class CheckoutIntegration {
       status: 'pending',
       table_number: orderData.tableNumber || null,
       order_type: orderData.orderType,
-      customer_name: orderData.customerName || 'عميل نقدي',
+      customer_name: effectiveCustomerName,
       customer_phone: orderData.customerPhone || '',
       customer_ref: orderData.customerRef || null,
       delivery_address: orderData.deliveryAddress || '',
@@ -214,16 +258,17 @@ class CheckoutIntegration {
           return { totalCOGS: 0, itemsWithCost: [] as any[] };
         });
 
-      // If customerId is still null, create new customer
-      if (!customerId && orderData.customerName?.trim()) {
+      // If customerId is still null, create a tenant-scoped customer. Cash must never
+      // proceed without the deterministic customer, even when the UI name is blank.
+      if (!customerId && (orderData.customerName?.trim() || isCashCustomerName(effectiveCustomerName))) {
         console.log('[checkout] Creating new customer...');
-        customerId = await this.findOrCreateCustomer(context.restaurantId, orderData.customerName.trim(), orderData.customerPhone, orderData.customerRef)
+        customerId = await this.findOrCreateCustomer(context.restaurantId, effectiveCustomerName, orderData.customerPhone, orderData.customerRef, effectiveWorkspaceId)
           .catch((e) => { console.warn('[checkout] customer upsert failed:', e); return null; });
         console.log('[checkout] Customer ID after creation:', customerId);
       }
 
       // Fallback validation: if customerId is still null after creation, show error
-      if (!customerId && orderData.customerName?.trim()) {
+      if (!customerId && (orderData.customerName?.trim() || isCashCustomerName(effectiveCustomerName))) {
         console.error('[checkout] customerId is still null after creation, cannot proceed');
         toast.error('برجاء اختيار أو إدخال بيانات العميل بشكل صحيح');
         return {
@@ -759,10 +804,14 @@ class CheckoutIntegration {
     restaurantId: string,
     name: string,
     phone?: string,
-    customerRef?: string
+    customerRef?: string,
+    workspaceId?: string | null
   ): Promise<string | null> {
     try {
-      if (!name || name === 'عميل نقدي' || name.trim() === '') return null;
+      if (!name || name.trim() === '') return null;
+      if (isCashCustomerName(name)) {
+        return await getOrCreateCashCustomer(restaurantId, workspaceId);
+      }
 
       const trimmedName = name.trim();
       const trimmedPhone = phone?.trim();
@@ -771,8 +820,9 @@ class CheckoutIntegration {
       // 1. Try to find existing customer by customer_ref first, then phone/name
       let query = supabase
         .from('customers')
-        .select('id, name, phone, customer_ref')
+        .select('id, name, phone, customer_ref, workspace_id')
         .eq('restaurant_id', restaurantId);
+      if (workspaceId) query = query.eq('workspace_id', workspaceId);
       
       if (trimmedCustomerRef) {
         query = query.eq('customer_ref', trimmedCustomerRef);
@@ -809,6 +859,7 @@ class CheckoutIntegration {
         .from('customers')
         .insert({
           restaurant_id: restaurantId,
+          workspace_id: workspaceId || null,
           name: trimmedName,
           phone: trimmedPhone || null,
           customer_ref: trimmedCustomerRef || null,

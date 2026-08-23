@@ -1,0 +1,56 @@
+name: Process queued Manager synchronization
+
+on:
+  schedule:
+    - cron: '*/10 * * * *'
+  workflow_dispatch:
+    inputs:
+      limit:
+        description: 'Maximum queued events to process'
+        required: false
+        default: '50'
+        type: string
+
+concurrency:
+  group: manager-sync-production
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  process-queue:
+    runs-on: ubuntu-latest
+    environment: production
+    timeout-minutes: 5
+    env:
+      SUPABASE_PROJECT_ID: ${{ secrets.SUPABASE_PROJECT_ID }}
+      MANAGER_SYNC_WORKER_SECRET: ${{ secrets.MANAGER_SYNC_WORKER_SECRET }}
+      SYNC_LIMIT: ${{ inputs.limit || '50' }}
+    steps:
+      - name: Validate production target and secrets
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ "${SUPABASE_PROJECT_ID:-}" != "uwdjijaqawnlcoyaorcr" ]]; then
+            echo "Refusing to process sync: unexpected production project ref" >&2
+            exit 1
+          fi
+          if [[ -z "${MANAGER_SYNC_WORKER_SECRET:-}" ]]; then
+            echo "Missing GitHub production secret: MANAGER_SYNC_WORKER_SECRET" >&2
+            exit 1
+          fi
+          if ! [[ "${SYNC_LIMIT:-}" =~ ^[0-9]+$ ]] || (( SYNC_LIMIT < 1 || SYNC_LIMIT > 100 )); then
+            echo "SYNC_LIMIT must be an integer from 1 to 100" >&2
+            exit 1
+          fi
+
+      - name: Process queued events
+        shell: bash
+        run: |
+          set -euo pipefail
+          response=$(curl --fail-with-body --silent --show-error --max-time 120 \
+            -X POST "https://uwdjijaqawnlcoyaorcr.supabase.co/functions/v1/manager-sync?mode=process&limit=${SYNC_LIMIT}" \
+            -H "x-manager-sync-secret: ${MANAGER_SYNC_WORKER_SECRET}" \
+            -H 'content-type: application/json')
+          echo "$response"

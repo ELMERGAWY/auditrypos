@@ -1,39 +1,72 @@
 // @ts-nocheck
 import { supabase } from '@/integrations/supabase/client';
 
+const CASH_CUSTOMER_NAMES = new Set(['عميل نقدي', 'cash customer', 'walk-in customer']);
+
+export function isCashCustomerName(name?: string | null): boolean {
+  return CASH_CUSTOMER_NAMES.has((name || '').trim().toLowerCase());
+}
+
 /**
- * Find or create a customer by name and phone
- * This is used in service activities (MarketingQuotes, MarketingContracts, SalesOrders)
- * to ensure customers are registered in the customers table
- *
- * IMPORTANT: Prevents duplicate customers by checking BOTH name AND phone
- * - If phone is provided: checks for exact phone match OR (name match AND no phone)
- * - If phone is NOT provided: checks for name match only (for cash customers)
+ * Returns the single deterministic walk-in customer for a restaurant.
+ * The database RPC serializes concurrent calls and assigns a stable customer_ref
+ * so cash invoices always have a customer_id before accounting/Manager sync.
+ */
+export async function getOrCreateCashCustomer(
+  restaurantId: string,
+  workspaceId?: string | null,
+): Promise<string> {
+  const { data, error } = await supabase.rpc('get_or_create_cash_customer', {
+    p_restaurant_id: restaurantId,
+    p_workspace_id: workspaceId || null,
+  });
+
+  if (error || !data) {
+    throw error || new Error('تعذر إنشاء أو استرجاع العميل النقدي');
+  }
+
+  return data as string;
+}
+
+/**
+ * Find or create a customer by name and phone.
+ * Used by service and sales-order modules; all lookups remain restaurant scoped.
+ * Cash names are routed through the deterministic walk-in customer policy.
  */
 export async function findOrCreateCustomer(
   restaurantId: string,
   name: string,
-  phone?: string
+  phone?: string,
+  workspaceId?: string | null,
 ): Promise<string | null> {
   try {
-    if (!name || name.trim() === '' || name === 'عميل نقدي') return null;
+    if (!name || name.trim() === '') {
+      return null;
+    }
+
+    if (isCashCustomerName(name)) {
+      return await getOrCreateCashCustomer(restaurantId, workspaceId);
+    }
 
     const trimmedName = name.trim();
     const trimmedPhone = phone?.trim();
 
-    // 1. Try to find existing customer with STRICT duplicate prevention
     let query = supabase
       .from('customers')
-      .select('id, name, phone')
+      .select('id, name, phone, customer_ref, workspace_id')
       .eq('restaurant_id', restaurantId);
 
+    if (workspaceId) {
+      // Normal customers belong to the active workspace. The restaurant-level
+      // exception is reserved for the deterministic cash customer.
+      query = query.eq('workspace_id', workspaceId);
+    } else {
+      query = query.is('workspace_id', null);
+    }
+
     if (trimmedPhone) {
-      // If phone is provided, check for:
-      // 1. Exact phone match (same customer with same phone)
-      // 2. Name match AND no phone (same customer without phone registered)
       query = query.or(`phone.eq.${trimmedPhone},and(name.ilike.${trimmedName},phone.is.null)`);
     } else {
-      // If no phone, check for name match only (for cash customers)
       query = query.ilike('name', trimmedName);
     }
 
@@ -45,42 +78,49 @@ export async function findOrCreateCustomer(
 
     if (existing && existing.length > 0) {
       const customer = existing[0];
-      // If customer exists but phone was missing, update it
       if (trimmedPhone && !customer.phone) {
         await supabase
           .from('customers')
           .update({ phone: trimmedPhone })
-          .eq('id', customer.id);
+          .eq('id', customer.id)
+          .eq('restaurant_id', restaurantId);
       }
-      console.log(`[customerUtils] Found existing customer: ${customer.name} (ID: ${customer.id})`);
       return customer.id;
     }
 
-    // 2. Create new customer if not found
-    console.log(`[customerUtils] Creating new customer: ${trimmedName}${trimmedPhone ? ` (${trimmedPhone})` : ''}`);
     const { data: newCustomer, error: insertError } = await supabase
       .from('customers')
       .insert({
         restaurant_id: restaurantId,
+        workspace_id: workspaceId || null,
         name: trimmedName,
         phone: trimmedPhone || null,
         customer_type: 'regular',
-        balance: 0
+        balance: 0,
+        current_balance: 0,
       })
       .select('id')
       .single();
 
     if (insertError) {
       console.error('[customerUtils] Failed to create customer:', insertError);
-      // If it's a unique constraint error, try one last fetch
       if (insertError.code === '23505') {
-         const { data: lastTry } = await supabase
-           .from('customers')
-           .select('id')
-           .eq('restaurant_id', restaurantId)
-           .ilike('name', trimmedName)
-           .single();
-         return lastTry?.id || null;
+        let fallbackQuery = supabase
+          .from('customers')
+          .select('id')
+          .eq('restaurant_id', restaurantId);
+        if (workspaceId) {
+          fallbackQuery = fallbackQuery.eq('workspace_id', workspaceId);
+        } else {
+          fallbackQuery = fallbackQuery.is('workspace_id', null);
+        }
+        if (trimmedPhone) {
+          fallbackQuery = fallbackQuery.eq('phone', trimmedPhone);
+        } else {
+          fallbackQuery = fallbackQuery.ilike('name', trimmedName);
+        }
+        const { data: lastTry } = await fallbackQuery.limit(1).maybeSingle();
+        return lastTry?.id || null;
       }
       return null;
     }

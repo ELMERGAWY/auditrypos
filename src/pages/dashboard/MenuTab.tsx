@@ -31,10 +31,11 @@ interface Props {
   menuItems: MenuItem[];
   setMenuItems: (items: MenuItem[]) => void;
   loadData: () => void;
+  workspaceId?: string | null;
 }
 
 export function MenuTab({
-  restaurant, menuItems, setMenuItems, loadData
+  restaurant, menuItems, setMenuItems, loadData, workspaceId
 }: Props) {
   if (!restaurant) return <div className="p-8 text-center">جاري تحميل بيانات النشاط...</div>;
   
@@ -72,15 +73,17 @@ export function MenuTab({
     if (showAddItem && menuForm.product_type === 'inventory') {
       loadInventoryProducts();
     }
-  }, [showAddItem, menuForm.product_type]);
+  }, [showAddItem, menuForm.product_type, workspaceId]);
 
   const loadInventoryProducts = async () => {
-    const { data } = await supabase
+    let query = supabase
       .from('products')
       .select('id, name, price, cost_price, unit, category')
       .eq('restaurant_id', restaurant.id)
       .eq('available', true)
       .order('name');
+    if (workspaceId) query = query.eq('workspace_id', workspaceId);
+    const { data } = await query;
     setInventoryProducts(data || []);
   };
 
@@ -136,7 +139,8 @@ export function MenuTab({
       available: true,
       ...(isInventoryBusiness ? {
         cost_price: menuForm.product_type === 'inventory' ? (inventoryProducts.find(p => p.id === menuForm.product_id)?.cost_price || 0) : 0,
-        restaurant_id: restaurant.id
+        restaurant_id: restaurant.id,
+        workspace_id: workspaceId || null
       } : {
         restaurant_id: restaurant.id,
         product_type: menuForm.product_type,
@@ -149,7 +153,9 @@ export function MenuTab({
     let savedItemId: string | null = null;
 
     if (editingItem) {
-      const { error } = await supabase.from(targetTable).update(payload).eq('id', editingItem.id);
+      let updateQuery = supabase.from(targetTable).update(payload).eq('id', editingItem.id).eq('restaurant_id', restaurant.id);
+      if (workspaceId && isInventoryBusiness) updateQuery = updateQuery.eq('workspace_id', workspaceId);
+      const { error } = await updateQuery;
       if (error) { 
         console.error('Save error:', error);
         toast.error('خطأ في التحديث: ' + error.message); 
@@ -596,6 +602,7 @@ export function MenuTab({
               <ItemWarehouseAssignments
                 itemId={warehouseAssignmentItem.id}
                 itemName={warehouseAssignmentItem.name}
+                workspaceId={workspaceId}
               />
               <div className="mt-4 flex justify-end">
                 <Button onClick={() => setWarehouseAssignmentItem(null)}>إغلاق</Button>

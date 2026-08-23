@@ -256,6 +256,7 @@ export async function getSyncStatus(): Promise<SyncStatus> {
 // ─── Sync Engine ───
 import { supabase } from '@/integrations/supabase/client';
 import { journalService } from './accounting/journalService';
+import { getOrCreateCashCustomer, isCashCustomerName } from './customerUtils';
 import type { Order, OrderItem } from '@/pages/dashboard/types';
 import type { BusinessType } from './businessTypes';
 
@@ -289,7 +290,13 @@ export async function syncPendingData(): Promise<{ synced: number; errors: numbe
       await updateSyncMeta(po.id, { id: po.id, retryCount: meta?.retryCount ?? 0, lastAttempt: Date.now() });
       
       const clientOrderId = po.orderData.client_order_id || po.id;
-      const orderPayload = { ...po.orderData, client_order_id: clientOrderId };
+      const orderPayload: Record<string, any> = { ...po.orderData, client_order_id: clientOrderId };
+      if (isCashCustomerName(String(orderPayload.customer_name || ''))) {
+        orderPayload.customer_id = await getOrCreateCashCustomer(
+          String(orderPayload.restaurant_id || po.restaurantId),
+          orderPayload.workspace_id ? String(orderPayload.workspace_id) : null,
+        );
+      }
 
       const { data: existing } = await supabase.from('orders')
         .select('id')
@@ -495,7 +502,13 @@ export async function forceSyncPendingData(): Promise<{ synced: number; errors: 
   for (const po of orders) {
     try {
       const clientOrderId = po.orderData.client_order_id || po.id;
-      const orderPayload = { ...po.orderData, client_order_id: clientOrderId };
+      const orderPayload: Record<string, any> = { ...po.orderData, client_order_id: clientOrderId };
+      if (isCashCustomerName(String(orderPayload.customer_name || ''))) {
+        orderPayload.customer_id = await getOrCreateCashCustomer(
+          String(orderPayload.restaurant_id || po.restaurantId),
+          orderPayload.workspace_id ? String(orderPayload.workspace_id) : null,
+        );
+      }
 
       const { data: existing } = await supabase.from('orders')
         .select('id')
