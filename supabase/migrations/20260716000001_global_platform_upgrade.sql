@@ -58,6 +58,9 @@ CREATE INDEX IF NOT EXISTS idx_restaurants_plan_id ON restaurants(plan_id);
 
 -- RLS for admin_notifications (super admin only)
 ALTER TABLE admin_notifications ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "super_admin_read_admin_notifications" ON admin_notifications;
+DROP POLICY IF EXISTS "super_admin_update_admin_notifications" ON admin_notifications;
+DROP POLICY IF EXISTS "system_insert_admin_notifications" ON admin_notifications;
 
 CREATE POLICY "super_admin_read_admin_notifications" ON admin_notifications
   FOR SELECT USING (
@@ -74,6 +77,8 @@ CREATE POLICY "system_insert_admin_notifications" ON admin_notifications
 
 -- RLS for subscription_plans (public read)
 ALTER TABLE subscription_plans ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "anyone_read_subscription_plans" ON subscription_plans;
+DROP POLICY IF EXISTS "super_admin_manage_subscription_plans" ON subscription_plans;
 
 CREATE POLICY "anyone_read_subscription_plans" ON subscription_plans
   FOR SELECT USING (true);
@@ -99,6 +104,7 @@ CREATE TABLE IF NOT EXISTS chat_typing_status (
 );
 
 ALTER TABLE chat_typing_status ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "restaurant_members_chat_typing" ON chat_typing_status;
 
 CREATE POLICY "restaurant_members_chat_typing" ON chat_typing_status
   FOR ALL USING (
