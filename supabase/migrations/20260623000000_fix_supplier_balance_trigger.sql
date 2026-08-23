@@ -10,22 +10,26 @@ RETURNS NUMERIC AS $$
 DECLARE
   v_balance NUMERIC;
 BEGIN
-  -- Calculate balance from all supplier transactions
-  -- Positive amounts increase balance (we owe them), negative amounts decrease balance
-  SELECT COALESCE(SUM(
-    CASE 
-      WHEN type IN ('purchase', 'invoice', 'purchase_invoice') THEN COALESCE(amount, 0)
-      WHEN type IN ('payment', 'payment_voucher') THEN -COALESCE(amount, 0)
-      WHEN type IN ('purchase_return') THEN -COALESCE(amount, 0)
-      WHEN type IN ('opening_balance') THEN COALESCE(amount, 0)
+  -- Some service deployments do not have the legacy supplier_transactions table.
+  -- Return a safe zero until that optional transaction ledger is installed.
+  IF to_regclass('public.supplier_transactions') IS NULL THEN
+    RETURN 0;
+  END IF;
+
+  EXECUTE 'SELECT COALESCE(SUM(
+    CASE
+      WHEN type IN (''purchase'', ''invoice'', ''purchase_invoice'') THEN COALESCE(amount, 0)
+      WHEN type IN (''payment'', ''payment_voucher'') THEN -COALESCE(amount, 0)
+      WHEN type IN (''purchase_return'') THEN -COALESCE(amount, 0)
+      WHEN type IN (''opening_balance'') THEN COALESCE(amount, 0)
       ELSE 0
     END
   ), 0)
-  INTO v_balance
   FROM public.supplier_transactions
-  WHERE supplier_id = p_supplier_id;
-  
-  RETURN v_balance;
+  WHERE supplier_id = $1'
+  INTO v_balance USING p_supplier_id;
+
+  RETURN COALESCE(v_balance, 0);
 END;
 $$ LANGUAGE plpgsql STABLE;
 
@@ -72,37 +76,43 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
--- 4. Drop existing triggers if they exist
-DROP TRIGGER IF EXISTS trg_supplier_transaction_insert ON public.supplier_transactions;
-DROP TRIGGER IF EXISTS trg_supplier_transaction_update ON public.supplier_transactions;
-DROP TRIGGER IF EXISTS trg_supplier_transaction_delete ON public.supplier_transactions;
+-- 4-5. Legacy transaction triggers are optional in the service schema.
+DO $trigger_setup$
+BEGIN
+  IF to_regclass('public.supplier_transactions') IS NOT NULL THEN
+    EXECUTE 'DROP TRIGGER IF EXISTS trg_supplier_transaction_insert ON public.supplier_transactions';
+    EXECUTE 'DROP TRIGGER IF EXISTS trg_supplier_transaction_update ON public.supplier_transactions';
+    EXECUTE 'DROP TRIGGER IF EXISTS trg_supplier_transaction_delete ON public.supplier_transactions';
 
--- 5. Create new triggers
-CREATE TRIGGER trg_supplier_transaction_insert
-AFTER INSERT ON public.supplier_transactions
-FOR EACH ROW
-EXECUTE FUNCTION public.update_supplier_balance_from_transaction();
+    EXECUTE 'CREATE TRIGGER trg_supplier_transaction_insert
+      AFTER INSERT ON public.supplier_transactions
+      FOR EACH ROW EXECUTE FUNCTION public.update_supplier_balance_from_transaction()';
+    EXECUTE 'CREATE TRIGGER trg_supplier_transaction_update
+      AFTER UPDATE ON public.supplier_transactions
+      FOR EACH ROW EXECUTE FUNCTION public.update_supplier_balance_from_transaction()';
+    EXECUTE 'CREATE TRIGGER trg_supplier_transaction_delete
+      AFTER DELETE ON public.supplier_transactions
+      FOR EACH ROW EXECUTE FUNCTION public.update_supplier_balance_from_transaction()';
+  ELSE
+    RAISE NOTICE 'supplier_transactions is not installed; skipping legacy supplier balance triggers';
+  END IF;
+END;
+$trigger_setup$;
 
-CREATE TRIGGER trg_supplier_transaction_update
-AFTER UPDATE ON public.supplier_transactions
-FOR EACH ROW
-EXECUTE FUNCTION public.update_supplier_balance_from_transaction();
-
-CREATE TRIGGER trg_supplier_transaction_delete
-AFTER DELETE ON public.supplier_transactions
-FOR EACH ROW
-EXECUTE FUNCTION public.update_supplier_balance_from_transaction();
-
--- 6. Recalculate all supplier balances
+-- 6. Recalculate all supplier balances only when the ledger exists.
 DO $$
 DECLARE
   v_supplier RECORD;
 BEGIN
-  FOR v_supplier IN SELECT id FROM public.suppliers LOOP
-    PERFORM public.recalculate_supplier_balance(v_supplier.id);
-  END LOOP;
-  
-  RAISE NOTICE '✅ Recalculated all supplier balances';
+  IF to_regclass('public.supplier_transactions') IS NOT NULL
+     AND to_regclass('public.suppliers') IS NOT NULL THEN
+    FOR v_supplier IN SELECT id FROM public.suppliers LOOP
+      PERFORM public.recalculate_supplier_balance(v_supplier.id);
+    END LOOP;
+    RAISE NOTICE '✅ Recalculated all supplier balances';
+  ELSE
+    RAISE NOTICE 'supplier_transactions or suppliers is not installed; skipped supplier balance recalculation';
+  END IF;
 END
 $$;
 
