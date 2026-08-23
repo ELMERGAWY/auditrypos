@@ -5,8 +5,16 @@
 
 BEGIN;
 
--- First, disable the trigger temporarily
-DROP TRIGGER IF EXISTS trg_create_sales_return_journal ON public.sales_returns;
+-- Disable the legacy trigger only when the optional table exists.
+DO $trigger_setup$
+BEGIN
+  IF to_regclass('public.sales_returns') IS NOT NULL THEN
+    EXECUTE 'DROP TRIGGER IF EXISTS trg_create_sales_return_journal ON public.sales_returns';
+  ELSE
+    RAISE NOTICE 'sales_returns is not installed; skipping legacy trigger drop';
+  END IF;
+END;
+$trigger_setup$;
 
 -- Create a very simple version that just logs what's happening
 CREATE OR REPLACE FUNCTION public.create_sales_return_journal_entry()
@@ -66,11 +74,18 @@ EXCEPTION
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
--- Recreate trigger
-CREATE TRIGGER trg_create_sales_return_journal
-BEFORE UPDATE OF status ON public.sales_returns
-FOR EACH ROW
-EXECUTE FUNCTION public.create_sales_return_journal_entry();
+-- Recreate the trigger only when the optional table exists.
+DO $trigger_setup$
+BEGIN
+  IF to_regclass('public.sales_returns') IS NOT NULL THEN
+    EXECUTE 'CREATE TRIGGER trg_create_sales_return_journal
+      BEFORE UPDATE OF status ON public.sales_returns
+      FOR EACH ROW EXECUTE FUNCTION public.create_sales_return_journal_entry()';
+  ELSE
+    RAISE NOTICE 'sales_returns is not installed; skipping legacy trigger creation';
+  END IF;
+END;
+$trigger_setup$;
 
 COMMIT;
 
