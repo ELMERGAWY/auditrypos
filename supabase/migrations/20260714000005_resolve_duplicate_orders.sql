@@ -45,13 +45,21 @@ WHERE order_id IN (
   AND o.id NOT IN (SELECT id FROM orders_to_keep)
 );
 
-DELETE FROM public.order_taxes
-WHERE order_id IN (
-  SELECT o.id 
-  FROM public.orders o
-  WHERE o.order_number IN (SELECT order_number FROM orders_to_keep)
-  AND o.id NOT IN (SELECT id FROM orders_to_keep)
-);
+DO $order_taxes_guard$
+BEGIN
+  IF to_regclass('public.order_taxes') IS NOT NULL THEN
+    EXECUTE 'DELETE FROM public.order_taxes
+      WHERE order_id IN (
+        SELECT o.id
+        FROM public.orders o
+        WHERE o.order_number IN (SELECT order_number FROM orders_to_keep)
+          AND o.id NOT IN (SELECT id FROM orders_to_keep)
+      )';
+  ELSE
+    RAISE NOTICE 'order_taxes is not installed; skipped optional duplicate cleanup';
+  END IF;
+END;
+$order_taxes_guard$;
 
 DELETE FROM public.orders
 WHERE order_number IN (SELECT order_number FROM orders_to_keep)
