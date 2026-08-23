@@ -9,6 +9,10 @@
 
 BEGIN;
 
+-- Legacy orders tables may not contain the separate direct-payment field.
+ALTER TABLE public.orders
+  ADD COLUMN IF NOT EXISTS direct_paid_amount NUMERIC(15,4) NOT NULL DEFAULT 0;
+
 -- 1) Drop ALL bidirectional paid/payment sync triggers
 DROP TRIGGER IF EXISTS trigger_sync_order_paid_amount ON public.orders;
 DROP TRIGGER IF EXISTS trigger_sync_order_paid_amount_insert ON public.orders;
