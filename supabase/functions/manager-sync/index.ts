@@ -104,8 +104,19 @@ Deno.serve(async (req) => {
 
   const supabaseUrl = Deno.env.get('SUPABASE_URL');
   const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
-  const managerToken = Deno.env.get('MANAGER_API_TOKEN');
-  if (!supabaseUrl || !serviceKey || !managerToken) return json({ error: 'server_configuration_missing' }, 500);
+  const managerTokenFallback = Deno.env.get('MANAGER_API_TOKEN') || '';
+  if (!supabaseUrl || !serviceKey) return json({ error: 'server_configuration_missing' }, 500);
+
+  const resolveManagerToken = (integration: Integration) => {
+    // Never allow a database value to read arbitrary environment variables.
+    // The migration constrains token_secret_ref to MANAGER_API_TOKEN[_SUFFIX].
+    if (!/^MANAGER_API_TOKEN(?:_[A-Z0-9_]+)?$/.test(integration.token_secret_ref)) {
+      throw new Error('unsupported Manager token reference');
+    }
+    return Deno.env.get(integration.token_secret_ref) || (
+      integration.token_secret_ref === 'MANAGER_API_TOKEN' ? managerTokenFallback : ''
+    );
+  };
 
   const admin = createClient(supabaseUrl, serviceKey, { auth: { persistSession: false } });
   const url = new URL(req.url);
@@ -121,6 +132,8 @@ Deno.serve(async (req) => {
     for (const integration of (integrations || []) as Integration[]) {
       try {
         const baseUrl = validateBaseUrl(integration.api_base_url);
+        const managerToken = resolveManagerToken(integration);
+        if (!managerToken) throw new Error('manager token missing for integration');
         const result = await managerRequest(baseUrl, managerToken, '/customers?pageSize=1');
         await admin.from('manager_integrations').update({
           last_health_check_at: new Date().toISOString(),
@@ -162,6 +175,8 @@ Deno.serve(async (req) => {
         continue;
       }
       const baseUrl = validateBaseUrl(settings.api_base_url);
+      const managerToken = resolveManagerToken(settings);
+      if (!managerToken) throw new Error('manager token missing for integration');
       const payload = row.payload || {};
       const managerPath = typeof payload.manager_path === 'string' ? payload.manager_path : '';
       validateManagerEntityPath(row.entity_type, row.operation, managerPath);
@@ -176,13 +191,13 @@ Deno.serve(async (req) => {
       const managerKey = (result.body && typeof result.body === 'object' && 'key' in result.body) ? String((result.body as {key: unknown}).key) : (typeof payload.manager_key === 'string' ? payload.manager_key : null);
       const posted = await admin.from('manager_sync_outbox').update({ status: 'posted', manager_key: managerKey, response_status: result.status, response_body: result.body, last_error: null, updated_at: new Date().toISOString() }).eq('id', row.id);
       if (posted.error) throw new Error('outbox_post_update_failed');
-      if (managerKey && row.source_id && ['customer', 'supplier', 'inventory_item'].includes(row.entity_type)) {
+      if (managerKey && row.source_id && ['customer', 'supplier', 'inventory_item', 'sales_invoice', 'purchase_invoice'].includes(row.entity_type)) {
         const mapping = await admin.from('manager_entity_mappings').upsert({
           integration_id: row.integration_id,
           restaurant_id: row.restaurant_id,
           workspace_id: row.workspace_id,
           entity_type: row.entity_type,
-          local_table: row.entity_type === 'inventory_item' ? 'products' : `${row.entity_type}s`,
+          local_table: row.source_table || (row.entity_type === 'inventory_item' ? 'products' : `${row.entity_type}s`),
           local_id: row.source_id,
           manager_key: managerKey,
           manager_name: typeof payload.manager_name === 'string' ? payload.manager_name : null,
