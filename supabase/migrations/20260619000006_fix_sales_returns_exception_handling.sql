@@ -208,11 +208,19 @@ END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
 -- 2. Ensure trigger exists
-DROP TRIGGER IF EXISTS trg_create_sales_return_journal ON public.sales_returns;
-CREATE TRIGGER trg_create_sales_return_journal
-BEFORE UPDATE OF status ON public.sales_returns
-FOR EACH ROW
-EXECUTE FUNCTION public.create_sales_return_journal_entry();
+DO $sales_return_trigger$
+BEGIN
+  IF to_regclass('public.sales_returns') IS NOT NULL THEN
+    EXECUTE 'DROP TRIGGER IF EXISTS trg_create_sales_return_journal ON public.sales_returns';
+    EXECUTE 'CREATE TRIGGER trg_create_sales_return_journal
+      BEFORE UPDATE OF status ON public.sales_returns
+      FOR EACH ROW
+      EXECUTE FUNCTION public.create_sales_return_journal_entry()';
+  ELSE
+    RAISE NOTICE 'Skipping sales_returns trigger: table is not present in this module schema';
+  END IF;
+END
+$sales_return_trigger$;
 
 COMMIT;
 
