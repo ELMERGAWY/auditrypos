@@ -67,6 +67,50 @@ REVOKE ALL ON public.manager_inventory_location_mappings FROM anon;
 GRANT SELECT, INSERT, UPDATE, DELETE ON public.manager_inventory_location_mappings TO authenticated;
 GRANT ALL ON public.manager_inventory_location_mappings TO service_role;
 
+-- Resolve a workspace-specific integration first, then fall back to the
+-- restaurant-level integration. The fallback is still tenant-safe because the
+-- restaurant/workspace relationship is asserted before lookup.
+CREATE OR REPLACE FUNCTION public._manager_integration_for_tenant(
+  p_restaurant_id uuid,
+  p_workspace_id uuid
+)
+RETURNS uuid
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_integration_id uuid;
+BEGIN
+  PERFORM public._manager_assert_tenant_scope(p_restaurant_id, p_workspace_id);
+
+  SELECT i.id INTO v_integration_id
+  FROM public.manager_integrations i
+  WHERE i.restaurant_id = p_restaurant_id
+    AND i.workspace_id IS NOT DISTINCT FROM p_workspace_id
+    AND i.enabled = true
+    AND i.sync_mode IN ('dry_run', 'outbox', 'live')
+  ORDER BY i.updated_at DESC
+  LIMIT 1;
+
+  IF v_integration_id IS NULL AND p_workspace_id IS NOT NULL THEN
+    SELECT i.id INTO v_integration_id
+    FROM public.manager_integrations i
+    WHERE i.restaurant_id = p_restaurant_id
+      AND i.workspace_id IS NULL
+      AND i.enabled = true
+      AND i.sync_mode IN ('dry_run', 'outbox', 'live')
+    ORDER BY i.updated_at DESC
+    LIMIT 1;
+  END IF;
+
+  IF v_integration_id IS NULL THEN
+    RAISE EXCEPTION 'no enabled Manager integration for tenant';
+  END IF;
+  RETURN v_integration_id;
+END;
+$$;
+
 CREATE OR REPLACE FUNCTION public._manager_account_mapping_key(
   p_integration_id uuid,
   p_restaurant_id uuid,
