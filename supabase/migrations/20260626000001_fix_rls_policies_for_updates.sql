@@ -58,6 +58,7 @@ WITH CHECK (
 
 -- 3. FIX PRODUCTS POLICIES - Allow updates for restaurant owners
 DROP POLICY IF EXISTS "Owner or Staff manages products" ON public.products;
+DROP POLICY IF EXISTS "Owner manages products" ON public.products;
 CREATE POLICY "Owner manages products" 
 ON public.products 
 FOR ALL TO authenticated 
@@ -100,6 +101,7 @@ USING (available = true);
 
 -- 5. FIX WAREHOUSES POLICIES - Allow create/update/delete for restaurant owners
 DROP POLICY IF EXISTS "users_can_manage_warehouses" ON public.warehouses;
+DROP POLICY IF EXISTS "Owner manages warehouses" ON public.warehouses;
 CREATE POLICY "Owner manages warehouses" 
 ON public.warehouses 
 FOR ALL TO authenticated 
@@ -107,6 +109,7 @@ USING (public.is_restaurant_owner(auth.uid(), restaurant_id) OR public.has_role(
 WITH CHECK (public.is_restaurant_owner(auth.uid(), restaurant_id) OR public.has_role(auth.uid(), 'super_admin'::app_role));
 
 DROP POLICY IF EXISTS "users_can_view_warehouses" ON public.warehouses;
+DROP POLICY IF EXISTS "Owner views warehouses" ON public.warehouses;
 CREATE POLICY "Owner views warehouses" 
 ON public.warehouses 
 FOR SELECT TO authenticated 
@@ -114,6 +117,7 @@ USING (public.is_restaurant_owner(auth.uid(), restaurant_id) OR public.has_role(
 
 -- 6. FIX SUB_WAREHOUSES POLICIES
 DROP POLICY IF EXISTS "users_can_manage_sub_warehouses" ON public.sub_warehouses;
+DROP POLICY IF EXISTS "Owner manages sub_warehouses" ON public.sub_warehouses;
 CREATE POLICY "Owner manages sub_warehouses" 
 ON public.sub_warehouses 
 FOR ALL TO authenticated 
@@ -135,6 +139,7 @@ WITH CHECK (
 );
 
 DROP POLICY IF EXISTS "users_can_view_sub_warehouses" ON public.sub_warehouses;
+DROP POLICY IF EXISTS "Owner views sub_warehouses" ON public.sub_warehouses;
 CREATE POLICY "Owner views sub_warehouses" 
 ON public.sub_warehouses 
 FOR SELECT TO authenticated 
