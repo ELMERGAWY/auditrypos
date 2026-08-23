@@ -16,14 +16,14 @@ CREATE OR REPLACE FUNCTION public.adjust_product_stock(
   _reason text,
   _reference_id text
 )
-RETURNS void
+RETURNS boolean
 LANGUAGE plpgsql
 SECURITY DEFINER
 SET search_path = public
 AS $$
 BEGIN
   IF _product_id IS NULL OR COALESCE(_quantity, 0) = 0 THEN
-    RETURN;
+    RETURN false;
   END IF;
 
   -- Update product quantity - explicitly reference the products table
@@ -48,6 +48,8 @@ BEGIN
   VALUES (
     _product_id, _restaurant_id, ABS(_quantity), _movement_type, _reason, _reference_id
   );
+
+  RETURN true;
 END;
 $$;
 

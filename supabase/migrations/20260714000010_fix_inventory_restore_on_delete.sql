@@ -35,7 +35,7 @@ CREATE OR REPLACE FUNCTION public.adjust_product_stock(
   _reason text,
   _reference_id text
 )
-RETURNS void
+RETURNS boolean
 LANGUAGE plpgsql
 SECURITY DEFINER
 SET search_path TO 'public'
@@ -44,7 +44,7 @@ DECLARE
   v_qty numeric := ABS(COALESCE(_quantity, 0));
 BEGIN
   IF _product_id IS NULL OR v_qty = 0 OR _restaurant_id IS NULL THEN
-    RETURN;
+    RETURN false;
   END IF;
 
   IF EXISTS (
@@ -53,7 +53,7 @@ BEGIN
       AND product_id = _product_id
       AND type = _movement_type
   ) THEN
-    RETURN;
+    RETURN false;
   END IF;
 
   IF _movement_type = 'out' THEN
@@ -92,6 +92,8 @@ BEGIN
   ) VALUES (
     _product_id, _restaurant_id, v_qty, _movement_type, _reason, _reference_id
   );
+
+  RETURN true;
 END;
 $$;
 
