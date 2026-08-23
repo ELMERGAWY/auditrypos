@@ -1,18 +1,27 @@
--- Add 'service' as a valid product_type option for menu_items
--- First, check if the constraint exists and drop it if needed
+-- Add 'service' as a valid product_type option only when the legacy column exists.
 DO $$
 BEGIN
-    IF EXISTS (SELECT 1 FROM information_schema.table_constraints 
-               WHERE constraint_name = 'menu_items_product_type_check' 
-               AND table_name = 'menu_items') THEN
-        ALTER TABLE menu_items DROP CONSTRAINT menu_items_product_type_check;
+    IF EXISTS (
+      SELECT 1
+      FROM information_schema.columns
+      WHERE table_schema = 'public'
+        AND table_name = 'menu_items'
+        AND column_name = 'product_type'
+    ) THEN
+        IF EXISTS (
+          SELECT 1
+          FROM information_schema.table_constraints
+          WHERE constraint_schema = 'public'
+            AND constraint_name = 'menu_items_product_type_check'
+            AND table_name = 'menu_items'
+        ) THEN
+            ALTER TABLE public.menu_items DROP CONSTRAINT menu_items_product_type_check;
+        END IF;
+
+        ALTER TABLE public.menu_items
+          ADD CONSTRAINT menu_items_product_type_check
+          CHECK (product_type IN ('inventory', 'manufactured', 'service'));
+    ELSE
+        RAISE NOTICE 'menu_items.product_type is not installed; skipped service product type constraint';
     END IF;
 END $$;
-
--- Add the new check constraint that includes 'service'
-ALTER TABLE menu_items
-ADD CONSTRAINT menu_items_product_type_check 
-CHECK (product_type IN ('inventory', 'manufactured', 'service'));
-
--- Update existing items if needed (optional)
--- ALTER TABLE menu_items ALTER COLUMN product_type SET DEFAULT 'inventory';
