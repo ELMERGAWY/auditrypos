@@ -111,10 +111,10 @@ BEGIN
   IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE schemaname='public' AND tablename='manager_integrations' AND policyname='manager_integrations_manage') THEN
     CREATE POLICY manager_integrations_manage ON public.manager_integrations FOR ALL USING (
       public.has_role(auth.uid(), 'super_admin'::app_role)
-      OR (restaurant_id IN (SELECT public.auth_restaurant_ids()) AND public.has_role(auth.uid(), 'admin'::app_role))
+      OR public.is_restaurant_owner(auth.uid(), restaurant_id)
     ) WITH CHECK (
       public.has_role(auth.uid(), 'super_admin'::app_role)
-      OR (restaurant_id IN (SELECT public.auth_restaurant_ids()) AND public.has_role(auth.uid(), 'admin'::app_role))
+      OR public.is_restaurant_owner(auth.uid(), restaurant_id)
     );
   END IF;
   IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE schemaname='public' AND tablename='manager_entity_mappings' AND policyname='manager_entity_mappings_read') THEN
