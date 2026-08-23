@@ -221,51 +221,82 @@ ALTER TABLE kpi_results ENABLE ROW LEVEL SECURITY;
 ALTER TABLE marketing_revenues ENABLE ROW LEVEL SECURITY;
 ALTER TABLE marketing_expenses ENABLE ROW LEVEL SECURITY;
 
+-- RLS access helper. Older service schemas may not have restaurant_users;
+-- use dynamic SQL only when that optional table exists.
+CREATE OR REPLACE FUNCTION public.marketing_user_has_restaurant_access(
+  _user_id UUID,
+  _restaurant_id UUID
+)
+RETURNS BOOLEAN
+LANGUAGE plpgsql
+STABLE
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_allowed BOOLEAN := FALSE;
+BEGIN
+  IF public.is_restaurant_owner(_user_id, _restaurant_id)
+     OR public.has_role(_user_id, 'super_admin'::app_role) THEN
+    RETURN TRUE;
+  END IF;
+
+  IF to_regclass('public.restaurant_users') IS NOT NULL THEN
+    EXECUTE 'SELECT EXISTS (
+      SELECT 1 FROM public.restaurant_users
+      WHERE restaurant_id = $1 AND user_id = $2
+    )' INTO v_allowed USING _restaurant_id, _user_id;
+  END IF;
+
+  RETURN COALESCE(v_allowed, FALSE);
+END;
+$$;
+
 -- RLS Policies for contracts
 CREATE POLICY "Users can view contracts in their restaurant" ON contracts
-  FOR SELECT USING (restaurant_id IN (SELECT restaurant_id FROM restaurant_users WHERE user_id = auth.uid()));
+  FOR SELECT USING (public.marketing_user_has_restaurant_access(auth.uid(), restaurant_id));
 
 CREATE POLICY "Users can insert contracts in their restaurant" ON contracts
-  FOR INSERT WITH CHECK (restaurant_id IN (SELECT restaurant_id FROM restaurant_users WHERE user_id = auth.uid()));
+  FOR INSERT WITH CHECK (public.marketing_user_has_restaurant_access(auth.uid(), restaurant_id));
 
 CREATE POLICY "Users can update contracts in their restaurant" ON contracts
-  FOR UPDATE USING (restaurant_id IN (SELECT restaurant_id FROM restaurant_users WHERE user_id = auth.uid()));
+  FOR UPDATE USING (public.marketing_user_has_restaurant_access(auth.uid(), restaurant_id));
 
 CREATE POLICY "Users can delete contracts in their restaurant" ON contracts
-  FOR DELETE USING (restaurant_id IN (SELECT restaurant_id FROM restaurant_users WHERE user_id = auth.uid()));
+  FOR DELETE USING (public.marketing_user_has_restaurant_access(auth.uid(), restaurant_id));
 
 -- RLS Policies for marketing_projects
 CREATE POLICY "Users can view projects in their restaurant" ON marketing_projects
-  FOR SELECT USING (restaurant_id IN (SELECT restaurant_id FROM restaurant_users WHERE user_id = auth.uid()));
+  FOR SELECT USING (public.marketing_user_has_restaurant_access(auth.uid(), restaurant_id));
 
 CREATE POLICY "Users can insert projects in their restaurant" ON marketing_projects
-  FOR INSERT WITH CHECK (restaurant_id IN (SELECT restaurant_id FROM restaurant_users WHERE user_id = auth.uid()));
+  FOR INSERT WITH CHECK (public.marketing_user_has_restaurant_access(auth.uid(), restaurant_id));
 
 CREATE POLICY "Users can update projects in their restaurant" ON marketing_projects
-  FOR UPDATE USING (restaurant_id IN (SELECT restaurant_id FROM restaurant_users WHERE user_id = auth.uid()));
+  FOR UPDATE USING (public.marketing_user_has_restaurant_access(auth.uid(), restaurant_id));
 
 CREATE POLICY "Users can delete projects in their restaurant" ON marketing_projects
-  FOR DELETE USING (restaurant_id IN (SELECT restaurant_id FROM restaurant_users WHERE user_id = auth.uid()));
+  FOR DELETE USING (public.marketing_user_has_restaurant_access(auth.uid(), restaurant_id));
 
 -- RLS Policies for marketing_tasks
 CREATE POLICY "Users can view tasks in their restaurant" ON marketing_tasks
-  FOR SELECT USING (restaurant_id IN (SELECT restaurant_id FROM restaurant_users WHERE user_id = auth.uid()));
+  FOR SELECT USING (public.marketing_user_has_restaurant_access(auth.uid(), restaurant_id));
 
 CREATE POLICY "Users can insert tasks in their restaurant" ON marketing_tasks
-  FOR INSERT WITH CHECK (restaurant_id IN (SELECT restaurant_id FROM restaurant_users WHERE user_id = auth.uid()));
+  FOR INSERT WITH CHECK (public.marketing_user_has_restaurant_access(auth.uid(), restaurant_id));
 
 CREATE POLICY "Users can update tasks in their restaurant" ON marketing_tasks
-  FOR UPDATE USING (restaurant_id IN (SELECT restaurant_id FROM restaurant_users WHERE user_id = auth.uid()));
+  FOR UPDATE USING (public.marketing_user_has_restaurant_access(auth.uid(), restaurant_id));
 
 CREATE POLICY "Users can delete tasks in their restaurant" ON marketing_tasks
-  FOR DELETE USING (restaurant_id IN (SELECT restaurant_id FROM restaurant_users WHERE user_id = auth.uid()));
+  FOR DELETE USING (public.marketing_user_has_restaurant_access(auth.uid(), restaurant_id));
 
 -- RLS Policies for employee_messages
 CREATE POLICY "Users can view messages they sent or received" ON employee_messages
   FOR SELECT USING (
     sender_id = auth.uid() 
     OR receiver_id = auth.uid()
-    OR restaurant_id IN (SELECT restaurant_id FROM restaurant_users WHERE user_id = auth.uid())
+    OR public.marketing_user_has_restaurant_access(auth.uid(), restaurant_id)
   );
 
 CREATE POLICY "Users can insert messages" ON employee_messages
@@ -279,55 +310,55 @@ CREATE POLICY "Users can delete messages they sent" ON employee_messages
 
 -- RLS Policies for kpi_definitions
 CREATE POLICY "Users can view KPIs in their restaurant" ON kpi_definitions
-  FOR SELECT USING (restaurant_id IN (SELECT restaurant_id FROM restaurant_users WHERE user_id = auth.uid()));
+  FOR SELECT USING (public.marketing_user_has_restaurant_access(auth.uid(), restaurant_id));
 
 CREATE POLICY "Users can insert KPIs in their restaurant" ON kpi_definitions
-  FOR INSERT WITH CHECK (restaurant_id IN (SELECT restaurant_id FROM restaurant_users WHERE user_id = auth.uid()));
+  FOR INSERT WITH CHECK (public.marketing_user_has_restaurant_access(auth.uid(), restaurant_id));
 
 CREATE POLICY "Users can update KPIs in their restaurant" ON kpi_definitions
-  FOR UPDATE USING (restaurant_id IN (SELECT restaurant_id FROM restaurant_users WHERE user_id = auth.uid()));
+  FOR UPDATE USING (public.marketing_user_has_restaurant_access(auth.uid(), restaurant_id));
 
 CREATE POLICY "Users can delete KPIs in their restaurant" ON kpi_definitions
-  FOR DELETE USING (restaurant_id IN (SELECT restaurant_id FROM restaurant_users WHERE user_id = auth.uid()));
+  FOR DELETE USING (public.marketing_user_has_restaurant_access(auth.uid(), restaurant_id));
 
 -- RLS Policies for kpi_results
 CREATE POLICY "Users can view KPI results in their restaurant" ON kpi_results
-  FOR SELECT USING (restaurant_id IN (SELECT restaurant_id FROM restaurant_users WHERE user_id = auth.uid()));
+  FOR SELECT USING (public.marketing_user_has_restaurant_access(auth.uid(), restaurant_id));
 
 CREATE POLICY "Users can insert KPI results in their restaurant" ON kpi_results
-  FOR INSERT WITH CHECK (restaurant_id IN (SELECT restaurant_id FROM restaurant_users WHERE user_id = auth.uid()));
+  FOR INSERT WITH CHECK (public.marketing_user_has_restaurant_access(auth.uid(), restaurant_id));
 
 CREATE POLICY "Users can update KPI results in their restaurant" ON kpi_results
-  FOR UPDATE USING (restaurant_id IN (SELECT restaurant_id FROM restaurant_users WHERE user_id = auth.uid()));
+  FOR UPDATE USING (public.marketing_user_has_restaurant_access(auth.uid(), restaurant_id));
 
 CREATE POLICY "Users can delete KPI results in their restaurant" ON kpi_results
-  FOR DELETE USING (restaurant_id IN (SELECT restaurant_id FROM restaurant_users WHERE user_id = auth.uid()));
+  FOR DELETE USING (public.marketing_user_has_restaurant_access(auth.uid(), restaurant_id));
 
 -- RLS Policies for marketing_revenues
 CREATE POLICY "Users can view revenues in their restaurant" ON marketing_revenues
-  FOR SELECT USING (restaurant_id IN (SELECT restaurant_id FROM restaurant_users WHERE user_id = auth.uid()));
+  FOR SELECT USING (public.marketing_user_has_restaurant_access(auth.uid(), restaurant_id));
 
 CREATE POLICY "Users can insert revenues in their restaurant" ON marketing_revenues
-  FOR INSERT WITH CHECK (restaurant_id IN (SELECT restaurant_id FROM restaurant_users WHERE user_id = auth.uid()));
+  FOR INSERT WITH CHECK (public.marketing_user_has_restaurant_access(auth.uid(), restaurant_id));
 
 CREATE POLICY "Users can update revenues in their restaurant" ON marketing_revenues
-  FOR UPDATE USING (restaurant_id IN (SELECT restaurant_id FROM restaurant_users WHERE user_id = auth.uid()));
+  FOR UPDATE USING (public.marketing_user_has_restaurant_access(auth.uid(), restaurant_id));
 
 CREATE POLICY "Users can delete revenues in their restaurant" ON marketing_revenues
-  FOR DELETE USING (restaurant_id IN (SELECT restaurant_id FROM restaurant_users WHERE user_id = auth.uid()));
+  FOR DELETE USING (public.marketing_user_has_restaurant_access(auth.uid(), restaurant_id));
 
 -- RLS Policies for marketing_expenses
 CREATE POLICY "Users can view expenses in their restaurant" ON marketing_expenses
-  FOR SELECT USING (restaurant_id IN (SELECT restaurant_id FROM restaurant_users WHERE user_id = auth.uid()));
+  FOR SELECT USING (public.marketing_user_has_restaurant_access(auth.uid(), restaurant_id));
 
 CREATE POLICY "Users can insert expenses in their restaurant" ON marketing_expenses
-  FOR INSERT WITH CHECK (restaurant_id IN (SELECT restaurant_id FROM restaurant_users WHERE user_id = auth.uid()));
+  FOR INSERT WITH CHECK (public.marketing_user_has_restaurant_access(auth.uid(), restaurant_id));
 
 CREATE POLICY "Users can update expenses in their restaurant" ON marketing_expenses
-  FOR UPDATE USING (restaurant_id IN (SELECT restaurant_id FROM restaurant_users WHERE user_id = auth.uid()));
+  FOR UPDATE USING (public.marketing_user_has_restaurant_access(auth.uid(), restaurant_id));
 
 CREATE POLICY "Users can delete expenses in their restaurant" ON marketing_expenses
-  FOR DELETE USING (restaurant_id IN (SELECT restaurant_id FROM restaurant_users WHERE user_id = auth.uid()));
+  FOR DELETE USING (public.marketing_user_has_restaurant_access(auth.uid(), restaurant_id));
 
 -- Force schema cache reload
 NOTIFY pgrst, 'reload schema';
