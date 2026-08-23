@@ -3,6 +3,10 @@
 -- PHASE 2: ATOMIC INVENTORY & WEIGHTED AVERAGE COST ENGINE
 -- ============================================================
 
+-- Older inventory movement tables may not have a human-readable reference number.
+ALTER TABLE public.inventory_movements
+  ADD COLUMN IF NOT EXISTS reference_number TEXT;
+
 CREATE OR REPLACE FUNCTION public._inv_lock_balance(
   p_item_id UUID,
   p_sub_warehouse_id UUID
