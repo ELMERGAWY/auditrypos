@@ -1,0 +1,67 @@
+name: Supabase Migration History Repair
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm_repair:
+        description: 'Type REPAIR_KNOWN_HISTORY to reconcile the known production history drift'
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: supabase-history-repair-production
+  cancel-in-progress: false
+
+jobs:
+  repair:
+    if: ${{ inputs.confirm_repair == 'REPAIR_KNOWN_HISTORY' }}
+    runs-on: ubuntu-latest
+    environment: production
+    timeout-minutes: 10
+    env:
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+      SUPABASE_PROJECT_ID: ${{ secrets.SUPABASE_PROJECT_ID }}
+
+    steps:
+      - name: Checkout exact commit
+        uses: actions/checkout@v4
+
+      - name: Validate production target
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$SUPABASE_PROJECT_ID" = "uwdjijaqawnlcoyaorcr"
+          test -n "$SUPABASE_ACCESS_TOKEN"
+          test -n "$SUPABASE_DB_PASSWORD"
+
+      - name: Setup Supabase CLI
+        uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Link production project
+        run: supabase link --project-ref "$SUPABASE_PROJECT_ID" --password "$SUPABASE_DB_PASSWORD"
+
+      - name: Repair only known history metadata
+        shell: bash
+        run: |
+          set -euo pipefail
+          # These versions are local-only in the repository but their schema
+          # objects were already reconciled in production. This updates only
+          # supabase_migrations.schema_migrations; it does not run SQL files.
+          supabase migration repair --status applied \
+            20250101000000 \
+            20250503000000 \
+            20250503000001 \
+            20250506000001 \
+            20250506000002 \
+            20250506000003 \
+            20260426240000 \
+            20260426250000
+
+      - name: Verify history alignment
+        run: supabase migration list
