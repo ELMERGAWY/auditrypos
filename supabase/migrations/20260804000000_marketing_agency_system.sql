@@ -56,10 +56,14 @@ CREATE TABLE IF NOT EXISTS marketing_projects (
     CONSTRAINT valid_project_dates CHECK (end_date IS NULL OR start_date IS NULL OR end_date >= start_date)
 );
 
-CREATE INDEX idx_marketing_projects_restaurant ON marketing_projects(restaurant_id);
-CREATE INDEX idx_marketing_projects_client ON marketing_projects(client_id);
-CREATE INDEX idx_marketing_projects_status ON marketing_projects(status);
-CREATE INDEX idx_marketing_projects_dates ON marketing_projects(start_date, end_date);
+-- Existing installations may have marketing_projects without client_id.
+ALTER TABLE public.marketing_projects
+  ADD COLUMN IF NOT EXISTS client_id UUID REFERENCES public.customers(id) ON DELETE SET NULL;
+
+CREATE INDEX IF NOT EXISTS idx_marketing_projects_restaurant ON marketing_projects(restaurant_id);
+CREATE INDEX IF NOT EXISTS idx_marketing_projects_client ON marketing_projects(client_id);
+CREATE INDEX IF NOT EXISTS idx_marketing_projects_status ON marketing_projects(status);
+CREATE INDEX IF NOT EXISTS idx_marketing_projects_dates ON marketing_projects(start_date, end_date);
 
 -- Project Tasks
 CREATE TABLE IF NOT EXISTS marketing_project_tasks (
