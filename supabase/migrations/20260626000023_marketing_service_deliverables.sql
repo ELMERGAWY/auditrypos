@@ -5,7 +5,8 @@ CREATE TABLE IF NOT EXISTS public.marketing_service_deliverables (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
   restaurant_id UUID REFERENCES public.restaurants(id) ON DELETE CASCADE,
   invoice_id UUID REFERENCES public.sales_invoices(id) ON DELETE CASCADE,
-  invoice_item_id UUID REFERENCES public.sales_invoice_items(id) ON DELETE CASCADE,
+  -- Optional in service schemas; sales_invoice_items is not installed everywhere.
+  invoice_item_id UUID,
   contract_id UUID REFERENCES public.marketing_contracts(id) ON DELETE CASCADE,
   quote_id UUID REFERENCES public.marketing_quotes(id) ON DELETE CASCADE,
   service_id UUID REFERENCES public.marketing_services(id) ON DELETE SET NULL,
