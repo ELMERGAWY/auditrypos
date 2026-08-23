@@ -20,26 +20,32 @@ WITH CHECK (
   )
 );
 
--- 2) Reaffirm strict owner-only policies for salary tables (drop super_admin bypass to guarantee salary/commission stays with true owner)
-DROP POLICY IF EXISTS owner_only_staff ON public.staff;
-CREATE POLICY owner_only_staff ON public.staff
-FOR ALL
-USING (
-  restaurant_id IN (SELECT r.id FROM public.restaurants r WHERE r.owner_id = auth.uid())
-)
-WITH CHECK (
-  restaurant_id IN (SELECT r.id FROM public.restaurants r WHERE r.owner_id = auth.uid())
-);
-
-DROP POLICY IF EXISTS restaurant_staff_owner_only ON public.restaurant_staff;
-CREATE POLICY restaurant_staff_owner_only ON public.restaurant_staff
-FOR ALL
-USING (
-  restaurant_id IN (SELECT r.id FROM public.restaurants r WHERE r.owner_id = auth.uid())
-)
-WITH CHECK (
-  restaurant_id IN (SELECT r.id FROM public.restaurants r WHERE r.owner_id = auth.uid())
-);
+-- 2) Reaffirm strict owner-only policies only for salary tables installed in this schema.
+DO $salary_policy_guard$
+DECLARE
+  v_table TEXT;
+  v_policy TEXT;
+BEGIN
+  FOR v_table, v_policy IN
+    SELECT * FROM (VALUES
+      ('staff', 'owner_only_staff'),
+      ('restaurant_staff', 'restaurant_staff_owner_only')
+    ) AS salary_tables(table_name, policy_name)
+  LOOP
+    IF to_regclass(format('public.%I', v_table)) IS NOT NULL THEN
+      EXECUTE format('DROP POLICY IF EXISTS %I ON public.%I', v_policy, v_table);
+      EXECUTE format(
+        'CREATE POLICY %I ON public.%I FOR ALL
+         USING (restaurant_id IN (SELECT r.id FROM public.restaurants r WHERE r.owner_id = auth.uid()))
+         WITH CHECK (restaurant_id IN (SELECT r.id FROM public.restaurants r WHERE r.owner_id = auth.uid()))',
+        v_policy, v_table
+      );
+    ELSE
+      RAISE NOTICE '% is not installed; skipped salary policy', v_table;
+    END IF;
+  END LOOP;
+END;
+$salary_policy_guard$;
 
 -- 3) Set fixed search_path on all public functions currently missing one
 DO $$
