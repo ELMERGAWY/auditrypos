@@ -154,25 +154,41 @@ REVOKE ALL ON public.abandoned_carts FROM anon;
 GRANT SELECT, INSERT, UPDATE, DELETE ON public.abandoned_carts TO authenticated;
 GRANT ALL ON public.abandoned_carts TO service_role;
 
-ALTER TABLE public.customer_balances_backup ENABLE ROW LEVEL SECURITY;
-DROP POLICY IF EXISTS customer_balances_backup_owner_only ON public.customer_balances_backup;
-CREATE POLICY customer_balances_backup_owner_only ON public.customer_balances_backup
-  FOR ALL TO authenticated
-  USING (restaurant_id IN (SELECT public.auth_restaurant_ids()) OR public.has_role(auth.uid(), 'super_admin'::app_role))
-  WITH CHECK (restaurant_id IN (SELECT public.auth_restaurant_ids()) OR public.has_role(auth.uid(), 'super_admin'::app_role));
-REVOKE ALL ON public.customer_balances_backup FROM anon;
-GRANT SELECT ON public.customer_balances_backup TO authenticated;
-GRANT ALL ON public.customer_balances_backup TO service_role;
+DO $backup_balance_rls$
+BEGIN
+  IF to_regclass('public.customer_balances_backup') IS NOT NULL THEN
+    EXECUTE 'ALTER TABLE public.customer_balances_backup ENABLE ROW LEVEL SECURITY';
+    EXECUTE 'DROP POLICY IF EXISTS customer_balances_backup_owner_only ON public.customer_balances_backup';
+    EXECUTE $stmt$
+      CREATE POLICY customer_balances_backup_owner_only ON public.customer_balances_backup
+      FOR ALL TO authenticated
+      USING (restaurant_id IN (SELECT public.auth_restaurant_ids()) OR public.has_role(auth.uid(), 'super_admin'::app_role))
+      WITH CHECK (restaurant_id IN (SELECT public.auth_restaurant_ids()) OR public.has_role(auth.uid(), 'super_admin'::app_role))
+    $stmt$;
+    EXECUTE 'REVOKE ALL ON public.customer_balances_backup FROM anon';
+    EXECUTE 'GRANT SELECT ON public.customer_balances_backup TO authenticated';
+    EXECUTE 'GRANT ALL ON public.customer_balances_backup TO service_role';
+  ELSE
+    RAISE NOTICE 'customer_balances_backup is not installed; skipped optional RLS';
+  END IF;
 
-ALTER TABLE public.supplier_balances_backup ENABLE ROW LEVEL SECURITY;
-DROP POLICY IF EXISTS supplier_balances_backup_owner_only ON public.supplier_balances_backup;
-CREATE POLICY supplier_balances_backup_owner_only ON public.supplier_balances_backup
-  FOR ALL TO authenticated
-  USING (restaurant_id IN (SELECT public.auth_restaurant_ids()) OR public.has_role(auth.uid(), 'super_admin'::app_role))
-  WITH CHECK (restaurant_id IN (SELECT public.auth_restaurant_ids()) OR public.has_role(auth.uid(), 'super_admin'::app_role));
-REVOKE ALL ON public.supplier_balances_backup FROM anon;
-GRANT SELECT ON public.supplier_balances_backup TO authenticated;
-GRANT ALL ON public.supplier_balances_backup TO service_role;
+  IF to_regclass('public.supplier_balances_backup') IS NOT NULL THEN
+    EXECUTE 'ALTER TABLE public.supplier_balances_backup ENABLE ROW LEVEL SECURITY';
+    EXECUTE 'DROP POLICY IF EXISTS supplier_balances_backup_owner_only ON public.supplier_balances_backup';
+    EXECUTE $stmt$
+      CREATE POLICY supplier_balances_backup_owner_only ON public.supplier_balances_backup
+      FOR ALL TO authenticated
+      USING (restaurant_id IN (SELECT public.auth_restaurant_ids()) OR public.has_role(auth.uid(), 'super_admin'::app_role))
+      WITH CHECK (restaurant_id IN (SELECT public.auth_restaurant_ids()) OR public.has_role(auth.uid(), 'super_admin'::app_role))
+    $stmt$;
+    EXECUTE 'REVOKE ALL ON public.supplier_balances_backup FROM anon';
+    EXECUTE 'GRANT SELECT ON public.supplier_balances_backup TO authenticated';
+    EXECUTE 'GRANT ALL ON public.supplier_balances_backup TO service_role';
+  ELSE
+    RAISE NOTICE 'supplier_balances_backup is not installed; skipped optional RLS';
+  END IF;
+END;
+$backup_balance_rls$;
 
 ALTER TABLE public.unbalanced_journal_entries ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS unbalanced_journal_entries_admin_only ON public.unbalanced_journal_entries;
