@@ -190,15 +190,25 @@ BEGIN
 END;
 $backup_balance_rls$;
 
-ALTER TABLE public.unbalanced_journal_entries ENABLE ROW LEVEL SECURITY;
-DROP POLICY IF EXISTS unbalanced_journal_entries_admin_only ON public.unbalanced_journal_entries;
-CREATE POLICY unbalanced_journal_entries_admin_only ON public.unbalanced_journal_entries
-  FOR ALL TO authenticated
-  USING (public.has_role(auth.uid(), 'super_admin'::app_role))
-  WITH CHECK (public.has_role(auth.uid(), 'super_admin'::app_role));
-REVOKE ALL ON public.unbalanced_journal_entries FROM anon;
-GRANT SELECT ON public.unbalanced_journal_entries TO authenticated;
-GRANT ALL ON public.unbalanced_journal_entries TO service_role;
+DO $unbalanced_journal_rls$
+BEGIN
+  IF to_regclass('public.unbalanced_journal_entries') IS NOT NULL THEN
+    EXECUTE 'ALTER TABLE public.unbalanced_journal_entries ENABLE ROW LEVEL SECURITY';
+    EXECUTE 'DROP POLICY IF EXISTS unbalanced_journal_entries_admin_only ON public.unbalanced_journal_entries';
+    EXECUTE $stmt$
+      CREATE POLICY unbalanced_journal_entries_admin_only ON public.unbalanced_journal_entries
+      FOR ALL TO authenticated
+      USING (public.has_role(auth.uid(), 'super_admin'::app_role))
+      WITH CHECK (public.has_role(auth.uid(), 'super_admin'::app_role))
+    $stmt$;
+    EXECUTE 'REVOKE ALL ON public.unbalanced_journal_entries FROM anon';
+    EXECUTE 'GRANT SELECT ON public.unbalanced_journal_entries TO authenticated';
+    EXECUTE 'GRANT ALL ON public.unbalanced_journal_entries TO service_role';
+  ELSE
+    RAISE NOTICE 'unbalanced_journal_entries is not installed; skipped optional RLS';
+  END IF;
+END;
+$unbalanced_journal_rls$;
 
 -- 5. Tenant-scope all open marketing policies
 DO $$
