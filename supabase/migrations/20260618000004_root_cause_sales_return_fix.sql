@@ -5,24 +5,29 @@
 BEGIN;
 
 -- 1) Fix sales_return_items: ensure we have cost_price_at_return and set it from original order
-DO $$
+DO $compat$
 BEGIN
-  IF NOT EXISTS (
-    SELECT 1 FROM information_schema.columns
-    WHERE table_schema = 'public'
-    AND table_name = 'sales_return_items'
-    AND column_name = 'cost_price_at_return'
-  ) THEN
-    ALTER TABLE public.sales_return_items ADD COLUMN cost_price_at_return NUMERIC(15,2) DEFAULT 0;
-  END IF;
+  IF to_regclass('public.sales_return_items') IS NOT NULL THEN
+    IF NOT EXISTS (
+      SELECT 1 FROM information_schema.columns
+      WHERE table_schema = 'public'
+        AND table_name = 'sales_return_items'
+        AND column_name = 'cost_price_at_return'
+    ) THEN
+      EXECUTE 'ALTER TABLE public.sales_return_items ADD COLUMN cost_price_at_return NUMERIC(15,2) DEFAULT 0';
+    END IF;
 
-  -- Update existing sales_return_items with cost_price from order_items if possible
-  UPDATE public.sales_return_items sri
-  SET cost_price_at_return = COALESCE(oi.cost_price_snapshot, 0)
-  FROM public.order_items oi
-  WHERE sri.original_order_item_id = oi.id;
+    IF to_regclass('public.order_items') IS NOT NULL THEN
+      EXECUTE 'UPDATE public.sales_return_items sri
+        SET cost_price_at_return = COALESCE(oi.cost_price_snapshot, 0)
+        FROM public.order_items oi
+        WHERE sri.original_order_item_id = oi.id';
+    END IF;
+  ELSE
+    RAISE NOTICE 'Skipping sales_return_items compatibility work: table is not present in this module schema';
+  END IF;
 END
-$$;
+$compat$;
 
 -- 2) FINAL create_sales_return_journal_entry() - WITH INVENTORY UPDATE!
 CREATE OR REPLACE FUNCTION public.create_sales_return_journal_entry()
@@ -224,11 +229,19 @@ END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
 -- 3) Make sure we ALSO check the sales_returns table's original trigger exists
-DROP TRIGGER IF EXISTS trg_create_sales_return_journal ON public.sales_returns;
-CREATE TRIGGER trg_create_sales_return_journal
-BEFORE UPDATE OF status ON public.sales_returns
-FOR EACH ROW
-EXECUTE FUNCTION public.create_sales_return_journal_entry();
+DO $sales_return_trigger$
+BEGIN
+  IF to_regclass('public.sales_returns') IS NOT NULL THEN
+    EXECUTE 'DROP TRIGGER IF EXISTS trg_create_sales_return_journal ON public.sales_returns';
+    EXECUTE 'CREATE TRIGGER trg_create_sales_return_journal
+      BEFORE UPDATE OF status ON public.sales_returns
+      FOR EACH ROW
+      EXECUTE FUNCTION public.create_sales_return_journal_entry()';
+  ELSE
+    RAISE NOTICE 'Skipping sales_returns trigger: table is not present in this module schema';
+  END IF;
+END
+$sales_return_trigger$;
 
 -- 4) Quick sanity check: ensure customer_transactions exists
 DO $$
