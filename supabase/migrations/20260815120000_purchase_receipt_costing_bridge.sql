@@ -1,6 +1,93 @@
 -- AuditryPOS purchase receipt/costing bridge — additive, idempotent, data preserving.
 -- Purchase invoices remain drafts until goods are received through the RPC below.
 
+-- The new project may not have the legacy receipt tables. Create the minimal
+-- canonical structures additively so purchase receiving and costing can work.
+CREATE TABLE IF NOT EXISTS public.inventory_receipts (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  restaurant_id uuid NOT NULL REFERENCES public.restaurants(id) ON DELETE CASCADE,
+  workspace_id uuid REFERENCES public.workspaces(id) ON DELETE SET NULL,
+  receipt_number text NOT NULL,
+  supplier_id uuid REFERENCES public.suppliers(id) ON DELETE SET NULL,
+  receipt_date timestamptz NOT NULL DEFAULT now(),
+  total_amount numeric(15,4) NOT NULL DEFAULT 0,
+  paid_amount numeric(15,4) NOT NULL DEFAULT 0,
+  discount_amount numeric(15,4) NOT NULL DEFAULT 0,
+  tax_amount numeric(15,4) NOT NULL DEFAULT 0,
+  net_amount numeric(15,4) NOT NULL DEFAULT 0,
+  status text NOT NULL DEFAULT 'draft',
+  notes text,
+  created_by uuid REFERENCES auth.users(id) ON DELETE SET NULL,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  updated_at timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS public.inventory_receipt_items (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  inventory_receipt_id uuid NOT NULL REFERENCES public.inventory_receipts(id) ON DELETE CASCADE,
+  product_id uuid NOT NULL REFERENCES public.products(id) ON DELETE RESTRICT,
+  quantity numeric(15,4) NOT NULL DEFAULT 0,
+  unit_cost numeric(15,4) NOT NULL DEFAULT 0,
+  total_cost numeric(15,4) NOT NULL DEFAULT 0,
+  unit text,
+  warehouse_location text,
+  notes text,
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_inventory_receipts_restaurant
+  ON public.inventory_receipts(restaurant_id, receipt_date DESC);
+CREATE INDEX IF NOT EXISTS idx_inventory_receipts_workspace
+  ON public.inventory_receipts(workspace_id, receipt_date DESC);
+CREATE INDEX IF NOT EXISTS idx_inventory_receipt_items_receipt
+  ON public.inventory_receipt_items(inventory_receipt_id);
+
+ALTER TABLE public.inventory_receipts ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS inventory_receipts_tenant_access ON public.inventory_receipts;
+CREATE POLICY inventory_receipts_tenant_access ON public.inventory_receipts
+  FOR ALL TO authenticated
+  USING (
+    restaurant_id IN (SELECT public.auth_restaurant_ids())
+    OR public.has_role(auth.uid(), 'super_admin'::app_role)
+  )
+  WITH CHECK (
+    restaurant_id IN (SELECT public.auth_restaurant_ids())
+    OR public.has_role(auth.uid(), 'super_admin'::app_role)
+  );
+REVOKE ALL ON public.inventory_receipts FROM anon;
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.inventory_receipts TO authenticated;
+GRANT ALL ON public.inventory_receipts TO service_role;
+
+ALTER TABLE public.inventory_receipt_items ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS inventory_receipt_items_tenant_access ON public.inventory_receipt_items;
+CREATE POLICY inventory_receipt_items_tenant_access ON public.inventory_receipt_items
+  FOR ALL TO authenticated
+  USING (
+    EXISTS (
+      SELECT 1
+      FROM public.inventory_receipts ir
+      WHERE ir.id = inventory_receipt_id
+        AND (
+          ir.restaurant_id IN (SELECT public.auth_restaurant_ids())
+          OR public.has_role(auth.uid(), 'super_admin'::app_role)
+        )
+    )
+  )
+  WITH CHECK (
+    EXISTS (
+      SELECT 1
+      FROM public.inventory_receipts ir
+      WHERE ir.id = inventory_receipt_id
+        AND (
+          ir.restaurant_id IN (SELECT public.auth_restaurant_ids())
+          OR public.has_role(auth.uid(), 'super_admin'::app_role)
+        )
+    )
+  );
+REVOKE ALL ON public.inventory_receipt_items FROM anon;
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.inventory_receipt_items TO authenticated;
+GRANT ALL ON public.inventory_receipt_items TO service_role;
+
 ALTER TABLE public.purchase_invoices
   ADD COLUMN IF NOT EXISTS workspace_id uuid REFERENCES public.workspaces(id) ON DELETE SET NULL;
 
