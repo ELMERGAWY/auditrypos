@@ -277,12 +277,20 @@ EXCEPTION
 END;
 $$;
 
--- Recreate trigger
-DROP TRIGGER IF EXISTS trg_create_sales_return_journal ON public.sales_returns;
-CREATE TRIGGER trg_create_sales_return_journal
-BEFORE UPDATE OF status ON public.sales_returns
-FOR EACH ROW
-EXECUTE FUNCTION public.create_sales_return_journal_entry();
+-- Recreate trigger only when the optional sales_returns table exists.
+DO $sales_return_quantity_trigger_guard$
+BEGIN
+  IF to_regclass('public.sales_returns') IS NOT NULL THEN
+    EXECUTE 'DROP TRIGGER IF EXISTS trg_create_sales_return_journal ON public.sales_returns';
+    EXECUTE 'CREATE TRIGGER trg_create_sales_return_journal
+      BEFORE UPDATE OF status ON public.sales_returns
+      FOR EACH ROW
+      EXECUTE FUNCTION public.create_sales_return_journal_entry()';
+  ELSE
+    RAISE NOTICE 'sales_returns is not installed; skipped optional quantity-error trigger';
+  END IF;
+END;
+$sales_return_quantity_trigger_guard$;
 
 COMMIT;
 
