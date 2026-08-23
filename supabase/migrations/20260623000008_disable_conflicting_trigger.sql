@@ -8,8 +8,16 @@
 
 BEGIN;
 
--- Drop the conflicting trigger
-DROP TRIGGER IF EXISTS trg_post_sales_return_to_journal ON public.sales_returns;
+-- Drop the conflicting trigger only when the optional table exists.
+DO $trigger_setup$
+BEGIN
+  IF to_regclass('public.sales_returns') IS NOT NULL THEN
+    EXECUTE 'DROP TRIGGER IF EXISTS trg_post_sales_return_to_journal ON public.sales_returns';
+  ELSE
+    RAISE NOTICE 'sales_returns is not installed; skipping conflicting trigger removal';
+  END IF;
+END;
+$trigger_setup$;
 
 COMMIT;
 
