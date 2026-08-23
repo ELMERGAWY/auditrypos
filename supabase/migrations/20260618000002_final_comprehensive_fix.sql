@@ -10,6 +10,26 @@
 
 BEGIN;
 
+-- Compatibility repair for the production schema. Some historical versions
+-- use customers.current_balance instead of customers.balance. Add only missing
+-- columns, then preserve existing current_balance values when available.
+ALTER TABLE public.customers
+  ADD COLUMN IF NOT EXISTS balance NUMERIC NOT NULL DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS credit_limit NUMERIC NOT NULL DEFAULT 0;
+ALTER TABLE public.suppliers
+  ADD COLUMN IF NOT EXISTS balance NUMERIC NOT NULL DEFAULT 0;
+
+DO $compat$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_schema = 'public' AND table_name = 'customers' AND column_name = 'current_balance'
+  ) THEN
+    EXECUTE 'UPDATE public.customers SET balance = current_balance WHERE balance = 0 AND current_balance IS NOT NULL';
+  END IF;
+END
+$compat$;
+
 -- ────────────────────────────────────────────────────────────
 -- 1. FIX CUSTOMERS TABLE
 -- ────────────────────────────────────────────────────────────
