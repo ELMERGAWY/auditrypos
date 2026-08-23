@@ -1,0 +1,3 @@
+-- Historical placeholder only.
+-- Version was already applied in the production Supabase migration history.
+-- The original local file is unavailable; this no-op preserves history alignment.
