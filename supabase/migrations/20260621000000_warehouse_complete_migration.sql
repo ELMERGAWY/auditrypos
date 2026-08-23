@@ -454,6 +454,33 @@ CREATE TABLE IF NOT EXISTS inventory_movements (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
+-- Compatibility for the earlier inventory_movements shape. The legacy table
+-- may use product_id/warehouse_id instead of item_id/sub_warehouse_id.
+DO $movement_compat$
+BEGIN
+    IF to_regclass('public.inventory_movements') IS NOT NULL THEN
+        IF NOT EXISTS (
+            SELECT 1 FROM information_schema.columns
+            WHERE table_schema = 'public' AND table_name = 'inventory_movements' AND column_name = 'item_id'
+        ) THEN
+            ALTER TABLE public.inventory_movements ADD COLUMN item_id UUID;
+            IF EXISTS (
+                SELECT 1 FROM information_schema.columns
+                WHERE table_schema = 'public' AND table_name = 'inventory_movements' AND column_name = 'product_id'
+            ) THEN
+                EXECUTE 'UPDATE public.inventory_movements SET item_id = product_id WHERE item_id IS NULL';
+            END IF;
+        END IF;
+        IF NOT EXISTS (
+            SELECT 1 FROM information_schema.columns
+            WHERE table_schema = 'public' AND table_name = 'inventory_movements' AND column_name = 'sub_warehouse_id'
+        ) THEN
+            ALTER TABLE public.inventory_movements ADD COLUMN sub_warehouse_id UUID;
+        END IF;
+    END IF;
+END
+$movement_compat$;
+
 CREATE INDEX IF NOT EXISTS idx_inventory_movements_item ON inventory_movements(item_id);
 CREATE INDEX IF NOT EXISTS idx_inventory_movements_sub_warehouse ON inventory_movements(sub_warehouse_id);
 CREATE INDEX IF NOT EXISTS idx_inventory_movements_date ON inventory_movements(movement_date DESC);
