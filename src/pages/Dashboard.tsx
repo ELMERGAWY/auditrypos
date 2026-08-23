@@ -2,7 +2,7 @@
 // Final Force Sync for Lovable - 2026-06-06 19:15
 import { useState, useRef, useEffect, useCallback, Suspense, lazy, useMemo, memo } from 'react';
 import { format, startOfMonth, endOfDay } from 'date-fns';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   LayoutGrid, ShoppingCart, QrCode, Bell, Settings, LogOut, ChefHat,
@@ -151,6 +151,7 @@ function OpsHealthIndicator({ restaurantId, workspaceId }: { restaurantId?: stri
 }
 
 export default function Dashboard() {
+  const location = useLocation();
   const navigate = useNavigate();
   const { isSuperAdmin, adminChecked } = useAuth();
   const { i18n } = useTranslation();
@@ -174,6 +175,15 @@ export default function Dashboard() {
   // Basic State
   const [activeTab, setActiveTab] = useState<SidebarTab>('home');
   const [activeSubView, setActiveSubView] = useState<'stock' | 'bom'>('stock');
+
+  // Honor existing deep links while keeping all inventory concepts inside the
+  // scoped Dashboard tab. Unknown values are ignored rather than cast blindly.
+  useEffect(() => {
+    const requestedTab = new URLSearchParams(location.search).get('tab');
+    if (requestedTab === 'inventory' || requestedTab === 'pos' || requestedTab === 'crm' || requestedTab === 'settings') {
+      setActiveTab(requestedTab);
+    }
+  }, [location.search]);
   const [orderFilter, setOrderFilter] = useState<'all' | OrderStatus>('all');
   const [orderSearchQuery, setOrderSearchQuery] = useState('');
   const [dateRange, setDateRange] = useState({ from: startOfMonth(new Date()), to: endOfDay(new Date()) });
@@ -1038,7 +1048,7 @@ export default function Dashboard() {
         )}
         
         {/* Management Tabs */}
-        {activeTab === 'menu' && <MenuTab restaurant={restaurant} menuItems={menuItems} setMenuItems={setMenuItems} loadData={loadData} />}
+        {activeTab === 'menu' && <MenuTab restaurant={restaurant} workspaceId={activeWorkspaceId || undefined} menuItems={menuItems} setMenuItems={setMenuItems} loadData={loadData} />}
         {activeTab === 'employees' && <EmployeesTab {...commonProps} businessType={businessType} />}
         {activeTab === 'inventory' && <InventoryTab {...commonProps} businessType={businessType} />}
         {activeTab === 'inventory_receipts' && <InventoryReceiptsManager {...commonProps} />}
@@ -1100,7 +1110,7 @@ export default function Dashboard() {
         {activeTab === 'staff' && <StaffTab {...commonProps} />}
         {activeTab === 'payroll' && <PayrollTab {...commonProps} businessType={businessType} />}
         {activeTab === 'chat' && restaurant?.id && <EmployeeChat restaurantId={restaurant.id} />}
-        {activeTab === 'settings' && <SettingsTab restaurant={restaurant} businessType={businessType} profileName={profileName} user={user} agents={agents} isSuspended={isSuspended} isSuperAdmin={isSuperAdmin} loadData={loadData} />}
+        {activeTab === 'settings' && <SettingsTab restaurant={restaurant} businessType={businessType} profileName={profileName} user={user} agents={agents} isSuspended={isSuspended} isSuperAdmin={isSuperAdmin} workspaceId={activeWorkspaceId || undefined} loadData={loadData} />}
         {activeTab === 'notifications' && <NotificationsTab {...commonProps} />}
         {activeTab === 'qr' && restaurant?.id && (
           <div className="p-10 flex flex-col items-center justify-center space-y-8 h-full">

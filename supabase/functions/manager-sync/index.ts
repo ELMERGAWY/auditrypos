@@ -24,8 +24,8 @@ type Integration = {
 const corsHeaders = {
   'content-type': 'application/json',
   'cache-control': 'no-store',
-  'access-control-allow-origin': 'https://supabase.com',
-  'access-control-allow-headers': 'content-type, x-manager-sync-secret',
+  'access-control-allow-origin': '*',
+  'access-control-allow-headers': 'authorization, x-client-info, apikey, content-type, x-manager-sync-secret',
   'access-control-allow-methods': 'POST, OPTIONS',
 };
 
@@ -99,7 +99,6 @@ async function managerRequest(baseUrl: string, token: string, path: string, init
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response(null, { status: 204, headers: corsHeaders });
   const expected = Deno.env.get('MANAGER_SYNC_WORKER_SECRET');
-  if (!expected || getWorkerSecret(req) !== expected) return json({ error: 'unauthorized' }, 401);
   if (req.method !== 'POST') return json({ error: 'method_not_allowed' }, 405);
 
   const supabaseUrl = Deno.env.get('SUPABASE_URL');
@@ -122,6 +121,44 @@ Deno.serve(async (req) => {
   const url = new URL(req.url);
   const mode = url.searchParams.get('mode') || 'process';
   const limit = Math.min(Math.max(Number(url.searchParams.get('limit') || 25), 1), 100);
+  const requestedRestaurantId = url.searchParams.get('restaurant_id');
+  const requestedWorkspaceId = url.searchParams.get('workspace_id');
+  const isWorkerRequest = Boolean(expected) && getWorkerSecret(req) === expected;
+
+  // Manual requests come from the authenticated application and are restricted
+  // to one restaurant/workspace. Automated requests use the worker secret and
+  // may process all enabled tenants in the bounded batch.
+  if (!isWorkerRequest) {
+    if (!['manual', 'reconcile'].includes(mode) || !requestedRestaurantId) return json({ error: 'unauthorized' }, 401);
+    const authHeader = req.headers.get('authorization') || '';
+    const { data: authData, error: authError } = await admin.auth.getUser(authHeader.replace(/^Bearer\\s+/i, ''));
+    if (authError || !authData.user) return json({ error: 'unauthorized' }, 401);
+
+    const [{ data: owner }, { data: companyUsers }, { data: superAdmin }] = await Promise.all([
+      admin.from('restaurants').select('id').eq('id', requestedRestaurantId).eq('owner_id', authData.user.id).maybeSingle(),
+      admin.from('company_users').select('company_id').eq('user_id', authData.user.id).eq('is_active', true),
+      admin.from('user_roles').select('role').eq('user_id', authData.user.id).eq('role', 'super_admin').maybeSingle(),
+    ]);
+    const companyIds = (companyUsers || []).map((row: { company_id: string | null }) => row.company_id).filter(Boolean) as string[];
+    let membership = null;
+    if (companyIds.length > 0) {
+      const { data: companyRestaurant } = await admin.from('restaurants')
+        .select('id')
+        .eq('id', requestedRestaurantId)
+        .in('company_id', companyIds)
+        .maybeSingle();
+      membership = companyRestaurant;
+    }
+    if (!owner && !membership && !superAdmin) return json({ error: 'forbidden' }, 403);
+    if (requestedWorkspaceId) {
+      const { data: workspace } = await admin.from('workspaces')
+        .select('id')
+        .eq('id', requestedWorkspaceId)
+        .eq('restaurant_id', requestedRestaurantId)
+        .maybeSingle();
+      if (!workspace) return json({ error: 'invalid_workspace' }, 400);
+    }
+  }
 
   if (mode === 'health') {
     const { data: integrations, error } = await admin.from('manager_integrations')
@@ -152,7 +189,135 @@ Deno.serve(async (req) => {
     return json({ mode, checked: results.length, results });
   }
 
-  const { data: rows, error: claimError } = await admin.rpc('claim_manager_sync_outbox', { p_limit: limit });
+  if (mode === 'reconcile') {
+    if (!requestedRestaurantId) return json({ error: 'restaurant_id_required' }, 400);
+
+    let integrationQuery = admin.from('manager_integrations')
+      .select('id,restaurant_id,workspace_id,api_base_url,token_secret_ref,enabled,sync_mode')
+      .eq('restaurant_id', requestedRestaurantId)
+      .eq('enabled', true)
+      .neq('sync_mode', 'disabled');
+    integrationQuery = requestedWorkspaceId
+      ? integrationQuery.or(`workspace_id.eq.${requestedWorkspaceId},workspace_id.is.null`)
+      : integrationQuery.is('workspace_id', null);
+    const { data: integrationRows, error: integrationLookupError } = await integrationQuery
+      .order('updated_at', { ascending: false })
+      .limit(1);
+    if (integrationLookupError || !integrationRows?.[0]) return json({ error: 'integration_lookup_failed' }, 500);
+
+    const integration = integrationRows[0] as Integration;
+    const runInsert = await admin.from('manager_sync_runs').insert({
+      integration_id: integration.id,
+      restaurant_id: requestedRestaurantId,
+      workspace_id: requestedWorkspaceId || null,
+      run_type: 'reconcile',
+      status: 'running',
+      summary: {},
+    }).select('id').maybeSingle();
+    const runId = runInsert.data?.id;
+
+    try {
+      const baseUrl = validateBaseUrl(integration.api_base_url);
+      const managerToken = resolveManagerToken(integration);
+      if (!managerToken) throw new Error('manager token missing for integration');
+
+      const definitions = [
+        { entityType: 'customer', path: '/customers?pageSize=100', listKey: 'customers' },
+        { entityType: 'supplier', path: '/suppliers?pageSize=100', listKey: 'suppliers' },
+        { entityType: 'inventory_item', path: '/inventory-items?pageSize=100', listKey: 'inventoryItems' },
+        { entityType: 'account', path: '/chart-of-accounts?pageSize=100', listKey: 'chartOfAccounts' },
+        { entityType: 'division', path: '/divisions?pageSize=100', listKey: 'divisions' },
+      ] as const;
+      const summary: Record<string, unknown> = { entities: {}, conflicts: 0, unmapped_manager_records: 0 };
+
+      for (const definition of definitions) {
+        const result = await managerRequest(baseUrl, managerToken, definition.path);
+        if (!result.ok) throw new Error(`${definition.entityType}_list_http_${result.status}`);
+        const body = result.body && typeof result.body === 'object' ? result.body as Record<string, unknown> : {};
+        const rows = Array.isArray(body[definition.listKey]) ? body[definition.listKey] as Record<string, unknown>[] : [];
+        const totalRecords = Number(body.totalRecords);
+        const listIsComplete = Number.isFinite(totalRecords) ? rows.length >= totalRecords : rows.length < 100;
+        const remoteByKey = new Map(rows.map((row) => [String(row.key || row.id || ''), row]).filter(([key]) => Boolean(key)));
+
+        let mappingQuery = admin.from('manager_entity_mappings')
+          .select('id,manager_key,manager_name,sync_status')
+          .eq('integration_id', integration.id)
+          .eq('restaurant_id', requestedRestaurantId)
+          .eq('entity_type', definition.entityType);
+        if (requestedWorkspaceId) {
+          mappingQuery = mappingQuery.or(`workspace_id.eq.${requestedWorkspaceId},workspace_id.is.null`);
+        }
+        const { data: mappings, error: mappingError } = await mappingQuery;
+        if (mappingError) throw new Error(`${definition.entityType}_mapping_lookup_failed`);
+
+        let conflicts = 0;
+        let mapped = 0;
+        for (const mapping of (mappings || []) as { id: string; manager_key: string; manager_name: string | null; sync_status: string }[]) {
+          const remote = remoteByKey.get(mapping.manager_key);
+          if (!remote) {
+            // A paginated response is not evidence that a Manager record was
+            // deleted. Only flag missing mappings when the full collection was
+            // returned; otherwise leave the existing mapping untouched.
+            if (listIsComplete) {
+              conflicts += 1;
+              await admin.from('manager_entity_mappings').update({
+                sync_status: 'conflict',
+                last_error: 'Manager record was not returned by the complete list; review before deletion',
+                updated_at: new Date().toISOString(),
+              }).eq('id', mapping.id);
+            }
+            continue;
+          }
+
+          mapped += 1;
+          const remoteName = String(remote.name || remote.itemName || remote.code || remote.key || mapping.manager_key);
+          await admin.from('manager_entity_mappings').update({
+            manager_name: remoteName,
+            sync_status: 'synced',
+            last_error: null,
+            updated_at: new Date().toISOString(),
+          }).eq('id', mapping.id);
+        }
+
+        const unmapped = listIsComplete ? Math.max((Number.isFinite(totalRecords) ? totalRecords : remoteByKey.size) - mapped, 0) : null;
+        if (unmapped !== null) conflicts += unmapped;
+        summary.entities = { ...(summary.entities as Record<string, unknown>), [definition.entityType]: { remote: Number.isFinite(totalRecords) ? totalRecords : remoteByKey.size, mapped, unmapped, complete: listIsComplete, conflicts } };
+        summary.conflicts = Number(summary.conflicts || 0) + conflicts;
+        if (unmapped !== null) summary.unmapped_manager_records = Number(summary.unmapped_manager_records || 0) + unmapped;
+      }
+
+      if (runId) await admin.from('manager_sync_runs').update({
+        status: 'completed',
+        finished_at: new Date().toISOString(),
+        processed_count: definitions.length,
+        succeeded_count: definitions.length,
+        failed_count: 0,
+        summary,
+      }).eq('id', runId);
+      return json({ mode, integration_id: integration.id, ...summary });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'reconcile failed';
+      if (runId) await admin.from('manager_sync_runs').update({
+        status: 'failed',
+        finished_at: new Date().toISOString(),
+        failed_count: 1,
+        error_message: message,
+      }).eq('id', runId);
+      return json({ error: 'reconcile_failed', detail: message }, 502);
+    }
+  }
+
+  const claimArgs = requestedRestaurantId
+    ? {
+        p_restaurant_id: requestedRestaurantId,
+        p_workspace_id: requestedWorkspaceId || null,
+        p_limit: limit,
+      }
+    : { p_limit: limit };
+  const claimRpc = requestedRestaurantId
+    ? 'claim_manager_sync_outbox_for_tenant'
+    : 'claim_manager_sync_outbox';
+  const { data: rows, error: claimError } = await admin.rpc(claimRpc, claimArgs);
   if (claimError) return json({ error: 'outbox_claim_failed' }, 500);
 
   const summary = { claimed: (rows || []).length, posted: 0, failed: 0, dry_run: 0 };
@@ -165,12 +330,35 @@ Deno.serve(async (req) => {
       integrationQuery = row.workspace_id === null
         ? integrationQuery.is('workspace_id', null)
         : integrationQuery.eq('workspace_id', row.workspace_id);
-      const { data: integration, error: integrationError } = await integrationQuery.single();
+      let { data: integration, error: integrationError } = await integrationQuery.maybeSingle();
+
+      // A restaurant-level Manager integration is the supported fallback for
+      // workspace-scoped outbox rows. The row remains workspace-scoped for
+      // auditing and idempotency; only the connection metadata is shared.
+      if ((!integration || integrationError) && row.workspace_id !== null) {
+        const fallback = await admin.from('manager_integrations')
+          .select('id,restaurant_id,workspace_id,api_base_url,token_secret_ref,enabled,sync_mode')
+          .eq('id', row.integration_id)
+          .eq('restaurant_id', row.restaurant_id)
+          .is('workspace_id', null)
+          .maybeSingle();
+        integration = fallback.data;
+        integrationError = fallback.error;
+      }
       if (integrationError || !integration) throw new Error('integration_not_found');
       const settings = integration as Integration;
       if (!settings.enabled || settings.sync_mode === 'disabled') throw new Error('integration_disabled');
+      if (settings.sync_mode === 'live') throw new Error('direct_live_mode_disabled_use_outbox');
       if (settings.sync_mode === 'dry_run') {
-        await admin.from('manager_sync_outbox').update({ status: 'posted', response_status: 0, response_body: { dry_run: true }, updated_at: new Date().toISOString() }).eq('id', row.id);
+        // Dry-run is a safety hold, not a successful delivery. Keep the event
+        // pending so switching the integration to outbox cannot lose history.
+        await admin.from('manager_sync_outbox').update({
+          status: 'pending',
+          available_at: new Date(Date.now() + 15 * 60 * 1000).toISOString(),
+          response_status: 0,
+          response_body: { dry_run: true },
+          updated_at: new Date().toISOString(),
+        }).eq('id', row.id);
         summary.dry_run += 1;
         continue;
       }

@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { Store, Shield, Percent, Lock, Building2, BookOpen, Share2, Printer, Palette } from 'lucide-react';
+import { Store, Shield, Percent, Lock, Building2, BookOpen, Share2, Printer, Palette, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -24,6 +24,7 @@ interface SettingsTabProps {
   agents: any[];
   isSuspended: boolean;
   isSuperAdmin: boolean;
+  workspaceId?: string | null;
   loadData: () => void;
 }
 
@@ -35,12 +36,17 @@ export function SettingsTab({
   agents,
   isSuspended,
   isSuperAdmin,
+  workspaceId,
   loadData
 }: SettingsTabProps) {
   const navigate = useNavigate();
   const [activeSubTab, setActiveSubTab] = useState<'profile' | 'roles' | 'taxes' | 'accounting' | 'marketing' | 'storefront' | 'appearance' | 'audit' | 'print'>('profile');
   const [storefrontSaving, setStorefrontSaving] = useState(false);
   const [storefrontConfig, setStorefrontConfig] = useState<any>({});
+  const [managerSyncing, setManagerSyncing] = useState(false);
+  const [managerSyncSummary, setManagerSyncSummary] = useState<{ claimed?: number; posted?: number; failed?: number; dry_run?: number; requeued?: number; queued?: number } | null>(null);
+  const [managerReconciling, setManagerReconciling] = useState(false);
+  const [managerReconcileSummary, setManagerReconcileSummary] = useState<{ conflicts?: number; unmapped_manager_records?: number } | null>(null);
 
   useEffect(() => {
     setStorefrontConfig(restaurant?.storefront_config || {});
@@ -63,6 +69,61 @@ export function SettingsTab({
       toast.error('تعذر حفظ إعدادات المتجر: ' + (error?.message || 'تحقق من migration المتجر'));
     } finally {
       setStorefrontSaving(false);
+    }
+  };
+
+  const handleManagerSync = async () => {
+    if (!restaurant?.id || managerSyncing) return;
+    setManagerSyncing(true);
+    setManagerSyncSummary(null);
+    try {
+      const { data: requestData, error: requestError } = await (supabase as any).rpc('request_manager_sync', {
+        p_restaurant_id: restaurant.id,
+        p_workspace_id: workspaceId || null,
+      });
+      if (requestError) throw requestError;
+
+      const query = new URLSearchParams({
+        mode: 'manual',
+        limit: '50',
+        restaurant_id: restaurant.id,
+      });
+      if (workspaceId) query.set('workspace_id', workspaceId);
+      const { data: workerData, error: workerError } = await supabase.functions.invoke(`manager-sync?${query.toString()}`, { body: {} });
+      if (workerError) throw workerError;
+
+      setManagerSyncSummary({
+        ...(requestData || {}),
+        ...(workerData || {}),
+      });
+      toast.success('تم تشغيل المزامنة المؤجلة؛ ستتم إعادة المحاولة تلقائياً عند فشل الاتصال');
+    } catch (error: any) {
+      console.error('[settings] Manager sync request failed:', error);
+      toast.error('تعذر تشغيل المزامنة: ' + (error?.message || 'تحقق من إعداد التكامل والـ migration'));
+    } finally {
+      setManagerSyncing(false);
+    }
+  };
+
+  const handleManagerReconcile = async () => {
+    if (!restaurant?.id || managerReconciling) return;
+    setManagerReconciling(true);
+    setManagerReconcileSummary(null);
+    try {
+      const query = new URLSearchParams({
+        mode: 'reconcile',
+        restaurant_id: restaurant.id,
+      });
+      if (workspaceId) query.set('workspace_id', workspaceId);
+      const { data, error } = await supabase.functions.invoke(`manager-sync?${query.toString()}`, { body: {} });
+      if (error) throw error;
+      setManagerReconcileSummary(data || {});
+      toast.success('اكتملت مراجعة Manager؛ لم يتم تعديل الأرصدة أو الطلبات تلقائياً');
+    } catch (error: any) {
+      console.error('[settings] Manager reconcile failed:', error);
+      toast.error('تعذر مراجعة Manager: ' + (error?.message || 'تحقق من الإعدادات'));
+    } finally {
+      setManagerReconciling(false);
     }
   };
 
@@ -213,6 +274,35 @@ export function SettingsTab({
                   </div>
                 </div>
               )}
+
+              <div className="pt-4 border-t border-border mt-2 space-y-2">
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <p className="font-semibold">مزامنة Manager</p>
+                    <p className="text-xs text-muted-foreground">مزامنة مؤجلة عبر الطابور؛ لا تعطل البيع أو التشغيل أوفلاين.</p>
+                  </div>
+                  <div className="flex flex-wrap justify-end gap-2">
+                    <Button type="button" variant="outline" onClick={handleManagerReconcile} disabled={managerReconciling} className="gap-2 shrink-0">
+                      <RefreshCw className={`w-4 h-4 ${managerReconciling ? 'animate-spin' : ''}`} />
+                      {managerReconciling ? 'جاري الفحص...' : 'فحص Manager'}
+                    </Button>
+                    <Button type="button" variant="outline" onClick={handleManagerSync} disabled={managerSyncing} className="gap-2 shrink-0">
+                      <RefreshCw className={`w-4 h-4 ${managerSyncing ? 'animate-spin' : ''}`} />
+                      {managerSyncing ? 'جاري المزامنة...' : 'مزامنة الآن'}
+                    </Button>
+                  </div>
+                </div>
+                {managerSyncSummary && (
+                  <p className="text-xs text-muted-foreground">
+                    الطابور: {managerSyncSummary.queued ?? 0} | تمت المعالجة: {managerSyncSummary.claimed ?? 0} | نجحت: {managerSyncSummary.posted ?? 0} | فشلت: {managerSyncSummary.failed ?? 0} | تجريبي: {managerSyncSummary.dry_run ?? 0}
+                  </p>
+                )}
+                {managerReconcileSummary && (
+                  <p className="text-xs text-muted-foreground">
+                    نتيجة الفحص: تعارضات {managerReconcileSummary.conflicts ?? 0} | سجلات Manager غير مربوطة {managerReconcileSummary.unmapped_manager_records ?? 0}
+                  </p>
+                )}
+              </div>
 
               {/* Super Admin Portal Link */}
               {isSuperAdmin && (

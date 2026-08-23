@@ -1,9 +1,9 @@
-import { lazy, Suspense, Component, type ReactNode, type ErrorInfo } from "react";
+import { lazy, Suspense, Component, useEffect, type ReactNode, type ErrorInfo } from "react";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Routes, Route, useNavigate } from "react-router-dom";
 import { AuthProvider } from "@/lib/AuthContext";
 import { RefreshCcw } from "lucide-react";
 import { GlobalCommandPalette } from "@/components/GlobalCommandPalette";
@@ -20,9 +20,7 @@ const SuperAdmin = lazy(() => import("./pages/SuperAdmin"));
 const DriverLogin = lazy(() => import("./pages/DriverLogin"));
 const DriverDashboard = lazy(() => import("./pages/DriverDashboard"));
 const TrackOrder = lazy(() => import("./pages/TrackOrder"));
-const Warehouses = lazy(() => import("./pages/Warehouses"));
-const SubWarehouses = lazy(() => import("./pages/SubWarehouses"));
-const InventoryTransfers = lazy(() => import("./pages/InventoryTransfers"));
+
 const NotFound = lazy(() => import("./pages/NotFound"));
 const OAuthConsent = lazy(() => import("./pages/OAuthConsent"));
 const StaffLogin = lazy(() => import("./pages/StaffLogin"));
@@ -35,6 +33,16 @@ const LoadingFallback = () => (
     <RefreshCcw className="w-10 h-10 animate-spin text-primary" />
   </div>
 );
+
+// Backward-compatible bridge: legacy inventory URLs must use the scoped Dashboard
+// flow instead of keeping a second, unsafe data path alive.
+const LegacyInventoryRedirect = () => {
+  const navigate = useNavigate();
+  useEffect(() => {
+    navigate('/dashboard?tab=inventory', { replace: true });
+  }, [navigate]);
+  return <LoadingFallback />;
+};
 
 class AppErrorBoundary extends Component<{ children: ReactNode }, { hasError: boolean; message: string }> {
   state = { hasError: false, message: '' };
@@ -78,9 +86,9 @@ const App = () => (
               <Route path="/staff-login" element={<StaffLogin />} />
               <Route path="/register" element={<Register />} />
               <Route path="/dashboard" element={<Dashboard />} />
-              <Route path="/warehouses" element={<Warehouses />} />
-              <Route path="/sub-warehouses" element={<SubWarehouses />} />
-              <Route path="/inventory-transfers" element={<InventoryTransfers />} />
+              <Route path="/warehouses" element={<LegacyInventoryRedirect />} />
+              <Route path="/sub-warehouses" element={<LegacyInventoryRedirect />} />
+              <Route path="/inventory-transfers" element={<LegacyInventoryRedirect />} />
               <Route path="/qr-menu/:restaurantId" element={<QRMenu />} />
               <Route path="/store/:restaurantId" element={<StoreFront />} />
               <Route path="/payment" element={<Payment />} />

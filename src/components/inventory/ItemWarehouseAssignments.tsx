@@ -23,6 +23,7 @@ interface SubWarehouse {
   name: string;
   name_ar: string;
   warehouse_id: string;
+  workspace_id?: string | null;
 }
 
 interface ItemWarehouseAssignment {
@@ -50,6 +51,7 @@ interface ItemWarehouseAssignment {
 interface ItemWarehouseAssignmentsProps {
   itemId: string;
   itemName?: string;
+  workspaceId?: string | null;
 }
 
 const costingMethodLabels: Record<CostingMethod, string> = {
@@ -74,7 +76,7 @@ const inventoryValuationRuleLabels: Record<InventoryValuationRule, string> = {
   GAAP_LIFO: 'GAAP LIFO'
 };
 
-export function ItemWarehouseAssignments({ itemId, itemName }: ItemWarehouseAssignmentsProps) {
+export function ItemWarehouseAssignments({ itemId, itemName, workspaceId }: ItemWarehouseAssignmentsProps) {
   const [assignments, setAssignments] = useState<ItemWarehouseAssignment[]>([]);
   const [subWarehouses, setSubWarehouses] = useState<SubWarehouse[]>([]);
   const [loading, setLoading] = useState(true);
@@ -102,16 +104,18 @@ export function ItemWarehouseAssignments({ itemId, itemName }: ItemWarehouseAssi
       fetchAssignments();
       fetchSubWarehouses();
     }
-  }, [itemId]);
+  }, [itemId, workspaceId]);
 
   const fetchAssignments = async () => {
     try {
       setLoading(true);
-      const { data, error } = await supabase
+      let query = supabase
         .from('item_warehouse_assignments')
         .select('*, sub_warehouse:sub_warehouses(*)')
         .eq('item_id', itemId)
         .order('created_at', { ascending: false });
+      if (workspaceId) query = query.eq('workspace_id', workspaceId);
+      const { data, error } = await query;
 
       if (error) throw error;
       setAssignments(data || []);
@@ -125,11 +129,13 @@ export function ItemWarehouseAssignments({ itemId, itemName }: ItemWarehouseAssi
 
   const fetchSubWarehouses = async () => {
     try {
-      const { data, error } = await supabase
+      let query = supabase
         .from('sub_warehouses')
         .select('*')
         .eq('is_active', true)
         .order('name_ar', { ascending: true });
+      if (workspaceId) query = query.eq('workspace_id', workspaceId);
+      const { data, error } = await query;
 
       if (error) throw error;
       setSubWarehouses(data || []);
@@ -198,10 +204,13 @@ export function ItemWarehouseAssignments({ itemId, itemName }: ItemWarehouseAssi
     if (!confirm('هل أنت متأكد من حذف هذا الارتباط؟')) return;
 
     try {
-      const { error } = await supabase
+      let query = supabase
         .from('item_warehouse_assignments')
         .delete()
-        .eq('id', id);
+        .eq('id', id)
+        .eq('item_id', itemId);
+      if (workspaceId) query = query.eq('workspace_id', workspaceId);
+      const { error } = await query;
 
       if (error) throw error;
 

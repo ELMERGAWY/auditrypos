@@ -1,5 +1,5 @@
 // @ts-nocheck
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Package, Plus, Search, AlertTriangle, Edit2, Trash2, 
@@ -159,7 +159,9 @@ export function InventoryTab({ restaurantId, workspaceId, currency, businessType
   });
   const [filterCategory, setFilterCategory] = useState('all');
   const [warehouseStocks, setWarehouseStocks] = useState<any[]>([]);
-  const [activeWarehouse, setActiveWarehouse] = useState<string>(() => localStorage.getItem(`inv_active_wh_${restaurantId}`) || 'all');
+  const activeWarehouseStorageKey = `inv_active_wh_${restaurantId}_${workspaceId || 'default'}`;
+  const activeWarehouseStorageKeyRef = useRef(activeWarehouseStorageKey);
+  const [activeWarehouse, setActiveWarehouse] = useState<string>(() => localStorage.getItem(activeWarehouseStorageKey) || 'all');
   const [projects, setProjects] = useState<any[]>([]);
   const [selectedProjectId, setSelectedProjectId] = useState<string>('');
   const [itemTypes, setItemTypes] = useState<ItemType[]>([]);
@@ -237,8 +239,14 @@ export function InventoryTab({ restaurantId, workspaceId, currency, businessType
   }, [restaurantId, workspaceId]);
 
   useEffect(() => {
-    if (restaurantId) localStorage.setItem(`inv_active_wh_${restaurantId}`, activeWarehouse);
-  }, [activeWarehouse, restaurantId]);
+    if (!restaurantId) return;
+    if (activeWarehouseStorageKeyRef.current !== activeWarehouseStorageKey) {
+      activeWarehouseStorageKeyRef.current = activeWarehouseStorageKey;
+      setActiveWarehouse(localStorage.getItem(activeWarehouseStorageKey) || 'all');
+      return;
+    }
+    localStorage.setItem(activeWarehouseStorageKey, activeWarehouse);
+  }, [activeWarehouse, restaurantId, activeWarehouseStorageKey]);
 
   // Products are scoped to the selected warehouse: an item that lives in another
   // warehouse never leaks into this one, even if the name matches.
@@ -588,22 +596,10 @@ export function InventoryTab({ restaurantId, workspaceId, currency, businessType
   const startEdit = async (p: Product) => {
     setEditingProduct(p);
     
-    // A product can legitimately have balances in multiple warehouses.
-    // Never use maybeSingle() here; it throws when more than one balance exists.
-    let warehouseId = p.warehouse_id || '';
-    try {
-      let stockQuery = supabase
-        .from('warehouse_stock')
-        .select('warehouse_id')
-        .eq('product_id', p.id)
-        .order('quantity', { ascending: false })
-        .limit(1);
-      if (workspaceId) stockQuery = stockQuery.eq('workspace_id', workspaceId);
-      const { data: stockRows } = await stockQuery;
-      warehouseId = stockRows?.[0]?.warehouse_id || warehouseId;
-    } catch (e) {
-      console.error('Error fetching warehouse assignment:', e);
-    }
+    // A product may legitimately have balances in multiple warehouses.
+    // Never infer its routing from the warehouse with the highest quantity.
+    // Warehouse routing is managed by the explicit assignment panel.
+    const warehouseId = p.warehouse_id || '';
     
     const { data: packagingData } = await supabase
       .from('product_packaging_levels')
