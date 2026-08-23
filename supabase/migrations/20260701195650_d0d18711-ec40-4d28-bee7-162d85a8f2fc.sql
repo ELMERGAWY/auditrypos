@@ -1,7 +1,14 @@
 
 ALTER TABLE public.orders ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.order_items ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.sales_orders ENABLE ROW LEVEL SECURITY;
+DO $$
+BEGIN
+  IF to_regclass('public.sales_orders') IS NOT NULL THEN
+    ALTER TABLE public.sales_orders ENABLE ROW LEVEL SECURITY;
+  ELSE
+    RAISE NOTICE 'sales_orders is not installed; skipped RLS enablement';
+  END IF;
+END $$;
 ALTER TABLE public.warehouses ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.sub_warehouses ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.item_warehouse_assignments ENABLE ROW LEVEL SECURITY;
