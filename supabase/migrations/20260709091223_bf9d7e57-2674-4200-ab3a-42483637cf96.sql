@@ -44,7 +44,11 @@ BEGIN
     'expense_vouchers','orders','inventory_receipts','journal_entries'
   ]
   LOOP
-    EXECUTE format('ALTER TABLE public.%I ADD COLUMN IF NOT EXISTS created_by_name TEXT', t);
-    EXECUTE format('ALTER TABLE public.%I ADD COLUMN IF NOT EXISTS updated_by_name TEXT', t);
+    IF to_regclass(format('public.%I', t)) IS NOT NULL THEN
+      EXECUTE format('ALTER TABLE public.%I ADD COLUMN IF NOT EXISTS created_by_name TEXT', t);
+      EXECUTE format('ALTER TABLE public.%I ADD COLUMN IF NOT EXISTS updated_by_name TEXT', t);
+    ELSE
+      RAISE NOTICE '% is not installed; skipped audit-name columns', t;
+    END IF;
   END LOOP;
 END $$;
