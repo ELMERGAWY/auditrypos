@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { ChefHat } from 'lucide-react';
@@ -20,18 +20,13 @@ const Login = () => {
   const navigate = useNavigate();
   const [params] = useSearchParams();
   const nextPath = safeNext(params.get('next'));
-  const { signIn, user } = useAuth();
+  const { signIn } = useAuth();
   const { t, i18n } = useTranslation();
   const dir = getLanguageDir(i18n.language);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
 
-  useEffect(() => {
-    if (user) {
-      navigate(nextPath ?? '/dashboard');
-    }
-  }, [user, navigate, nextPath]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -46,6 +41,7 @@ const Login = () => {
       toast.error(error.message);
     } else {
       toast.success(t('loginPage.welcome'));
+      navigate(nextPath ?? '/dashboard', { replace: true });
     }
   };
 
