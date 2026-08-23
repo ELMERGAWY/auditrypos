@@ -114,9 +114,8 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
-DROP FUNCTION IF EXISTS public.recalculate_all_account_balances(UUID) CASCADE;
-DROP FUNCTION IF EXISTS public.recalculate_all_account_balances() CASCADE;
-CREATE OR REPLACE FUNCTION public.recalculate_all_account_balances(p_restaurant_id UUID DEFAULT NULL)
+-- Preserve the legacy VOID-returning function; expose the counted variant separately.
+CREATE OR REPLACE FUNCTION public.recalculate_all_account_balances_count(p_restaurant_id UUID DEFAULT NULL)
 RETURNS INTEGER AS $$
 DECLARE
   v_count INTEGER;

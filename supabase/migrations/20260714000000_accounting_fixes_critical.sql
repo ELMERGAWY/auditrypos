@@ -221,7 +221,7 @@ END;
 $$ LANGUAGE plpgsql;
 
 -- 4.3 Function to recalculate all account balances
-CREATE OR REPLACE FUNCTION public.recalculate_all_account_balances(p_restaurant_id UUID DEFAULT NULL)
+CREATE OR REPLACE FUNCTION public.recalculate_all_account_balances_count(p_restaurant_id UUID DEFAULT NULL)
 RETURNS INTEGER AS $$
 DECLARE
   v_count INTEGER;
