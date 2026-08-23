@@ -11,23 +11,28 @@ BEGIN;
 -- First, check if there's a relationship column between the tables
 -- If not, we'll need to create one based on some criteria
 
--- Add a foreign key column if it doesn't exist
+-- Add relationship columns only when both sides of the optional link exist.
 DO $$
 BEGIN
-  IF NOT EXISTS (
-    SELECT 1 FROM information_schema.columns 
-    WHERE table_name = 'orders' AND column_name = 'sales_order_id'
-  ) THEN
-    ALTER TABLE orders ADD COLUMN sales_order_id UUID REFERENCES sales_orders(id);
-    RAISE NOTICE 'Added sales_order_id column to orders';
-  END IF;
-  
-  IF NOT EXISTS (
-    SELECT 1 FROM information_schema.columns 
-    WHERE table_name = 'sales_orders' AND column_name = 'order_id'
-  ) THEN
-    ALTER TABLE sales_orders ADD COLUMN order_id UUID REFERENCES orders(id);
-    RAISE NOTICE 'Added order_id column to sales_orders';
+  IF to_regclass('public.orders') IS NOT NULL
+     AND to_regclass('public.sales_orders') IS NOT NULL THEN
+    IF NOT EXISTS (
+      SELECT 1 FROM information_schema.columns
+      WHERE table_schema = 'public' AND table_name = 'orders' AND column_name = 'sales_order_id'
+    ) THEN
+      ALTER TABLE public.orders ADD COLUMN sales_order_id UUID REFERENCES public.sales_orders(id);
+      RAISE NOTICE 'Added sales_order_id column to orders';
+    END IF;
+
+    IF NOT EXISTS (
+      SELECT 1 FROM information_schema.columns
+      WHERE table_schema = 'public' AND table_name = 'sales_orders' AND column_name = 'order_id'
+    ) THEN
+      ALTER TABLE public.sales_orders ADD COLUMN order_id UUID REFERENCES public.orders(id);
+      RAISE NOTICE 'Added order_id column to sales_orders';
+    END IF;
+  ELSE
+    RAISE NOTICE 'orders or sales_orders is not installed; skipped optional relationship columns';
   END IF;
 END $$;
 
@@ -81,18 +86,25 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
--- Create triggers
-DROP TRIGGER IF EXISTS trigger_sync_order_to_sales_order ON orders;
-CREATE TRIGGER trigger_sync_order_to_sales_order
-  AFTER UPDATE ON orders
-  FOR EACH ROW
-  EXECUTE FUNCTION sync_order_to_sales_order();
+-- Create triggers only when both tables exist.
+DO $trigger_setup$
+BEGIN
+  IF to_regclass('public.orders') IS NOT NULL
+     AND to_regclass('public.sales_orders') IS NOT NULL THEN
+    EXECUTE 'DROP TRIGGER IF EXISTS trigger_sync_order_to_sales_order ON public.orders';
+    EXECUTE 'CREATE TRIGGER trigger_sync_order_to_sales_order
+      AFTER UPDATE ON public.orders
+      FOR EACH ROW EXECUTE FUNCTION public.sync_order_to_sales_order()';
 
-DROP TRIGGER IF EXISTS trigger_sync_sales_order_to_order ON sales_orders;
-CREATE TRIGGER trigger_sync_sales_order_to_order
-  AFTER UPDATE ON sales_orders
-  FOR EACH ROW
-  EXECUTE FUNCTION sync_sales_order_to_order();
+    EXECUTE 'DROP TRIGGER IF EXISTS trigger_sync_sales_order_to_order ON public.sales_orders';
+    EXECUTE 'CREATE TRIGGER trigger_sync_sales_order_to_order
+      AFTER UPDATE ON public.sales_orders
+      FOR EACH ROW EXECUTE FUNCTION public.sync_sales_order_to_order()';
+  ELSE
+    RAISE NOTICE 'orders or sales_orders is not installed; skipped synchronization triggers';
+  END IF;
+END;
+$trigger_setup$;
 
 COMMIT;
 
