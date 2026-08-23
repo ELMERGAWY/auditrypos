@@ -156,7 +156,8 @@ CREATE TABLE IF NOT EXISTS marketing_project_revenue (
     amount DECIMAL(12, 2) NOT NULL DEFAULT 0,
     currency VARCHAR(10) DEFAULT 'EGP',
     sales_invoice_id UUID REFERENCES sales_invoices(id) ON DELETE SET NULL,
-    sales_order_id UUID REFERENCES sales_orders(id) ON DELETE SET NULL,
+    -- Optional in service schemas; keep the link without requiring sales_orders.
+    sales_order_id UUID,
     milestone_id UUID,
     milestone_name VARCHAR(200),
     milestone_status VARCHAR(50) DEFAULT 'pending' CHECK (milestone_status IN ('pending', 'in_progress', 'completed', 'cancelled')),
