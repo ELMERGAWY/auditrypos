@@ -8,7 +8,15 @@ DROP TRIGGER IF EXISTS trigger_sync_order_paid_amount ON public.orders;
 DROP TRIGGER IF EXISTS trigger_sync_order_paid_amount_insert ON public.orders;
 DROP TRIGGER IF EXISTS trigger_sync_order_paid_with_allocations ON public.orders;
 DROP TRIGGER IF EXISTS trigger_sync_order_to_sales_order ON public.orders;
-DROP TRIGGER IF EXISTS trigger_sync_sales_order_to_order ON public.sales_orders;
+DO $sales_orders_payment_trigger_guard$
+BEGIN
+  IF to_regclass('public.sales_orders') IS NOT NULL THEN
+    EXECUTE 'DROP TRIGGER IF EXISTS trigger_sync_sales_order_to_order ON public.sales_orders';
+  ELSE
+    RAISE NOTICE 'sales_orders is not installed; skipped optional payment trigger removal';
+  END IF;
+END;
+$sales_orders_payment_trigger_guard$;
 
 -- 2. Drop all payment sync triggers on sales_invoices table
 DROP TRIGGER IF EXISTS trigger_sync_invoice_paid_amount ON public.sales_invoices;
