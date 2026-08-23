@@ -120,24 +120,29 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
--- 2.3 Create triggers for supplier_transactions
-DROP TRIGGER IF EXISTS trg_supplier_transaction_insert ON public.supplier_transactions;
-CREATE TRIGGER trg_supplier_transaction_insert
-AFTER INSERT ON public.supplier_transactions
-FOR EACH ROW
-EXECUTE FUNCTION public.update_supplier_balance_from_transaction();
+-- 2.3 Create supplier triggers only when the optional table exists.
+DO $supplier_trigger_guard$
+BEGIN
+  IF to_regclass('public.supplier_transactions') IS NOT NULL THEN
+    EXECUTE 'DROP TRIGGER IF EXISTS trg_supplier_transaction_insert ON public.supplier_transactions';
+    EXECUTE 'CREATE TRIGGER trg_supplier_transaction_insert
+      AFTER INSERT ON public.supplier_transactions
+      FOR EACH ROW EXECUTE FUNCTION public.update_supplier_balance_from_transaction()';
 
-DROP TRIGGER IF EXISTS trg_supplier_transaction_update ON public.supplier_transactions;
-CREATE TRIGGER trg_supplier_transaction_update
-AFTER UPDATE ON public.supplier_transactions
-FOR EACH ROW
-EXECUTE FUNCTION public.update_supplier_balance_from_transaction();
+    EXECUTE 'DROP TRIGGER IF EXISTS trg_supplier_transaction_update ON public.supplier_transactions';
+    EXECUTE 'CREATE TRIGGER trg_supplier_transaction_update
+      AFTER UPDATE ON public.supplier_transactions
+      FOR EACH ROW EXECUTE FUNCTION public.update_supplier_balance_from_transaction()';
 
-DROP TRIGGER IF EXISTS trg_supplier_transaction_delete ON public.supplier_transactions;
-CREATE TRIGGER trg_supplier_transaction_delete
-AFTER DELETE ON public.supplier_transactions
-FOR EACH ROW
-EXECUTE FUNCTION public.update_supplier_balance_from_transaction();
+    EXECUTE 'DROP TRIGGER IF EXISTS trg_supplier_transaction_delete ON public.supplier_transactions';
+    EXECUTE 'CREATE TRIGGER trg_supplier_transaction_delete
+      AFTER DELETE ON public.supplier_transactions
+      FOR EACH ROW EXECUTE FUNCTION public.update_supplier_balance_from_transaction()';
+  ELSE
+    RAISE NOTICE 'supplier_transactions is not installed; skipped supplier balance triggers';
+  END IF;
+END;
+$supplier_trigger_guard$;
 
 -- ============================================================
 -- FIX 3: JOURNAL ENTRY BALANCE VALIDATION
