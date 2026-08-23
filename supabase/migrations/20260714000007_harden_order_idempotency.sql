@@ -54,32 +54,42 @@ WITH ranked AS (
 DELETE FROM public.order_items
 WHERE order_id IN (SELECT id FROM ranked WHERE grp_cnt > 1 AND rn > 1);
 
-WITH ranked AS (
-  SELECT
-    id,
-    restaurant_id,
-    total,
-    paid_amount,
-    receipt_voucher_ids,
-    date_trunc('second', created_at) AS created_sec,
-    right(order_number, 4) AS display_num,
-    ROW_NUMBER() OVER (
-      PARTITION BY restaurant_id, total, date_trunc('second', created_at), right(order_number, 4)
-      ORDER BY
-        CASE
-          WHEN COALESCE(paid_amount, 0) > 0 THEN 0
-          WHEN receipt_voucher_ids IS NOT NULL AND cardinality(receipt_voucher_ids) > 0 THEN 1
-          ELSE 2
-        END,
-        created_at ASC
-    ) AS rn,
-    COUNT(*) OVER (
-      PARTITION BY restaurant_id, total, date_trunc('second', created_at), right(order_number, 4)
-    ) AS grp_cnt
-  FROM public.orders
-)
-DELETE FROM public.order_taxes
-WHERE order_id IN (SELECT id FROM ranked WHERE grp_cnt > 1 AND rn > 1);
+DO $order_taxes_idempotency_guard$
+BEGIN
+  IF to_regclass('public.order_taxes') IS NOT NULL THEN
+    EXECUTE $sql$
+      WITH ranked AS (
+        SELECT
+          id,
+          restaurant_id,
+          total,
+          paid_amount,
+          receipt_voucher_ids,
+          date_trunc('second', created_at) AS created_sec,
+          right(order_number, 4) AS display_num,
+          ROW_NUMBER() OVER (
+            PARTITION BY restaurant_id, total, date_trunc('second', created_at), right(order_number, 4)
+            ORDER BY
+              CASE
+                WHEN COALESCE(paid_amount, 0) > 0 THEN 0
+                WHEN receipt_voucher_ids IS NOT NULL AND cardinality(receipt_voucher_ids) > 0 THEN 1
+                ELSE 2
+              END,
+              created_at ASC
+          ) AS rn,
+          COUNT(*) OVER (
+            PARTITION BY restaurant_id, total, date_trunc('second', created_at), right(order_number, 4)
+          ) AS grp_cnt
+        FROM public.orders
+      )
+      DELETE FROM public.order_taxes
+      WHERE order_id IN (SELECT id FROM ranked WHERE grp_cnt > 1 AND rn > 1)
+    $sql$;
+  ELSE
+    RAISE NOTICE 'order_taxes is not installed; skipped optional idempotency cleanup';
+  END IF;
+END;
+$order_taxes_idempotency_guard$;
 
 WITH ranked AS (
   SELECT
