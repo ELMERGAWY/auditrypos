@@ -112,8 +112,7 @@ UPDATE public.sales_invoices si
 SET workspace_id = COALESCE(
   (SELECT o.workspace_id FROM public.orders o WHERE o.id = si.order_id),
   (SELECT o.workspace_id FROM public.orders o WHERE o.id = si.source_reference_id),
-  (SELECT ws.id FROM public.workspaces ws WHERE ws.restaurant_id = si.restaurant_id AND ws.is_default = true ORDER BY ws.created_at LIMIT 1),
-  (SELECT ws.id FROM public.workspaces ws WHERE ws.company_id = si.company_id AND ws.is_default = true ORDER BY ws.created_at LIMIT 1)
+  (SELECT ws.id FROM public.workspaces ws WHERE ws.restaurant_id = si.restaurant_id AND ws.is_default = true ORDER BY ws.created_at LIMIT 1)
 )
 WHERE si.workspace_id IS NULL;
 
