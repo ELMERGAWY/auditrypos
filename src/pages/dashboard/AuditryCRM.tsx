@@ -241,19 +241,26 @@ export function AuditryCRM({ restaurantId, currency, businessType }: Props) {
 
   const handleSocialReply = async () => {
     if (!selectedMessage) return;
-    if (!replyText.trim()) return toast.error('اكتب الرد أولاً');
-    await handleAddCommunicationLog({
-      type: 'social',
-      summary: `رد على ${selectedMessage.sender_name}: ${replyText.trim().slice(0, 120)}`,
-      details: replyText.trim(),
-      contact_date: new Date().toISOString(),
-    });
-    if (selectedMessage.status === 'unread') {
-      await supabase.from('crm_social_messages').update({ status: 'read' }).eq('id', selectedMessage.id);
-      setSelectedMessage({ ...selectedMessage, status: 'read' });
+    const text = replyText.trim();
+    if (!text) return toast.error('اكتب الرد أولاً');
+    try {
+      const { data, error } = await supabase.functions.invoke('social-publish', {
+        body: { action: 'reply_message', restaurantId, messageId: selectedMessage.id, text },
+      });
+      if (error || !data?.success) throw new Error(error?.message || data?.error || 'تعذر إرسال الرد إلى Meta');
+      await handleAddCommunicationLog({
+        type: 'social',
+        summary: `رد على ${selectedMessage.sender_name}: ${text.slice(0, 120)}`,
+        details: text,
+        contact_date: new Date().toISOString(),
+      });
+      setSelectedMessage({ ...selectedMessage, status: 'replied' });
+      setReplyText('');
+      await loadCRMData();
+      toast.success('تم إرسال الرد وتسجيله في CRM');
+    } catch (error: any) {
+      toast.error(error?.message || 'تعذر إرسال الرد إلى Meta');
     }
-    setReplyText('');
-    toast.success('تم تسجيل الرد (أرسل الرد فعلياً من المنصة المرتبطة)');
   };
 
   const handleAddTask = async () => {

@@ -55,6 +55,56 @@ async function addEvent(admin: SupabaseClient, post: any, actorId: string, actio
   });
 }
 
+async function getSocialMessage(admin: SupabaseClient, messageId: string, restaurantId: string) {
+  const { data, error } = await admin.from('crm_social_messages')
+    .select('id, restaurant_id, platform, sender_external_id, message_content, message_type, external_message_id, external_account_id, created_at, status')
+    .eq('id', messageId)
+    .eq('restaurant_id', restaurantId)
+    .maybeSingle();
+  if (error || !data) throw new Error('Social message not found');
+  return data;
+}
+
+async function graphJsonPost(path: string, token: string, payload: Record<string, unknown>) {
+  const url = new URL(`${GRAPH_BASE}${path}`);
+  url.searchParams.set('access_token', token);
+  const response = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+  const data = await readJson(response);
+  if (!response.ok || data?.error) throw new Error(data?.error?.message || `Meta message failed (${response.status})`);
+  return data;
+}
+
+async function replyToSocialMessage(admin: SupabaseClient, message: any, text: string) {
+  if (message.platform !== 'meta' && message.platform !== 'facebook') throw new Error('Replies are currently supported for Facebook Page messages and comments');
+  if (!message.external_message_id || !message.external_account_id || !message.sender_external_id) throw new Error('The inbound Meta event does not contain a reply target');
+  const { data: account, error } = await admin.from('social_media_accounts')
+    .select('id, platform, account_id, access_token, metadata, is_active')
+    .eq('restaurant_id', message.restaurant_id)
+    .eq('platform', 'facebook')
+    .eq('account_id', message.external_account_id)
+    .eq('is_active', true)
+    .maybeSingle();
+  if (error || !account?.access_token) throw new Error('Active Facebook Page connection not found');
+
+  if (message.message_type === 'message') {
+    const createdAt = message.created_at ? new Date(message.created_at).getTime() : NaN;
+    if (!Number.isFinite(createdAt) || Date.now() - createdAt > 24 * 60 * 60 * 1000) {
+      throw new Error('Messenger replies are allowed only within Meta\'s 24-hour response window');
+    }
+    return graphJsonPost(`/${encodeURIComponent(account.account_id)}/messages`, account.access_token, {
+      recipient: { id: message.sender_external_id },
+      messaging_type: 'RESPONSE',
+      message: { text },
+    });
+  }
+
+  return graphPost(`/${encodeURIComponent(message.external_message_id)}`, account.access_token, { message: text });
+}
+
 async function getPost(admin: SupabaseClient, postId: string) {
   const { data, error } = await admin.from('social_media_posts').select(
     'id, restaurant_id, social_account_id, content, media_urls, post_type, status, scheduled_at, published_at, approval_status, approved_by, approved_at, attempt_count, last_attempt_at, error_message'
@@ -201,6 +251,20 @@ Deno.serve(async (req) => {
     const admin = createClient(supabaseUrl, serviceKey);
     const body = await req.json().catch(() => ({}));
     const action = String(body.action || '');
+    const restaurantId = String(body.restaurantId || '');
+    if (action === 'reply_message') {
+      if (!restaurantId) return json({ error: 'restaurantId is required' }, 400);
+      await assertPermission(admin, restaurantId, user.id, 'marketing.content.publish');
+      const messageId = String(body.messageId || '');
+      const text = String(body.text || '').trim();
+      if (!messageId || !text || text.length > 2000) return json({ error: 'messageId and a reply up to 2000 characters are required' }, 400);
+      const message = await getSocialMessage(admin, messageId, restaurantId);
+      const result = await replyToSocialMessage(admin, message, text);
+      const { error: updateError } = await admin.from('crm_social_messages').update({ status: 'replied', updated_at: new Date().toISOString() }).eq('id', message.id).eq('restaurant_id', restaurantId);
+      if (updateError) throw updateError;
+      return json({ success: true, externalReplyId: result?.id || result?.message_id || null });
+    }
+
     const postId = String(body.postId || '');
     if (!postId) return json({ error: 'postId is required' }, 400);
     const post = await getPost(admin, postId);
