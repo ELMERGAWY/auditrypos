@@ -814,7 +814,7 @@ export function AuditryCRM({ restaurantId, currency, businessType }: Props) {
               <div className="p-3 rounded-xl bg-blue-50 border border-blue-100 space-y-2">
                 <p className="text-[10px] text-blue-700 font-bold flex items-center gap-1"><AlertCircle className="w-3 h-3" /> رابط Webhook الخاص بك:</p>
                 <code className="text-[9px] block bg-white p-2 rounded border break-all">
-                  {`https://lovable-auditry.supabase.co/functions/v1/crm-social-webhooks?platform=${showPlatformSetup}&restaurant_id=${restaurantId}`}
+                  {`${import.meta.env.VITE_SUPABASE_URL || 'https://uwdjijaqawnlcoyaorcr.supabase.co'}/functions/v1/crm-social-webhooks?platform=${showPlatformSetup}&restaurant_id=${restaurantId}`}
                 </code>
                 <p className="text-[9px] text-blue-600 italic">قم بنسخ هذا الرابط ووضعه في إعدادات المطورين بالمنصة (Meta/Google/TikTok).</p>
               </div>

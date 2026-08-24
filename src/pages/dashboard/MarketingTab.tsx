@@ -8,7 +8,7 @@ import { ProjectsManager } from '@/components/marketing/ProjectsManager';
 import { CRMManager } from '@/components/marketing/CRMManager';
 import { RetainersManager } from '@/components/marketing/RetainersManager';
 import { ExpensesManager } from '@/components/marketing/ExpensesManager';
-import { FacebookIntegration } from '@/components/marketing/FacebookIntegration';
+import { SocialMediaManager } from '@/pages/dashboard/SocialMediaManager';
 import { AdAnalyticsDashboard } from '@/components/marketing/AdAnalyticsDashboard';
 import { AgencyEmployeesManager } from '@/components/marketing/AgencyEmployeesManager';
 
@@ -71,7 +71,7 @@ export function MarketingTab({ restaurantId, currency }: Props) {
         </TabsContent>
 
         <TabsContent value="facebook" className="mt-0">
-          <FacebookIntegration restaurantId={restaurantId} currency={currency} />
+          <SocialMediaManager restaurantId={restaurantId} />
         </TabsContent>
 
         <TabsContent value="analytics" className="mt-0">
