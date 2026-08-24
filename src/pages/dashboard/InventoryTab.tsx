@@ -172,7 +172,7 @@ export function InventoryTab({ restaurantId, workspaceId, currency, businessType
 
   const load = async () => {
     // Load Products in the active workspace.
-    let productsQuery = supabase.from('products').select('*').eq('restaurant_id', restaurantId).order('created_at', { ascending: false });
+    let productsQuery = supabase.from('products').select('*').eq('restaurant_id', restaurantId).eq('available', true).order('created_at', { ascending: false });
     if (workspaceId) productsQuery = productsQuery.eq('workspace_id', workspaceId);
     const { data: prodData } = await productsQuery;
 
@@ -399,37 +399,39 @@ export function InventoryTab({ restaurantId, workspaceId, currency, businessType
   };
 
   const handleDelete = async (id: string) => {
-    if (!confirm('حذف هذا المنتج?')) return;
-    
+    if (!confirm('سيتم أرشفة الصنف وإخفاؤه من التشغيل مع الحفاظ على الأرصدة وسجل الحركات. هل تريد المتابعة؟')) return;
+
     try {
-      // First delete related stock_movements
-      let movementDeleteQuery = supabase.from('stock_movements').delete().eq('product_id', id);
-      if (workspaceId) movementDeleteQuery = movementDeleteQuery.eq('workspace_id', workspaceId);
-      const { error: mvErr } = await movementDeleteQuery;
-      if (mvErr) console.warn('Failed to delete stock_movements:', mvErr.message);
-      
-      // Delete warehouse_stock records
-      let stockDeleteQuery = supabase.from('warehouse_stock').delete().eq('product_id', id);
-      if (workspaceId) stockDeleteQuery = stockDeleteQuery.eq('workspace_id', workspaceId);
-      const { error: whErr } = await stockDeleteQuery;
-      if (whErr) console.warn('Failed to delete warehouse_stock:', whErr.message);
-      
-      // Then delete the product
-      let productDeleteQuery = supabase.from('products').delete().eq('id', id);
-      if (workspaceId) productDeleteQuery = productDeleteQuery.eq('workspace_id', workspaceId);
-      const { error } = await productDeleteQuery;
-      if (error) { toast.error(`فشل الحذف: ${error.message}`); return; }
-      
-      toast.success('تم الحذف');
-      load();
+      // Never delete products, stock balances, or movement history from the UI.
+      // Archiving keeps invoices, journals, cost layers, and audit trails intact.
+      let archiveQuery = supabase
+        .from('products')
+        .update({ available: false, updated_at: new Date().toISOString() })
+        .eq('id', id)
+        .eq('restaurant_id', restaurantId)
+        .eq('available', true);
+      if (workspaceId) archiveQuery = archiveQuery.eq('workspace_id', workspaceId);
+      const { data, error } = await archiveQuery.select('id').maybeSingle();
+      if (error) throw error;
+      if (!data) {
+        toast.error('لم يتم العثور على الصنف في الفرع النشط أو تم أرشفته بالفعل');
+        return;
+      }
+
+      toast.success('تمت أرشفة الصنف مع الحفاظ على السجلات');
+      await load();
     } catch (e: any) {
-      toast.error(`فشل الحذف: ${e?.message || 'تحقق من الصلاحيات'}`);
+      toast.error(`فشل الأرشفة: ${e?.message || 'تحقق من الصلاحيات'}`);
     }
   };
 
   const handleMovement = async () => {
     if (!showMovement || !movementQty) return;
     const qty = Number(movementQty);
+    if (!Number.isFinite(qty) || qty <= 0) {
+      toast.error('الكمية يجب أن تكون أكبر من صفر');
+      return;
+    }
     try {
       const warehouseId = activeWarehouse !== 'all' && activeWarehouse !== 'unassigned'
         ? activeWarehouse
@@ -542,7 +544,14 @@ export function InventoryTab({ restaurantId, workspaceId, currency, businessType
 
   const loadReports = async () => {
     setShowReports(true);
-    const { data } = await supabase.from('stock_movements').select('*').eq('restaurant_id', restaurantId).order('created_at', { ascending: false }).limit(500);
+    let movementQuery = supabase
+      .from('stock_movements')
+      .select('*')
+      .eq('restaurant_id', restaurantId)
+      .order('created_at', { ascending: false })
+      .limit(500);
+    if (workspaceId) movementQuery = movementQuery.eq('workspace_id', workspaceId);
+    const { data } = await movementQuery;
     const mvts = (data || []) as StockMovement[];
     const enriched = mvts.map(m => ({
       ...m,
@@ -553,7 +562,15 @@ export function InventoryTab({ restaurantId, workspaceId, currency, businessType
 
   const loadProductHistory = async (p: Product) => {
     setShowProductHistory(p);
-    const { data } = await supabase.from('stock_movements').select('*').eq('product_id', p.id).order('created_at', { ascending: false }).limit(100);
+    let movementQuery = supabase
+      .from('stock_movements')
+      .select('*')
+      .eq('product_id', p.id)
+      .eq('restaurant_id', restaurantId)
+      .order('created_at', { ascending: false })
+      .limit(100);
+    if (workspaceId) movementQuery = movementQuery.eq('workspace_id', workspaceId);
+    const { data } = await movementQuery;
     setProductMovements((data || []) as StockMovement[]);
   };
 
@@ -793,7 +810,7 @@ export function InventoryTab({ restaurantId, workspaceId, currency, businessType
                     <Button size="sm" variant="ghost" className="rounded-lg h-8 w-8 p-0" onClick={() => loadProductJournal(p)} title="القيود المحاسبية"><FileText className="w-4 h-4" /></Button>
                     <Button size="sm" variant="ghost" className="rounded-lg h-8 w-8 p-0 text-destructive hover:bg-destructive/10" onClick={() => setShowDeductionModal(p)} title="خصم مخزون"><ArrowUp className="w-4 h-4" /></Button>
                     <Button size="sm" variant="ghost" className="rounded-lg h-8 w-8 p-0" onClick={() => startEdit(p)}><Edit2 className="w-4 h-4" /></Button>
-                    <Button size="sm" variant="ghost" className="rounded-lg h-8 w-8 p-0 text-destructive hover:bg-destructive/10" onClick={() => handleDelete(p.id)}><Trash2 className="w-4 h-4" /></Button>
+                    <Button size="sm" variant="ghost" className="rounded-lg h-8 w-8 p-0 text-destructive hover:bg-destructive/10" onClick={() => handleDelete(p.id)} title="أرشفة الصنف"><Trash2 className="w-4 h-4" /></Button>
                   </div>
                 </motion.div>
               );
