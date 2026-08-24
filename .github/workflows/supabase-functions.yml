@@ -6,21 +6,33 @@ on:
       - main
     paths:
       - 'supabase/functions/manager-sync/**'
+      - 'supabase/functions/social-oauth/**'
+      - 'supabase/functions/social-ads/**'
+      - 'supabase/functions/social-publish/**'
+      - 'supabase/functions/social-publish-worker/**'
+      - 'supabase/functions/crm-social-webhooks/**'
+      - 'supabase/functions/_shared/**'
       - 'supabase/config.toml'
   workflow_dispatch:
+    inputs:
+      deploy_marketing:
+        description: 'Deploy the active marketing OAuth, publishing, ads, and CRM webhook functions'
+        required: false
+        default: true
+        type: boolean
+
+permissions:
+  contents: read
 
 concurrency:
   group: supabase-production-functions
   cancel-in-progress: false
 
-permissions:
-  contents: read
-
 jobs:
-  deploy-manager-sync:
+  deploy-functions:
     runs-on: ubuntu-latest
     environment: production
-    timeout-minutes: 15
+    timeout-minutes: 20
     env:
       SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
       SUPABASE_PROJECT_ID: ${{ secrets.SUPABASE_PROJECT_ID }}
@@ -50,14 +62,31 @@ jobs:
         with:
           version: latest
 
-      - name: Deploy manager-sync
-        run: supabase functions deploy manager-sync --project-ref "$SUPABASE_PROJECT_ID" --no-verify-jwt
+      - name: Deploy active Edge Functions
+        shell: bash
+        run: |
+          set -euo pipefail
+          functions=(
+            manager-sync
+            social-oauth
+            social-ads
+            social-publish
+            social-publish-worker
+            crm-social-webhooks
+          )
+          for function_name in "${functions[@]}"; do
+            if [[ ! -f "supabase/functions/${function_name}/index.ts" ]]; then
+              echo "Missing function entrypoint: ${function_name}" >&2
+              exit 1
+            fi
+            echo "Deploying ${function_name} to ${SUPABASE_PROJECT_ID}"
+            supabase functions deploy "$function_name" \
+              --project-ref "$SUPABASE_PROJECT_ID" \
+              --no-verify-jwt
+          done
 
       - name: Confirm deployment target
         run: |
-          echo "manager-sync deployment submitted for Supabase project $SUPABASE_PROJECT_ID"
+          echo "Active Edge Functions deployment submitted for Supabase project $SUPABASE_PROJECT_ID"
           echo "Runtime secrets are intentionally managed in Supabase and are never stored in GitHub source files."
-
-      # The function itself requires x-manager-sync-secret and also requires
-      # MANAGER_API_TOKEN and MANAGER_SYNC_WORKER_SECRET in Supabase runtime.
-      # Configure those once in Supabase before enabling live processing.
+          echo "The application functions enforce their own authenticated/secret gates; gateway JWT verification remains disabled for webhook and worker callbacks."
