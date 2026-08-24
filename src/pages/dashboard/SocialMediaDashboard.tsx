@@ -70,6 +70,7 @@ export function SocialMediaDashboard({ restaurantId }: Props) {
   const [loading, setLoading] = useState(true);
   const [showPostModal, setShowPostModal] = useState(false);
   const [selectedAccounts, setSelectedAccounts] = useState<string[]>([]);
+  const [editingPostId, setEditingPostId] = useState<string | null>(null);
   const [postContent, setPostContent] = useState('');
   const [postMedia, setPostMedia] = useState<string[]>([]);
   const [uploadingMedia, setUploadingMedia] = useState(false);
@@ -79,6 +80,42 @@ export function SocialMediaDashboard({ restaurantId }: Props) {
   const [accounts, setAccounts] = useState<any[]>([]);
   const [activeTab, setActiveTab] = useState('posts');
   const oauthService = new OAuthService(supabase);
+
+  const resetPostEditor = () => {
+    setEditingPostId(null);
+    setPostContent('');
+    setPostMedia([]);
+    setSelectedAccounts([]);
+    setPostType('post');
+    setScheduledDate('');
+    setScheduledTime('');
+  };
+
+  const closePostModal = () => {
+    resetPostEditor();
+    setShowPostModal(false);
+  };
+
+  const openPostEditor = (post?: SocialPost) => {
+    if (!post) {
+      resetPostEditor();
+      setShowPostModal(true);
+      return;
+    }
+    if (!['draft', 'rejected'].includes(post.approval_status)) {
+      toast.error('لا يمكن تعديل منشور تم إرساله للمراجعة أو اعتماده');
+      return;
+    }
+    const scheduled = post.scheduled_at ? new Date(post.scheduled_at) : null;
+    setEditingPostId(post.id);
+    setSelectedAccounts([post.social_account_id]);
+    setPostContent(post.content || '');
+    setPostMedia(Array.isArray(post.media_urls) ? post.media_urls : []);
+    setPostType(post.post_type || 'post');
+    setScheduledDate(scheduled && !Number.isNaN(scheduled.getTime()) ? `${scheduled.getFullYear()}-${String(scheduled.getMonth() + 1).padStart(2, '0')}-${String(scheduled.getDate()).padStart(2, '0')}` : '');
+    setScheduledTime(scheduled && !Number.isNaN(scheduled.getTime()) ? `${String(scheduled.getHours()).padStart(2, '0')}:${String(scheduled.getMinutes()).padStart(2, '0')}` : '');
+    setShowPostModal(true);
+  };
 
   useEffect(() => {
     void loadAccounts();
@@ -186,44 +223,58 @@ export function SocialMediaDashboard({ restaurantId }: Props) {
   };
 
   const handleCreatePost = async () => {
-    if (selectedAccounts.length === 0) {
-      return toast.error('اختر حساباً واحداً على الأقل');
-    }
-    if (!postContent.trim()) {
-      return toast.error('أدخل محتوى المنشور');
-    }
+    if (selectedAccounts.length === 0) return toast.error('اختر حساباً واحداً على الأقل');
+    if (!postContent.trim()) return toast.error('أدخل محتوى المنشور');
+    if (editingPostId && selectedAccounts.length !== 1) return toast.error('اختر حساباً واحداً عند تعديل المنشور');
 
     try {
-      const scheduledAt = scheduledDate && scheduledTime 
-        ? new Date(`${scheduledDate}T${scheduledTime}`).toISOString()
-        : null;
+      const scheduledDateTime = scheduledDate && scheduledTime ? new Date(`${scheduledDate}T${scheduledTime}`) : null;
+      if (scheduledDateTime && Number.isNaN(scheduledDateTime.getTime())) return toast.error('تاريخ أو وقت الجدولة غير صالح');
+      if (scheduledDateTime && scheduledDateTime.getTime() <= Date.now()) return toast.error('يجب أن يكون موعد الجدولة في المستقبل');
+      const scheduledAt = scheduledDateTime ? scheduledDateTime.toISOString() : null;
+      const payload = {
+        social_account_id: selectedAccounts[0],
+        content: postContent.trim(),
+        media_urls: postMedia,
+        post_type: postType,
+        scheduled_at: scheduledAt,
+        updated_at: new Date().toISOString(),
+      };
 
-      for (const accountId of selectedAccounts) {
-        const { error } = await supabase.from('social_media_posts').insert({
-          restaurant_id: restaurantId,
-          social_account_id: accountId,
-          content: postContent,
-          media_urls: postMedia,
-          post_type: postType,
+      if (editingPostId) {
+        const existing = posts.find((post) => post.id === editingPostId);
+        if (!existing || !['draft', 'rejected'].includes(existing.approval_status)) {
+          throw new Error('لا يمكن تعديل هذا المنشور في حالته الحالية');
+        }
+        const { error } = await supabase.from('social_media_posts').update({
+          ...payload,
           status: 'draft',
           approval_status: 'draft',
-          scheduled_at: scheduledAt,
-          created_at: new Date().toISOString(),
-        });
-
+          rejected_at: null,
+          rejected_by: null,
+          rejection_reason: null,
+        }).eq('id', editingPostId).eq('restaurant_id', restaurantId);
         if (error) throw error;
+        toast.success('تم حفظ تعديلات المسودة');
+      } else {
+        for (const accountId of selectedAccounts) {
+          const { error } = await supabase.from('social_media_posts').insert({
+            restaurant_id: restaurantId,
+            ...payload,
+            social_account_id: accountId,
+            status: 'draft',
+            approval_status: 'draft',
+            created_at: new Date().toISOString(),
+          });
+          if (error) throw error;
+        }
+        toast.success('تم إنشاء المنشور بنجاح');
       }
 
-      toast.success('تم إنشاء المنشور بنجاح');
-      setShowPostModal(false);
-      setPostContent('');
-      setPostMedia([]);
-      setSelectedAccounts([]);
-      setScheduledDate('');
-      setScheduledTime('');
-      loadPosts();
+      closePostModal();
+      await loadPosts();
     } catch (error: any) {
-      toast.error('فشل إنشاء المنشور: ' + error.message);
+      toast.error((editingPostId ? 'فشل حفظ التعديل: ' : 'فشل إنشاء المنشور: ') + (error?.message || 'خطأ غير معروف'));
     }
   };
 
@@ -254,7 +305,8 @@ export function SocialMediaDashboard({ restaurantId }: Props) {
       const { error } = await supabase
         .from('social_media_posts')
         .delete()
-        .eq('id', postId);
+        .eq('id', postId)
+        .eq('restaurant_id', restaurantId);
 
       if (error) throw error;
       toast.success('تم حذف المنشور');
@@ -303,7 +355,7 @@ export function SocialMediaDashboard({ restaurantId }: Props) {
           <h2 className="text-2xl font-bold">لوحة تحكم وسائل التواصل</h2>
           <p className="text-muted-foreground">إدارة المنشورات والإحصائيات</p>
         </div>
-        <Button onClick={() => setShowPostModal(true)}>
+        <Button onClick={() => openPostEditor()}>
           <Plus className="w-4 h-4 mr-2" />
           إنشاء منشور
         </Button>
@@ -319,10 +371,7 @@ export function SocialMediaDashboard({ restaurantId }: Props) {
                 <span className="text-sm font-medium">المتابعين</span>
               </div>
               <p className="text-2xl font-bold">{formatNumber(data.followers_count)}</p>
-              <div className="flex items-center gap-1 text-xs text-green-600 mt-1">
-                <ArrowUp className="w-3 h-3" />
-                <span>+5.2%</span>
-              </div>
+                      <div className="text-xs text-muted-foreground mt-1">آخر قراءة متاحة</div>
             </Card>
           ))}
           <Card className="p-4">
@@ -435,9 +484,11 @@ export function SocialMediaDashboard({ restaurantId }: Props) {
                         إعادة المحاولة
                       </Button>
                     )}
-                    <Button size="sm" variant="ghost">
-                      <Edit2 className="w-3 h-3" />
-                    </Button>
+                    {['draft', 'rejected'].includes(post.approval_status) && (
+                      <Button size="sm" variant="ghost" onClick={() => openPostEditor(post)}>
+                        <Edit2 className="w-3 h-3" />
+                      </Button>
+                    )}
                     <Button 
                       size="sm" 
                       variant="ghost" 
@@ -486,11 +537,35 @@ export function SocialMediaDashboard({ restaurantId }: Props) {
           )}
         </TabsContent>
 
-        <TabsContent value="analytics">
-          <Card className="p-8 text-center">
-            <BarChart3 className="w-12 h-12 mx-auto mb-4 text-muted-foreground" />
-            <p className="text-muted-foreground">الإحصائيات التفصيلية قريباً</p>
-          </Card>
+        <TabsContent value="analytics" className="space-y-4">
+          {Object.keys(analytics).length === 0 ? (
+            <Card className="p-8 text-center">
+              <BarChart3 className="w-12 h-12 mx-auto mb-4 text-muted-foreground" />
+              <p className="text-muted-foreground">لا توجد بيانات تحليلات متزامنة بعد</p>
+            </Card>
+          ) : (
+            <div className="grid gap-4 md:grid-cols-2">
+              {Object.entries(analytics).map(([accountId, data]) => {
+                const account = accounts.find((candidate) => candidate.id === accountId);
+                return (
+                  <Card key={accountId} className="p-5 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <h3 className="font-semibold">{account?.account_name || 'حساب اجتماعي'}</h3>
+                      <Badge variant="outline">{account?.platform || 'meta'}</Badge>
+                    </div>
+                    <div className="grid grid-cols-2 gap-3 text-sm">
+                      <div><span className="text-muted-foreground">المتابعون</span><p className="font-semibold">{formatNumber(data.followers_count)}</p></div>
+                      <div><span className="text-muted-foreground">معدل التفاعل</span><p className="font-semibold">{data.engagement_rate.toFixed(2)}%</p></div>
+                      <div><span className="text-muted-foreground">الظهور</span><p className="font-semibold">{formatNumber(data.impressions)}</p></div>
+                      <div><span className="text-muted-foreground">الوصول</span><p className="font-semibold">{formatNumber(data.reach)}</p></div>
+                      <div><span className="text-muted-foreground">الإعجابات</span><p className="font-semibold">{formatNumber(data.likes_count)}</p></div>
+                      <div><span className="text-muted-foreground">التعليقات</span><p className="font-semibold">{formatNumber(data.comments_count)}</p></div>
+                    </div>
+                  </Card>
+                );
+              })}
+            </div>
+          )}
         </TabsContent>
 
         <TabsContent value="scheduled" className="space-y-4">
@@ -526,7 +601,7 @@ export function SocialMediaDashboard({ restaurantId }: Props) {
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             className="fixed inset-0 z-50 bg-background/80 backdrop-blur-sm flex items-center justify-center p-4"
-            onClick={() => setShowPostModal(false)}
+            onClick={closePostModal}
           >
             <motion.div
               initial={{ scale: 0.9, y: 20 }}
@@ -536,8 +611,8 @@ export function SocialMediaDashboard({ restaurantId }: Props) {
               onClick={(e) => e.stopPropagation()}
             >
               <div className="flex items-center justify-between mb-6">
-                <h3 className="text-xl font-bold">إنشاء منشور جديد</h3>
-                <Button variant="ghost" size="sm" onClick={() => setShowPostModal(false)}>
+                <h3 className="text-xl font-bold">{editingPostId ? 'تعديل مسودة المنشور' : 'إنشاء منشور جديد'}</h3>
+                <Button variant="ghost" size="sm" onClick={closePostModal}>
                   <X className="w-5 h-5" />
                 </Button>
               </div>
@@ -650,11 +725,13 @@ export function SocialMediaDashboard({ restaurantId }: Props) {
 
                 {/* Actions */}
                 <div className="flex justify-end gap-2 pt-4 border-t">
-                  <Button variant="outline" onClick={() => setShowPostModal(false)}>
+                  <Button variant="outline" onClick={closePostModal}>
                     إلغاء
                   </Button>
                   <Button onClick={handleCreatePost}>
-                    {scheduledDate && scheduledTime ? (
+                    {editingPostId ? (
+                      'حفظ المسودة'
+                    ) : scheduledDate && scheduledTime ? (
                       <>
                         <Clock className="w-4 h-4 mr-2" />
                         جدولة
@@ -662,7 +739,7 @@ export function SocialMediaDashboard({ restaurantId }: Props) {
                     ) : (
                       <>
                         <Send className="w-4 h-4 mr-2" />
-                        نشر
+                        إنشاء مسودة
                       </>
                     )}
                   </Button>

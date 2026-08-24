@@ -1,0 +1,63 @@
+name: Process Social Publishing Queue
+
+on:
+  schedule:
+    - cron: '*/10 * * * *'
+  workflow_dispatch:
+    inputs:
+      limit:
+        description: 'Maximum queued deliveries to process'
+        required: false
+        default: '25'
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: social-publish-production
+  cancel-in-progress: false
+
+jobs:
+  process-publish-queue:
+    runs-on: ubuntu-latest
+    environment: production
+    timeout-minutes: 5
+    env:
+      SUPABASE_PROJECT_ID: ${{ secrets.SUPABASE_PROJECT_ID }}
+      SOCIAL_PUBLISH_WORKER_SECRET: ${{ secrets.SOCIAL_PUBLISH_WORKER_SECRET }}
+      PUBLISH_LIMIT: ${{ inputs.limit || '25' }}
+    steps:
+      - name: Validate production target and publishing secret
+        id: guard
+        shell: bash
+        env:
+          WORKER_SECRET: ${{ secrets.SOCIAL_PUBLISH_WORKER_SECRET }}
+        run: |
+          set -euo pipefail
+          if [[ "${SUPABASE_PROJECT_ID:-}" != "uwdjijaqawnlcoyaorcr" ]]; then
+            echo "Refusing to process publishing queue: unexpected production project ref" >&2
+            exit 1
+          fi
+          if [[ -z "${WORKER_SECRET:-}" ]]; then
+            echo "SOCIAL_PUBLISH_WORKER_SECRET is not configured; publishing queue skipped safely."
+            echo "enabled=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          if ! [[ "${PUBLISH_LIMIT:-}" =~ ^[0-9]+$ ]] || (( PUBLISH_LIMIT < 1 || PUBLISH_LIMIT > 100 )); then
+            echo "PUBLISH_LIMIT must be an integer from 1 to 100" >&2
+            exit 1
+          fi
+          echo "enabled=true" >> "$GITHUB_OUTPUT"
+
+      - name: Process publishing queue
+        if: steps.guard.outputs.enabled == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          response=$(curl --fail-with-body --silent --show-error --max-time 120 \
+            -X POST "https://uwdjijaqawnlcoyaorcr.supabase.co/functions/v1/social-publish-worker" \
+            -H "x-social-worker-secret: ${SOCIAL_PUBLISH_WORKER_SECRET}" \
+            -H 'content-type: application/json' \
+            --data "{\"batchSize\":${PUBLISH_LIMIT}}")
+          echo "$response"
