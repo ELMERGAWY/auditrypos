@@ -189,6 +189,27 @@ async function assertRestaurantAccess(admin: SupabaseClient, restaurantId: strin
   return restaurant;
 }
 
+async function assertMetaMarketingPermission(admin: SupabaseClient, restaurantId: string, userId: string) {
+  const restaurant = await assertRestaurantAccess(admin, restaurantId, userId);
+  if (restaurant.owner_id === userId) return restaurant;
+
+  const permissions = [
+    'marketing.content.create',
+    'marketing.content.publish',
+    'marketing.ads.read',
+    'marketing.ads.manage',
+  ];
+  for (const permission of permissions) {
+    const { data, error } = await admin.rpc('check_user_permission', {
+      p_user_id: userId,
+      p_company_id: restaurant.company_id,
+      p_permission_code: permission,
+    });
+    if (!error && data === true) return restaurant;
+  }
+  throw new Error('Insufficient marketing permission');
+}
+
 async function loadConfig(admin: SupabaseClient, platform: string, restaurantId: string): Promise<OAuthConfigRow> {
   const { data, error } = await admin
     .from('social_media_oauth_config')
@@ -409,6 +430,7 @@ Deno.serve(async (req) => {
       const platform = state.platform;
       const meta = PLATFORMS[platform];
       if (!meta) return json({ error: 'Unsupported platform' }, 400);
+      if (meta.isMeta) await assertMetaMarketingPermission(admin, state.restaurant_id, user.id);
       const config = await loadConfig(admin, platform, state.restaurant_id);
       const tokenParams: Record<string, string> = {
         client_id: config.client_id,
@@ -457,6 +479,7 @@ Deno.serve(async (req) => {
       const meta = PLATFORMS[requestedPlatform];
       if (!meta) return json({ error: 'Unsupported platform' }, 400);
       if (!validRedirectUri(redirectUri)) return json({ error: 'Invalid redirect URI' }, 400);
+      if (meta.isMeta) await assertMetaMarketingPermission(admin, requestedRestaurantId, user.id);
       const config = await loadConfig(admin, requestedPlatform, requestedRestaurantId);
       const rawState = randomState();
       const stateHash = await sha256(rawState);
@@ -483,11 +506,11 @@ Deno.serve(async (req) => {
     }
 
     if (action === 'list_assets') {
+      await assertMetaMarketingPermission(admin, requestedRestaurantId, user.id);
       const { data, error } = await admin
         .from('social_media_assets')
         .select('id, platform, external_id, asset_type, asset_name, asset_handle, parent_external_id, scopes, status, metadata, token_expires_at, created_at')
         .eq('restaurant_id', requestedRestaurantId)
-        .eq('created_by', user.id)
         .eq('status', 'pending')
         .order('created_at', { ascending: false });
       if (error) throw new Error('Could not load discovered assets');
@@ -495,6 +518,7 @@ Deno.serve(async (req) => {
     }
 
     if (action === 'connect_asset') {
+      await assertMetaMarketingPermission(admin, requestedRestaurantId, user.id);
       const account = await connectAsset(admin, String(body.assetId || ''), requestedRestaurantId, user.id);
       return json({ success: true, account });
     }
