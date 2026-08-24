@@ -62,6 +62,29 @@ jobs:
         with:
           version: latest
 
+      - name: Sync Meta and publishing runtime secrets
+        shell: bash
+        env:
+          META_WEBHOOK_VERIFY_TOKEN: ${{ secrets.META_WEBHOOK_VERIFY_TOKEN }}
+          SOCIAL_PUBLISH_WORKER_SECRET: ${{ secrets.SOCIAL_PUBLISH_WORKER_SECRET }}
+          OAUTH_ALLOWED_REDIRECT_ORIGINS: ${{ secrets.OAUTH_ALLOWED_REDIRECT_ORIGINS }}
+        run: |
+          set -euo pipefail
+          for name in META_WEBHOOK_VERIFY_TOKEN SOCIAL_PUBLISH_WORKER_SECRET OAUTH_ALLOWED_REDIRECT_ORIGINS; do
+            if [[ -z "${!name:-}" ]]; then
+              echo "Missing required GitHub production secret: $name" >&2
+              exit 1
+            fi
+          done
+          secret_file=$(mktemp)
+          trap 'rm -f "$secret_file"' EXIT
+          umask 077
+          printf 'META_WEBHOOK_VERIFY_TOKEN=%s\nSOCIAL_PUBLISH_WORKER_SECRET=%s\nOAUTH_ALLOWED_REDIRECT_ORIGINS=%s\n' \
+            "$META_WEBHOOK_VERIFY_TOKEN" \
+            "$SOCIAL_PUBLISH_WORKER_SECRET" \
+            "$OAUTH_ALLOWED_REDIRECT_ORIGINS" > "$secret_file"
+          supabase secrets set --project-ref "$SUPABASE_PROJECT_ID" --env-file "$secret_file"
+
       - name: Deploy active Edge Functions
         shell: bash
         run: |
@@ -87,6 +110,6 @@ jobs:
 
       - name: Confirm deployment target
         run: |
-          echo "Active Edge Functions deployment submitted for Supabase project $SUPABASE_PROJECT_ID"
-          echo "Runtime secrets are intentionally managed in Supabase and are never stored in GitHub source files."
+          echo "Active Edge Functions deployment and runtime secret sync completed for Supabase project $SUPABASE_PROJECT_ID"
+          echo "Runtime secret values are supplied through GitHub Environment Secrets and are never stored in source files or logs."
           echo "The application functions enforce their own authenticated/secret gates; gateway JWT verification remains disabled for webhook and worker callbacks."
