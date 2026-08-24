@@ -37,6 +37,64 @@ function firstField(fieldData: any[], names: string[]): string {
   return String(field?.values?.[0] ?? field?.string_value ?? '').trim();
 }
 
+function metaPageIdFromPayload(body: any): string | null {
+  const entry = Array.isArray(body?.entry) ? body.entry.find((candidate: any) => candidate?.id) : null;
+  return entry?.id ? String(entry.id) : null;
+}
+
+async function resolveRestaurantId(admin: SupabaseClient, requestedRestaurantId: string | null, pageId: string | null): Promise<string | null> {
+  if (!pageId) return requestedRestaurantId;
+
+  const { data, error } = await admin.from('social_media_accounts')
+    .select('restaurant_id')
+    .eq('platform', 'facebook')
+    .eq('account_id', pageId)
+    .eq('is_active', true)
+    .limit(2);
+  if (error) throw new Error('Could not resolve Meta Page tenant');
+  const restaurantIds = Array.from(new Set((data || []).map((row: any) => String(row.restaurant_id)).filter(Boolean)));
+  if (restaurantIds.length > 1) throw new Error('Meta Page is connected to more than one restaurant');
+  const resolvedRestaurantId = restaurantIds[0] || null;
+  if (requestedRestaurantId && resolvedRestaurantId && requestedRestaurantId !== resolvedRestaurantId) {
+    throw new Error('Meta Page does not belong to the requested restaurant');
+  }
+  return requestedRestaurantId || resolvedRestaurantId;
+}
+
+async function loadPlatformConfig(admin: SupabaseClient, restaurantId: string | null, platform: string) {
+  if (restaurantId) {
+    const { data } = await admin.from('crm_platform_configs')
+      .select('api_secret, webhook_verify_token, is_active')
+      .eq('restaurant_id', restaurantId)
+      .eq('platform', platform)
+      .maybeSingle();
+    if (data) return data;
+  }
+  const { data } = await admin.from('crm_platform_configs')
+    .select('api_secret, webhook_verify_token, is_active')
+    .is('restaurant_id', null)
+    .eq('platform', platform)
+    .maybeSingle();
+  return data;
+}
+
+async function loadOauthSecret(admin: SupabaseClient, restaurantId: string | null): Promise<string | null> {
+  if (restaurantId) {
+    const { data } = await admin.from('social_media_oauth_config')
+      .select('client_secret')
+      .eq('platform', 'facebook')
+      .eq('restaurant_id', restaurantId)
+      .maybeSingle();
+    if (data?.client_secret) return data.client_secret;
+  }
+  const { data } = await admin.from('social_media_oauth_config')
+    .select('client_secret')
+    .eq('platform', 'facebook')
+    .is('restaurant_id', null)
+    .maybeSingle();
+  return data?.client_secret || null;
+}
+
 async function getMetaPageToken(admin: SupabaseClient, restaurantId: string, pageId: string): Promise<string | null> {
   const { data } = await admin.from('social_media_accounts')
     .select('access_token, metadata')
@@ -224,23 +282,26 @@ Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response(null, { headers: corsHeaders });
   const url = new URL(req.url);
   const platform = url.searchParams.get('platform') || 'meta';
-  const restaurantId = url.searchParams.get('restaurant_id');
+  const requestedRestaurantId = url.searchParams.get('restaurant_id');
   const supabaseUrl = Deno.env.get('SUPABASE_URL');
   const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
   if (!supabaseUrl || !serviceKey) return jsonResponse({ error: 'Server not configured' }, 500);
-  if (!restaurantId) return jsonResponse({ error: 'restaurant_id is required' }, 400);
   const admin = createClient(supabaseUrl, serviceKey);
 
-  const { data: platformConfig } = await admin.from('crm_platform_configs')
-    .select('api_secret, webhook_verify_token, is_active')
-    .eq('restaurant_id', restaurantId)
-    .eq('platform', platform)
-    .maybeSingle();
-  const { data: oauthConfig } = platform === 'meta'
-    ? await admin.from('social_media_oauth_config').select('client_secret').eq('platform', 'facebook').or(`restaurant_id.eq.${restaurantId},restaurant_id.is.null`).limit(1).maybeSingle()
-    : { data: null };
+  let body: any = null;
+  let rawBody = '';
+  if (req.method === 'POST') {
+    rawBody = await req.text();
+    try { body = JSON.parse(rawBody); } catch { return jsonResponse({ error: 'Invalid JSON payload' }, 400); }
+  }
+  const pageId = platform === 'meta' ? metaPageIdFromPayload(body) : null;
+  const restaurantId = await resolveRestaurantId(admin, requestedRestaurantId, pageId);
+  if (!restaurantId && req.method === 'POST') return jsonResponse({ error: 'restaurant_id is required until the Meta Page is connected' }, 400);
+
+  const platformConfig = await loadPlatformConfig(admin, restaurantId, platform);
+  const oauthSecret = platform === 'meta' ? await loadOauthSecret(admin, restaurantId) : null;
   const config = {
-    api_secret: platformConfig?.api_secret || oauthConfig?.client_secret || null,
+    api_secret: platformConfig?.api_secret || oauthSecret || null,
     webhook_verify_token: platformConfig?.webhook_verify_token || Deno.env.get('META_WEBHOOK_VERIFY_TOKEN') || null,
     is_active: platformConfig?.is_active ?? true,
   };
@@ -259,7 +320,6 @@ Deno.serve(async (req) => {
   }
   if (req.method !== 'POST') return jsonResponse({ error: 'Method not allowed' }, 405);
 
-  const rawBody = await req.text();
   if (platform === 'meta') {
     const signature = req.headers.get('x-hub-signature-256') || '';
     if (!config.api_secret || !signature.startsWith('sha256=')) return jsonResponse({ error: 'Invalid signature' }, 401);
@@ -271,7 +331,6 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const body = JSON.parse(rawBody);
     if (platform === 'meta' && body.object === 'page') {
       for (const [index, entry] of (body.entry || []).entries()) {
         await processMetaEntry(admin, restaurantId, entry, index);
