@@ -190,7 +190,7 @@ export function AdAnalyticsDashboard({ restaurantId, currency }: Props) {
     return matchesPlatform && matchesCampaign;
   });
 
-  const campaigns = Array.from(new Set(filteredData.map(d => d.campaign_id).filter(Boolean)));
+  const campaignIds = Array.from(new Set(filteredData.map(d => d.campaign_id).filter(Boolean)));
 
   const stats = {
     totalSpend: filteredData.reduce((sum, d) => sum + d.spend, 0),
@@ -318,7 +318,7 @@ export function AdAnalyticsDashboard({ restaurantId, currency }: Props) {
               </SelectContent>
             </Select>
           </div>
-          {campaigns.length > 0 && (
+          {campaignIds.length > 0 && (
             <div className="flex-1">
               <Label>الحملة</Label>
               <Select value={selectedCampaign} onValueChange={setSelectedCampaign}>
@@ -327,8 +327,8 @@ export function AdAnalyticsDashboard({ restaurantId, currency }: Props) {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">جميع الحملات</SelectItem>
-                  {campaigns.map(campaign => (
-                    <SelectItem key={campaign} value={campaign}>{campaign}</SelectItem>
+                  {campaignIds.map(campaignId => (
+                    <SelectItem key={campaignId} value={campaignId}>{campaignId}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
