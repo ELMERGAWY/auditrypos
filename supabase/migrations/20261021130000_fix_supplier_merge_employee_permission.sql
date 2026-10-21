@@ -57,7 +57,7 @@ BEGIN
   END IF;
 
   IF NOT (
-    v_role IN ('admin', 'super_admin')
+    COALESCE(v_role IN ('admin', 'super_admin'), false)
     OR COALESCE(v_can_merge, false)
   ) THEN
     RAISE EXCEPTION 'SUPPLIER_MERGE_NOT_ALLOWED';
